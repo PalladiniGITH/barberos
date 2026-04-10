@@ -1,0 +1,582 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// TENANT
+// ─────────────────────────────────────────────
+
+model Barbershop {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logo      String?
+  address   String?
+  phone     String?
+  email     String?
+  timezone  String   @default("America/Sao_Paulo")
+  active    Boolean  @default(true)
+  onboardingStep        Int       @default(0)
+  onboardingCompletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users             User[]
+  professionals     Professional[]
+  customers         Customer[]
+  appointments      Appointment[]
+  services          Service[]
+  revenues          Revenue[]
+  expenses          Expense[]
+  categories        FinancialCategory[]
+  monthlyGoals      MonthlyGoal[]
+  challenges        Challenge[]
+  supplies          Supply[]
+  pricingRules      PricingRule[]
+  campaignMetrics   CampaignMetric[]
+  commissions       Commission[]
+  messagingEvents   MessagingEvent[]
+
+  @@map("barbershops")
+}
+
+// ─────────────────────────────────────────────
+// AUTH
+// ─────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  role          UserRole  @default(BARBER)
+  barbershopId  String
+  barbershop    Barbershop @relation(fields: [barbershopId], references: [id])
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  OWNER
+  MANAGER
+  BARBER
+  FINANCIAL
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─────────────────────────────────────────────
+// EQUIPE
+// ─────────────────────────────────────────────
+
+model Professional {
+  id           String     @id @default(cuid())
+  name         String
+  email        String?
+  phone        String?
+  avatar       String?
+  active       Boolean    @default(true)
+  barbershopId String
+  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  revenues          Revenue[]
+  appointments      Appointment[]
+  professionalGoals ProfessionalGoal[]
+  challengeResults  ChallengeResult[]
+  commissions       Commission[]
+
+  @@unique([email, barbershopId])
+  @@index([barbershopId, active])
+  @@map("professionals")
+}
+
+// ─────────────────────────────────────────────
+// FINANCEIRO
+// ─────────────────────────────────────────────
+
+model FinancialCategory {
+  id           String       @id @default(cuid())
+  name         String
+  type         CategoryType
+  color        String?      @default("#6366f1")
+  barbershopId String
+  barbershop   Barbershop   @relation(fields: [barbershopId], references: [id])
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  revenues Revenue[]
+  expenses Expense[]
+
+  @@index([barbershopId, type])
+  @@map("financial_categories")
+}
+
+enum CategoryType {
+  REVENUE
+  EXPENSE_FIXED
+  EXPENSE_VARIABLE
+}
+
+model Revenue {
+  id             String             @id @default(cuid())
+  barbershopId   String
+  barbershop     Barbershop         @relation(fields: [barbershopId], references: [id])
+  customerId     String?
+  customer       Customer?          @relation(fields: [customerId], references: [id])
+  professionalId String?
+  professional   Professional?      @relation(fields: [professionalId], references: [id])
+  serviceId      String?
+  service        Service?           @relation(fields: [serviceId], references: [id])
+  categoryId     String?
+  category       FinancialCategory? @relation(fields: [categoryId], references: [id])
+  amount         Decimal            @db.Decimal(10, 2)
+  origin         RevenueOrigin      @default(SERVICE)
+  paymentMethod  PaymentMethod
+  date           DateTime
+  description    String?
+  notes          String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([barbershopId, date])
+  @@index([barbershopId, professionalId])
+  @@index([barbershopId, customerId, date])
+  @@map("revenues")
+}
+
+enum PaymentMethod {
+  CASH
+  PIX
+  CREDIT_CARD
+  DEBIT_CARD
+  TRANSFER
+  OTHER
+}
+
+enum RevenueOrigin {
+  SERVICE
+  SUBSCRIPTION
+  PRODUCT
+  OTHER
+}
+
+model Expense {
+  id           String             @id @default(cuid())
+  barbershopId String
+  barbershop   Barbershop         @relation(fields: [barbershopId], references: [id])
+  categoryId   String?
+  category     FinancialCategory? @relation(fields: [categoryId], references: [id])
+  amount       Decimal            @db.Decimal(10, 2)
+  type         ExpenseType
+  recurrent    Boolean            @default(false)
+  dueDate      DateTime?
+  paidAt       DateTime?
+  paid         Boolean            @default(false)
+  description  String
+  notes        String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([barbershopId, dueDate])
+  @@map("expenses")
+}
+
+enum ExpenseType {
+  FIXED
+  VARIABLE
+}
+
+// ─────────────────────────────────────────────
+// SERVIÇOS E PRECIFICAÇÃO
+// ─────────────────────────────────────────────
+
+model Service {
+  id           String     @id @default(cuid())
+  name         String
+  description  String?
+  price        Decimal    @db.Decimal(10, 2)
+  duration     Int        // minutos
+  active       Boolean    @default(true)
+  barbershopId String
+  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  revenues      Revenue[]
+  appointments  Appointment[]
+  serviceInputs ServiceInput[]
+  pricingRule   PricingRule?
+
+  @@map("services")
+}
+
+// ─────────────────────────────────────────────
+// AGENDA
+// ─────────────────────────────────────────────
+
+model Customer {
+  id           String     @id @default(cuid())
+  name         String
+  phone        String?
+  email        String?
+  notes        String?
+  type         CustomerType       @default(WALK_IN)
+  subscriptionStatus SubscriptionStatus?
+  subscriptionPrice  Decimal?     @db.Decimal(10, 2)
+  subscriptionStartedAt DateTime?
+  active       Boolean    @default(true)
+  barbershopId String
+  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  appointments Appointment[]
+  revenues     Revenue[]
+  messagingEvents MessagingEvent[]
+
+  @@index([barbershopId, name])
+  @@index([barbershopId, phone])
+  @@index([barbershopId, email])
+  @@map("customers")
+}
+
+enum CustomerType {
+  SUBSCRIPTION
+  WALK_IN
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+}
+
+model Appointment {
+  id              String            @id @default(cuid())
+  barbershopId    String
+  barbershop      Barbershop        @relation(fields: [barbershopId], references: [id])
+  customerId      String
+  customer        Customer          @relation(fields: [customerId], references: [id])
+  professionalId  String
+  professional    Professional      @relation(fields: [professionalId], references: [id])
+  serviceId       String
+  service         Service           @relation(fields: [serviceId], references: [id])
+  status          AppointmentStatus @default(PENDING)
+  source          AppointmentSource @default(MANUAL)
+  billingModel    AppointmentBillingModel @default(AVULSO)
+  startAt         DateTime
+  endAt           DateTime
+  durationMinutes Int
+  priceSnapshot   Decimal           @db.Decimal(10, 2)
+  notes           String?
+  sourceReference String?
+  confirmedAt     DateTime?
+  cancelledAt     DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([barbershopId, startAt])
+  @@index([barbershopId, professionalId, startAt])
+  @@index([barbershopId, customerId, startAt])
+  @@map("appointments")
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum AppointmentSource {
+  MANUAL
+  WHATSAPP
+}
+
+enum AppointmentBillingModel {
+  AVULSO
+  SUBSCRIPTION_INCLUDED
+  SUBSCRIPTION_EXTRA
+}
+
+model MessagingEvent {
+  id                String               @id @default(cuid())
+  barbershopId      String
+  barbershop        Barbershop           @relation(fields: [barbershopId], references: [id])
+  customerId        String?
+  customer          Customer?            @relation(fields: [customerId], references: [id])
+  provider          MessagingProvider
+  direction         MessagingDirection
+  status            MessagingEventStatus @default(PENDING)
+  eventType         String
+  instanceName      String
+  dedupeKey         String               @unique
+  providerMessageId String?
+  remoteJid         String?
+  remotePhone       String?
+  contactName       String?
+  bodyText          String?
+  responseText      String?
+  lastError         String?
+  payload           Json
+  processedAt       DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@index([barbershopId, createdAt])
+  @@index([barbershopId, customerId, createdAt])
+  @@index([barbershopId, provider, eventType, createdAt])
+  @@map("messaging_events")
+}
+
+enum MessagingProvider {
+  EVOLUTION
+}
+
+enum MessagingDirection {
+  INBOUND
+  OUTBOUND
+  SYSTEM
+}
+
+enum MessagingEventStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+  IGNORED
+}
+
+model Supply {
+  id           String     @id @default(cuid())
+  name         String
+  unit         String     // ml, g, un, L
+  unitCost     Decimal    @db.Decimal(10, 4)
+  barbershopId String
+  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  serviceInputs ServiceInput[]
+
+  @@map("supplies")
+}
+
+model ServiceInput {
+  id        String   @id @default(cuid())
+  serviceId String
+  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  supplyId  String
+  supply    Supply   @relation(fields: [supplyId], references: [id])
+  quantity  Decimal  @db.Decimal(10, 4)
+
+  @@unique([serviceId, supplyId])
+  @@map("service_inputs")
+}
+
+model PricingRule {
+  id                String     @id @default(cuid())
+  serviceId         String     @unique
+  service           Service    @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  barbershopId      String
+  barbershop        Barbershop @relation(fields: [barbershopId], references: [id])
+  cardFeePercent    Decimal    @db.Decimal(5, 2) @default(3.0)
+  taxPercent        Decimal    @db.Decimal(5, 2) @default(0)
+  commissionPercent Decimal    @db.Decimal(5, 2) @default(40)
+  directCost        Decimal    @db.Decimal(10, 2) @default(0)
+  suggestedPrice    Decimal?   @db.Decimal(10, 2)
+  updatedAt         DateTime   @updatedAt
+
+  @@map("pricing_rules")
+}
+
+// ─────────────────────────────────────────────
+// METAS
+// ─────────────────────────────────────────────
+
+model MonthlyGoal {
+  id           String     @id @default(cuid())
+  barbershopId String
+  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
+  month        Int        // 1-12
+  year         Int
+  revenueGoal  Decimal    @db.Decimal(10, 2)
+  revenueMin   Decimal    @db.Decimal(10, 2)
+  expenseLimit Decimal?   @db.Decimal(10, 2)
+  notes        String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  professionalGoals ProfessionalGoal[]
+
+  @@unique([barbershopId, month, year])
+  @@map("monthly_goals")
+}
+
+model ProfessionalGoal {
+  id             String       @id @default(cuid())
+  monthlyGoalId  String
+  monthlyGoal    MonthlyGoal  @relation(fields: [monthlyGoalId], references: [id], onDelete: Cascade)
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id])
+  barbershopId   String
+  revenueGoal    Decimal      @db.Decimal(10, 2)
+  revenueMin     Decimal      @db.Decimal(10, 2)
+  month          Int
+  year           Int
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([professionalId, month, year])
+  @@map("professional_goals")
+}
+
+// ─────────────────────────────────────────────
+// DESAFIOS
+// ─────────────────────────────────────────────
+
+model Challenge {
+  id           String        @id @default(cuid())
+  barbershopId String
+  barbershop   Barbershop    @relation(fields: [barbershopId], references: [id])
+  title        String
+  description  String?
+  startDate    DateTime
+  endDate      DateTime
+  type         ChallengeType
+  targetValue  Decimal       @db.Decimal(10, 2)
+  reward       String?
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  results ChallengeResult[]
+
+  @@map("challenges")
+}
+
+enum ChallengeType {
+  REVENUE
+  SERVICES_COUNT
+  TICKET_AVERAGE
+  NEW_CLIENTS
+}
+
+model ChallengeResult {
+  id             String       @id @default(cuid())
+  challengeId    String
+  challenge      Challenge    @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id])
+  achievedValue  Decimal      @db.Decimal(10, 2) @default(0)
+  completed      Boolean      @default(false)
+  rewardGiven    Boolean      @default(false)
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([challengeId, professionalId])
+  @@map("challenge_results")
+}
+
+// ─────────────────────────────────────────────
+// COMISSÕES
+// ─────────────────────────────────────────────
+
+model Commission {
+  id               String       @id @default(cuid())
+  professionalId   String
+  professional     Professional @relation(fields: [professionalId], references: [id])
+  barbershopId     String
+  barbershop       Barbershop   @relation(fields: [barbershopId], references: [id])
+  month            Int
+  year             Int
+  grossRevenue     Decimal      @db.Decimal(10, 2)
+  commissionRate   Decimal      @db.Decimal(5, 2)
+  commissionAmount Decimal      @db.Decimal(10, 2)
+  bonus            Decimal      @db.Decimal(10, 2) @default(0)
+  paid             Boolean      @default(false)
+  paidAt           DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@unique([professionalId, month, year])
+  @@index([barbershopId, month, year])
+  @@map("commissions")
+}
+
+// ─────────────────────────────────────────────
+// CRM (preparado para v2)
+// ─────────────────────────────────────────────
+
+model CampaignMetric {
+  id                 String     @id @default(cuid())
+  barbershopId       String
+  barbershop         Barbershop @relation(fields: [barbershopId], references: [id])
+  month              Int
+  year               Int
+  campaignName       String?
+  messagesSent       Int        @default(0)
+  messagesAnswered   Int        @default(0)
+  appointmentsBooked Int        @default(0)
+  newClients         Int        @default(0)
+  recoveredClients   Int        @default(0)
+  notes              String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  @@map("campaign_metrics")
+}
