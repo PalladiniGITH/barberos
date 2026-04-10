@@ -44,18 +44,36 @@ export async function POST(request: Request) {
     ignoreReason: normalized.ignoreReason,
   })
 
+  if (result.code === 409) {
+    console.warn('[evolution-webhook] returning 409', {
+      instanceNameReceived: 'diagnostics' in result ? result.diagnostics?.instanceNameReceived ?? normalized.instanceName : normalized.instanceName,
+      configuredInstance: 'diagnostics' in result ? result.diagnostics?.configuredInstance ?? null : null,
+      explicitBarbershopSlug: 'diagnostics' in result ? result.diagnostics?.explicitBarbershopSlug ?? null : null,
+      foundBarbershopSlug: 'diagnostics' in result ? result.diagnostics?.foundBarbershopSlug ?? null : null,
+      foundBarbershopName: 'diagnostics' in result ? result.diagnostics?.foundBarbershopName ?? null : null,
+      matchedBy: 'diagnostics' in result ? result.diagnostics?.matchedBy ?? null : null,
+      finalReason: 'diagnostics' in result ? result.diagnostics?.finalReason ?? result.reason : result.reason,
+    })
+  }
+
   return NextResponse.json(
-    {
-      ok: result.ok,
-      reason: result.reason,
-      eventId: result.eventId,
-      phone,
-      message,
-      customerId: 'customerId' in result ? result.customerId : undefined,
-      customerCreated: 'customerCreated' in result ? result.customerCreated : undefined,
-      replySent: result.replySent,
-      error: 'error' in result ? result.error : undefined,
-    },
+    result.code === 409
+      ? {
+          ok: false,
+          error: 'Tenant nao configurado para esta instancia.',
+          replySent: false,
+        }
+      : {
+          ok: result.ok,
+          reason: result.reason,
+          eventId: result.eventId,
+          phone,
+          message,
+          customerId: 'customerId' in result ? result.customerId : undefined,
+          customerCreated: 'customerCreated' in result ? result.customerCreated : undefined,
+          replySent: result.replySent,
+          error: 'error' in result ? result.error : undefined,
+        },
     { status: result.code }
   )
 }

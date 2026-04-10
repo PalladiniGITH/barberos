@@ -19,6 +19,31 @@ export interface IncomingWhatsAppMessage {
   ignoreReason?: string | null
 }
 
+interface TenantCandidate {
+  id: string
+  name: string
+  slug: string
+}
+
+interface TenantResolutionResult {
+  barbershop: TenantCandidate | null
+  instanceNameReceived: string | null
+  configuredInstance: string
+  explicitBarbershopSlug: string | null
+  matchedBy: 'explicit_slug' | 'slug_exact' | 'slug_normalized' | 'name_normalized' | 'slug_in_instance' | 'single_tenant_fallback' | null
+  reason: string
+}
+
+interface TenantResolutionLogContext {
+  instanceNameReceived: string | null
+  configuredInstance: string
+  explicitBarbershopSlug: string | null
+  foundBarbershopSlug: string | null
+  foundBarbershopName: string | null
+  matchedBy: TenantResolutionResult['matchedBy']
+  finalReason: string
+}
+
 function normalizePhoneDigits(value?: string | null) {
   if (!value) {
     return null
@@ -58,22 +83,168 @@ function buildAutoReply(input: {
   return `${greeting} Recebi sua mensagem na ${input.barbershopName}. Ja registrei seu contato por aqui e vamos seguir com seu agendamento pelo WhatsApp em seguida.`
 }
 
-async function resolveTenantBarbershop(instanceName: string | null) {
-  const configuredInstance = getEvolutionInstanceName()
-  const resolvedInstance = instanceName ?? configuredInstance
-
-  if (resolvedInstance !== configuredInstance) {
+function normalizeTenantKey(value?: string | null) {
+  if (!value) {
     return null
   }
 
-  return prisma.barbershop.findUnique({
-    where: { slug: configuredInstance },
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+function buildTenantLogContext(result: TenantResolutionResult): TenantResolutionLogContext {
+  return {
+    instanceNameReceived: result.instanceNameReceived,
+    configuredInstance: result.configuredInstance,
+    explicitBarbershopSlug: result.explicitBarbershopSlug,
+    foundBarbershopSlug: result.barbershop?.slug ?? null,
+    foundBarbershopName: result.barbershop?.name ?? null,
+    matchedBy: result.matchedBy,
+    finalReason: result.reason,
+  }
+}
+
+async function resolveTenantBarbershop(instanceName: string | null): Promise<TenantResolutionResult> {
+  const configuredInstance = getEvolutionInstanceName()
+  const explicitBarbershopSlug = process.env.EVOLUTION_BARBERSHOP_SLUG?.trim() || null
+  const resolvedInstance = instanceName ?? configuredInstance
+  const normalizedConfiguredInstance = normalizeTenantKey(configuredInstance)
+  const normalizedResolvedInstance = normalizeTenantKey(resolvedInstance)
+
+  if (
+    normalizedResolvedInstance
+    && normalizedConfiguredInstance
+    && normalizedResolvedInstance !== normalizedConfiguredInstance
+  ) {
+    return {
+      barbershop: null,
+      instanceNameReceived: instanceName,
+      configuredInstance,
+      explicitBarbershopSlug,
+      matchedBy: null,
+      reason: 'instance_mismatch',
+    }
+  }
+
+  if (explicitBarbershopSlug) {
+    const explicitMatch = await prisma.barbershop.findFirst({
+      where: {
+        slug: explicitBarbershopSlug,
+        active: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+      },
+    })
+
+    return {
+      barbershop: explicitMatch,
+      instanceNameReceived: instanceName,
+      configuredInstance,
+      explicitBarbershopSlug,
+      matchedBy: explicitMatch ? 'explicit_slug' : null,
+      reason: explicitMatch ? 'resolved' : 'explicit_slug_not_found',
+    }
+  }
+
+  const barbershops = await prisma.barbershop.findMany({
+    where: { active: true },
     select: {
       id: true,
       name: true,
       slug: true,
     },
   })
+
+  const exactSlugMatch = barbershops.find((barbershop) => barbershop.slug === resolvedInstance)
+  if (exactSlugMatch) {
+    return {
+      barbershop: exactSlugMatch,
+      instanceNameReceived: instanceName,
+      configuredInstance,
+      explicitBarbershopSlug,
+      matchedBy: 'slug_exact',
+      reason: 'resolved',
+    }
+  }
+
+  const normalizedSlugMatch = barbershops.find((barbershop) =>
+    normalizeTenantKey(barbershop.slug) === normalizedResolvedInstance
+  )
+  if (normalizedSlugMatch) {
+    return {
+      barbershop: normalizedSlugMatch,
+      instanceNameReceived: instanceName,
+      configuredInstance,
+      explicitBarbershopSlug,
+      matchedBy: 'slug_normalized',
+      reason: 'resolved',
+    }
+  }
+
+  const normalizedNameMatch = barbershops.find((barbershop) =>
+    normalizeTenantKey(barbershop.name) === normalizedResolvedInstance
+  )
+  if (normalizedNameMatch) {
+    return {
+      barbershop: normalizedNameMatch,
+      instanceNameReceived: instanceName,
+      configuredInstance,
+      explicitBarbershopSlug,
+      matchedBy: 'name_normalized',
+      reason: 'resolved',
+    }
+  }
+
+  const slugContainedMatches = normalizedResolvedInstance
+    ? barbershops.filter((barbershop) => {
+        const normalizedSlug = normalizeTenantKey(barbershop.slug)
+        return Boolean(
+          normalizedSlug
+          && (
+            normalizedResolvedInstance.includes(normalizedSlug)
+            || normalizedSlug.includes(normalizedResolvedInstance)
+          )
+        )
+      })
+    : []
+
+  if (slugContainedMatches.length === 1) {
+    return {
+      barbershop: slugContainedMatches[0],
+      instanceNameReceived: instanceName,
+      configuredInstance,
+      explicitBarbershopSlug,
+      matchedBy: 'slug_in_instance',
+      reason: 'resolved',
+    }
+  }
+
+  if (barbershops.length === 1) {
+    return {
+      barbershop: barbershops[0],
+      instanceNameReceived: instanceName,
+      configuredInstance,
+      explicitBarbershopSlug,
+      matchedBy: 'single_tenant_fallback',
+      reason: 'resolved',
+    }
+  }
+
+  return {
+    barbershop: null,
+    instanceNameReceived: instanceName,
+    configuredInstance,
+    explicitBarbershopSlug,
+    matchedBy: null,
+    reason: slugContainedMatches.length > 1 ? 'ambiguous_instance_match' : 'barbershop_not_found',
+  }
 }
 
 async function findOrCreateCustomerFromInbound(input: {
@@ -209,13 +380,23 @@ async function claimMessagingEventForProcessing(eventId: string) {
 }
 
 export async function handleIncomingWhatsAppMessage(input: IncomingWhatsAppMessage) {
-  const barbershop = await resolveTenantBarbershop(input.instanceName)
+  const tenantResolution = await resolveTenantBarbershop(input.instanceName)
+  const tenantResolutionLog = buildTenantLogContext(tenantResolution)
+
+  if (tenantResolution.barbershop) {
+    console.info('[whatsapp-handler] tenant resolved', tenantResolutionLog)
+  } else {
+    console.warn('[whatsapp-handler] tenant resolution failed', tenantResolutionLog)
+  }
+
+  const barbershop = tenantResolution.barbershop
 
   if (!barbershop) {
     return {
       ok: false,
       code: 409,
-      reason: 'tenant_not_configured',
+      reason: `tenant_not_configured:${tenantResolution.reason}`,
+      diagnostics: tenantResolutionLog,
       replySent: false,
     }
   }
