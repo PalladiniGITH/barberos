@@ -3,6 +3,7 @@ import 'server-only'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getEvolutionInstanceName, sendTextMessage } from '@/lib/integrations/evolution'
+import { processWhatsAppConversation } from '@/lib/whatsapp-conversation'
 
 export interface IncomingWhatsAppMessage {
   provider: 'EVOLUTION'
@@ -71,16 +72,6 @@ function chooseCustomerName(input: {
   }
 
   return buildFallbackCustomerName(input.phone)
-}
-
-function buildAutoReply(input: {
-  barbershopName: string
-  customerName?: string | null
-}) {
-  const firstName = input.customerName?.trim()?.split(' ')[0]
-  const greeting = firstName ? `Oi, ${firstName}!` : 'Oi!'
-
-  return `${greeting} Recebi sua mensagem na ${input.barbershopName}. Ja registrei seu contato por aqui e vamos seguir com seu agendamento pelo WhatsApp em seguida.`
 }
 
 function normalizeTenantKey(value?: string | null) {
@@ -364,6 +355,46 @@ async function createMessagingEvent(input: {
   })
 }
 
+async function createOutboundMessagingEvent(input: {
+  barbershopId: string
+  customerId: string
+  phone: string
+  responseText: string
+  inboundEventId: string
+}) {
+  try {
+    await prisma.messagingEvent.create({
+      data: {
+        barbershopId: input.barbershopId,
+        customerId: input.customerId,
+        provider: 'EVOLUTION',
+        direction: 'OUTBOUND',
+        status: 'PROCESSED',
+        eventType: 'WHATSAPP_REPLY',
+        instanceName: getEvolutionInstanceName(),
+        dedupeKey: `outbound:${input.inboundEventId}`,
+        remotePhone: input.phone,
+        bodyText: input.responseText,
+        responseText: input.responseText,
+        payload: {
+          source: 'whatsapp-conversation',
+          inboundEventId: input.inboundEventId,
+        } as Prisma.InputJsonValue,
+        processedAt: new Date(),
+      },
+    })
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError
+      && error.code === 'P2002'
+    ) {
+      return
+    }
+
+    throw error
+  }
+}
+
 async function claimMessagingEventForProcessing(eventId: string) {
   const claimed = await prisma.messagingEvent.updateMany({
     where: {
@@ -470,14 +501,30 @@ export async function handleIncomingWhatsAppMessage(input: IncomingWhatsAppMessa
       contactName: input.contactName,
     })
 
-    const responseText = buildAutoReply({
-      barbershopName: barbershop.name,
-      customerName: customer.name,
+    const conversation = await processWhatsAppConversation({
+      barbershop,
+      customer: {
+        id: customer.id,
+        name: customer.name,
+        created: customer.created,
+        phone: input.phone,
+      },
+      inboundText: input.message ?? '',
+      eventId: existingEvent.id,
     })
+    const responseText = conversation.responseText
 
     await sendTextMessage({
       number: input.phone,
       text: responseText,
+    })
+
+    await createOutboundMessagingEvent({
+      barbershopId: barbershop.id,
+      customerId: customer.id,
+      phone: input.phone,
+      responseText,
+      inboundEventId: existingEvent.id,
     })
 
     await prisma.messagingEvent.update({
@@ -494,10 +541,14 @@ export async function handleIncomingWhatsAppMessage(input: IncomingWhatsAppMessa
       ok: true,
       code: 200,
       reason: 'processed',
-      flow: 'initial_confirmation',
+      flow: conversation.flow,
       eventId: existingEvent.id,
       customerId: customer.id,
       customerCreated: customer.created,
+      appointmentId: conversation.appointmentId,
+      conversationId: conversation.conversationId,
+      conversationState: conversation.conversationState,
+      usedAI: conversation.usedAI,
       phone: input.phone,
       message: input.message,
       replySent: true,

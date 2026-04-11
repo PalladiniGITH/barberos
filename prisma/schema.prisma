@@ -12,35 +12,36 @@ datasource db {
 // ─────────────────────────────────────────────
 
 model Barbershop {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  logo      String?
-  address   String?
-  phone     String?
-  email     String?
-  timezone  String   @default("America/Sao_Paulo")
-  active    Boolean  @default(true)
+  id                    String    @id @default(cuid())
+  name                  String
+  slug                  String    @unique
+  logo                  String?
+  address               String?
+  phone                 String?
+  email                 String?
+  timezone              String    @default("America/Sao_Paulo")
+  active                Boolean   @default(true)
   onboardingStep        Int       @default(0)
   onboardingCompletedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
-  users             User[]
-  professionals     Professional[]
-  customers         Customer[]
-  appointments      Appointment[]
-  services          Service[]
-  revenues          Revenue[]
-  expenses          Expense[]
-  categories        FinancialCategory[]
-  monthlyGoals      MonthlyGoal[]
-  challenges        Challenge[]
-  supplies          Supply[]
-  pricingRules      PricingRule[]
-  campaignMetrics   CampaignMetric[]
-  commissions       Commission[]
-  messagingEvents   MessagingEvent[]
+  users                 User[]
+  professionals         Professional[]
+  customers             Customer[]
+  appointments          Appointment[]
+  services              Service[]
+  revenues              Revenue[]
+  expenses              Expense[]
+  categories            FinancialCategory[]
+  monthlyGoals          MonthlyGoal[]
+  challenges            Challenge[]
+  supplies              Supply[]
+  pricingRules          PricingRule[]
+  campaignMetrics       CampaignMetric[]
+  commissions           Commission[]
+  messagingEvents       MessagingEvent[]
+  whatsappConversations WhatsappConversation[]
 
   @@map("barbershops")
 }
@@ -50,18 +51,18 @@ model Barbershop {
 // ─────────────────────────────────────────────
 
 model User {
-  id            String    @id @default(cuid())
+  id            String     @id @default(cuid())
   name          String
-  email         String    @unique
+  email         String     @unique
   emailVerified DateTime?
   image         String?
   passwordHash  String?
-  role          UserRole  @default(BARBER)
+  role          UserRole   @default(BARBER)
   barbershopId  String
   barbershop    Barbershop @relation(fields: [barbershopId], references: [id])
-  active        Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  active        Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   accounts Account[]
   sessions Session[]
@@ -246,7 +247,7 @@ model Service {
   name         String
   description  String?
   price        Decimal    @db.Decimal(10, 2)
-  duration     Int        // minutos
+  duration     Int // minutos
   active       Boolean    @default(true)
   barbershopId String
   barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
@@ -266,24 +267,25 @@ model Service {
 // ─────────────────────────────────────────────
 
 model Customer {
-  id           String     @id @default(cuid())
-  name         String
-  phone        String?
-  email        String?
-  notes        String?
-  type         CustomerType       @default(WALK_IN)
-  subscriptionStatus SubscriptionStatus?
-  subscriptionPrice  Decimal?     @db.Decimal(10, 2)
+  id                    String              @id @default(cuid())
+  name                  String
+  phone                 String?
+  email                 String?
+  notes                 String?
+  type                  CustomerType        @default(WALK_IN)
+  subscriptionStatus    SubscriptionStatus?
+  subscriptionPrice     Decimal?            @db.Decimal(10, 2)
   subscriptionStartedAt DateTime?
-  active       Boolean    @default(true)
-  barbershopId String
-  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  active                Boolean             @default(true)
+  barbershopId          String
+  barbershop            Barbershop          @relation(fields: [barbershopId], references: [id])
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
 
-  appointments Appointment[]
-  revenues     Revenue[]
-  messagingEvents MessagingEvent[]
+  appointments          Appointment[]
+  revenues              Revenue[]
+  messagingEvents       MessagingEvent[]
+  whatsappConversations WhatsappConversation[]
 
   @@index([barbershopId, name])
   @@index([barbershopId, phone])
@@ -303,29 +305,29 @@ enum SubscriptionStatus {
 }
 
 model Appointment {
-  id              String            @id @default(cuid())
+  id              String                  @id @default(cuid())
   barbershopId    String
-  barbershop      Barbershop        @relation(fields: [barbershopId], references: [id])
+  barbershop      Barbershop              @relation(fields: [barbershopId], references: [id])
   customerId      String
-  customer        Customer          @relation(fields: [customerId], references: [id])
+  customer        Customer                @relation(fields: [customerId], references: [id])
   professionalId  String
-  professional    Professional      @relation(fields: [professionalId], references: [id])
+  professional    Professional            @relation(fields: [professionalId], references: [id])
   serviceId       String
-  service         Service           @relation(fields: [serviceId], references: [id])
-  status          AppointmentStatus @default(PENDING)
-  source          AppointmentSource @default(MANUAL)
+  service         Service                 @relation(fields: [serviceId], references: [id])
+  status          AppointmentStatus       @default(PENDING)
+  source          AppointmentSource       @default(MANUAL)
   billingModel    AppointmentBillingModel @default(AVULSO)
   startAt         DateTime
   endAt           DateTime
   durationMinutes Int
-  priceSnapshot   Decimal           @db.Decimal(10, 2)
+  priceSnapshot   Decimal                 @db.Decimal(10, 2)
   notes           String?
   sourceReference String?
   confirmedAt     DateTime?
   cancelledAt     DateTime?
   completedAt     DateTime?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
 
   @@index([barbershopId, startAt])
   @@index([barbershopId, professionalId, startAt])
@@ -382,6 +384,36 @@ model MessagingEvent {
   @@map("messaging_events")
 }
 
+model WhatsappConversation {
+  id                       String                    @id @default(cuid())
+  barbershopId             String
+  barbershop               Barbershop                @relation(fields: [barbershopId], references: [id])
+  customerId               String
+  customer                 Customer                  @relation(fields: [customerId], references: [id])
+  phone                    String?
+  state                    WhatsappConversationState @default(IDLE)
+  selectedServiceId        String?
+  selectedServiceName      String?
+  selectedProfessionalId   String?
+  selectedProfessionalName String?
+  allowAnyProfessional     Boolean                   @default(false)
+  requestedDate            DateTime?
+  requestedTimeLabel       String?
+  slotOptions              Json?
+  selectedSlot             Json?
+  lastIntent               Json?
+  lastInboundText          String?
+  lastAssistantText        String?
+  completedAt              DateTime?
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+
+  @@unique([barbershopId, customerId])
+  @@index([barbershopId, phone])
+  @@index([barbershopId, state, updatedAt])
+  @@map("whatsapp_conversations")
+}
+
 enum MessagingProvider {
   EVOLUTION
 }
@@ -400,10 +432,19 @@ enum MessagingEventStatus {
   IGNORED
 }
 
+enum WhatsappConversationState {
+  IDLE
+  WAITING_SERVICE
+  WAITING_PROFESSIONAL
+  WAITING_DATE
+  WAITING_TIME
+  WAITING_CONFIRMATION
+}
+
 model Supply {
   id           String     @id @default(cuid())
   name         String
-  unit         String     // ml, g, un, L
+  unit         String // ml, g, un, L
   unitCost     Decimal    @db.Decimal(10, 4)
   barbershopId String
   barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
@@ -416,12 +457,12 @@ model Supply {
 }
 
 model ServiceInput {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   serviceId String
-  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   supplyId  String
-  supply    Supply   @relation(fields: [supplyId], references: [id])
-  quantity  Decimal  @db.Decimal(10, 4)
+  supply    Supply  @relation(fields: [supplyId], references: [id])
+  quantity  Decimal @db.Decimal(10, 4)
 
   @@unique([serviceId, supplyId])
   @@map("service_inputs")
@@ -433,10 +474,10 @@ model PricingRule {
   service           Service    @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   barbershopId      String
   barbershop        Barbershop @relation(fields: [barbershopId], references: [id])
-  cardFeePercent    Decimal    @db.Decimal(5, 2) @default(3.0)
-  taxPercent        Decimal    @db.Decimal(5, 2) @default(0)
-  commissionPercent Decimal    @db.Decimal(5, 2) @default(40)
-  directCost        Decimal    @db.Decimal(10, 2) @default(0)
+  cardFeePercent    Decimal    @default(3.0) @db.Decimal(5, 2)
+  taxPercent        Decimal    @default(0) @db.Decimal(5, 2)
+  commissionPercent Decimal    @default(40) @db.Decimal(5, 2)
+  directCost        Decimal    @default(0) @db.Decimal(10, 2)
   suggestedPrice    Decimal?   @db.Decimal(10, 2)
   updatedAt         DateTime   @updatedAt
 
@@ -451,7 +492,7 @@ model MonthlyGoal {
   id           String     @id @default(cuid())
   barbershopId String
   barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
-  month        Int        // 1-12
+  month        Int // 1-12
   year         Int
   revenueGoal  Decimal    @db.Decimal(10, 2)
   revenueMin   Decimal    @db.Decimal(10, 2)
@@ -521,7 +562,7 @@ model ChallengeResult {
   challenge      Challenge    @relation(fields: [challengeId], references: [id], onDelete: Cascade)
   professionalId String
   professional   Professional @relation(fields: [professionalId], references: [id])
-  achievedValue  Decimal      @db.Decimal(10, 2) @default(0)
+  achievedValue  Decimal      @default(0) @db.Decimal(10, 2)
   completed      Boolean      @default(false)
   rewardGiven    Boolean      @default(false)
   notes          String?
@@ -547,7 +588,7 @@ model Commission {
   grossRevenue     Decimal      @db.Decimal(10, 2)
   commissionRate   Decimal      @db.Decimal(5, 2)
   commissionAmount Decimal      @db.Decimal(10, 2)
-  bonus            Decimal      @db.Decimal(10, 2) @default(0)
+  bonus            Decimal      @default(0) @db.Decimal(10, 2)
   paid             Boolean      @default(false)
   paidAt           DateTime?
   createdAt        DateTime     @default(now())
