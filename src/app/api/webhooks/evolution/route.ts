@@ -29,6 +29,27 @@ export async function POST(request: Request) {
   const normalized = normalizeEvolutionWebhookPayload(payload)
   const phone = normalized.remotePhone
   const message = normalized.text
+
+  console.info('[evolution-webhook] normalized payload', {
+    eventOriginal: normalized.originalEvent,
+    eventNormalized: normalized.event,
+    shouldProcessInboundMessage: normalized.shouldProcessInboundMessage,
+    ignoreReason: normalized.ignoreReason,
+    fromMe: normalized.fromMe,
+    messageType: normalized.messageType,
+  })
+
+  if (!normalized.shouldProcessInboundMessage) {
+    console.warn('[evolution-webhook] inbound message ignored before handler', {
+      eventOriginal: normalized.originalEvent,
+      eventNormalized: normalized.event,
+      shouldProcessInboundMessage: normalized.shouldProcessInboundMessage,
+      ignoreReason: normalized.ignoreReason,
+      fromMe: normalized.fromMe,
+      messageType: normalized.messageType,
+    })
+  }
+
   const result = await handleIncomingWhatsAppMessage({
     provider: 'EVOLUTION',
     event: normalized.event,

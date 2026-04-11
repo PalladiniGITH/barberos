@@ -6,6 +6,15 @@ import { handleIncomingWhatsAppMessage } from '@/lib/whatsapp-handler'
 export async function processEvolutionWebhookPayload(payload: unknown) {
   const normalized = normalizeEvolutionWebhookPayload(payload)
 
+  console.info('[evolution-webhook] normalized payload', {
+    eventOriginal: normalized.originalEvent,
+    eventNormalized: normalized.event,
+    shouldProcessInboundMessage: normalized.shouldProcessInboundMessage,
+    ignoreReason: normalized.ignoreReason,
+    fromMe: normalized.fromMe,
+    messageType: normalized.messageType,
+  })
+
   return handleIncomingWhatsAppMessage({
     provider: 'EVOLUTION',
     event: normalized.event,

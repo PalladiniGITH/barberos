@@ -45,6 +45,7 @@ export interface EvolutionWebhookConfigResult {
 }
 
 export interface EvolutionNormalizedWebhookPayload {
+  originalEvent: string
   event: string
   instanceName: string | null
   messageId: string | null
@@ -123,6 +124,20 @@ function pickPrimaryRecord(...values: unknown[]) {
 
 function normalizeBaseUrl(value: string) {
   return value.trim().replace(/\/+$/, '')
+}
+
+function normalizeEvolutionEventName(value: string | null) {
+  if (!value) {
+    return 'UNKNOWN'
+  }
+
+  const normalized = value
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toUpperCase()
+
+  return normalized || 'UNKNOWN'
 }
 
 function getPublicAppUrl() {
@@ -367,7 +382,7 @@ export async function configureEvolutionInstanceWebhook(input?: {
   const instance = input?.instance ?? getEvolutionInstanceName()
   const webhookUrl = getEvolutionWebhookUrl()
   const events = Array.from(
-    new Set((input?.events ?? [...DEFAULT_EVOLUTION_WEBHOOK_EVENTS]).map((event) => event.toUpperCase()))
+    new Set((input?.events ?? [...DEFAULT_EVOLUTION_WEBHOOK_EVENTS]).map((event) => normalizeEvolutionEventName(event)))
   )
 
   const data = await evolutionRequest(`/webhook/set/${instance}`, {
@@ -398,8 +413,8 @@ export async function configureWebhook(input?: {
 
 export function normalizeEvolutionWebhookPayload(payload: unknown): EvolutionNormalizedWebhookPayload {
   const root = asRecord(payload) ?? {}
-  const event = pickString(root.event, root.eventType, root.type) ?? 'UNKNOWN'
-  const eventUpper = event.toUpperCase()
+  const originalEvent = pickString(root.event, root.eventType, root.type) ?? 'UNKNOWN'
+  const eventNormalized = normalizeEvolutionEventName(originalEvent)
   const data = pickPrimaryRecord(root.data, root.payload, root.body) ?? root
   const keyRecord = pickObject(data.key, root.key)
   const messageRecord = pickPrimaryRecord(
@@ -436,8 +451,8 @@ export function normalizeEvolutionWebhookPayload(payload: unknown): EvolutionNor
   const isStatusBroadcast = Boolean(remoteJid?.includes('status@broadcast'))
 
   let ignoreReason: string | null = null
-  if (eventUpper !== 'MESSAGES_UPSERT') {
-    ignoreReason = `evento_${eventUpper.toLowerCase()}`
+  if (eventNormalized !== 'MESSAGES_UPSERT') {
+    ignoreReason = `evento_${eventNormalized.toLowerCase()}`
   } else if (fromMe) {
     ignoreReason = 'from_me'
   } else if (isGroup) {
@@ -449,7 +464,8 @@ export function normalizeEvolutionWebhookPayload(payload: unknown): EvolutionNor
   }
 
   return {
-    event: eventUpper,
+    originalEvent,
+    event: eventNormalized,
     instanceName,
     messageId,
     remoteJid,
@@ -464,7 +480,7 @@ export function normalizeEvolutionWebhookPayload(payload: unknown): EvolutionNor
     shouldProcessInboundMessage: ignoreReason === null,
     ignoreReason,
     dedupeKey: buildDedupeKey({
-      event: eventUpper,
+      event: eventNormalized,
       instanceName,
       messageId,
       remoteJid,
