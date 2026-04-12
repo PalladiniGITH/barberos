@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 const BUSINESS_OPEN_HOUR = 8
 const BUSINESS_CLOSE_HOUR = 21
 const SLOT_STEP_MINUTES = 15
+const DEFAULT_OPERATIONAL_BUFFER_MINUTES = 5
 
 export interface WhatsAppBookingSlot {
   key: string
@@ -49,12 +50,37 @@ function getNowRoundedToStep() {
   return now
 }
 
+function getOperationalBufferMinutes() {
+  const rawValue = process.env.WHATSAPP_APPOINTMENT_BUFFER_MINUTES
+  const parsed = Number(rawValue)
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return DEFAULT_OPERATIONAL_BUFFER_MINUTES
+  }
+
+  return Math.min(30, Math.round(parsed))
+}
+
 function getSlotKey(professionalId: string, startAt: Date) {
   return `${professionalId}:${startAt.toISOString()}`
 }
 
 function overlaps(startAt: Date, endAt: Date, blockedStart: Date, blockedEnd: Date) {
   return startAt < blockedEnd && endAt > blockedStart
+}
+
+function hasBufferedConflict(input: {
+  candidateStart: Date
+  candidateEnd: Date
+  blockedStart: Date
+  blockedEnd: Date
+  bufferMinutes: number
+}) {
+  const bufferMs = input.bufferMinutes * 60_000
+  const candidateBufferedEnd = new Date(input.candidateEnd.getTime() + bufferMs)
+  const blockedBufferedEnd = new Date(input.blockedEnd.getTime() + bufferMs)
+
+  return overlaps(input.candidateStart, candidateBufferedEnd, input.blockedStart, blockedBufferedEnd)
 }
 
 function normalizeTimeLabel(value?: string | null) {
@@ -202,6 +228,8 @@ export async function getAvailableWhatsAppSlots(input: {
   const dayClose = buildLocalDate(input.dateIso, BUSINESS_CLOSE_HOUR, 0)
   const currentRoundedTime = getNowRoundedToStep()
   const isToday = input.dateIso === formatLocalDate(new Date())
+  const operationalBufferMinutes = getOperationalBufferMinutes()
+  const slotWindowMinutes = service.duration + operationalBufferMinutes
 
   const appointments = await prisma.appointment.findMany({
     where: {
@@ -238,7 +266,7 @@ export async function getAvailableWhatsAppSlots(input: {
 
     for (
       let candidate = new Date(dayOpen);
-      candidate.getTime() + service.duration * 60_000 <= dayClose.getTime();
+      candidate.getTime() + slotWindowMinutes * 60_000 <= dayClose.getTime();
       candidate = new Date(candidate.getTime() + SLOT_STEP_MINUTES * 60_000)
     ) {
       const slotEnd = new Date(candidate.getTime() + service.duration * 60_000)
@@ -247,7 +275,13 @@ export async function getAvailableWhatsAppSlots(input: {
       }
 
       const conflict = blockedSlots.some((appointment) =>
-        overlaps(candidate, slotEnd, appointment.startAt, appointment.endAt)
+        hasBufferedConflict({
+          candidateStart: candidate,
+          candidateEnd: slotEnd,
+          blockedStart: appointment.startAt,
+          blockedEnd: appointment.endAt,
+          bufferMinutes: operationalBufferMinutes,
+        })
       )
 
       if (conflict) {
@@ -359,26 +393,40 @@ export async function createAppointmentFromWhatsApp(input: {
 
   const startAt = new Date(input.startAtIso)
   const endAt = new Date(startAt.getTime() + service.duration * 60_000)
+  const operationalBufferMinutes = getOperationalBufferMinutes()
+  const bufferedEndAt = new Date(endAt.getTime() + operationalBufferMinutes * 60_000)
   const dateIso = input.startAtIso.slice(0, 10)
   const openAt = buildLocalDate(dateIso, BUSINESS_OPEN_HOUR, 0)
   const closeAt = buildLocalDate(dateIso, BUSINESS_CLOSE_HOUR, 0)
 
-  if (startAt < openAt || endAt > closeAt) {
+  if (startAt < openAt || bufferedEndAt > closeAt) {
     throw new Error('O horario selecionado esta fora da janela de atendimento.')
   }
 
-  const conflictingAppointment = await prisma.appointment.findFirst({
+  const conflictingAppointments = await prisma.appointment.findMany({
     where: {
       barbershopId: input.barbershopId,
       professionalId: input.professionalId,
       status: { in: ['PENDING', 'CONFIRMED'] },
-      startAt: { lt: endAt },
-      endAt: { gt: startAt },
+      startAt: { lt: bufferedEndAt },
+      endAt: { gt: new Date(startAt.getTime() - operationalBufferMinutes * 60_000) },
     },
     select: {
       id: true,
+      startAt: true,
+      endAt: true,
     },
   })
+
+  const conflictingAppointment = conflictingAppointments.find((appointment) =>
+    hasBufferedConflict({
+      candidateStart: startAt,
+      candidateEnd: endAt,
+      blockedStart: appointment.startAt,
+      blockedEnd: appointment.endAt,
+      bufferMinutes: operationalBufferMinutes,
+    })
+  )
 
   if (conflictingAppointment) {
     throw new Error('O horario selecionado nao esta mais disponivel.')

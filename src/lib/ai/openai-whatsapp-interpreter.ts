@@ -266,6 +266,37 @@ function parseRelativeDate(message: string, today: Date) {
 function inferTimePreference(message: string) {
   const normalized = normalizeText(message)
 
+  const afterHourMatch = normalized.match(/depois\s+das?\s+([01]?\d|2[0-3])/)
+  if (afterHourMatch) {
+    const hour = Number(afterHourMatch[1])
+
+    if (hour >= 18) {
+      return {
+        timePreference: 'EVENING' as const,
+        exactTime: null,
+      }
+    }
+
+    if (hour >= 17) {
+      return {
+        timePreference: 'LATE_AFTERNOON' as const,
+        exactTime: null,
+      }
+    }
+
+    if (hour >= 12) {
+      return {
+        timePreference: 'AFTERNOON' as const,
+        exactTime: null,
+      }
+    }
+
+    return {
+      timePreference: 'MORNING' as const,
+      exactTime: null,
+    }
+  }
+
   const exactTime = parseExplicitTime(normalized)
   if (exactTime) {
     return {

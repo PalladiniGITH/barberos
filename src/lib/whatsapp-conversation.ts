@@ -42,6 +42,7 @@ interface ConversationServiceResult {
     | 'collect_service'
     | 'collect_professional'
     | 'collect_date'
+    | 'collect_period'
     | 'offer_slots'
     | 'await_confirmation'
     | 'appointment_created'
@@ -133,6 +134,10 @@ function buildProfessionalQuestion(professionalNames: string[]) {
 
 function buildDateQuestion() {
   return 'Qual dia você prefere? Pode me falar algo como hoje, amanhã, sexta ou uma data.'
+}
+
+function buildPeriodQuestion() {
+  return 'Perfeito. Você prefere manhã, tarde ou noite?'
 }
 
 function buildNoAvailabilityMessage(dateIso: string) {
@@ -258,6 +263,14 @@ function resolveRequestedTimeLabel(input: {
   }
 
   return input.existingValue
+}
+
+function hasResolvedTimePreference(value: string | null) {
+  if (!value) {
+    return false
+  }
+
+  return ['MORNING', 'AFTERNOON', 'LATE_AFTERNOON', 'EVENING'].includes(value) || value.includes(':')
 }
 
 function isBookingEntryPoint(state: ConversationState, intent: string) {
@@ -844,6 +857,29 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     return {
       responseText,
       flow: 'reschedule',
+      conversationId: conversation.id,
+      conversationState: 'WAITING_TIME',
+      usedAI,
+    }
+  }
+
+  if (!hasResolvedTimePreference(requestedTimeLabel)) {
+    const responseText = buildPeriodQuestion()
+
+    await prisma.whatsappConversation.update({
+      where: { id: conversation.id },
+      data: {
+        ...baseUpdate,
+        state: 'WAITING_TIME',
+        slotOptions: JSON_NULL,
+        selectedSlot: JSON_NULL,
+        lastAssistantText: responseText,
+      },
+    })
+
+    return {
+      responseText,
+      flow: 'collect_period',
       conversationId: conversation.id,
       conversationState: 'WAITING_TIME',
       usedAI,

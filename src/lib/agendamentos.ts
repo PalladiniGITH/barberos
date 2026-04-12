@@ -264,7 +264,7 @@ const getCachedSchedulePageData = cache(
               },
             },
           },
-          orderBy: { startAt: 'asc' },
+          orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
         }),
       ])
 
@@ -324,9 +324,7 @@ const getCachedSchedulePageData = cache(
       ACTIVE_APPOINTMENT_STATUSES.has(appointment.status)
     )
 
-    const upcomingToday = selectedDayAppointments
-      .filter((appointment) => appointment.status === 'PENDING' || appointment.status === 'CONFIRMED')
-      .slice(0, 5)
+    const upcomingToday = activeDayAppointments.slice(0, 5)
 
     const panelRevenue = selectedProfessional
       ? monthRevenueByProfessionalMap[focusProfessionalId ?? ''] ?? 0
