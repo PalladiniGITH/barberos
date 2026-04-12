@@ -28,6 +28,27 @@ function formatTimeLabel(date: Date) {
   })
 }
 
+function formatLocalDate(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function getNowRoundedToStep() {
+  const now = new Date()
+  now.setSeconds(0, 0)
+
+  const roundedMinutes = Math.ceil(now.getMinutes() / SLOT_STEP_MINUTES) * SLOT_STEP_MINUTES
+  if (roundedMinutes >= 60) {
+    now.setHours(now.getHours() + 1, 0, 0, 0)
+  } else {
+    now.setMinutes(roundedMinutes, 0, 0)
+  }
+
+  return now
+}
+
 function getSlotKey(professionalId: string, startAt: Date) {
   return `${professionalId}:${startAt.toISOString()}`
 }
@@ -53,19 +74,7 @@ function filterSlotsByTimePreference(input: {
   const timePreference = normalizeTimeLabel(input.timePreference)
 
   if (timePreference === 'EXACT' && input.exactTime) {
-    const exactMatches = input.slots.filter((slot) => slot.timeLabel === input.exactTime)
-    if (exactMatches.length > 0) {
-      return exactMatches
-    }
-
-    const [targetHours, targetMinutes] = input.exactTime.split(':').map(Number)
-    const targetMinutesOfDay = targetHours * 60 + targetMinutes
-
-    return input.slots.filter((slot) => {
-      const [hours, minutes] = slot.timeLabel.split(':').map(Number)
-      const minutesOfDay = hours * 60 + minutes
-      return minutesOfDay >= targetMinutesOfDay
-    })
+    return input.slots.filter((slot) => slot.timeLabel === input.exactTime)
   }
 
   if (!timePreference || timePreference === 'NONE') {
@@ -191,6 +200,8 @@ export async function getAvailableWhatsAppSlots(input: {
 
   const dayOpen = buildLocalDate(input.dateIso, BUSINESS_OPEN_HOUR, 0)
   const dayClose = buildLocalDate(input.dateIso, BUSINESS_CLOSE_HOUR, 0)
+  const currentRoundedTime = getNowRoundedToStep()
+  const isToday = input.dateIso === formatLocalDate(new Date())
 
   const appointments = await prisma.appointment.findMany({
     where: {
@@ -231,6 +242,10 @@ export async function getAvailableWhatsAppSlots(input: {
       candidate = new Date(candidate.getTime() + SLOT_STEP_MINUTES * 60_000)
     ) {
       const slotEnd = new Date(candidate.getTime() + service.duration * 60_000)
+      if (isToday && candidate < currentRoundedTime) {
+        continue
+      }
+
       const conflict = blockedSlots.some((appointment) =>
         overlaps(candidate, slotEnd, appointment.startAt, appointment.endAt)
       )
@@ -268,6 +283,30 @@ export async function getAvailableWhatsAppSlots(input: {
       .sort((left, right) => new Date(left.startAtIso).getTime() - new Date(right.startAtIso).getTime())
       .slice(0, input.limit ?? 4),
   }
+}
+
+export async function findExactAvailableWhatsAppSlot(input: {
+  barbershopId: string
+  serviceId: string
+  professionalId: string
+  dateIso: string
+  timeLabel: string
+}) {
+  const availability = await getAvailableWhatsAppSlots({
+    barbershopId: input.barbershopId,
+    serviceId: input.serviceId,
+    professionalId: input.professionalId,
+    dateIso: input.dateIso,
+    timePreference: 'EXACT',
+    exactTime: input.timeLabel,
+    limit: 8,
+  })
+
+  return availability.slots.find((slot) => (
+    slot.professionalId === input.professionalId
+    && slot.dateIso === input.dateIso
+    && slot.timeLabel === input.timeLabel
+  )) ?? null
 }
 
 export async function createAppointmentFromWhatsApp(input: {

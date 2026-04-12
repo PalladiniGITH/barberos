@@ -29,7 +29,7 @@ const WEEKDAY_INDEX: Record<string, number> = {
 const IntentSchema = z.object({
   intent: z.enum(['BOOK_APPOINTMENT', 'CONFIRM', 'DECLINE', 'CHANGE_REQUEST', 'UNKNOWN']),
   serviceName: z.string().min(1).max(120).nullable(),
-  professionalName: z.string().min(1).max(120).nullable(),
+  mentionedName: z.string().min(1).max(120).nullable(),
   allowAnyProfessional: z.boolean(),
   requestedDateIso: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
   timePreference: z.enum(['NONE', 'EXACT', 'MORNING', 'AFTERNOON', 'LATE_AFTERNOON', 'EVENING']),
@@ -50,7 +50,7 @@ const INTENT_JSON_SCHEMA = {
     serviceName: {
       anyOf: [{ type: 'string' }, { type: 'null' }],
     },
-    professionalName: {
+    mentionedName: {
       anyOf: [{ type: 'string' }, { type: 'null' }],
     },
     allowAnyProfessional: { type: 'boolean' },
@@ -73,7 +73,7 @@ const INTENT_JSON_SCHEMA = {
   required: [
     'intent',
     'serviceName',
-    'professionalName',
+    'mentionedName',
     'allowAnyProfessional',
     'requestedDateIso',
     'timePreference',
@@ -206,6 +206,28 @@ function parseExplicitTime(message: string) {
   }
 
   return null
+}
+
+function extractMentionedName(message: string) {
+  const directMatch = message.match(/\b(?:com|do|da)\s+([a-zA-ZÀ-ÿ]+(?:\s+[a-zA-ZÀ-ÿ]+){0,2})/i)
+  const fallbackMatch = message.match(/\b([A-ZÀ-Ý][a-zà-ÿ]+(?:\s+[A-ZÀ-Ý][a-zà-ÿ]+){0,2})\b/)
+  const rawName = directMatch?.[1] ?? fallbackMatch?.[1] ?? null
+
+  if (!rawName) {
+    return null
+  }
+
+  const normalized = normalizeText(rawName)
+  if (
+    normalized.includes('qualquer')
+    || normalized.includes('barbeiro')
+    || normalized.includes('horario')
+    || normalized.includes('horario')
+  ) {
+    return null
+  }
+
+  return rawName.trim()
 }
 
 function parseRelativeDate(message: string, today: Date) {
@@ -361,7 +383,7 @@ function buildFallbackIntent(input: WhatsAppInterpreterInput): WhatsAppIntent {
   return {
     intent: inferIntent(input.message, input.conversationState),
     serviceName: findBestNamedMatch(input.services, input.message),
-    professionalName: findBestNamedMatch(input.professionals, input.message),
+    mentionedName: extractMentionedName(input.message),
     allowAnyProfessional: /\b(qualquer um|qualquer barbeiro|tanto faz|sem preferencia|sem preferência)\b/.test(
       normalizeText(input.message)
     ),
@@ -387,7 +409,8 @@ function buildInterpreterPrompt(input: WhatsAppInterpreterInput) {
     `Quantidade de opcoes de horario atualmente oferecidas ao cliente: ${input.offeredSlotCount}.`,
     'Regras obrigatorias:',
     '- serviceName deve ser exatamente um dos servicos validos, ou null.',
-    '- professionalName deve ser exatamente um dos profissionais validos, ou null.',
+    '- mentionedName deve conter apenas o nome da pessoa citada pelo cliente, ou null.',
+    '- Nao assuma que o nome citado e um barbeiro. Apenas extraia o nome mencionado.',
     '- requestedDateIso deve ser yyyy-mm-dd apenas quando a data estiver clara. Para "amanha", converta para a data absoluta.',
     '- timePreference deve ser EXACT, MORNING, AFTERNOON, LATE_AFTERNOON, EVENING ou NONE.',
     '- exactTime so deve ser preenchido se o horario exato estiver explicito.',
