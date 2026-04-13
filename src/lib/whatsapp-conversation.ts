@@ -3,6 +3,7 @@ import 'server-only'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { interpretWhatsAppMessage } from '@/lib/ai/openai-whatsapp-interpreter'
+import { processWhatsAppConversationWithAgent } from '@/lib/ai/openai-whatsapp-agent'
 import {
   createAppointmentFromWhatsApp,
   findExactAvailableWhatsAppSlot,
@@ -618,6 +619,9 @@ async function resetConversation(input: {
       requestedTimeLabel: null,
       slotOptions: JSON_NULL,
       selectedSlot: JSON_NULL,
+      conversationSummary: null,
+      bookingDraft: JSON_NULL,
+      recentCorrections: JSON_NULL,
       lastInboundText: input.inboundText,
       lastIntent: buildJsonValue(input.interpreted),
       lastAssistantText: input.responseText,
@@ -902,6 +906,165 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     requestedTimeLabel: conversation.requestedTimeLabel ?? null,
     offeredSlots: parseConversationSlots(conversation.slotOptions),
     selectedStoredSlot: parseSelectedSlot(conversation.selectedSlot),
+  }
+
+  const agentResult = await processWhatsAppConversationWithAgent({
+    barbershop: input.barbershop,
+    customer: input.customer,
+    inboundText,
+    conversation: {
+      id: conversation.id,
+      state: conversation.state,
+      updatedAt: conversation.updatedAt,
+      selectedServiceId: conversation.selectedServiceId ?? null,
+      selectedServiceName: conversation.selectedServiceName ?? null,
+      selectedProfessionalId: conversation.selectedProfessionalId ?? null,
+      selectedProfessionalName: conversation.selectedProfessionalName ?? null,
+      allowAnyProfessional: conversation.allowAnyProfessional,
+      requestedDate: conversation.requestedDate,
+      requestedTimeLabel: conversation.requestedTimeLabel ?? null,
+      slotOptions: conversation.slotOptions,
+      selectedSlot: conversation.selectedSlot,
+      conversationSummary: conversation.conversationSummary ?? null,
+      bookingDraft: conversation.bookingDraft,
+      recentCorrections: conversation.recentCorrections,
+      lastInboundText: conversation.lastInboundText ?? null,
+      lastAssistantText: conversation.lastAssistantText ?? null,
+    },
+    services,
+    professionals,
+    nowContext,
+  })
+
+  if (agentResult) {
+    const shouldResetPersistedContext =
+      agentResult.structured.nextAction === 'RESET_CONTEXT'
+      || agentResult.structured.nextAction === 'GREET'
+
+    if (agentResult.shouldCreateAppointment && agentResult.memory.selectedSlot && agentResult.memory.selectedServiceId) {
+      try {
+        const appointment = await createAppointmentFromWhatsApp({
+          barbershopId: input.barbershop.id,
+          customerId: input.customer.id,
+          serviceId: agentResult.memory.selectedServiceId,
+          professionalId: agentResult.memory.selectedSlot.professionalId,
+          startAtIso: agentResult.memory.selectedSlot.startAtIso,
+          sourceReference: `whatsapp:${conversation.id}:${input.eventId}`,
+          notes: 'Agendamento criado via agente conversacional do WhatsApp.',
+        })
+
+        await prisma.whatsappConversation.update({
+          where: { id: conversation.id },
+          data: {
+            state: 'IDLE',
+            selectedServiceId: null,
+            selectedServiceName: null,
+            selectedProfessionalId: null,
+            selectedProfessionalName: null,
+            allowAnyProfessional: false,
+            requestedDate: null,
+            requestedTimeLabel: null,
+            slotOptions: JSON_NULL,
+            selectedSlot: JSON_NULL,
+            conversationSummary: agentResult.memory.conversationSummary,
+            bookingDraft: JSON_NULL,
+            recentCorrections: agentResult.memory.recentCorrections.length
+              ? buildJsonValue(agentResult.memory.recentCorrections)
+              : JSON_NULL,
+            lastInboundText: inboundText,
+            lastIntent: buildJsonValue({
+              source: 'agent',
+              structured: agentResult.structured,
+              toolTrace: agentResult.toolTrace,
+            }),
+            lastAssistantText: agentResult.responseText,
+            completedAt: new Date(),
+          },
+        })
+
+        console.info('[whatsapp-conversation] backend action', {
+          mode: 'agent',
+          action: 'appointment_created',
+          conversationId: conversation.id,
+          appointmentId: appointment.id,
+        })
+
+        return {
+          responseText: agentResult.responseText,
+          flow: 'appointment_created',
+          conversationId: conversation.id,
+          conversationState: 'IDLE',
+          appointmentId: appointment.id,
+          usedAI: true,
+        }
+      } catch (error) {
+        console.warn('[whatsapp-conversation] agent booking fallback_to_legacy', {
+          error: error instanceof Error ? error.message : 'unknown_error',
+          conversationId: conversation.id,
+        })
+      }
+    } else {
+      await prisma.whatsappConversation.update({
+        where: { id: conversation.id },
+        data: {
+          state: agentResult.conversationState,
+          selectedServiceId: shouldResetPersistedContext ? null : agentResult.memory.selectedServiceId,
+          selectedServiceName: shouldResetPersistedContext ? null : agentResult.memory.selectedServiceName,
+          selectedProfessionalId: shouldResetPersistedContext ? null : agentResult.memory.selectedProfessionalId,
+          selectedProfessionalName: shouldResetPersistedContext ? null : agentResult.memory.selectedProfessionalName,
+          allowAnyProfessional: shouldResetPersistedContext ? false : agentResult.memory.allowAnyProfessional,
+          requestedDate: !shouldResetPersistedContext && agentResult.memory.requestedDateIso
+            ? new Date(`${agentResult.memory.requestedDateIso}T12:00:00`)
+            : null,
+          requestedTimeLabel: shouldResetPersistedContext ? null : agentResult.memory.requestedTimeLabel,
+          slotOptions: !shouldResetPersistedContext && agentResult.memory.offeredSlots.length
+            ? buildJsonValue(agentResult.memory.offeredSlots)
+            : JSON_NULL,
+          selectedSlot: !shouldResetPersistedContext && agentResult.memory.selectedSlot
+            ? buildJsonValue(agentResult.memory.selectedSlot)
+            : JSON_NULL,
+          conversationSummary: agentResult.memory.conversationSummary,
+          bookingDraft: !shouldResetPersistedContext
+            ? buildJsonValue({
+                selectedServiceId: agentResult.memory.selectedServiceId,
+                selectedServiceName: agentResult.memory.selectedServiceName,
+                selectedProfessionalId: agentResult.memory.selectedProfessionalId,
+                selectedProfessionalName: agentResult.memory.selectedProfessionalName,
+                allowAnyProfessional: agentResult.memory.allowAnyProfessional,
+                requestedDateIso: agentResult.memory.requestedDateIso,
+                requestedTimeLabel: agentResult.memory.requestedTimeLabel,
+                selectedSlot: agentResult.memory.selectedSlot,
+              })
+            : JSON_NULL,
+          recentCorrections: agentResult.memory.recentCorrections.length
+            ? buildJsonValue(agentResult.memory.recentCorrections)
+            : JSON_NULL,
+          lastInboundText: inboundText,
+          lastIntent: buildJsonValue({
+            source: 'agent',
+            structured: agentResult.structured,
+            toolTrace: agentResult.toolTrace,
+          }),
+          lastAssistantText: agentResult.responseText,
+          completedAt: shouldResetPersistedContext ? new Date() : null,
+        },
+      })
+
+      console.info('[whatsapp-conversation] backend action', {
+        mode: 'agent',
+        action: agentResult.structured.nextAction,
+        conversationId: conversation.id,
+        conversationState: agentResult.conversationState,
+      })
+
+      return {
+        responseText: agentResult.responseText,
+        flow: agentResult.flow,
+        conversationId: conversation.id,
+        conversationState: agentResult.conversationState,
+        usedAI: true,
+      }
+    }
   }
 
   const contextReliable = isConversationContextReliable({
@@ -1473,6 +1636,9 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
         requestedTimeLabel: null,
         slotOptions: JSON_NULL,
         selectedSlot: JSON_NULL,
+        conversationSummary: null,
+        bookingDraft: JSON_NULL,
+        recentCorrections: JSON_NULL,
         lastInboundText: inboundText,
         lastIntent: buildJsonValue(interpreted),
         lastAssistantText: responseText,

@@ -404,6 +404,9 @@ model WhatsappConversation {
   lastIntent               Json?
   lastInboundText          String?
   lastAssistantText        String?
+  conversationSummary      String?
+  bookingDraft             Json?
+  recentCorrections        Json?
   completedAt              DateTime?
   createdAt                DateTime                  @default(now())
   updatedAt                DateTime                  @updatedAt
