@@ -50,6 +50,36 @@ test('frases como "com o de sempre" ativam a referencia ao barbeiro preferencial
   assert.equal(conversationTesting.referencesPreferredProfessional('quero ver horario hoje'), false)
 })
 
+test('barbeiro do agendamento recente vira preferencia contextual para o proximo servico', () => {
+  const contextual = conversationTesting.resolveContextualProfessionalPreference({
+    professionals: [
+      { id: 'pro-matheus', name: 'Matheus' },
+      { id: 'pro-lucas', name: 'Lucas' },
+    ],
+    preferredProfessional: {
+      professionalId: 'pro-lucas',
+      professionalName: 'Lucas',
+    },
+    recentBooking: {
+      serviceName: 'Corte Classic',
+      professionalName: 'Matheus',
+      dateIso: '2026-04-13',
+      timeLabel: '16:45',
+    },
+    hasRecentConfirmedBooking: true,
+  })
+
+  const reply = conversationTesting.buildProfessionalQuestion(
+    ['Matheus', 'Lucas'],
+    contextual?.professionalName ?? null
+  )
+
+  assert.equal(contextual?.professionalName, 'Matheus')
+  assert.equal(contextual?.source, 'recent_booking')
+  assert.match(reply, /Matheus/)
+  assert.match(reply, /de novo|prefere outro/i)
+})
+
 test('agenda e fila do dia projetam o mesmo horario local do agendamento confirmado', () => {
   const serialized = scheduleTesting.serializeScheduleAppointment({
     timezone: 'America/Sao_Paulo',

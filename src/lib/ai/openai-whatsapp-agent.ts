@@ -600,6 +600,16 @@ function enforceNextActionFromMemory(
     return requestedAction
   }
 
+  if (memory.requestedDateIso && requestedAction === 'ASK_DATE') {
+    if (validation.missingFields.includes('period')) {
+      return 'ASK_PERIOD'
+    }
+
+    if (!validation.missingFields.includes('date')) {
+      return memory.selectedSlot ? 'ASK_CONFIRMATION' : memory.offeredSlots.length > 0 ? 'OFFER_SLOTS' : requestedAction
+    }
+  }
+
   if (validation.missingFields.includes('service')) {
     return 'ASK_SERVICE'
   }

@@ -89,6 +89,16 @@ export interface WhatsAppAvailabilityResult {
   diagnostics: WhatsAppAvailabilityDiagnostics
 }
 
+function dedupeWhatsAppSlots(slots: WhatsAppBookingSlot[]) {
+  return slots.filter((slot, index, collection) =>
+    collection.findIndex((candidate) =>
+      candidate.professionalId === slot.professionalId
+      && candidate.dateIso === slot.dateIso
+      && candidate.timeLabel === slot.timeLabel
+    ) === index
+  )
+}
+
 function getSlotKey(professionalId: string, startAt: Date) {
   return `${professionalId}:${startAt.toISOString()}`
 }
@@ -378,7 +388,8 @@ export async function getAvailableWhatsAppSlots(input: {
     }
   }
 
-  const slots = openSlotsAfterPeriodFilter
+  const dedupedSlots = dedupeWhatsAppSlots(openSlotsAfterPeriodFilter)
+  const slots = dedupedSlots
     .sort((left, right) => new Date(left.startAtIso).getTime() - new Date(right.startAtIso).getTime())
     .slice(0, input.limit ?? 4)
 
@@ -413,6 +424,17 @@ export async function getAvailableWhatsAppSlots(input: {
     diagnostics,
     slots,
   })
+
+  if (dedupedSlots.length !== openSlotsAfterPeriodFilter.length) {
+    console.info('[whatsapp-booking] offeredSlots deduplicated', {
+      barbershopId: input.barbershopId,
+      serviceId: input.serviceId,
+      before: openSlotsAfterPeriodFilter.length,
+      after: dedupedSlots.length,
+      period: normalizedPeriod,
+      dateIso: input.dateIso,
+    })
+  }
 
   return {
     service: {
@@ -635,4 +657,9 @@ export function resolveWhatsAppAppointmentStartAt(input: {
     chosenLocalDateTime,
     startAt,
   }
+}
+
+export const __testing = {
+  dedupeWhatsAppSlots,
+  resolveWhatsAppAppointmentStartAt,
 }

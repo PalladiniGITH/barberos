@@ -151,6 +151,24 @@ test('backend corrige nextAction quando a IA tenta perguntar algo ja preenchido'
   assert.equal(corrected, 'OFFER_SLOTS')
 })
 
+test('backend nao volta a pedir dia quando a data ja foi informada claramente', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.selectedProfessionalId = 'pro-matheus'
+  memory.selectedProfessionalName = 'Matheus'
+  memory.requestedDateIso = '2026-04-14'
+
+  const corrected = agentTesting.enforceNextActionFromMemory(
+    'ASK_DATE',
+    memory,
+    false,
+    createAgentInput().nowContext
+  )
+
+  assert.equal(corrected, 'ASK_PERIOD')
+})
+
 test('validateMissingFields nao oferece manha quando ja e tarde e a data e hoje', () => {
   const input = createAgentInput()
   input.nowContext = {
