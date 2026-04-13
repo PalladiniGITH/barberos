@@ -461,12 +461,12 @@ export async function createAppointmentFromWhatsApp(input: {
     throw new Error('Dados de agendamento indisponiveis para o fluxo do WhatsApp.')
   }
 
-  const chosenLocalDateTime = input.dateIso && input.timeLabel
-    ? `${input.dateIso} ${input.timeLabel}`
-    : null
-  const startAt = chosenLocalDateTime
-    ? buildBusinessDateTimeFromTimeLabel(input.dateIso as string, input.timeLabel as string, resolvedTimezone)
-    : new Date(input.startAtIso as string)
+  const { chosenLocalDateTime, startAt } = resolveWhatsAppAppointmentStartAt({
+    dateIso: input.dateIso ?? null,
+    timeLabel: input.timeLabel ?? null,
+    timezone: resolvedTimezone,
+    fallbackStartAtIso: input.startAtIso ?? null,
+  })
   const endAt = new Date(startAt.getTime() + service.duration * 60_000)
   const operationalBufferMinutes = getOperationalBufferMinutes()
   const bufferedEndAt = new Date(endAt.getTime() + operationalBufferMinutes * 60_000)
@@ -551,5 +551,26 @@ export async function createAppointmentFromWhatsApp(input: {
     id: appointment.id,
     startAt: appointment.startAt,
     endAt: appointment.endAt,
+  }
+}
+
+export function resolveWhatsAppAppointmentStartAt(input: {
+  dateIso?: string | null
+  timeLabel?: string | null
+  timezone?: string | null
+  fallbackStartAtIso?: string | null
+}) {
+  const resolvedTimezone = resolveBusinessTimezone(input.timezone)
+  const chosenLocalDateTime = input.dateIso && input.timeLabel
+    ? `${input.dateIso} ${input.timeLabel}`
+    : null
+  const startAt = chosenLocalDateTime
+    ? buildBusinessDateTimeFromTimeLabel(input.dateIso as string, input.timeLabel as string, resolvedTimezone)
+    : new Date(input.fallbackStartAtIso as string)
+
+  return {
+    timezone: resolvedTimezone,
+    chosenLocalDateTime,
+    startAt,
   }
 }

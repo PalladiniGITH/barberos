@@ -126,6 +126,14 @@ function isShortGreetingMessage(value: string) {
   return SHORT_GREETING_PATTERN.test(normalizeText(value))
 }
 
+function shouldResetConversationOnGreeting(input: {
+  shortGreeting: boolean
+  contextReliable: boolean
+  restartConversation: boolean
+}) {
+  return input.restartConversation || (input.shortGreeting && !input.contextReliable)
+}
+
 function buildEmptyConversationDraft(): ConversationDraft {
   return {
     selectedServiceId: null,
@@ -1137,7 +1145,11 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   const usedAI = interpreted.source === 'openai'
   const shortGreeting = interpreted.greetingOnly || isShortGreetingMessage(inboundText)
 
-  if (interpreted.restartConversation || (shortGreeting && !contextReliable)) {
+  if (shouldResetConversationOnGreeting({
+    shortGreeting,
+    contextReliable,
+    restartConversation: interpreted.restartConversation,
+  })) {
     const responseText = buildGreeting(input.barbershop.name, input.customer.created ? null : input.customer.name)
 
     await resetConversation({
@@ -1692,4 +1704,11 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       responseLeadIn: 'Esse horario nao estava mais livre no momento de confirmar. Vou te mostrar opcoes atualizadas.',
     })
   }
+}
+
+export const __testing = {
+  buildEmptyConversationDraft,
+  isConversationContextReliable,
+  isShortGreetingMessage,
+  shouldResetConversationOnGreeting,
 }

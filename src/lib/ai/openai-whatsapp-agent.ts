@@ -1561,3 +1561,10 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     clearTimeout(timeout)
   }
 }
+
+export const __testing = {
+  buildInitialMemory,
+  promoteIntentContextToMemory,
+  enforceNextActionFromMemory,
+  buildGuardrailReplyText,
+}
