@@ -15,6 +15,7 @@ import {
   listBlockingAppointmentsForDay,
   matchesTimePreference,
 } from '@/lib/agendamentos/availability'
+import { getTodayIsoInTimezone } from '@/lib/timezone'
 
 export interface WhatsAppBookingSlot {
   key: string
@@ -161,6 +162,7 @@ export async function getAvailableWhatsAppSlots(input: {
   barbershopId: string
   serviceId: string
   dateIso: string
+  timezone?: string | null
   professionalId?: string | null
   timePreference?: string | null
   exactTime?: string | null
@@ -251,8 +253,8 @@ export async function getAvailableWhatsAppSlots(input: {
 
   const dayOpen = buildLocalDate(input.dateIso, SCHEDULE_START_HOUR, 0)
   const dayClose = buildLocalDate(input.dateIso, SCHEDULE_END_HOUR, 0)
-  const currentRoundedTime = getNowRoundedToStep()
-  const isToday = input.dateIso === formatLocalDate(new Date())
+  const currentRoundedTime = getNowRoundedToStep(input.timezone)
+  const isToday = input.dateIso === getTodayIsoInTimezone(input.timezone)
   const blockingAppointments = await listBlockingAppointmentsForDay({
     barbershopId: input.barbershopId,
     dateIso: input.dateIso,
@@ -379,12 +381,14 @@ export async function findExactAvailableWhatsAppSlot(input: {
   professionalId: string
   dateIso: string
   timeLabel: string
+  timezone?: string | null
 }) {
   const availability = await getAvailableWhatsAppSlots({
     barbershopId: input.barbershopId,
     serviceId: input.serviceId,
     professionalId: input.professionalId,
     dateIso: input.dateIso,
+    timezone: input.timezone,
     timePreference: 'EXACT',
     exactTime: input.timeLabel,
     limit: 8,

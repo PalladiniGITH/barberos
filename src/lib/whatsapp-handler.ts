@@ -24,6 +24,7 @@ interface TenantCandidate {
   id: string
   name: string
   slug: string
+  timezone: string
 }
 
 interface TenantResolutionResult {
@@ -131,6 +132,7 @@ async function resolveTenantBarbershop(instanceName: string | null): Promise<Ten
         id: true,
         name: true,
         slug: true,
+        timezone: true,
       },
     })
 
@@ -150,6 +152,7 @@ async function resolveTenantBarbershop(instanceName: string | null): Promise<Ten
       id: true,
       name: true,
       slug: true,
+      timezone: true,
     },
   })
 

@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { prisma } from '@/lib/prisma'
+import { getCurrentDateTimeInTimezone } from '@/lib/timezone'
 
 export const SCHEDULE_START_HOUR = 8
 export const SCHEDULE_END_HOUR = 21
@@ -62,8 +63,9 @@ export function getOperationalBufferMinutes() {
   return Math.min(30, Math.round(parsed))
 }
 
-export function getNowRoundedToStep() {
-  const now = new Date()
+export function getNowRoundedToStep(timezone?: string | null) {
+  const nowContext = getCurrentDateTimeInTimezone(timezone)
+  const now = buildLocalDate(nowContext.dateIso, nowContext.hour, nowContext.minute)
   now.setSeconds(0, 0)
 
   const roundedMinutes =

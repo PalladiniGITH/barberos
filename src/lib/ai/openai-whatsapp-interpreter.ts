@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { z } from 'zod'
+import { nextWeekdayIsoDate, shiftIsoDate } from '@/lib/timezone'
 
 const DEFAULT_OPENAI_MODEL = 'gpt-5.4-mini'
 const DEFAULT_TIMEOUT_MS = 15000
@@ -13,8 +14,8 @@ const WEEKDAY_INDEX: Record<string, number> = {
   segunda: 1,
   'segunda-feira': 1,
   terca: 2,
-  terça: 2,
   'terca-feira': 2,
+  terça: 2,
   'terça-feira': 2,
   quarta: 3,
   'quarta-feira': 3,
@@ -35,6 +36,9 @@ const IntentSchema = z.object({
   timePreference: z.enum(['NONE', 'EXACT', 'MORNING', 'AFTERNOON', 'LATE_AFTERNOON', 'EVENING']),
   exactTime: z.string().regex(/^\d{2}:\d{2}$/).nullable(),
   selectedOptionNumber: z.number().int().min(1).max(6).nullable(),
+  correctionTarget: z.enum(['NONE', 'SERVICE', 'PROFESSIONAL', 'DATE', 'PERIOD', 'TIME', 'FLOW']),
+  greetingOnly: z.boolean(),
+  restartConversation: z.boolean(),
   confidence: z.number().min(0).max(1),
   reasoning: z.string().max(240),
 })
@@ -67,6 +71,12 @@ const INTENT_JSON_SCHEMA = {
     selectedOptionNumber: {
       anyOf: [{ type: 'integer', minimum: 1, maximum: 6 }, { type: 'null' }],
     },
+    correctionTarget: {
+      type: 'string',
+      enum: ['NONE', 'SERVICE', 'PROFESSIONAL', 'DATE', 'PERIOD', 'TIME', 'FLOW'],
+    },
+    greetingOnly: { type: 'boolean' },
+    restartConversation: { type: 'boolean' },
     confidence: { type: 'number', minimum: 0, maximum: 1 },
     reasoning: { type: 'string' },
   },
@@ -79,6 +89,9 @@ const INTENT_JSON_SCHEMA = {
     'timePreference',
     'exactTime',
     'selectedOptionNumber',
+    'correctionTarget',
+    'greetingOnly',
+    'restartConversation',
     'confidence',
     'reasoning',
   ],
@@ -93,11 +106,22 @@ interface OpenAIConfig {
 export interface WhatsAppInterpreterInput {
   message: string
   barbershopName: string
+  barbershopTimezone: string
   conversationState: string
   offeredSlotCount: number
   services: Array<{ name: string }>
   professionals: Array<{ name: string }>
   todayIsoDate: string
+  currentLocalDateTime: string
+  conversationSummary: {
+    selectedServiceName?: string | null
+    selectedProfessionalName?: string | null
+    requestedDateIso?: string | null
+    requestedTimeLabel?: string | null
+    allowAnyProfessional?: boolean
+    lastCustomerMessage?: string | null
+    lastAssistantMessage?: string | null
+  }
 }
 
 export type WhatsAppIntent = z.infer<typeof IntentSchema> & {
@@ -140,6 +164,7 @@ function normalizeText(value: string) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
+    .trim()
 }
 
 function extractResponseText(payload: unknown) {
@@ -169,25 +194,6 @@ function extractResponseText(payload: unknown) {
   })
 
   return chunks.join('\n').trim()
-}
-
-function nextWeekdayDate(base: Date, weekday: number) {
-  const candidate = new Date(base)
-  candidate.setHours(0, 0, 0, 0)
-  const currentWeekday = candidate.getDay()
-  let delta = weekday - currentWeekday
-  if (delta <= 0) {
-    delta += 7
-  }
-  candidate.setDate(candidate.getDate() + delta)
-  return candidate
-}
-
-function formatIsoDate(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
 }
 
 function formatIsoTime(hours: number, minutes: number) {
@@ -222,7 +228,6 @@ function extractMentionedName(message: string) {
     normalized.includes('qualquer')
     || normalized.includes('barbeiro')
     || normalized.includes('horario')
-    || normalized.includes('horario')
   ) {
     return null
   }
@@ -230,24 +235,27 @@ function extractMentionedName(message: string) {
   return rawName.trim()
 }
 
-function parseRelativeDate(message: string, today: Date) {
+function parseRelativeDate(message: string, todayIsoDate: string) {
   const normalized = normalizeText(message)
 
+  if (normalized.includes('depois de amanha')) {
+    return shiftIsoDate(todayIsoDate, 2)
+  }
+
   if (normalized.includes('amanha')) {
-    const date = new Date(today)
-    date.setDate(date.getDate() + 1)
-    return formatIsoDate(date)
+    return shiftIsoDate(todayIsoDate, 1)
   }
 
   if (normalized.includes('hoje')) {
-    return formatIsoDate(today)
+    return todayIsoDate
   }
 
   const explicitDate = normalized.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/)
   if (explicitDate) {
     const day = Number(explicitDate[1])
     const month = Number(explicitDate[2])
-    const yearRaw = explicitDate[3] ? Number(explicitDate[3]) : today.getFullYear()
+    const currentYear = Number(todayIsoDate.slice(0, 4))
+    const yearRaw = explicitDate[3] ? Number(explicitDate[3]) : currentYear
     const year = yearRaw < 100 ? 2000 + yearRaw : yearRaw
 
     if (day >= 1 && day <= 31 && month >= 1 && month <= 12) {
@@ -257,7 +265,7 @@ function parseRelativeDate(message: string, today: Date) {
 
   const weekdayName = Object.keys(WEEKDAY_INDEX).find((name) => normalized.includes(name))
   if (weekdayName) {
-    return formatIsoDate(nextWeekdayDate(today, WEEKDAY_INDEX[weekdayName]))
+    return nextWeekdayIsoDate(todayIsoDate, WEEKDAY_INDEX[weekdayName])
   }
 
   return null
@@ -271,72 +279,42 @@ function inferTimePreference(message: string) {
     const hour = Number(afterHourMatch[1])
 
     if (hour >= 18) {
-      return {
-        timePreference: 'EVENING' as const,
-        exactTime: null,
-      }
+      return { timePreference: 'EVENING' as const, exactTime: null }
     }
 
     if (hour >= 17) {
-      return {
-        timePreference: 'LATE_AFTERNOON' as const,
-        exactTime: null,
-      }
+      return { timePreference: 'LATE_AFTERNOON' as const, exactTime: null }
     }
 
     if (hour >= 12) {
-      return {
-        timePreference: 'AFTERNOON' as const,
-        exactTime: null,
-      }
+      return { timePreference: 'AFTERNOON' as const, exactTime: null }
     }
 
-    return {
-      timePreference: 'MORNING' as const,
-      exactTime: null,
-    }
+    return { timePreference: 'MORNING' as const, exactTime: null }
   }
 
   const exactTime = parseExplicitTime(normalized)
   if (exactTime) {
-    return {
-      timePreference: 'EXACT' as const,
-      exactTime,
-    }
+    return { timePreference: 'EXACT' as const, exactTime }
   }
 
   if (normalized.includes('fim da tarde')) {
-    return {
-      timePreference: 'LATE_AFTERNOON' as const,
-      exactTime: null,
-    }
+    return { timePreference: 'LATE_AFTERNOON' as const, exactTime: null }
   }
 
   if (normalized.includes('manha')) {
-    return {
-      timePreference: 'MORNING' as const,
-      exactTime: null,
-    }
+    return { timePreference: 'MORNING' as const, exactTime: null }
   }
 
   if (normalized.includes('tarde')) {
-    return {
-      timePreference: 'AFTERNOON' as const,
-      exactTime: null,
-    }
+    return { timePreference: 'AFTERNOON' as const, exactTime: null }
   }
 
   if (normalized.includes('noite')) {
-    return {
-      timePreference: 'EVENING' as const,
-      exactTime: null,
-    }
+    return { timePreference: 'EVENING' as const, exactTime: null }
   }
 
-  return {
-    timePreference: 'NONE' as const,
-    exactTime: null,
-  }
+  return { timePreference: 'NONE' as const, exactTime: null }
 }
 
 function findBestNamedMatch(options: Array<{ name: string }>, message: string) {
@@ -370,6 +348,23 @@ function findBestNamedMatch(options: Array<{ name: string }>, message: string) {
   return tokenMatch?.name ?? null
 }
 
+function isGreetingOnly(message: string) {
+  const normalized = normalizeText(message)
+  if (!normalized) {
+    return false
+  }
+
+  const pureGreetingPattern = /^(oi+|ola+|ol[aá]|bom dia|boa tarde|boa noite|e ai|opa|hey+|fala)(\s+.+)?$/
+  const bookingSignals = /\b(agendar|marcar|horario|horario|corte|barba|amanha|hoje|segunda|terca|quarta|quinta|sexta|sabado|domingo)\b/
+
+  return pureGreetingPattern.test(normalized) && !bookingSignals.test(normalized)
+}
+
+function shouldRestartConversation(message: string) {
+  const normalized = normalizeText(message)
+  return /\b(recomeca|recomeca|comeca de novo|comeca do zero|do zero|esquece tudo|novo atendimento)\b/.test(normalized)
+}
+
 function inferIntent(message: string, conversationState: string) {
   const normalized = normalizeText(message)
 
@@ -377,13 +372,13 @@ function inferIntent(message: string, conversationState: string) {
     return 'CONFIRM' as const
   }
 
-  if (/\b(nao|não|cancelar|cancela|mudar|trocar|outro horario|outro horario)\b/.test(normalized)) {
+  if (/\b(nao|cancelar|cancela|mudar|trocar|outro horario|outro barbeiro|na verdade|quis dizer)\b/.test(normalized)) {
     return conversationState === 'WAITING_CONFIRMATION'
       ? 'DECLINE' as const
       : 'CHANGE_REQUEST' as const
   }
 
-  if (/\b(agendar|marcar|agendamento|horario|horário|corte|barba|quero cortar|quero marcar)\b/.test(normalized)) {
+  if (/\b(agendar|marcar|agendamento|horario|corte|barba|quero cortar|quero marcar)\b/.test(normalized)) {
     return 'BOOK_APPOINTMENT' as const
   }
 
@@ -398,7 +393,7 @@ function inferSelectedOptionNumber(message: string, offeredSlotCount: number) {
     return selected >= 1 && selected <= Math.max(offeredSlotCount, 1) ? selected : null
   }
 
-  const optionNumber = normalized.match(/\b([1-6])[oa]?\s*(?:opcao|opção)\b/)
+  const optionNumber = normalized.match(/\b([1-6])[oa]?\s*(?:opcao|opcao)\b/)
   if (optionNumber) {
     const selected = Number(optionNumber[1])
     return selected >= 1 && selected <= Math.max(offeredSlotCount, 1) ? selected : null
@@ -407,21 +402,125 @@ function inferSelectedOptionNumber(message: string, offeredSlotCount: number) {
   return null
 }
 
+function inferCorrectionTarget(input: {
+  message: string
+  serviceName: string | null
+  mentionedName: string | null
+  requestedDateIso: string | null
+  timePreference: string
+  exactTime: string | null
+  allowAnyProfessional: boolean
+  conversationSummary: WhatsAppInterpreterInput['conversationSummary']
+}) {
+  const normalized = normalizeText(input.message)
+
+  if (shouldRestartConversation(input.message)) {
+    return 'FLOW' as const
+  }
+
+  const hasCorrectionCue = /\b(mas|nao|na verdade|quis dizer|corrig|melhor|troca|trocar|outro|ajusta)\b/.test(
+    normalized
+  )
+
+  if (
+    input.requestedDateIso
+    && input.conversationSummary.requestedDateIso
+    && input.requestedDateIso !== input.conversationSummary.requestedDateIso
+  ) {
+    return 'DATE' as const
+  }
+
+  if (
+    input.exactTime
+    && input.conversationSummary.requestedTimeLabel
+    && input.exactTime !== input.conversationSummary.requestedTimeLabel
+  ) {
+    return 'TIME' as const
+  }
+
+  if (
+    input.timePreference !== 'NONE'
+    && input.timePreference !== 'EXACT'
+    && input.conversationSummary.requestedTimeLabel
+    && input.timePreference !== input.conversationSummary.requestedTimeLabel
+  ) {
+    return 'PERIOD' as const
+  }
+
+  if (
+    input.serviceName
+    && input.conversationSummary.selectedServiceName
+    && normalizeText(input.serviceName) !== normalizeText(input.conversationSummary.selectedServiceName)
+  ) {
+    return 'SERVICE' as const
+  }
+
+  if (input.allowAnyProfessional && input.conversationSummary.selectedProfessionalName) {
+    return 'PROFESSIONAL' as const
+  }
+
+  if (
+    input.mentionedName
+    && input.conversationSummary.selectedProfessionalName
+    && normalizeText(input.mentionedName) !== normalizeText(input.conversationSummary.selectedProfessionalName)
+  ) {
+    return 'PROFESSIONAL' as const
+  }
+
+  if (hasCorrectionCue) {
+    if (/(hoje|amanha|depois de amanha|segunda|terca|quarta|quinta|sexta|sabado|domingo|\d{1,2}[\/\-]\d{1,2})/.test(normalized)) {
+      return 'DATE' as const
+    }
+
+    if (/(manha|tarde|noite|fim da tarde|depois das?)/.test(normalized)) {
+      return input.exactTime ? 'TIME' as const : 'PERIOD' as const
+    }
+
+    if (/(outro barbeiro|com outro|nao com ele|nao com esse|qualquer um|sem preferencia)/.test(normalized)) {
+      return 'PROFESSIONAL' as const
+    }
+
+    if (input.serviceName) {
+      return 'SERVICE' as const
+    }
+
+    return 'FLOW' as const
+  }
+
+  return 'NONE' as const
+}
+
 function buildFallbackIntent(input: WhatsAppInterpreterInput): WhatsAppIntent {
-  const today = new Date(`${input.todayIsoDate}T09:00:00`)
   const timePreference = inferTimePreference(input.message)
+  const serviceName = findBestNamedMatch(input.services, input.message)
+  const mentionedName = extractMentionedName(input.message)
+  const allowAnyProfessional = /\b(qualquer um|qualquer barbeiro|tanto faz|sem preferencia)\b/.test(
+    normalizeText(input.message)
+  )
+  const requestedDateIso = parseRelativeDate(input.message, input.todayIsoDate)
+  const correctionTarget = inferCorrectionTarget({
+    message: input.message,
+    serviceName,
+    mentionedName,
+    requestedDateIso,
+    timePreference: timePreference.timePreference,
+    exactTime: timePreference.exactTime,
+    allowAnyProfessional,
+    conversationSummary: input.conversationSummary,
+  })
 
   return {
     intent: inferIntent(input.message, input.conversationState),
-    serviceName: findBestNamedMatch(input.services, input.message),
-    mentionedName: extractMentionedName(input.message),
-    allowAnyProfessional: /\b(qualquer um|qualquer barbeiro|tanto faz|sem preferencia|sem preferência)\b/.test(
-      normalizeText(input.message)
-    ),
-    requestedDateIso: parseRelativeDate(input.message, today),
+    serviceName,
+    mentionedName,
+    allowAnyProfessional,
+    requestedDateIso,
     timePreference: timePreference.timePreference,
     exactTime: timePreference.exactTime,
     selectedOptionNumber: inferSelectedOptionNumber(input.message, input.offeredSlotCount),
+    correctionTarget,
+    greetingOnly: isGreetingOnly(input.message),
+    restartConversation: shouldRestartConversation(input.message),
     confidence: 0.48,
     reasoning: 'Fallback deterministico local.',
     source: 'fallback',
@@ -429,33 +528,61 @@ function buildFallbackIntent(input: WhatsAppInterpreterInput): WhatsAppIntent {
 }
 
 function buildInterpreterPrompt(input: WhatsAppInterpreterInput) {
+  const summary = input.conversationSummary
+
   return [
-    'Voce interpreta mensagens de WhatsApp para um fluxo guiado de agendamento da BarberOS.',
-    'Nao crie agendamento. Nao invente disponibilidade. Apenas extraia intencao estruturada.',
+    'Voce interpreta mensagens de WhatsApp para um agente guiado de agendamento da BarberOS.',
+    'Voce nunca cria agendamento, nunca inventa horario e nunca decide barbeiro sozinho.',
+    'Sua funcao e somente interpretar a mensagem de forma estruturada.',
     `Barbearia: ${input.barbershopName}.`,
-    `Data atual local: ${input.todayIsoDate}.`,
+    `Timezone local da barbearia: ${input.barbershopTimezone}.`,
+    `Agora local da barbearia: ${input.currentLocalDateTime}.`,
+    `Data local de referencia: ${input.todayIsoDate}.`,
     `Estado atual da conversa: ${input.conversationState}.`,
     `Servicos validos: ${input.services.map((service) => service.name).join(', ') || 'nenhum'}.`,
     `Profissionais validos: ${input.professionals.map((professional) => professional.name).join(', ') || 'nenhum'}.`,
-    `Quantidade de opcoes de horario atualmente oferecidas ao cliente: ${input.offeredSlotCount}.`,
+    `Quantidade de opcoes de horario atualmente oferecidas: ${input.offeredSlotCount}.`,
+    `Resumo atual do contexto: servico=${summary.selectedServiceName ?? 'none'}; barbeiro=${summary.selectedProfessionalName ?? (summary.allowAnyProfessional ? 'qualquer' : 'none')}; data=${summary.requestedDateIso ?? 'none'}; horario_ou_periodo=${summary.requestedTimeLabel ?? 'none'}.`,
+    `Ultima mensagem do cliente: ${summary.lastCustomerMessage ?? 'none'}.`,
+    `Ultima resposta do sistema: ${summary.lastAssistantMessage ?? 'none'}.`,
     'Regras obrigatorias:',
-    '- serviceName deve ser exatamente um dos servicos validos, ou null.',
-    '- mentionedName deve conter apenas o nome da pessoa citada pelo cliente, ou null.',
-    '- Nao assuma que o nome citado e um barbeiro. Apenas extraia o nome mencionado.',
-    '- requestedDateIso deve ser yyyy-mm-dd apenas quando a data estiver clara. Para "amanha", converta para a data absoluta.',
+    '- serviceName deve ser exatamente um servico valido ou null.',
+    '- mentionedName deve conter apenas o nome citado pelo cliente ou null.',
+    '- Nao assuma que mentionedName e barbeiro; so extraia o nome mencionado.',
+    '- requestedDateIso deve ser yyyy-mm-dd apenas quando a data estiver clara.',
+    '- Para "hoje", "amanha" e "depois de amanha", use a data local da barbearia.',
     '- timePreference deve ser EXACT, MORNING, AFTERNOON, LATE_AFTERNOON, EVENING ou NONE.',
-    '- exactTime so deve ser preenchido se o horario exato estiver explicito.',
-    '- selectedOptionNumber so deve ser preenchido quando o cliente escolher uma das opcoes oferecidas.',
-    '- Se o cliente disser "qualquer um" ou equivalente, marque allowAnyProfessional=true.',
+    '- exactTime so deve ser preenchido quando o horario exato estiver explicito.',
+    '- selectedOptionNumber so deve ser preenchido quando o cliente escolher uma opcao oferecida.',
+    '- correctionTarget deve indicar se o cliente esta corrigindo SERVICE, PROFESSIONAL, DATE, PERIOD, TIME, FLOW ou NONE.',
+    '- greetingOnly=true apenas quando a mensagem for basicamente saudacao sem pedido concreto.',
+    '- restartConversation=true apenas quando o cliente realmente quiser recomecar.',
     '- intent deve ser BOOK_APPOINTMENT, CONFIRM, DECLINE, CHANGE_REQUEST ou UNKNOWN.',
     `Mensagem do cliente: """${input.message}"""`,
   ].join('\n')
 }
 
+function mergeWithFallback(parsed: z.infer<typeof IntentSchema>, fallback: WhatsAppIntent): WhatsAppIntent {
+  return {
+    ...parsed,
+    serviceName: parsed.serviceName ?? fallback.serviceName,
+    mentionedName: parsed.mentionedName ?? fallback.mentionedName,
+    requestedDateIso: parsed.requestedDateIso ?? fallback.requestedDateIso,
+    exactTime: parsed.exactTime ?? fallback.exactTime,
+    selectedOptionNumber: parsed.selectedOptionNumber ?? fallback.selectedOptionNumber,
+    correctionTarget: parsed.correctionTarget === 'NONE' ? fallback.correctionTarget : parsed.correctionTarget,
+    greetingOnly: parsed.greetingOnly || fallback.greetingOnly,
+    restartConversation: parsed.restartConversation || fallback.restartConversation,
+    source: 'openai',
+  }
+}
+
 export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput): Promise<WhatsAppIntent> {
+  const fallback = buildFallbackIntent(input)
   const config = getOpenAIConfig()
+
   if (!config) {
-    return buildFallbackIntent(input)
+    return fallback
   }
 
   const controller = new AbortController()
@@ -471,7 +598,7 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
       body: JSON.stringify({
         model: config.model,
         store: false,
-        max_output_tokens: 280,
+        max_output_tokens: 320,
         input: [
           {
             role: 'user',
@@ -493,14 +620,14 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
 
     if (!response.ok) {
       console.warn('[whatsapp-interpreter/openai] fallback bad_status', { status: response.status })
-      return buildFallbackIntent(input)
+      return fallback
     }
 
     const payload = await response.json()
     const outputText = extractResponseText(payload)
     if (!outputText) {
       console.warn('[whatsapp-interpreter/openai] fallback empty_output')
-      return buildFallbackIntent(input)
+      return fallback
     }
 
     const parsedJson = JSON.parse(outputText)
@@ -510,18 +637,15 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
       console.warn('[whatsapp-interpreter/openai] fallback invalid_schema', {
         issues: parsed.error.issues.map((issue) => `${issue.path.join('.') || 'root'}:${issue.message}`),
       })
-      return buildFallbackIntent(input)
+      return fallback
     }
 
-    return {
-      ...parsed.data,
-      source: 'openai',
-    }
+    return mergeWithFallback(parsed.data, fallback)
   } catch (error) {
     console.warn('[whatsapp-interpreter/openai] fallback request_failed', {
       error: error instanceof Error ? error.message : 'unknown_error',
     })
-    return buildFallbackIntent(input)
+    return fallback
   } finally {
     clearTimeout(timeout)
   }
