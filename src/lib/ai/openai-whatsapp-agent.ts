@@ -788,7 +788,7 @@ async function loadRecentMessages(input: {
       direction: { in: ['INBOUND', 'OUTBOUND'] },
     },
     orderBy: { createdAt: 'desc' },
-    take: 6,
+    take: 8,
     select: {
       direction: true,
       bodyText: true,

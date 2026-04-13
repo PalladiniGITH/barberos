@@ -46,3 +46,31 @@ test('saudacao curta com contexto nao confiavel dispara reset seguro', () => {
     true
   )
 })
+
+test('retomada logo apos agendamento confirmado usa contexto recente em vez de saudacao fria', () => {
+  const hasRecentContext = conversationTesting.hasRecentCompletedBookingContext({
+    state: 'IDLE',
+    completedAt: new Date(Date.now() - 5 * 60_000),
+    recentBooking: {
+      serviceName: 'Barba Terapia',
+      professionalName: 'Rafael Costa',
+      dateIso: '2026-04-13',
+      timeLabel: '16:45',
+    },
+  })
+
+  const reply = conversationTesting.buildRecentConfirmedGreeting(
+    {
+      serviceName: 'Barba Terapia',
+      professionalName: 'Rafael Costa',
+      dateIso: '2026-04-13',
+      timeLabel: '16:45',
+    },
+    'America/Sao_Paulo'
+  )
+
+  assert.equal(hasRecentContext, true)
+  assert.match(reply, /16:45/)
+  assert.match(reply, /Rafael Costa/)
+  assert.match(reply, /ja ficou marcado|Precisa de mais alguma coisa/i)
+})

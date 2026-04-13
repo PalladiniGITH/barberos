@@ -1,6 +1,6 @@
 import 'server-only'
 
-import { Prisma } from '@prisma/client'
+import { MessagingProvider, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { interpretWhatsAppMessage } from '@/lib/ai/openai-whatsapp-interpreter'
 import { processWhatsAppConversationWithAgent } from '@/lib/ai/openai-whatsapp-agent'
@@ -109,8 +109,23 @@ interface ConversationBaseUpdate {
 
 type ConversationSlot = WhatsAppBookingSlot
 
+interface RecentConversationMessage {
+  direction: 'INBOUND' | 'OUTBOUND'
+  text: string
+  createdAt: string
+}
+
+interface RecentConfirmedBookingMemory {
+  serviceName: string
+  professionalName: string
+  dateIso: string
+  timeLabel: string
+}
+
 const JSON_NULL = Prisma.JsonNull
 const CONVERSATION_CONTEXT_TTL_MS = 45 * 60_000
+const RECENT_COMPLETED_BOOKING_CONTEXT_MS = 20 * 60_000
+const RECENT_MESSAGE_CONTEXT_LIMIT = 8
 const SHORT_GREETING_PATTERN = /^(oi+|ola+|ol[aá]|bom dia|boa tarde|boa noite)[!.,\s]*$/
 
 function normalizeText(value: string) {
@@ -188,6 +203,21 @@ function buildGreeting(barbershopName: string, customerName?: string | null) {
   const firstName = customerName?.trim()?.split(' ')[0]
   const greeting = firstName ? `Oi, ${firstName}!` : 'Oi!'
   return `${greeting} Posso te ajudar a marcar um horario na ${barbershopName}.`
+}
+
+function buildRecentConfirmedBookingSummary(
+  slot: ConversationSlot,
+  serviceName: string | null,
+  timezone: string
+) {
+  return `Agendamento confirmado: ${formatDayLabel(slot.dateIso, timezone).toLowerCase()} as ${slot.timeLabel} com ${slot.professionalName} para ${serviceName ?? 'o servico solicitado'}.`
+}
+
+function buildRecentConfirmedGreeting(
+  booking: RecentConfirmedBookingMemory,
+  timezone: string
+) {
+  return `Oi! Seu horario ja ficou marcado para ${formatDayLabel(booking.dateIso, timezone).toLowerCase()} as ${booking.timeLabel} com ${booking.professionalName} para ${booking.serviceName}. Precisa de mais alguma coisa?`
 }
 
 function buildServiceQuestion(serviceNames: string[]) {
@@ -278,22 +308,30 @@ function buildHumanSlotOfferMessage(
   timezone: string,
   timePreference?: string | null
 ) {
-  const sameDay = slots.every((slot) => slot.dateIso === slots[0]?.dateIso)
-  const sameProfessional = slots.every((slot) => slot.professionalId === slots[0]?.professionalId)
+  const uniqueSlots = slots.filter((slot, index, collection) =>
+    collection.findIndex((candidate) =>
+      candidate.dateIso === slot.dateIso
+      && candidate.timeLabel === slot.timeLabel
+      && candidate.professionalId === slot.professionalId
+    ) === index
+  )
+
+  const sameDay = uniqueSlots.every((slot) => slot.dateIso === uniqueSlots[0]?.dateIso)
+  const sameProfessional = uniqueSlots.every((slot) => slot.professionalId === uniqueSlots[0]?.professionalId)
   const periodLabel = describeHumanPeriodLabel(timePreference)
 
   let header = `Encontrei estes horarios disponiveis para ${serviceName}:`
   if (sameDay && sameProfessional) {
     header = periodLabel
-      ? `${formatDayLabel(slots[0].dateIso, timezone)} ${periodLabel} com ${slots[0].professionalName} eu tenho estes horarios livres para ${serviceName}:`
-      : `${formatDayLabel(slots[0].dateIso, timezone)} com ${slots[0].professionalName} eu tenho estes horarios livres para ${serviceName}:`
+      ? `${formatDayLabel(uniqueSlots[0].dateIso, timezone)} ${periodLabel} com ${uniqueSlots[0].professionalName} eu tenho estes horarios livres para ${serviceName}:`
+      : `${formatDayLabel(uniqueSlots[0].dateIso, timezone)} com ${uniqueSlots[0].professionalName} eu tenho estes horarios livres para ${serviceName}:`
   } else if (sameDay) {
     header = periodLabel
-      ? `${formatDayLabel(slots[0].dateIso, timezone)} ${periodLabel} encontrei estes horarios disponiveis para ${serviceName}:`
-      : `${formatDayLabel(slots[0].dateIso, timezone)} encontrei estes horarios disponiveis para ${serviceName}:`
+      ? `${formatDayLabel(uniqueSlots[0].dateIso, timezone)} ${periodLabel} encontrei estes horarios disponiveis para ${serviceName}:`
+      : `${formatDayLabel(uniqueSlots[0].dateIso, timezone)} encontrei estes horarios disponiveis para ${serviceName}:`
   }
 
-  const lines = slots.map((slot) => {
+  const lines = uniqueSlots.map((slot) => {
     if (sameDay && sameProfessional) {
       return `- ${slot.timeLabel}`
     }
@@ -303,9 +341,11 @@ function buildHumanSlotOfferMessage(
     }
 
     return `- ${formatDayLabel(slot.dateIso, timezone)} as ${slot.timeLabel} com ${slot.professionalName}`
-  })
+  }).filter(Boolean)
 
-  return `${header}\n\n${lines.join('\n')}\n\nPode me dizer qual prefere ou pedir outro horario.`
+  return [header, lines.join('\n'), 'Pode me dizer qual prefere ou pedir outro horario.']
+    .filter((line) => line.trim().length > 0)
+    .join('\n\n')
 }
 
 function buildConfirmationMessage(slot: ConversationSlot, serviceName: string, timezone: string) {
@@ -698,6 +738,80 @@ async function resetConversation(input: {
   })
 }
 
+function parseRecentConfirmedBookingMemory(raw: Prisma.JsonValue | null) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return null
+  }
+
+  const candidate = raw as Record<string, unknown>
+  const recentBooking =
+    candidate.recentBooking && typeof candidate.recentBooking === 'object' && !Array.isArray(candidate.recentBooking)
+      ? candidate.recentBooking as Record<string, unknown>
+      : null
+
+  if (
+    !recentBooking
+    || typeof recentBooking.serviceName !== 'string'
+    || typeof recentBooking.professionalName !== 'string'
+    || typeof recentBooking.dateIso !== 'string'
+    || typeof recentBooking.timeLabel !== 'string'
+  ) {
+    return null
+  }
+
+  return {
+    serviceName: recentBooking.serviceName,
+    professionalName: recentBooking.professionalName,
+    dateIso: recentBooking.dateIso,
+    timeLabel: recentBooking.timeLabel,
+  } satisfies RecentConfirmedBookingMemory
+}
+
+function hasRecentCompletedBookingContext(input: {
+  state: ConversationState
+  completedAt?: Date | null
+  recentBooking: RecentConfirmedBookingMemory | null
+}) {
+  if (input.state !== 'IDLE' || !input.completedAt || !input.recentBooking) {
+    return false
+  }
+
+  return Date.now() - input.completedAt.getTime() <= RECENT_COMPLETED_BOOKING_CONTEXT_MS
+}
+
+async function loadRecentConversationMessages(input: {
+  barbershopId: string
+  customerId: string
+}) {
+  const events = await prisma.messagingEvent.findMany({
+    where: {
+      barbershopId: input.barbershopId,
+      customerId: input.customerId,
+      provider: MessagingProvider.EVOLUTION,
+      direction: { in: ['INBOUND', 'OUTBOUND'] },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: RECENT_MESSAGE_CONTEXT_LIMIT,
+    select: {
+      direction: true,
+      bodyText: true,
+      responseText: true,
+      createdAt: true,
+    },
+  })
+
+  return events
+    .map((event) => ({
+      direction: event.direction,
+      text: event.direction === 'OUTBOUND'
+        ? (event.responseText ?? event.bodyText ?? '')
+        : (event.bodyText ?? ''),
+      createdAt: event.createdAt.toISOString(),
+    }))
+    .filter((event): event is RecentConversationMessage => event.text.trim().length > 0)
+    .reverse()
+}
+
 function pickOfferedSlot(input: {
   offeredSlots: ConversationSlot[]
   selectedOptionNumber: number | null
@@ -941,6 +1055,11 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     customerId: input.customer.id,
     phone: input.customer.phone ?? null,
   })
+  const recentMessages = await loadRecentConversationMessages({
+    barbershopId: input.barbershop.id,
+    customerId: input.customer.id,
+  })
+  const recentConfirmedBooking = parseRecentConfirmedBookingMemory(conversation.lastIntent)
   const preferredProfessional = await resolveCustomerPreferredProfessional({
     barbershopId: input.barbershop.id,
     customerId: input.customer.id,
@@ -997,6 +1116,11 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   })
   const effectiveState = contextReliable ? currentState : 'IDLE'
   const draftForInterpreter = contextReliable ? conversationDraft : buildEmptyConversationDraft()
+  const hasRecentConfirmedBooking = hasRecentCompletedBookingContext({
+    state: effectiveState,
+    completedAt: conversation.completedAt,
+    recentBooking: recentConfirmedBooking,
+  })
 
   if (!contextReliable && currentState !== 'IDLE') {
     console.info('[whatsapp-conversation] discarded unreliable context', {
@@ -1105,7 +1229,11 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
             requestedTimeLabel: null,
             slotOptions: JSON_NULL,
             selectedSlot: JSON_NULL,
-            conversationSummary: agentResult.memory.conversationSummary,
+            conversationSummary: buildRecentConfirmedBookingSummary(
+              agentResult.memory.selectedSlot,
+              agentResult.memory.selectedServiceName,
+              timezone
+            ),
             bookingDraft: JSON_NULL,
             recentCorrections: agentResult.memory.recentCorrections.length
               ? buildJsonValue(agentResult.memory.recentCorrections)
@@ -1115,6 +1243,12 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
               source: 'agent',
               structured: agentResult.structured,
               toolTrace: agentResult.toolTrace,
+              recentBooking: {
+                serviceName: agentResult.memory.selectedServiceName,
+                professionalName: agentResult.memory.selectedSlot.professionalName,
+                dateIso: agentResult.memory.selectedSlot.dateIso,
+                timeLabel: agentResult.memory.selectedSlot.timeLabel,
+              },
             }),
             lastAssistantText: agentResult.responseText,
             completedAt: new Date(),
@@ -1303,6 +1437,37 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
 
   const usedAI = interpreted.source === 'openai'
   const shortGreeting = interpreted.greetingOnly || isShortGreetingMessage(inboundText)
+
+  console.info('[whatsapp-conversation] recent memory context', {
+    customerId: input.customer.id,
+    recentMessagesUsed: recentMessages.length,
+    recentMessages: recentMessages.map((message) => `${message.direction}:${message.text}`),
+    hadRecentConfirmedBooking: hasRecentConfirmedBooking,
+    responseStrategy: shortGreeting && !contextReliable && hasRecentConfirmedBooking
+      ? 'contextual_recent_booking_greeting'
+      : 'default_flow',
+  })
+
+  if (shortGreeting && !contextReliable && hasRecentConfirmedBooking && recentConfirmedBooking) {
+    const responseText = buildRecentConfirmedGreeting(recentConfirmedBooking, timezone)
+
+    await prisma.whatsappConversation.update({
+      where: { id: conversation.id },
+      data: {
+        lastInboundText: inboundText,
+        lastIntent: buildJsonValue(interpreted),
+        lastAssistantText: responseText,
+      },
+    })
+
+    return {
+      responseText,
+      flow: 'greeting',
+      conversationId: conversation.id,
+      conversationState: 'IDLE',
+      usedAI,
+    }
+  }
 
   if (shouldResetConversationOnGreeting({
     shortGreeting,
@@ -1895,11 +2060,23 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
         requestedTimeLabel: null,
         slotOptions: JSON_NULL,
         selectedSlot: JSON_NULL,
-        conversationSummary: null,
+        conversationSummary: buildRecentConfirmedBookingSummary(
+          slotForConfirmation,
+          draft.selectedServiceName,
+          timezone
+        ),
         bookingDraft: JSON_NULL,
         recentCorrections: JSON_NULL,
         lastInboundText: inboundText,
-        lastIntent: buildJsonValue(interpreted),
+        lastIntent: buildJsonValue({
+          ...interpreted,
+          recentBooking: {
+            serviceName: draft.selectedServiceName,
+            professionalName: slotForConfirmation.professionalName,
+            dateIso: slotForConfirmation.dateIso,
+            timeLabel: slotForConfirmation.timeLabel,
+          },
+        }),
         lastAssistantText: responseText,
         completedAt: new Date(),
       },
@@ -1943,7 +2120,10 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
 
 export const __testing = {
   buildEmptyConversationDraft,
+  buildRecentConfirmedGreeting,
   buildProfessionalQuestion,
+  buildHumanSlotOfferMessage,
+  hasRecentCompletedBookingContext,
   isConversationContextReliable,
   isShortGreetingMessage,
   referencesPreferredProfessional,

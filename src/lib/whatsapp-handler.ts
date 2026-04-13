@@ -55,8 +55,12 @@ interface AggregatedInboundMessage {
 }
 
 const MESSAGE_AGGREGATION_WINDOW_MS = 2000
+const SENSITIVE_MESSAGE_AGGREGATION_WINDOW_MS = 4000
 const IMMEDIATE_MESSAGE_PATTERN =
   /^(oi+|ola+|ol[aá]|bom dia|boa tarde|boa noite|quero agendar|quero marcar|agendar|marcar horario)[!.,\s]*$/i
+
+const COMPLEMENTARY_SHORT_MESSAGE_PATTERN =
+  /^(?:\d{1,2}(?::\d{2})?\s*(?:h|hr|hrs|hora|horas)?|com\s+.+|qualquer um|qualquer barbeiro|com o mesmo|com meu barbeiro|com o de sempre|sim|ok|beleza|fechado|pode ser)$/i
 
 function normalizePhoneDigits(value?: string | null) {
   if (!value) {
@@ -79,6 +83,54 @@ function shouldProcessImmediately(message: string) {
       .toLowerCase()
       .trim()
   )
+}
+
+function normalizeConversationStateForAggregation(state?: string | null) {
+  if (
+    state === 'WAITING_SERVICE'
+    || state === 'WAITING_PROFESSIONAL'
+    || state === 'WAITING_DATE'
+    || state === 'WAITING_TIME'
+    || state === 'WAITING_CONFIRMATION'
+  ) {
+    return state
+  }
+
+  return 'IDLE'
+}
+
+function isComplementaryShortMessage(message: string) {
+  const normalized = normalizeMessageText(message)
+  return normalized.length > 0
+    && normalized.length <= 40
+    && COMPLEMENTARY_SHORT_MESSAGE_PATTERN.test(normalized)
+}
+
+function buildConcatenatedMessage(rawMessages: string[]) {
+  return rawMessages
+    .map((message) => normalizeMessageText(message))
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function resolveAggregationWindowMs(input: {
+  state: string
+  currentMessage: string
+  previousMessages: string[]
+}) {
+  const state = normalizeConversationStateForAggregation(input.state)
+  const shouldUseSensitiveWindow =
+    (state === 'WAITING_TIME' || state === 'WAITING_CONFIRMATION')
+    && (
+      isComplementaryShortMessage(input.currentMessage)
+      || input.previousMessages.some((message) => isComplementaryShortMessage(message))
+    )
+
+  return shouldUseSensitiveWindow
+    ? SENSITIVE_MESSAGE_AGGREGATION_WINDOW_MS
+    : MESSAGE_AGGREGATION_WINDOW_MS
 }
 
 function parseMessageBuffer(raw: Prisma.JsonValue | null) {
@@ -375,6 +427,7 @@ async function getOrCreateWhatsappConversation(input: {
     },
     select: {
       id: true,
+      state: true,
       messageBuffer: true,
       lastMessageTimestamp: true,
     },
@@ -393,6 +446,12 @@ async function aggregateInboundMessages(input: {
     customerId: input.customerId,
     phone: input.phone ?? null,
   })
+  const aggregationState = normalizeConversationStateForAggregation(conversation.state)
+  const activeWindowMs = resolveAggregationWindowMs({
+    state: aggregationState,
+    currentMessage: normalizedMessage,
+    previousMessages: parseMessageBuffer(conversation.messageBuffer),
+  })
 
   if (shouldProcessImmediately(normalizedMessage)) {
     await prisma.whatsappConversation.update({
@@ -405,6 +464,8 @@ async function aggregateInboundMessages(input: {
     })
 
     console.info('[whatsapp-agent] message aggregation', {
+      state: aggregationState,
+      windowMs: activeWindowMs,
       rawMessages: [normalizedMessage],
       concatenatedMessage: normalizedMessage,
     })
@@ -421,7 +482,7 @@ async function aggregateInboundMessages(input: {
   const now = new Date()
   const previousBuffer =
     conversation.lastMessageTimestamp
-    && now.getTime() - conversation.lastMessageTimestamp.getTime() <= MESSAGE_AGGREGATION_WINDOW_MS
+    && now.getTime() - conversation.lastMessageTimestamp.getTime() <= activeWindowMs
       ? parseMessageBuffer(conversation.messageBuffer)
       : []
   const nextBuffer = [...previousBuffer, normalizedMessage]
@@ -435,7 +496,7 @@ async function aggregateInboundMessages(input: {
     },
   })
 
-  await wait(MESSAGE_AGGREGATION_WINDOW_MS)
+  await wait(activeWindowMs)
 
   const latestConversation = await prisma.whatsappConversation.findUnique({
     where: { id: conversation.id },
@@ -461,7 +522,7 @@ async function aggregateInboundMessages(input: {
   }
 
   const rawMessages = parseMessageBuffer(latestConversation.messageBuffer)
-  const concatenatedMessage = rawMessages.join(' ').replace(/\s+/g, ' ').trim()
+  const concatenatedMessage = buildConcatenatedMessage(rawMessages)
 
   await prisma.whatsappConversation.update({
     where: { id: conversation.id },
@@ -472,6 +533,8 @@ async function aggregateInboundMessages(input: {
   })
 
   console.info('[whatsapp-agent] message aggregation', {
+    state: aggregationState,
+    windowMs: activeWindowMs,
     rawMessages,
     concatenatedMessage,
   })
@@ -783,4 +846,10 @@ export async function handleIncomingWhatsAppMessage(input: IncomingWhatsAppMessa
       error: message,
     }
   }
+}
+
+export const __testing = {
+  isComplementaryShortMessage,
+  buildConcatenatedMessage,
+  resolveAggregationWindowMs,
 }
