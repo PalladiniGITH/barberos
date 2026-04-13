@@ -35,6 +35,28 @@ test('contexto velho ou incoerente nao e considerado confiavel', () => {
   assert.equal(reliable, false)
 })
 
+test('contexto com progresso util e preservado mesmo quando a confiabilidade estrita falha', () => {
+  const draft = conversationTesting.buildEmptyConversationDraft()
+  draft.selectedServiceId = 'svc-classic'
+  draft.selectedServiceName = 'Corte Classic'
+  draft.selectedProfessionalId = 'pro-matheus'
+  draft.selectedProfessionalName = 'Matheus'
+  draft.requestedDateIso = '2026-04-13'
+  draft.requestedTimeLabel = '17:30'
+  draft.selectedStoredSlot = buildSlot()
+
+  const runtime = conversationTesting.resolveConversationRuntimeContext({
+    state: 'WAITING_TIME',
+    updatedAt: new Date(Date.now() - 60 * 60_000),
+    draft,
+  })
+
+  assert.equal(runtime.contextReliable, false)
+  assert.equal(runtime.shouldPreserveProgress, true)
+  assert.equal(runtime.effectiveState, 'WAITING_CONFIRMATION')
+  assert.equal(runtime.draftForContinuation.selectedStoredSlot?.timeLabel, '13:15')
+})
+
 test('saudacao curta com contexto nao confiavel dispara reset seguro', () => {
   assert.equal(conversationTesting.isShortGreetingMessage('Oi'), true)
   assert.equal(
@@ -73,4 +95,12 @@ test('retomada logo apos agendamento confirmado usa contexto recente em vez de s
   assert.match(reply, /16:45/)
   assert.match(reply, /Rafael Costa/)
   assert.match(reply, /ja ficou marcado|Precisa de mais alguma coisa/i)
+})
+
+test('respostas afirmativas amplas sao aceitas para fechamento deterministico', () => {
+  const affirmativeReplies = ['sim', 's', 'ok', 'pode', 'confirmar', 'quero', 'desejo', 'fechado']
+
+  affirmativeReplies.forEach((reply) => {
+    assert.equal(conversationTesting.isAffirmativeConfirmationMessage(reply), true)
+  })
 })

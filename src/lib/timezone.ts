@@ -207,6 +207,23 @@ export function buildBusinessDateTimeFromTimeLabel(
   return buildBusinessDateTime(dateIso, hours, minutes, timezone)
 }
 
+export function localDateTimeToUtc(input: {
+  dateIso: string
+  timeLabel: string
+  timezone?: string | null
+}) {
+  const resolvedTimezone = resolveBusinessTimezone(input.timezone)
+
+  return {
+    timezone: resolvedTimezone,
+    startAtUtc: buildBusinessDateTimeFromTimeLabel(
+      input.dateIso,
+      input.timeLabel,
+      resolvedTimezone
+    ),
+  }
+}
+
 export function formatIsoDateInTimezone(date: Date, timezone?: string | null) {
   const resolvedTimezone = resolveBusinessTimezone(timezone)
   return getDateTimePartsInTimezone(date, resolvedTimezone).dateIso

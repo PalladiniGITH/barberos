@@ -18,10 +18,10 @@ import {
   matchesTimePreference,
 } from '@/lib/agendamentos/availability'
 import {
-  buildBusinessDateTimeFromTimeLabel,
   formatDateTimeInTimezone,
   formatIsoDateInTimezone,
   getTodayIsoInTimezone,
+  localDateTimeToUtc,
   resolveBusinessTimezone,
 } from '@/lib/timezone'
 
@@ -531,6 +531,18 @@ export async function createAppointmentFromWhatsApp(input: {
     datetimePersistCandidateUtc: startAt.toISOString(),
   })
 
+  console.info('[whatsapp-booking] final create datetime', {
+    barbershopId: input.barbershopId,
+    customerId: input.customerId,
+    serviceId: input.serviceId,
+    professionalId: input.professionalId,
+    timezone: resolvedTimezone,
+    selectedLocalDate: dateIso,
+    selectedLocalTime: input.timeLabel ?? formatTimeLabel(startAt, resolvedTimezone),
+    datetimePersistedUtc: startAt.toISOString(),
+    datetimeConvertedBack: formatDateTimeInTimezone(startAt, resolvedTimezone),
+  })
+
   if (startAt < openAt || bufferedEndAt > closeAt) {
     throw new Error('O horario selecionado esta fora da janela de atendimento.')
   }
@@ -611,7 +623,11 @@ export function resolveWhatsAppAppointmentStartAt(input: {
     ? `${input.dateIso} ${input.timeLabel}`
     : null
   const startAt = chosenLocalDateTime
-    ? buildBusinessDateTimeFromTimeLabel(input.dateIso as string, input.timeLabel as string, resolvedTimezone)
+    ? localDateTimeToUtc({
+        dateIso: input.dateIso as string,
+        timeLabel: input.timeLabel as string,
+        timezone: resolvedTimezone,
+      }).startAtUtc
     : new Date(input.fallbackStartAtIso as string)
 
   return {
