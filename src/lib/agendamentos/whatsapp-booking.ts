@@ -15,7 +15,12 @@ import {
   listBlockingAppointmentsForDay,
   matchesTimePreference,
 } from '@/lib/agendamentos/availability'
-import { getTodayIsoInTimezone } from '@/lib/timezone'
+import {
+  buildBusinessDateTimeFromTimeLabel,
+  formatDateTimeInTimezone,
+  getTodayIsoInTimezone,
+  resolveBusinessTimezone,
+} from '@/lib/timezone'
 
 export interface WhatsAppBookingSlot {
   key: string
@@ -168,6 +173,7 @@ export async function getAvailableWhatsAppSlots(input: {
   exactTime?: string | null
   limit?: number
 }): Promise<WhatsAppAvailabilityResult> {
+  const resolvedTimezone = resolveBusinessTimezone(input.timezone)
   const operationalBufferMinutes = getOperationalBufferMinutes()
   const normalizedPeriod = normalizeTimePreference(input.timePreference)
 
@@ -251,14 +257,15 @@ export async function getAvailableWhatsAppSlots(input: {
     }
   }
 
-  const dayOpen = buildLocalDate(input.dateIso, SCHEDULE_START_HOUR, 0)
-  const dayClose = buildLocalDate(input.dateIso, SCHEDULE_END_HOUR, 0)
-  const currentRoundedTime = getNowRoundedToStep(input.timezone)
-  const isToday = input.dateIso === getTodayIsoInTimezone(input.timezone)
+  const dayOpen = buildLocalDate(input.dateIso, SCHEDULE_START_HOUR, 0, resolvedTimezone)
+  const dayClose = buildLocalDate(input.dateIso, SCHEDULE_END_HOUR, 0, resolvedTimezone)
+  const currentRoundedTime = getNowRoundedToStep(resolvedTimezone)
+  const isToday = input.dateIso === getTodayIsoInTimezone(resolvedTimezone)
   const blockingAppointments = await listBlockingAppointmentsForDay({
     barbershopId: input.barbershopId,
     dateIso: input.dateIso,
     professionalIds: professionals.map((professional) => professional.id),
+    timezone: resolvedTimezone,
   })
 
   const appointmentsByProfessional = new Map<string, typeof blockingAppointments>()
@@ -310,7 +317,7 @@ export async function getAvailableWhatsAppSlots(input: {
         professionalId: professional.id,
         professionalName: professional.name,
         dateIso: input.dateIso,
-        timeLabel: formatTimeLabel(candidate),
+        timeLabel: formatTimeLabel(candidate, resolvedTimezone),
         startAtIso: candidate.toISOString(),
         endAtIso: slotEnd.toISOString(),
       } satisfies WhatsAppBookingSlot
@@ -322,6 +329,7 @@ export async function getAvailableWhatsAppSlots(input: {
           startAt: candidate,
           preference: normalizedPeriod,
           exactTime: input.exactTime,
+          timezone: resolvedTimezone,
         })
       ) {
         openSlotsAfterPeriodFilter.push(slot)
@@ -406,10 +414,14 @@ export async function createAppointmentFromWhatsApp(input: {
   customerId: string
   serviceId: string
   professionalId: string
-  startAtIso: string
+  startAtIso?: string
+  dateIso?: string
+  timeLabel?: string
+  timezone?: string | null
   sourceReference: string
   notes?: string | null
 }) {
+  const resolvedTimezone = resolveBusinessTimezone(input.timezone)
   const [customer, service, professional] = await Promise.all([
     prisma.customer.findFirst({
       where: {
@@ -449,13 +461,32 @@ export async function createAppointmentFromWhatsApp(input: {
     throw new Error('Dados de agendamento indisponiveis para o fluxo do WhatsApp.')
   }
 
-  const startAt = new Date(input.startAtIso)
+  const chosenLocalDateTime = input.dateIso && input.timeLabel
+    ? `${input.dateIso} ${input.timeLabel}`
+    : null
+  const startAt = chosenLocalDateTime
+    ? buildBusinessDateTimeFromTimeLabel(input.dateIso as string, input.timeLabel as string, resolvedTimezone)
+    : new Date(input.startAtIso as string)
   const endAt = new Date(startAt.getTime() + service.duration * 60_000)
   const operationalBufferMinutes = getOperationalBufferMinutes()
   const bufferedEndAt = new Date(endAt.getTime() + operationalBufferMinutes * 60_000)
-  const dateIso = formatLocalDate(startAt)
-  const openAt = buildLocalDate(dateIso, SCHEDULE_START_HOUR, 0)
-  const closeAt = buildLocalDate(dateIso, SCHEDULE_END_HOUR, 0)
+  const dateIso = input.dateIso ?? formatLocalDate(startAt, resolvedTimezone)
+  const openAt = buildLocalDate(dateIso, SCHEDULE_START_HOUR, 0, resolvedTimezone)
+  const closeAt = buildLocalDate(dateIso, SCHEDULE_END_HOUR, 0, resolvedTimezone)
+
+  console.info('[whatsapp-booking] appointment datetime resolved', {
+    barbershopId: input.barbershopId,
+    customerId: input.customerId,
+    professionalId: input.professionalId,
+    serviceId: input.serviceId,
+    chosenClientTime: input.timeLabel ?? null,
+    chosenClientDate: dateIso,
+    timezone: resolvedTimezone,
+    chosenLocalDateTime,
+    localDateTimeBuilt: formatDateTimeInTimezone(startAt, resolvedTimezone),
+    startAtIsoSource: input.startAtIso ?? null,
+    datetimePersistCandidateUtc: startAt.toISOString(),
+  })
 
   if (startAt < openAt || bufferedEndAt > closeAt) {
     throw new Error('O horario selecionado esta fora da janela de atendimento.')
@@ -465,6 +496,7 @@ export async function createAppointmentFromWhatsApp(input: {
     barbershopId: input.barbershopId,
     dateIso,
     professionalIds: [input.professionalId],
+    timezone: resolvedTimezone,
   })
 
   const conflictingAppointment = blockingAppointments.find((appointment) =>
@@ -503,6 +535,16 @@ export async function createAppointmentFromWhatsApp(input: {
       startAt: true,
       endAt: true,
     },
+  })
+
+  console.info('[whatsapp-booking] appointment persisted', {
+    appointmentId: appointment.id,
+    timezone: resolvedTimezone,
+    chosenLocalDateTime,
+    localDateTimePersisted: formatDateTimeInTimezone(appointment.startAt, resolvedTimezone),
+    datetimePersistedUtc: appointment.startAt.toISOString(),
+    datetimeReturnedToAgendaUtc: appointment.startAt.toISOString(),
+    datetimeReturnedToAgendaLocal: formatDateTimeInTimezone(appointment.startAt, resolvedTimezone),
   })
 
   return {

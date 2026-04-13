@@ -5,6 +5,7 @@ export interface TimezoneNowContext {
   day: number
   hour: number
   minute: number
+  second: number
   weekdayIndex: number
   weekdayLabel: string
   dateIso: string
@@ -54,9 +55,51 @@ function getFormatter(timezone: string) {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    second: '2-digit',
     weekday: 'long',
     hour12: false,
   })
+}
+
+function getDateTimePartsInTimezone(referenceDate: Date, timezone: string) {
+  const formatter = getFormatter(timezone)
+  const parts = formatter.formatToParts(referenceDate)
+
+  const year = Number(parts.find((part) => part.type === 'year')?.value ?? referenceDate.getFullYear())
+  const month = Number(parts.find((part) => part.type === 'month')?.value ?? referenceDate.getMonth() + 1)
+  const day = Number(parts.find((part) => part.type === 'day')?.value ?? referenceDate.getDate())
+  const hour = Number(parts.find((part) => part.type === 'hour')?.value ?? referenceDate.getHours())
+  const minute = Number(parts.find((part) => part.type === 'minute')?.value ?? referenceDate.getMinutes())
+  const second = Number(parts.find((part) => part.type === 'second')?.value ?? referenceDate.getSeconds())
+  const weekdayLabel = parts.find((part) => part.type === 'weekday')?.value ?? 'Monday'
+  const weekdayIndex = new Date(Date.UTC(year, month - 1, day, 12, 0, 0)).getUTCDay()
+  const dateIso = formatIsoDateParts({ year, month, day })
+
+  return {
+    timezone,
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second,
+    weekdayIndex,
+    weekdayLabel,
+    dateIso,
+    dateTimeLabel: `${dateIso} ${pad(hour)}:${pad(minute)}`,
+  }
+}
+
+function parseTimeLabel(timeLabel: string) {
+  const match = /^(\d{2}):(\d{2})$/.exec(timeLabel.trim())
+  if (!match) {
+    throw new Error(`Horario invalido: ${timeLabel}`)
+  }
+
+  return {
+    hours: Number(match[1]),
+    minutes: Number(match[2]),
+  }
 }
 
 export function formatIsoDateParts(input: {
@@ -72,30 +115,7 @@ export function getCurrentDateTimeInTimezone(
   referenceDate = new Date()
 ): TimezoneNowContext {
   const resolvedTimezone = resolveBusinessTimezone(timezone)
-  const formatter = getFormatter(resolvedTimezone)
-  const parts = formatter.formatToParts(referenceDate)
-
-  const year = Number(parts.find((part) => part.type === 'year')?.value ?? referenceDate.getFullYear())
-  const month = Number(parts.find((part) => part.type === 'month')?.value ?? referenceDate.getMonth() + 1)
-  const day = Number(parts.find((part) => part.type === 'day')?.value ?? referenceDate.getDate())
-  const hour = Number(parts.find((part) => part.type === 'hour')?.value ?? referenceDate.getHours())
-  const minute = Number(parts.find((part) => part.type === 'minute')?.value ?? referenceDate.getMinutes())
-  const weekdayLabel = parts.find((part) => part.type === 'weekday')?.value ?? 'Monday'
-  const weekdayIndex = new Date(Date.UTC(year, month - 1, day, 12, 0, 0)).getUTCDay()
-  const dateIso = formatIsoDateParts({ year, month, day })
-
-  return {
-    timezone: resolvedTimezone,
-    year,
-    month,
-    day,
-    hour,
-    minute,
-    weekdayIndex,
-    weekdayLabel,
-    dateIso,
-    dateTimeLabel: `${dateIso} ${pad(hour)}:${pad(minute)}`,
-  }
+  return getDateTimePartsInTimezone(referenceDate, resolvedTimezone)
 }
 
 export function getTodayIsoInTimezone(timezone?: string | null, referenceDate = new Date()) {
@@ -131,4 +151,72 @@ export function nextWeekdayIsoDate(baseIsoDate: string, weekdayIndex: number) {
     month: date.getUTCMonth() + 1,
     day: date.getUTCDate(),
   })
+}
+
+export function buildDateAnchorUtc(dateIso: string) {
+  const [year, month, day] = dateIso.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
+}
+
+export function getTimezoneOffsetMinutes(timezone: string, referenceDate = new Date()) {
+  const resolvedTimezone = resolveBusinessTimezone(timezone)
+  const parts = getDateTimePartsInTimezone(referenceDate, resolvedTimezone)
+  const asUtc = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second,
+    0
+  )
+
+  return Math.round((asUtc - referenceDate.getTime()) / 60_000)
+}
+
+export function buildBusinessDateTime(
+  dateIso: string,
+  hours = 0,
+  minutes = 0,
+  timezone?: string | null
+) {
+  const resolvedTimezone = resolveBusinessTimezone(timezone)
+  const [year, month, day] = dateIso.split('-').map(Number)
+  const utcGuess = Date.UTC(year, month - 1, day, hours, minutes, 0, 0)
+
+  let offsetMinutes = getTimezoneOffsetMinutes(resolvedTimezone, new Date(utcGuess))
+  let resolvedDate = new Date(utcGuess - offsetMinutes * 60_000)
+  const adjustedOffsetMinutes = getTimezoneOffsetMinutes(resolvedTimezone, resolvedDate)
+
+  if (adjustedOffsetMinutes !== offsetMinutes) {
+    offsetMinutes = adjustedOffsetMinutes
+    resolvedDate = new Date(utcGuess - offsetMinutes * 60_000)
+  }
+
+  return resolvedDate
+}
+
+export function buildBusinessDateTimeFromTimeLabel(
+  dateIso: string,
+  timeLabel: string,
+  timezone?: string | null
+) {
+  const { hours, minutes } = parseTimeLabel(timeLabel)
+  return buildBusinessDateTime(dateIso, hours, minutes, timezone)
+}
+
+export function formatIsoDateInTimezone(date: Date, timezone?: string | null) {
+  const resolvedTimezone = resolveBusinessTimezone(timezone)
+  return getDateTimePartsInTimezone(date, resolvedTimezone).dateIso
+}
+
+export function formatTimeInTimezone(date: Date, timezone?: string | null) {
+  const resolvedTimezone = resolveBusinessTimezone(timezone)
+  const parts = getDateTimePartsInTimezone(date, resolvedTimezone)
+  return `${pad(parts.hour)}:${pad(parts.minute)}`
+}
+
+export function formatDateTimeInTimezone(date: Date, timezone?: string | null) {
+  const resolvedTimezone = resolveBusinessTimezone(timezone)
+  return getDateTimePartsInTimezone(date, resolvedTimezone).dateTimeLabel
 }

@@ -12,6 +12,7 @@ import {
   type WhatsAppBookingSlot,
 } from '@/lib/agendamentos/whatsapp-booking'
 import {
+  buildDateAnchorUtc,
   getCurrentDateTimeInTimezone,
   getTodayIsoInTimezone,
   resolveBusinessTimezone,
@@ -146,9 +147,9 @@ function nameTokens(value: string) {
 }
 
 function formatDateIso(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
+  const year = date.getUTCFullYear()
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
 
@@ -907,6 +908,25 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     offeredSlots: parseConversationSlots(conversation.slotOptions),
     selectedStoredSlot: parseSelectedSlot(conversation.selectedSlot),
   }
+  const contextReliable = isConversationContextReliable({
+    state: currentState,
+    updatedAt: conversation.updatedAt,
+    draft: conversationDraft,
+  })
+  const effectiveState = contextReliable ? currentState : 'IDLE'
+  const draftForInterpreter = contextReliable ? conversationDraft : buildEmptyConversationDraft()
+
+  if (!contextReliable && currentState !== 'IDLE') {
+    console.info('[whatsapp-conversation] discarded unreliable context', {
+      customerId: input.customer.id,
+      previousState: currentState,
+      updatedAt: conversation.updatedAt.toISOString(),
+      requestedDateIso: conversationDraft.requestedDateIso,
+      requestedTimeLabel: conversationDraft.requestedTimeLabel,
+      offeredSlots: conversationDraft.offeredSlots.length,
+      hasSelectedSlot: Boolean(conversationDraft.selectedStoredSlot),
+    })
+  }
 
   const agentResult = await processWhatsAppConversationWithAgent({
     barbershop: input.barbershop,
@@ -914,22 +934,28 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     inboundText,
     conversation: {
       id: conversation.id,
-      state: conversation.state,
-      updatedAt: conversation.updatedAt,
-      selectedServiceId: conversation.selectedServiceId ?? null,
-      selectedServiceName: conversation.selectedServiceName ?? null,
-      selectedProfessionalId: conversation.selectedProfessionalId ?? null,
-      selectedProfessionalName: conversation.selectedProfessionalName ?? null,
-      allowAnyProfessional: conversation.allowAnyProfessional,
-      requestedDate: conversation.requestedDate,
-      requestedTimeLabel: conversation.requestedTimeLabel ?? null,
-      slotOptions: conversation.slotOptions,
-      selectedSlot: conversation.selectedSlot,
-      conversationSummary: conversation.conversationSummary ?? null,
-      bookingDraft: conversation.bookingDraft,
-      recentCorrections: conversation.recentCorrections,
-      lastInboundText: conversation.lastInboundText ?? null,
-      lastAssistantText: conversation.lastAssistantText ?? null,
+      state: effectiveState,
+      updatedAt: contextReliable ? conversation.updatedAt : new Date(),
+      selectedServiceId: draftForInterpreter.selectedServiceId,
+      selectedServiceName: draftForInterpreter.selectedServiceName,
+      selectedProfessionalId: draftForInterpreter.selectedProfessionalId,
+      selectedProfessionalName: draftForInterpreter.selectedProfessionalName,
+      allowAnyProfessional: draftForInterpreter.allowAnyProfessional,
+      requestedDate: draftForInterpreter.requestedDateIso
+        ? buildDateAnchorUtc(draftForInterpreter.requestedDateIso)
+        : null,
+      requestedTimeLabel: draftForInterpreter.requestedTimeLabel,
+      slotOptions: draftForInterpreter.offeredSlots.length
+        ? (buildJsonValue(draftForInterpreter.offeredSlots) as Prisma.JsonValue)
+        : null,
+      selectedSlot: draftForInterpreter.selectedStoredSlot
+        ? (buildJsonValue(draftForInterpreter.selectedStoredSlot) as Prisma.JsonValue)
+        : null,
+      conversationSummary: contextReliable ? conversation.conversationSummary ?? null : null,
+      bookingDraft: contextReliable ? conversation.bookingDraft : null,
+      recentCorrections: contextReliable ? conversation.recentCorrections : null,
+      lastInboundText: contextReliable ? conversation.lastInboundText ?? null : null,
+      lastAssistantText: contextReliable ? conversation.lastAssistantText ?? null : null,
     },
     services,
     professionals,
@@ -949,6 +975,9 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
           serviceId: agentResult.memory.selectedServiceId,
           professionalId: agentResult.memory.selectedSlot.professionalId,
           startAtIso: agentResult.memory.selectedSlot.startAtIso,
+          dateIso: agentResult.memory.selectedSlot.dateIso,
+          timeLabel: agentResult.memory.selectedSlot.timeLabel,
+          timezone,
           sourceReference: `whatsapp:${conversation.id}:${input.eventId}`,
           notes: 'Agendamento criado via agente conversacional do WhatsApp.',
         })
@@ -1014,7 +1043,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
           selectedProfessionalName: shouldResetPersistedContext ? null : agentResult.memory.selectedProfessionalName,
           allowAnyProfessional: shouldResetPersistedContext ? false : agentResult.memory.allowAnyProfessional,
           requestedDate: !shouldResetPersistedContext && agentResult.memory.requestedDateIso
-            ? new Date(`${agentResult.memory.requestedDateIso}T12:00:00`)
+            ? buildDateAnchorUtc(agentResult.memory.requestedDateIso)
             : null,
           requestedTimeLabel: shouldResetPersistedContext ? null : agentResult.memory.requestedTimeLabel,
           slotOptions: !shouldResetPersistedContext && agentResult.memory.offeredSlots.length
@@ -1065,26 +1094,6 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
         usedAI: true,
       }
     }
-  }
-
-  const contextReliable = isConversationContextReliable({
-    state: currentState,
-    updatedAt: conversation.updatedAt,
-    draft: conversationDraft,
-  })
-  const effectiveState = contextReliable ? currentState : 'IDLE'
-  const draftForInterpreter = contextReliable ? conversationDraft : buildEmptyConversationDraft()
-
-  if (!contextReliable && currentState !== 'IDLE') {
-    console.info('[whatsapp-conversation] discarded unreliable context', {
-      customerId: input.customer.id,
-      previousState: currentState,
-      updatedAt: conversation.updatedAt.toISOString(),
-      requestedDateIso: conversationDraft.requestedDateIso,
-      requestedTimeLabel: conversationDraft.requestedTimeLabel,
-      offeredSlots: conversationDraft.offeredSlots.length,
-      hasSelectedSlot: Boolean(conversationDraft.selectedStoredSlot),
-    })
   }
 
   const interpreted = await interpretWhatsAppMessage({
@@ -1299,7 +1308,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     selectedProfessionalId: draft.selectedProfessionalId,
     selectedProfessionalName: draft.selectedProfessionalName,
     allowAnyProfessional: draft.allowAnyProfessional,
-    requestedDate: draft.requestedDateIso ? new Date(`${draft.requestedDateIso}T12:00:00`) : null,
+    requestedDate: draft.requestedDateIso ? buildDateAnchorUtc(draft.requestedDateIso) : null,
     requestedTimeLabel: draft.requestedTimeLabel,
   }
 
@@ -1617,6 +1626,9 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       serviceId: draft.selectedServiceId,
       professionalId: slotForConfirmation.professionalId,
       startAtIso: slotForConfirmation.startAtIso,
+      dateIso: slotForConfirmation.dateIso,
+      timeLabel: slotForConfirmation.timeLabel,
+      timezone,
       sourceReference: `whatsapp:${conversation.id}:${input.eventId}`,
       notes: 'Agendamento criado via fluxo conversacional do WhatsApp.',
     })

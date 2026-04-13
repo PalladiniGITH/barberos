@@ -386,9 +386,9 @@ function normalizeText(value: string) {
 }
 
 function formatDateIso(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
+  const year = date.getUTCFullYear()
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
 
@@ -509,6 +509,46 @@ function inferConversationState(nextAction: WhatsAppAgentNextAction): WhatsAppAg
   if (nextAction === 'ASK_PERIOD' || nextAction === 'OFFER_SLOTS') return 'WAITING_TIME'
   if (nextAction === 'ASK_CONFIRMATION') return 'WAITING_CONFIRMATION'
   return 'IDLE'
+}
+
+function enforceNextActionFromMemory(
+  requestedAction: WhatsAppAgentNextAction,
+  memory: WorkingMemory,
+  shouldCreateAppointment: boolean
+) {
+  if (requestedAction === 'RESET_CONTEXT' || requestedAction === 'GREET') {
+    return requestedAction
+  }
+
+  if (!memory.selectedServiceId) {
+    return 'ASK_SERVICE'
+  }
+
+  if (!memory.selectedProfessionalId && !memory.allowAnyProfessional) {
+    return 'ASK_PROFESSIONAL'
+  }
+
+  if (!memory.requestedTimeLabel) {
+    return 'ASK_PERIOD'
+  }
+
+  if (!memory.requestedDateIso) {
+    return 'ASK_DATE'
+  }
+
+  if (shouldCreateAppointment) {
+    return 'CONFIRM_BOOKING'
+  }
+
+  if (memory.selectedSlot) {
+    return 'ASK_CONFIRMATION'
+  }
+
+  if (memory.offeredSlots.length > 0) {
+    return 'OFFER_SLOTS'
+  }
+
+  return requestedAction
 }
 
 function isExplicitConfirmation(message: string) {
@@ -649,6 +689,11 @@ function appendCorrection(memory: WorkingMemory, target: string, value: string |
   ].slice(-5)
 }
 
+function clearPromotedAvailability(memory: WorkingMemory) {
+  memory.offeredSlots = []
+  memory.selectedSlot = null
+}
+
 function resetWorkingMemory(memory: WorkingMemory) {
   memory.state = 'IDLE'
   memory.selectedServiceId = null
@@ -658,8 +703,7 @@ function resetWorkingMemory(memory: WorkingMemory) {
   memory.allowAnyProfessional = false
   memory.requestedDateIso = null
   memory.requestedTimeLabel = null
-  memory.offeredSlots = []
-  memory.selectedSlot = null
+  clearPromotedAvailability(memory)
 }
 
 function findServiceByIdOrName(input: {
@@ -702,6 +746,132 @@ function findProfessionalCandidates(professionals: WhatsAppAgentInput['professio
       professionalTokens.some((professionalToken) => professionalToken === token || professionalToken.startsWith(token))
     )
   })
+}
+
+function applyCorrectionTargetToMemory(memory: WorkingMemory, correctionTarget: string) {
+  if (correctionTarget === 'FLOW') {
+    resetWorkingMemory(memory)
+    return
+  }
+
+  if (correctionTarget === 'SERVICE') {
+    memory.selectedServiceId = null
+    memory.selectedServiceName = null
+    memory.requestedDateIso = null
+    memory.requestedTimeLabel = null
+    clearPromotedAvailability(memory)
+    return
+  }
+
+  if (correctionTarget === 'PROFESSIONAL') {
+    memory.selectedProfessionalId = null
+    memory.selectedProfessionalName = null
+    memory.allowAnyProfessional = false
+    memory.requestedTimeLabel = null
+    clearPromotedAvailability(memory)
+    return
+  }
+
+  if (correctionTarget === 'DATE') {
+    memory.requestedDateIso = null
+    clearPromotedAvailability(memory)
+    return
+  }
+
+  if (correctionTarget === 'PERIOD' || correctionTarget === 'TIME') {
+    memory.requestedTimeLabel = null
+    clearPromotedAvailability(memory)
+  }
+}
+
+function resolvePromotedTimeLabel(input: {
+  preferredPeriod: 'MORNING' | 'AFTERNOON' | 'EVENING' | null
+  timePreference: string
+  exactTime: string | null
+}) {
+  if (input.exactTime) {
+    return input.exactTime
+  }
+
+  if (input.timePreference && input.timePreference !== 'NONE') {
+    return input.timePreference
+  }
+
+  return input.preferredPeriod
+}
+
+function promoteIntentContextToMemory(input: {
+  memory: WorkingMemory
+  intent: Awaited<ReturnType<typeof interpretWhatsAppMessage>>
+  services: WhatsAppAgentInput['services']
+  professionals: WhatsAppAgentInput['professionals']
+}) {
+  const { memory, intent, services, professionals } = input
+
+  if (intent.restartConversation) {
+    resetWorkingMemory(memory)
+    return
+  }
+
+  const baseline = {
+    selectedServiceId: memory.selectedServiceId,
+    selectedProfessionalId: memory.selectedProfessionalId,
+    allowAnyProfessional: memory.allowAnyProfessional,
+    requestedDateIso: memory.requestedDateIso,
+    requestedTimeLabel: memory.requestedTimeLabel,
+  }
+
+  if (intent.correctionTarget !== 'NONE') {
+    applyCorrectionTargetToMemory(memory, intent.correctionTarget)
+  }
+
+  const service = findServiceByIdOrName({
+    serviceName: intent.serviceName,
+    services,
+  })
+
+  if (service) {
+    memory.selectedServiceId = service.id
+    memory.selectedServiceName = service.name
+  }
+
+  if (intent.allowAnyProfessional) {
+    memory.allowAnyProfessional = true
+    memory.selectedProfessionalId = null
+    memory.selectedProfessionalName = null
+  } else if (intent.mentionedName) {
+    const professionalCandidates = findProfessionalCandidates(professionals, intent.mentionedName)
+    if (professionalCandidates.length === 1) {
+      memory.allowAnyProfessional = false
+      memory.selectedProfessionalId = professionalCandidates[0].id
+      memory.selectedProfessionalName = professionalCandidates[0].name
+    }
+  }
+
+  if (intent.requestedDateIso) {
+    memory.requestedDateIso = intent.requestedDateIso
+  }
+
+  const promotedTimeLabel = resolvePromotedTimeLabel({
+    preferredPeriod: intent.preferredPeriod,
+    timePreference: intent.timePreference,
+    exactTime: intent.exactTime,
+  })
+
+  if (promotedTimeLabel) {
+    memory.requestedTimeLabel = promotedTimeLabel
+  }
+
+  const serviceChanged = memory.selectedServiceId !== baseline.selectedServiceId
+  const professionalChanged =
+    memory.selectedProfessionalId !== baseline.selectedProfessionalId
+    || memory.allowAnyProfessional !== baseline.allowAnyProfessional
+  const dateChanged = memory.requestedDateIso !== baseline.requestedDateIso
+  const timeChanged = memory.requestedTimeLabel !== baseline.requestedTimeLabel
+
+  if (serviceChanged || professionalChanged || dateChanged || timeChanged || intent.correctionTarget !== 'NONE') {
+    clearPromotedAvailability(memory)
+  }
 }
 
 async function findCustomerCandidates(input: {
@@ -820,6 +990,49 @@ function buildFallbackStructuredOutput(input: {
     replyText,
     summary: buildRuntimeSummary(input.memory),
   } satisfies AgentStructuredOutput
+}
+
+function buildGuardrailReplyText(input: {
+  nextAction: WhatsAppAgentNextAction
+  memory: WorkingMemory
+  customerName: string
+  barbershopName: string
+}) {
+  const firstName = input.customerName.trim().split(' ')[0]
+
+  if (input.nextAction === 'GREET' || input.nextAction === 'RESET_CONTEXT') {
+    return `Oi, ${firstName}! Posso te ajudar a marcar um horario na ${input.barbershopName}?`
+  }
+
+  if (input.nextAction === 'ASK_SERVICE') {
+    return 'Perfeito. Qual servico voce quer fazer?'
+  }
+
+  if (input.nextAction === 'ASK_PROFESSIONAL') {
+    return 'Tem preferencia de barbeiro?'
+  }
+
+  if (input.nextAction === 'ASK_PERIOD') {
+    return 'Voce prefere manha, tarde ou noite?'
+  }
+
+  if (input.nextAction === 'ASK_DATE') {
+    return 'Qual dia voce prefere? Pode ser hoje, amanha ou a data que quiser.'
+  }
+
+  if (input.nextAction === 'ASK_CONFIRMATION' && input.memory.selectedSlot && input.memory.selectedServiceName) {
+    return `Posso confirmar ${input.memory.selectedServiceName} para ${input.memory.selectedSlot.dateIso} as ${input.memory.selectedSlot.timeLabel} com ${input.memory.selectedSlot.professionalName}?`
+  }
+
+  if (input.nextAction === 'OFFER_SLOTS' && input.memory.offeredSlots.length > 0) {
+    const header = input.memory.selectedProfessionalName
+      ? `${input.memory.requestedDateIso ?? 'Nesse dia'} com ${input.memory.selectedProfessionalName} eu tenho estes horarios:`
+      : `${input.memory.requestedDateIso ?? 'Nesse dia'} eu tenho estes horarios:`
+    const lines = input.memory.offeredSlots.slice(0, 4).map((slot) => `- ${slot.timeLabel}`)
+    return `${header}\n\n${lines.join('\n')}\n\nPode me dizer qual voce prefere?`
+  }
+
+  return null
 }
 
 async function executeAgentTool(input: {
@@ -1121,6 +1334,13 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     },
   })
 
+  promoteIntentContextToMemory({
+    memory,
+    intent: fallbackIntent,
+    services: input.services,
+    professionals: input.professionals,
+  })
+
   const fallbackStructured = buildFallbackStructuredOutput({
     fallbackIntent,
     memory,
@@ -1132,6 +1352,13 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     customerId: input.customer.id,
     conversationId: input.conversation.id,
     inboundText: input.inboundText,
+    promotedContext: {
+      selectedServiceId: memory.selectedServiceId,
+      selectedProfessionalId: memory.selectedProfessionalId,
+      allowAnyProfessional: memory.allowAnyProfessional,
+      requestedDateIso: memory.requestedDateIso,
+      requestedTimeLabel: memory.requestedTimeLabel,
+    },
     summarySent: buildRuntimeSummary(memory),
     recentMessages: recentMessages.map((message) => `${message.direction}:${message.text}`),
   })
@@ -1253,6 +1480,25 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     const rawStructured = JSON.parse(finalText) as AgentStructuredOutput
     const structuredDraft = sanitizeStructuredOutput(rawStructured, fallbackStructured)
 
+    promoteIntentContextToMemory({
+      memory,
+      intent: {
+        ...fallbackIntent,
+        mentionedName: structuredDraft.mentionedName,
+        preferredPeriod: structuredDraft.preferredPeriod,
+        requestedDateIso: structuredDraft.requestedDate,
+        timePreference: structuredDraft.requestedTime && /^\d{2}:\d{2}$/.test(structuredDraft.requestedTime)
+          ? 'EXACT'
+          : (structuredDraft.preferredPeriod ?? fallbackIntent.timePreference),
+        exactTime: structuredDraft.requestedTime && /^\d{2}:\d{2}$/.test(structuredDraft.requestedTime)
+          ? structuredDraft.requestedTime
+          : null,
+        correctionTarget: structuredDraft.correctionTarget,
+      },
+      services: input.services,
+      professionals: input.professionals,
+    })
+
     if (structuredDraft.correctionTarget !== 'NONE') {
       appendCorrection(
         memory,
@@ -1267,12 +1513,24 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
       && Boolean(memory.selectedSlot)
       && isExplicitConfirmation(input.inboundText)
 
-    const structured = shouldCreateAppointment || structuredDraft.nextAction !== 'CONFIRM_BOOKING'
-      ? structuredDraft
-      : {
-          ...structuredDraft,
-          nextAction: 'ASK_CONFIRMATION' as const,
-        }
+    const normalizedNextAction = enforceNextActionFromMemory(
+      structuredDraft.nextAction,
+      memory,
+      shouldCreateAppointment
+    )
+    const guardedReplyText = normalizedNextAction !== structuredDraft.nextAction
+      ? buildGuardrailReplyText({
+          nextAction: normalizedNextAction,
+          memory,
+          customerName: input.customer.name,
+          barbershopName: input.barbershop.name,
+        })
+      : null
+    const structured = {
+      ...structuredDraft,
+      nextAction: normalizedNextAction,
+      replyText: guardedReplyText ?? structuredDraft.replyText,
+    } satisfies AgentStructuredOutput
 
     memory.state = inferConversationState(structured.nextAction)
     memory.conversationSummary = structured.summary || buildRuntimeSummary(memory)

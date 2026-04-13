@@ -1,7 +1,13 @@
 import 'server-only'
 
 import { prisma } from '@/lib/prisma'
-import { getCurrentDateTimeInTimezone } from '@/lib/timezone'
+import {
+  buildBusinessDateTime,
+  formatIsoDateInTimezone,
+  formatTimeInTimezone,
+  getCurrentDateTimeInTimezone,
+  resolveBusinessTimezone,
+} from '@/lib/timezone'
 
 export const SCHEDULE_START_HOUR = 8
 export const SCHEDULE_END_HOUR = 21
@@ -25,23 +31,16 @@ export interface BlockingAppointment {
   endAt: Date
 }
 
-export function buildLocalDate(baseDateIso: string, hours = 0, minutes = 0) {
-  const [year, month, day] = baseDateIso.split('-').map(Number)
-  return new Date(year, month - 1, day, hours, minutes, 0, 0)
+export function buildLocalDate(baseDateIso: string, hours = 0, minutes = 0, timezone?: string | null) {
+  return buildBusinessDateTime(baseDateIso, hours, minutes, timezone)
 }
 
-export function formatLocalDate(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+export function formatLocalDate(date: Date, timezone?: string | null) {
+  return formatIsoDateInTimezone(date, timezone)
 }
 
-export function formatTimeLabel(date: Date) {
-  return date.toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+export function formatTimeLabel(date: Date, timezone?: string | null) {
+  return formatTimeInTimezone(date, timezone)
 }
 
 export function normalizeAvailabilityTimePreference(value?: string | null) {
@@ -64,8 +63,9 @@ export function getOperationalBufferMinutes() {
 }
 
 export function getNowRoundedToStep(timezone?: string | null) {
-  const nowContext = getCurrentDateTimeInTimezone(timezone)
-  const now = buildLocalDate(nowContext.dateIso, nowContext.hour, nowContext.minute)
+  const resolvedTimezone = resolveBusinessTimezone(timezone)
+  const nowContext = getCurrentDateTimeInTimezone(resolvedTimezone)
+  const now = buildLocalDate(nowContext.dateIso, nowContext.hour, nowContext.minute, resolvedTimezone)
   now.setSeconds(0, 0)
 
   const roundedMinutes =
@@ -102,13 +102,14 @@ export function matchesTimePreference(input: {
   startAt: Date
   preference?: string | null
   exactTime?: string | null
+  timezone?: string | null
 }) {
   const preference = normalizeAvailabilityTimePreference(input.preference)
-  const [hours, minutes] = formatTimeLabel(input.startAt).split(':').map(Number)
+  const [hours, minutes] = formatTimeLabel(input.startAt, input.timezone).split(':').map(Number)
   const minutesOfDay = hours * 60 + minutes
 
   if (preference === 'EXACT' && input.exactTime) {
-    return formatTimeLabel(input.startAt) === input.exactTime
+    return formatTimeLabel(input.startAt, input.timezone) === input.exactTime
   }
 
   if (preference === 'NONE') {
@@ -149,9 +150,11 @@ export async function listBlockingAppointmentsForDay(input: {
   barbershopId: string
   dateIso: string
   professionalIds?: string[]
+  timezone?: string | null
 }) {
-  const dayOpen = buildLocalDate(input.dateIso, SCHEDULE_START_HOUR, 0)
-  const dayClose = buildLocalDate(input.dateIso, SCHEDULE_END_HOUR, 0)
+  const resolvedTimezone = resolveBusinessTimezone(input.timezone)
+  const dayOpen = buildLocalDate(input.dateIso, SCHEDULE_START_HOUR, 0, resolvedTimezone)
+  const dayClose = buildLocalDate(input.dateIso, SCHEDULE_END_HOUR, 0, resolvedTimezone)
 
   return prisma.appointment.findMany({
     where: {
