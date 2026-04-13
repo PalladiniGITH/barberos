@@ -3,7 +3,7 @@ import 'server-only'
 import { z } from 'zod'
 import { nextWeekdayIsoDate, shiftIsoDate } from '@/lib/timezone'
 
-const DEFAULT_OPENAI_MODEL = 'gpt-5.4-mini'
+const DEFAULT_OPENAI_MODEL = 'gpt-4.1-mini'
 const DEFAULT_TIMEOUT_MS = 15000
 const MIN_TIMEOUT_MS = 1000
 const MAX_TIMEOUT_MS = 20000

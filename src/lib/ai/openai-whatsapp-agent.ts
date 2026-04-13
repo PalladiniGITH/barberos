@@ -8,8 +8,13 @@ import {
   getAvailableWhatsAppSlots,
 } from '@/lib/agendamentos/whatsapp-booking'
 import { interpretWhatsAppMessage } from '@/lib/ai/openai-whatsapp-interpreter'
+import {
+  getAvailableBusinessPeriodsForDate,
+  getCurrentBusinessPeriod,
+  type BusinessPeriod,
+} from '@/lib/timezone'
 
-const DEFAULT_OPENAI_MODEL = 'gpt-5.4-mini'
+const DEFAULT_OPENAI_MODEL = 'gpt-4.1-mini'
 const DEFAULT_TIMEOUT_MS = 20000
 const MIN_TIMEOUT_MS = 1000
 const MAX_TIMEOUT_MS = 30000
@@ -99,6 +104,13 @@ interface AgentStructuredOutput {
   summary: string
 }
 
+interface MissingFieldsValidation {
+  missingFields: Array<'service' | 'professional' | 'period' | 'date'>
+  availablePeriods: Array<Exclude<BusinessPeriod, 'CLOSED'>>
+  currentBusinessPeriod: BusinessPeriod
+  shouldAskDateInsteadOfPeriod: boolean
+}
+
 export interface WhatsAppAgentResult {
   responseText: string
   flow: WhatsAppAgentFlow
@@ -124,6 +136,7 @@ export interface WhatsAppAgentInput {
     phone?: string | null
   }
   inboundText: string
+  rawMessages?: string[]
   conversation: {
     id: string
     state: string
@@ -156,6 +169,8 @@ export interface WhatsAppAgentInput {
   nowContext: {
     dateIso: string
     dateTimeLabel: string
+    hour?: number
+    minute?: number
   }
 }
 
@@ -232,7 +247,6 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     name: 'get_conversation_summary',
     description: 'Retorna o resumo atual da conversa, estado persistido, ultimas mensagens e draft em andamento.',
-    strict: true,
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -244,7 +258,6 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     name: 'list_services',
     description: 'Lista os servicos ativos da barbearia para ajudar a identificar o servico pedido pelo cliente.',
-    strict: true,
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -258,7 +271,6 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     name: 'resolve_professional_name',
     description: 'Valida se um nome citado corresponde a barbeiro, cliente ou caso ambiguo antes de usar no fluxo.',
-    strict: true,
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -272,7 +284,6 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     name: 'search_availability',
     description: 'Consulta disponibilidade real no backend usando servico, barbeiro, data e periodo.',
-    strict: true,
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -295,7 +306,6 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     name: 'create_booking_draft',
     description: 'Atualiza ou prepara um draft de agendamento com servico, barbeiro, data, periodo ou horario escolhido.',
-    strict: true,
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -319,7 +329,6 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     name: 'confirm_booking',
     description: 'Valida se ja existe um draft completo e se a mensagem do cliente permite confirmar com seguranca.',
-    strict: true,
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -334,7 +343,6 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     name: 'reset_conversation_context',
     description: 'Limpa o contexto atual quando o cliente quiser recomecar ou quando o contexto estiver inconsistente.',
-    strict: true,
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -511,28 +519,102 @@ function inferConversationState(nextAction: WhatsAppAgentNextAction): WhatsAppAg
   return 'IDLE'
 }
 
+function getNormalizedNowContext(input: WhatsAppAgentInput['nowContext']) {
+  const [datePart, timePart = '00:00'] = input.dateTimeLabel.split(' ')
+  const [parsedHour = 0, parsedMinute = 0] = timePart.split(':').map((value) => Number(value))
+
+  return {
+    dateIso: input.dateIso || datePart,
+    hour: typeof input.hour === 'number' ? input.hour : parsedHour,
+    minute: typeof input.minute === 'number' ? input.minute : parsedMinute,
+  }
+}
+
+function validateMissingFields(input: {
+  memory: WorkingMemory
+  nowContext: WhatsAppAgentInput['nowContext']
+}) {
+  const normalizedNow = getNormalizedNowContext(input.nowContext)
+  const availablePeriods = getAvailableBusinessPeriodsForDate({
+    selectedDateIso: input.memory.requestedDateIso,
+    nowContext: normalizedNow,
+  })
+  const currentBusinessPeriod = getCurrentBusinessPeriod(normalizedNow)
+
+  if (
+    input.memory.requestedDateIso
+    && !input.memory.requestedTimeLabel
+    && availablePeriods.length === 1
+  ) {
+    input.memory.requestedTimeLabel = availablePeriods[0]
+  }
+
+  const missingFields: MissingFieldsValidation['missingFields'] = []
+
+  if (!input.memory.selectedServiceId) {
+    missingFields.push('service')
+  }
+
+  if (!input.memory.selectedProfessionalId && !input.memory.allowAnyProfessional) {
+    missingFields.push('professional')
+  }
+
+  if (!input.memory.requestedTimeLabel) {
+    if (input.memory.requestedDateIso && availablePeriods.length === 0) {
+      missingFields.push('date')
+    } else {
+      missingFields.push('period')
+    }
+  }
+
+  if (!input.memory.requestedDateIso) {
+    missingFields.push('date')
+  }
+
+  return {
+    missingFields,
+    availablePeriods,
+    currentBusinessPeriod,
+    shouldAskDateInsteadOfPeriod: Boolean(
+      input.memory.requestedDateIso
+      && !input.memory.requestedTimeLabel
+      && availablePeriods.length === 0
+    ),
+  } satisfies MissingFieldsValidation
+}
+
 function enforceNextActionFromMemory(
   requestedAction: WhatsAppAgentNextAction,
   memory: WorkingMemory,
-  shouldCreateAppointment: boolean
+  shouldCreateAppointment: boolean,
+  nowContext: WhatsAppAgentInput['nowContext']
 ) {
+  const validation = validateMissingFields({
+    memory,
+    nowContext,
+  })
+
   if (requestedAction === 'RESET_CONTEXT' || requestedAction === 'GREET') {
     return requestedAction
   }
 
-  if (!memory.selectedServiceId) {
+  if (validation.missingFields.includes('service')) {
     return 'ASK_SERVICE'
   }
 
-  if (!memory.selectedProfessionalId && !memory.allowAnyProfessional) {
+  if (validation.missingFields.includes('professional')) {
     return 'ASK_PROFESSIONAL'
   }
 
-  if (!memory.requestedTimeLabel) {
+  if (validation.shouldAskDateInsteadOfPeriod) {
+    return 'ASK_DATE'
+  }
+
+  if (validation.missingFields.includes('period')) {
     return 'ASK_PERIOD'
   }
 
-  if (!memory.requestedDateIso) {
+  if (validation.missingFields.includes('date')) {
     return 'ASK_DATE'
   }
 
@@ -599,7 +681,55 @@ function extractFunctionCalls(payload: ResponsePayload): ToolCallRecord[] {
     }))
 }
 
-async function callResponsesApi(config: OpenAIConfig, payload: Record<string, unknown>, signal: AbortSignal) {
+function buildOpenAiPayloadLog(payload: Record<string, unknown>) {
+  return {
+    model: payload.model,
+    store: payload.store ?? 'default',
+    hasTools: Array.isArray(payload.tools),
+    toolNames: Array.isArray(payload.tools)
+      ? payload.tools
+          .map((tool) => (
+            tool && typeof tool === 'object' && !Array.isArray(tool) && typeof tool.name === 'string'
+              ? tool.name
+              : null
+          ))
+          .filter(Boolean)
+      : [],
+    hasPreviousResponseId: typeof payload.previous_response_id === 'string',
+    inputPreview: typeof payload.input === 'string'
+      ? payload.input.slice(0, 500)
+      : Array.isArray(payload.input)
+        ? JSON.stringify(payload.input).slice(0, 500)
+        : null,
+    hasTextFormat: Boolean(
+      payload.text
+      && typeof payload.text === 'object'
+      && !Array.isArray(payload.text)
+      && 'format' in payload.text
+    ),
+  }
+}
+
+function extractOpenAiErrorMessage(data: unknown, fallbackText: string) {
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    const errorValue = (data as Record<string, unknown>).error
+    if (errorValue && typeof errorValue === 'object' && !Array.isArray(errorValue)) {
+      const messageValue = (errorValue as Record<string, unknown>).message
+      if (typeof messageValue === 'string' && messageValue.trim()) {
+        return messageValue.trim()
+      }
+    }
+  }
+
+  return fallbackText.slice(0, 500) || 'unknown_error'
+}
+
+async function callResponsesApi(
+  config: OpenAIConfig,
+  payload: Record<string, unknown>,
+  signal: AbortSignal,
+  requestName: string
+) {
   const response = await fetch(OPENAI_RESPONSES_URL, {
     method: 'POST',
     headers: {
@@ -612,10 +742,25 @@ async function callResponsesApi(config: OpenAIConfig, payload: Record<string, un
   })
 
   const text = await response.text()
-  const data = text ? JSON.parse(text) : {}
+  let data: unknown = {}
+
+  try {
+    data = text ? JSON.parse(text) : {}
+  } catch {
+    data = {}
+  }
 
   if (!response.ok) {
-    throw new Error(`OpenAI Responses API ${response.status}`)
+    const errorMessage = extractOpenAiErrorMessage(data, text)
+
+    console.error('[whatsapp-agent] openai error', {
+      requestName,
+      status: response.status,
+      message: errorMessage,
+      payloadSent: buildOpenAiPayloadLog(payload),
+    })
+
+    throw new Error(`OpenAI Responses API ${response.status}: ${errorMessage}`)
   }
 
   return data as ResponsePayload
@@ -907,6 +1052,10 @@ function buildToolPhasePrompt(input: {
   memory: WorkingMemory
   recentMessages: RecentMessage[]
 }) {
+  const validation = validateMissingFields({
+    memory: input.memory,
+    nowContext: input.agentInput.nowContext,
+  })
   return [
     'Voce e uma secretaria virtual de barbearia e deve usar ferramentas do backend antes de responder.',
     'Objetivo: entender a mensagem do cliente, corrigir contexto quando necessario e decidir qual ferramenta chamar.',
@@ -915,13 +1064,17 @@ function buildToolPhasePrompt(input: {
     `Timezone: ${input.agentInput.barbershop.timezone}.`,
     `Agora local: ${input.agentInput.nowContext.dateTimeLabel}.`,
     `Mensagem recebida: """${input.agentInput.inboundText}""".`,
+    `Mensagens brutas desta janela: ${input.agentInput.rawMessages?.join(' | ') || input.agentInput.inboundText}.`,
     `Estado atual: ${input.memory.state}.`,
     `Resumo persistido: ${input.memory.conversationSummary ?? 'nenhum'}.`,
     `Resumo do draft atual: ${buildRuntimeSummary(input.memory)}.`,
+    `Campos faltantes reais no backend: ${validation.missingFields.join(', ') || 'nenhum'}.`,
+    `Periodos validos agora: ${validation.availablePeriods.join(', ') || 'nenhum'}.`,
     `Correcoes recentes: ${input.memory.recentCorrections.map((item) => `${item.target}:${item.value ?? 'null'}`).join(' | ') || 'nenhuma'}.`,
     `Ultimas mensagens: ${input.recentMessages.map((message) => `${message.direction}:${message.text}`).join(' | ') || 'nenhuma'}.`,
     'Use as ferramentas para validar servico, barbeiro, disponibilidade e rascunho antes de responder.',
     'Quando faltar contexto, prefira perguntar em vez de assumir.',
+    'Nunca pergunte novamente por um campo que o backend ja tem preenchido.',
   ].join('\n')
 }
 
@@ -931,6 +1084,10 @@ function buildFinalPrompt(input: {
   toolTrace: ToolTraceEntry[]
   recentMessages: RecentMessage[]
 }) {
+  const validation = validateMissingFields({
+    memory: input.memory,
+    nowContext: input.agentInput.nowContext,
+  })
   return [
     'Voce acabou de usar ferramentas do backend para atender um cliente no WhatsApp.',
     'Responda com JSON estruturado e linguagem humana curta, como uma secretaria virtual de barbearia.',
@@ -938,9 +1095,12 @@ function buildFinalPrompt(input: {
     'Nunca prometa horarios que nao vieram das ferramentas.',
     'Se houver duvida, use nextAction=ASK_CLARIFICATION.',
     `Mensagem atual do cliente: """${input.agentInput.inboundText}""".`,
+    `Mensagens brutas desta janela: ${input.agentInput.rawMessages?.join(' | ') || input.agentInput.inboundText}.`,
     `Barbearia: ${input.agentInput.barbershop.name}.`,
     `Data/hora local: ${input.agentInput.nowContext.dateTimeLabel}.`,
     `Resumo atualizado do contexto: ${buildRuntimeSummary(input.memory)}.`,
+    `Campos faltantes reais no backend: ${validation.missingFields.join(', ') || 'nenhum'}.`,
+    `Periodos validos agora: ${validation.availablePeriods.join(', ') || 'nenhum'}.`,
     `Correcoes recentes: ${input.memory.recentCorrections.map((item) => `${item.target}:${item.value ?? 'null'}`).join(' | ') || 'nenhuma'}.`,
     `Ferramentas chamadas nesta rodada: ${input.toolTrace.map((trace) => `${trace.name}:${JSON.stringify(trace.result)}`).join(' | ') || 'nenhuma'}.`,
     `Ultimas mensagens: ${input.recentMessages.map((message) => `${message.direction}:${message.text}`).join(' | ') || 'nenhuma'}.`,
@@ -953,6 +1113,7 @@ function buildFallbackStructuredOutput(input: {
   memory: WorkingMemory
   customerName: string
   barbershopName: string
+  nowContext: WhatsAppAgentInput['nowContext']
 }) {
   const firstName = input.customerName.trim().split(' ')[0]
   const replyText = input.fallbackIntent.greetingOnly || input.fallbackIntent.restartConversation
@@ -970,13 +1131,16 @@ function buildFallbackStructuredOutput(input: {
   const nextAction: WhatsAppAgentNextAction =
     input.fallbackIntent.restartConversation
       ? 'RESET_CONTEXT'
-      : (!input.memory.selectedServiceId
-        ? 'ASK_SERVICE'
-        : (!input.memory.selectedProfessionalId && !input.memory.allowAnyProfessional
-          ? 'ASK_PROFESSIONAL'
-          : (!input.memory.requestedTimeLabel
-            ? 'ASK_PERIOD'
-            : (!input.memory.requestedDateIso ? 'ASK_DATE' : 'ASK_CLARIFICATION'))))
+      : enforceNextActionFromMemory('ASK_CLARIFICATION', input.memory, false, input.nowContext)
+  const guardedReplyText =
+    buildGuardrailReplyText({
+      nextAction,
+      memory: input.memory,
+      customerName: input.customerName,
+      barbershopName: input.barbershopName,
+      nowContext: input.nowContext,
+    })
+    ?? replyText
 
   return {
     intent: input.fallbackIntent.intent,
@@ -987,7 +1151,7 @@ function buildFallbackStructuredOutput(input: {
     requestedTime: input.fallbackIntent.exactTime ?? input.memory.requestedTimeLabel,
     confidence: input.fallbackIntent.confidence,
     nextAction,
-    replyText,
+    replyText: guardedReplyText,
     summary: buildRuntimeSummary(input.memory),
   } satisfies AgentStructuredOutput
 }
@@ -997,8 +1161,15 @@ function buildGuardrailReplyText(input: {
   memory: WorkingMemory
   customerName: string
   barbershopName: string
+  nowContext?: WhatsAppAgentInput['nowContext']
 }) {
   const firstName = input.customerName.trim().split(' ')[0]
+  const validation = input.nowContext
+    ? validateMissingFields({
+        memory: input.memory,
+        nowContext: input.nowContext,
+      })
+    : null
 
   if (input.nextAction === 'GREET' || input.nextAction === 'RESET_CONTEXT') {
     return `Oi, ${firstName}! Posso te ajudar a marcar um horario na ${input.barbershopName}?`
@@ -1013,6 +1184,22 @@ function buildGuardrailReplyText(input: {
   }
 
   if (input.nextAction === 'ASK_PERIOD') {
+    if (validation?.availablePeriods.length === 0) {
+      return 'Hoje ja passou do horario de atendimento. Quer que eu veja para amanha ou outro dia?'
+    }
+
+    if (validation?.availablePeriods.length === 1) {
+      return validation.availablePeriods[0] === 'EVENING'
+        ? 'Perfeito. Para hoje eu consigo te atender na noite. Quer que eu te mostre os horarios?'
+        : validation.availablePeriods[0] === 'AFTERNOON'
+          ? 'Perfeito. Para hoje eu consigo te atender na tarde. Quer que eu te mostre os horarios?'
+          : 'Perfeito. Para hoje eu consigo te atender na manha. Quer que eu te mostre os horarios?'
+    }
+
+    if (validation?.availablePeriods.length === 2 && validation.currentBusinessPeriod !== 'MORNING') {
+      return 'Voce prefere tarde ou noite?'
+    }
+
     return 'Voce prefere manha, tarde ou noite?'
   }
 
@@ -1346,12 +1533,14 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     memory,
     customerName: input.customer.name,
     barbershopName: input.barbershop.name,
+    nowContext: input.nowContext,
   })
 
   console.info('[whatsapp-agent] turn received', {
     customerId: input.customer.id,
     conversationId: input.conversation.id,
     inboundText: input.inboundText,
+    rawMessages: input.rawMessages ?? [input.inboundText],
     promotedContext: {
       selectedServiceId: memory.selectedServiceId,
       selectedProfessionalId: memory.selectedProfessionalId,
@@ -1372,21 +1561,16 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
       config,
       {
         model: config.model,
-        store: false,
         max_output_tokens: 500,
         tools: TOOL_DEFINITIONS,
-        input: [
-          {
-            role: 'user',
-            content: buildToolPhasePrompt({
-              agentInput: input,
-              memory,
-              recentMessages,
-            }),
-          },
-        ],
+        input: buildToolPhasePrompt({
+          agentInput: input,
+          memory,
+          recentMessages,
+        }),
       },
-      controller.signal
+      controller.signal,
+      'tool_phase'
     )
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
@@ -1432,13 +1616,13 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
         config,
         {
           model: config.model,
-          store: false,
           max_output_tokens: 500,
           tools: TOOL_DEFINITIONS,
           previous_response_id: response.id,
           input: toolOutputs,
         },
-        controller.signal
+        controller.signal,
+        'tool_round'
       )
     }
 
@@ -1446,19 +1630,13 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
       config,
       {
         model: config.model,
-        store: false,
         max_output_tokens: 400,
-        input: [
-          {
-            role: 'user',
-            content: buildFinalPrompt({
-              agentInput: input,
-              memory,
-              toolTrace,
-              recentMessages,
-            }),
-          },
-        ],
+        input: buildFinalPrompt({
+          agentInput: input,
+          memory,
+          toolTrace,
+          recentMessages,
+        }),
         text: {
           format: {
             type: 'json_schema',
@@ -1468,7 +1646,8 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
           },
         },
       },
-      controller.signal
+      controller.signal,
+      'final_schema'
     )
 
     const finalText = extractResponseText(finalResponse)
@@ -1516,7 +1695,8 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     const normalizedNextAction = enforceNextActionFromMemory(
       structuredDraft.nextAction,
       memory,
-      shouldCreateAppointment
+      shouldCreateAppointment,
+      input.nowContext
     )
     const guardedReplyText = normalizedNextAction !== structuredDraft.nextAction
       ? buildGuardrailReplyText({
@@ -1524,6 +1704,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
           memory,
           customerName: input.customer.name,
           barbershopName: input.barbershop.name,
+          nowContext: input.nowContext,
         })
       : null
     const structured = {
@@ -1565,6 +1746,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
 export const __testing = {
   buildInitialMemory,
   promoteIntentContextToMemory,
+  validateMissingFields,
   enforceNextActionFromMemory,
   buildGuardrailReplyText,
 }

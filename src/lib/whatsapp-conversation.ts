@@ -13,6 +13,8 @@ import {
 } from '@/lib/agendamentos/whatsapp-booking'
 import {
   buildDateAnchorUtc,
+  getAvailableBusinessPeriodsForDate,
+  getCurrentBusinessPeriod,
   getCurrentDateTimeInTimezone,
   getTodayIsoInTimezone,
   resolveBusinessTimezone,
@@ -40,6 +42,7 @@ interface ConversationServiceInput {
     phone?: string | null
   }
   inboundText: string
+  rawMessages?: string[]
   eventId: string
 }
 
@@ -199,7 +202,39 @@ function buildDateQuestion() {
   return 'Qual dia voce prefere? Pode me falar algo como hoje, amanha, sexta ou uma data.'
 }
 
-function buildPeriodQuestion() {
+function buildPeriodQuestion(input?: {
+  requestedDateIso?: string | null
+  nowContext?: {
+    dateIso: string
+    hour: number
+    minute: number
+  }
+}) {
+  if (!input?.requestedDateIso || !input.nowContext) {
+    return 'Perfeito. Voce prefere de manha, a tarde ou a noite?'
+  }
+
+  const availablePeriods = getAvailableBusinessPeriodsForDate({
+    selectedDateIso: input.requestedDateIso,
+    nowContext: input.nowContext,
+  })
+
+  if (availablePeriods.length === 0) {
+    return 'Hoje ja passou do horario de atendimento. Quer que eu veja para amanha ou outro dia?'
+  }
+
+  if (availablePeriods.length === 1) {
+    return availablePeriods[0] === 'EVENING'
+      ? 'Perfeito. Para esse dia eu consigo te atender na noite. Quer que eu te mostre os horarios?'
+      : availablePeriods[0] === 'AFTERNOON'
+        ? 'Perfeito. Para esse dia eu consigo te atender na tarde. Quer que eu te mostre os horarios?'
+        : 'Perfeito. Para esse dia eu consigo te atender na manha. Quer que eu te mostre os horarios?'
+  }
+
+  if (getCurrentBusinessPeriod(input.nowContext) !== 'MORNING' && availablePeriods.length === 2) {
+    return 'Perfeito. Voce prefere tarde ou noite?'
+  }
+
   return 'Perfeito. Voce prefere de manha, a tarde ou a noite?'
 }
 
@@ -291,6 +326,11 @@ function buildProfessionalNotFoundMessage(name: string, professionals: NameMatch
 function buildResumeMessage(input: {
   state: ConversationState
   timezone: string
+  nowContext: {
+    dateIso: string
+    hour: number
+    minute: number
+  }
   draft: ConversationDraft
   professionals: NameMatch[]
 }) {
@@ -323,7 +363,10 @@ function buildResumeMessage(input: {
     )}`
   }
 
-  return `Oi! Posso continuar por aqui. ${buildPeriodQuestion()}`
+  return `Oi! Posso continuar por aqui. ${buildPeriodQuestion({
+    requestedDateIso: input.draft.requestedDateIso,
+    nowContext: input.nowContext,
+  })}`
 }
 
 function buildCorrectionLeadIn(target: string) {
@@ -940,6 +983,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     barbershop: input.barbershop,
     customer: input.customer,
     inboundText,
+    rawMessages: input.rawMessages,
     conversation: {
       id: conversation.id,
       state: effectiveState,
@@ -1172,6 +1216,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     const responseText = buildResumeMessage({
       state: effectiveState,
       timezone,
+      nowContext,
       draft: draftForInterpreter,
       professionals: professionals.map((professional) => ({ id: professional.id, name: professional.name })),
     })
@@ -1297,6 +1342,19 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       preferredPeriod: interpreted.preferredPeriod,
       existingValue: draft.requestedTimeLabel,
     })
+  }
+
+  const availablePeriodsForDraft = getAvailableBusinessPeriodsForDate({
+    selectedDateIso: draft.requestedDateIso,
+    nowContext,
+  })
+
+  if (
+    draft.requestedDateIso
+    && !draft.requestedTimeLabel
+    && availablePeriodsForDraft.length === 1
+  ) {
+    draft.requestedTimeLabel = availablePeriodsForDraft[0]
   }
 
   if (serviceChanged || professionalChanged || dateChanged || interpreted.correctionTarget !== 'NONE') {
@@ -1445,7 +1503,13 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
 
   if (!draft.allowAnyProfessional && !draft.selectedProfessionalId) {
     const responseText = professionals.length === 1
-      ? withLeadIn(`Perfeito. Vou buscar com ${professionals[0].name}. ${buildPeriodQuestion()}`, responseLeadIn)
+      ? withLeadIn(
+          `Perfeito. Vou buscar com ${professionals[0].name}. ${buildPeriodQuestion({
+            requestedDateIso: draft.requestedDateIso,
+            nowContext,
+          })}`,
+          responseLeadIn
+        )
       : withLeadIn(buildProfessionalQuestion(professionals.map((professional) => professional.name)), responseLeadIn)
 
     await prisma.whatsappConversation.update({
@@ -1472,7 +1536,10 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   }
 
   if (!hasResolvedTimePreference(draft.requestedTimeLabel)) {
-    const responseText = withLeadIn(buildPeriodQuestion(), responseLeadIn)
+    const responseText = withLeadIn(buildPeriodQuestion({
+      requestedDateIso: draft.requestedDateIso,
+      nowContext,
+    }), responseLeadIn)
 
     await prisma.whatsappConversation.update({
       where: { id: conversation.id },

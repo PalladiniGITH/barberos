@@ -46,6 +46,18 @@ interface TenantResolutionLogContext {
   finalReason: string
 }
 
+interface AggregatedInboundMessage {
+  shouldProcess: boolean
+  conversationId: string
+  rawMessages: string[]
+  concatenatedMessage: string
+  reason: 'immediate' | 'aggregated' | 'awaiting_more_messages'
+}
+
+const MESSAGE_AGGREGATION_WINDOW_MS = 2000
+const IMMEDIATE_MESSAGE_PATTERN =
+  /^(oi+|ola+|ol[aá]|bom dia|boa tarde|boa noite|quero agendar|quero marcar|agendar|marcar horario)[!.,\s]*$/i
+
 function normalizePhoneDigits(value?: string | null) {
   if (!value) {
     return null
@@ -53,6 +65,32 @@ function normalizePhoneDigits(value?: string | null) {
 
   const digits = value.replace(/\D/g, '')
   return digits || null
+}
+
+function normalizeMessageText(value?: string | null) {
+  return value?.trim() ?? ''
+}
+
+function shouldProcessImmediately(message: string) {
+  return IMMEDIATE_MESSAGE_PATTERN.test(
+    message
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim()
+  )
+}
+
+function parseMessageBuffer(raw: Prisma.JsonValue | null) {
+  if (!Array.isArray(raw)) {
+    return []
+  }
+
+  return raw.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+}
+
+async function wait(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function buildFallbackCustomerName(phone: string) {
@@ -314,6 +352,139 @@ async function findOrCreateCustomerFromInbound(input: {
   }
 }
 
+async function getOrCreateWhatsappConversation(input: {
+  barbershopId: string
+  customerId: string
+  phone?: string | null
+}) {
+  return prisma.whatsappConversation.upsert({
+    where: {
+      barbershopId_customerId: {
+        barbershopId: input.barbershopId,
+        customerId: input.customerId,
+      },
+    },
+    update: {
+      phone: input.phone ?? undefined,
+    },
+    create: {
+      barbershopId: input.barbershopId,
+      customerId: input.customerId,
+      phone: input.phone ?? null,
+      state: 'IDLE',
+    },
+    select: {
+      id: true,
+      messageBuffer: true,
+      lastMessageTimestamp: true,
+    },
+  })
+}
+
+async function aggregateInboundMessages(input: {
+  barbershopId: string
+  customerId: string
+  phone?: string | null
+  message: string
+}) : Promise<AggregatedInboundMessage> {
+  const normalizedMessage = normalizeMessageText(input.message)
+  const conversation = await getOrCreateWhatsappConversation({
+    barbershopId: input.barbershopId,
+    customerId: input.customerId,
+    phone: input.phone ?? null,
+  })
+
+  if (shouldProcessImmediately(normalizedMessage)) {
+    await prisma.whatsappConversation.update({
+      where: { id: conversation.id },
+      data: {
+        phone: input.phone ?? null,
+        messageBuffer: Prisma.JsonNull,
+        lastMessageTimestamp: null,
+      },
+    })
+
+    console.info('[whatsapp-agent] message aggregation', {
+      rawMessages: [normalizedMessage],
+      concatenatedMessage: normalizedMessage,
+    })
+
+    return {
+      shouldProcess: true,
+      conversationId: conversation.id,
+      rawMessages: [normalizedMessage],
+      concatenatedMessage: normalizedMessage,
+      reason: 'immediate',
+    }
+  }
+
+  const now = new Date()
+  const previousBuffer =
+    conversation.lastMessageTimestamp
+    && now.getTime() - conversation.lastMessageTimestamp.getTime() <= MESSAGE_AGGREGATION_WINDOW_MS
+      ? parseMessageBuffer(conversation.messageBuffer)
+      : []
+  const nextBuffer = [...previousBuffer, normalizedMessage]
+
+  await prisma.whatsappConversation.update({
+    where: { id: conversation.id },
+    data: {
+      phone: input.phone ?? null,
+      messageBuffer: nextBuffer as Prisma.InputJsonValue,
+      lastMessageTimestamp: now,
+    },
+  })
+
+  await wait(MESSAGE_AGGREGATION_WINDOW_MS)
+
+  const latestConversation = await prisma.whatsappConversation.findUnique({
+    where: { id: conversation.id },
+    select: {
+      id: true,
+      messageBuffer: true,
+      lastMessageTimestamp: true,
+    },
+  })
+
+  if (
+    !latestConversation
+    || !latestConversation.lastMessageTimestamp
+    || latestConversation.lastMessageTimestamp.getTime() !== now.getTime()
+  ) {
+    return {
+      shouldProcess: false,
+      conversationId: conversation.id,
+      rawMessages: nextBuffer,
+      concatenatedMessage: nextBuffer.join(' '),
+      reason: 'awaiting_more_messages',
+    }
+  }
+
+  const rawMessages = parseMessageBuffer(latestConversation.messageBuffer)
+  const concatenatedMessage = rawMessages.join(' ').replace(/\s+/g, ' ').trim()
+
+  await prisma.whatsappConversation.update({
+    where: { id: conversation.id },
+    data: {
+      messageBuffer: Prisma.JsonNull,
+      lastMessageTimestamp: null,
+    },
+  })
+
+  console.info('[whatsapp-agent] message aggregation', {
+    rawMessages,
+    concatenatedMessage,
+  })
+
+  return {
+    shouldProcess: true,
+    conversationId: conversation.id,
+    rawMessages,
+    concatenatedMessage,
+    reason: 'aggregated',
+  }
+}
+
 async function findExistingMessagingEvent(dedupeKey: string) {
   return prisma.messagingEvent.findUnique({
     where: { dedupeKey },
@@ -504,6 +675,39 @@ export async function handleIncomingWhatsAppMessage(input: IncomingWhatsAppMessa
       contactName: input.contactName,
     })
 
+    const aggregatedMessage = await aggregateInboundMessages({
+      barbershopId: barbershop.id,
+      customerId: customer.id,
+      phone: input.phone,
+      message: input.message ?? '',
+    })
+
+    if (!aggregatedMessage.shouldProcess) {
+      await prisma.messagingEvent.update({
+        where: { id: existingEvent.id },
+        data: {
+          customerId: customer.id,
+          status: 'PROCESSED',
+          lastError: `message_${aggregatedMessage.reason}`,
+          processedAt: new Date(),
+        },
+      })
+
+      return {
+        ok: true,
+        code: 200,
+        reason: aggregatedMessage.reason,
+        flow: 'awaiting_more_messages',
+        eventId: existingEvent.id,
+        customerId: customer.id,
+        customerCreated: customer.created,
+        conversationId: aggregatedMessage.conversationId,
+        phone: input.phone,
+        message: aggregatedMessage.concatenatedMessage,
+        replySent: false,
+      }
+    }
+
     const conversation = await processWhatsAppConversation({
       barbershop,
       customer: {
@@ -512,7 +716,8 @@ export async function handleIncomingWhatsAppMessage(input: IncomingWhatsAppMessa
         created: customer.created,
         phone: input.phone,
       },
-      inboundText: input.message ?? '',
+      inboundText: aggregatedMessage.concatenatedMessage,
+      rawMessages: aggregatedMessage.rawMessages,
       eventId: existingEvent.id,
     })
     const responseText = conversation.responseText

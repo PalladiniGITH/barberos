@@ -401,6 +401,8 @@ model WhatsappConversation {
   requestedTimeLabel       String?
   slotOptions              Json?
   selectedSlot             Json?
+  messageBuffer            Json?
+  lastMessageTimestamp     DateTime?
   lastIntent               Json?
   lastInboundText          String?
   lastAssistantText        String?

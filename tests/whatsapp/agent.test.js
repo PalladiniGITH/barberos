@@ -53,6 +53,8 @@ function createAgentInput() {
     nowContext: {
       dateIso: '2026-04-13',
       dateTimeLabel: '2026-04-13 10:30',
+      hour: 10,
+      minute: 30,
     },
   }
 }
@@ -140,6 +142,64 @@ test('backend corrige nextAction quando a IA tenta perguntar algo ja preenchido'
     },
   ]
 
-  const corrected = agentTesting.enforceNextActionFromMemory('ASK_DATE', memory, false)
+  const corrected = agentTesting.enforceNextActionFromMemory(
+    'ASK_DATE',
+    memory,
+    false,
+    createAgentInput().nowContext
+  )
   assert.equal(corrected, 'OFFER_SLOTS')
+})
+
+test('validateMissingFields nao oferece manha quando ja e tarde e a data e hoje', () => {
+  const input = createAgentInput()
+  input.nowContext = {
+    dateIso: '2026-04-13',
+    dateTimeLabel: '2026-04-13 14:00',
+    hour: 14,
+    minute: 0,
+  }
+
+  const memory = agentTesting.buildInitialMemory(input)
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.selectedProfessionalId = 'pro-matheus'
+  memory.selectedProfessionalName = 'Matheus'
+  memory.requestedDateIso = '2026-04-13'
+
+  const validation = agentTesting.validateMissingFields({
+    memory,
+    nowContext: input.nowContext,
+  })
+
+  assert.deepEqual(validation.availablePeriods, ['AFTERNOON', 'EVENING'])
+  assert.deepEqual(validation.missingFields, ['period'])
+})
+
+test('guardrail de periodo pergunta apenas o que faz sentido no horario atual', () => {
+  const input = createAgentInput()
+  input.nowContext = {
+    dateIso: '2026-04-13',
+    dateTimeLabel: '2026-04-13 14:00',
+    hour: 14,
+    minute: 0,
+  }
+
+  const memory = agentTesting.buildInitialMemory(input)
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.selectedProfessionalId = 'pro-matheus'
+  memory.selectedProfessionalName = 'Matheus'
+  memory.requestedDateIso = '2026-04-13'
+
+  const reply = agentTesting.buildGuardrailReplyText({
+    nextAction: 'ASK_PERIOD',
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    nowContext: input.nowContext,
+  })
+
+  assert.match(reply, /tarde ou noite/i)
+  assert.doesNotMatch(reply, /manha/i)
 })

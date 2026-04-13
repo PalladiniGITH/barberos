@@ -12,6 +12,8 @@ export interface TimezoneNowContext {
   dateTimeLabel: string
 }
 
+export type BusinessPeriod = 'MORNING' | 'AFTERNOON' | 'EVENING' | 'CLOSED'
+
 const DEFAULT_TIMEZONE = 'America/Sao_Paulo'
 const APP_TIMEZONE_ENV = 'APP_TIMEZONE'
 
@@ -219,4 +221,51 @@ export function formatTimeInTimezone(date: Date, timezone?: string | null) {
 export function formatDateTimeInTimezone(date: Date, timezone?: string | null) {
   const resolvedTimezone = resolveBusinessTimezone(timezone)
   return getDateTimePartsInTimezone(date, resolvedTimezone).dateTimeLabel
+}
+
+export function getCurrentBusinessPeriod(
+  input: Pick<TimezoneNowContext, 'hour' | 'minute'>
+): BusinessPeriod {
+  const minutesOfDay = input.hour * 60 + input.minute
+
+  if (minutesOfDay >= 21 * 60) {
+    return 'CLOSED'
+  }
+
+  if (minutesOfDay >= 18 * 60) {
+    return 'EVENING'
+  }
+
+  if (minutesOfDay >= 12 * 60) {
+    return 'AFTERNOON'
+  }
+
+  return 'MORNING'
+}
+
+export function getAvailableBusinessPeriodsForDate(input: {
+  selectedDateIso?: string | null
+  nowContext: Pick<TimezoneNowContext, 'dateIso' | 'hour' | 'minute'>
+}) {
+  const allPeriods: Array<Exclude<BusinessPeriod, 'CLOSED'>> = ['MORNING', 'AFTERNOON', 'EVENING']
+
+  if (!input.selectedDateIso || input.selectedDateIso !== input.nowContext.dateIso) {
+    return allPeriods
+  }
+
+  const currentPeriod = getCurrentBusinessPeriod(input.nowContext)
+
+  if (currentPeriod === 'CLOSED') {
+    return [] as Array<Exclude<BusinessPeriod, 'CLOSED'>>
+  }
+
+  if (currentPeriod === 'EVENING') {
+    return ['EVENING'] as Array<Exclude<BusinessPeriod, 'CLOSED'>>
+  }
+
+  if (currentPeriod === 'AFTERNOON') {
+    return ['AFTERNOON', 'EVENING'] as Array<Exclude<BusinessPeriod, 'CLOSED'>>
+  }
+
+  return allPeriods
 }
