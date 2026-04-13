@@ -104,3 +104,40 @@ test('respostas afirmativas amplas sao aceitas para fechamento deterministico', 
     assert.equal(conversationTesting.isAffirmativeConfirmationMessage(reply), true)
   })
 })
+
+test('quando o horario exato nao existe a resposta avanca com alternativas proximas', () => {
+  const slots = [
+    {
+      key: 'pro-matheus:2026-04-14T11:00:00.000Z',
+      professionalId: 'pro-matheus',
+      professionalName: 'Matheus',
+      dateIso: '2026-04-14',
+      timeLabel: '08:00',
+      startAtIso: '2026-04-14T11:00:00.000Z',
+      endAtIso: '2026-04-14T11:35:00.000Z',
+    },
+    {
+      key: 'pro-matheus:2026-04-14T11:15:00.000Z',
+      professionalId: 'pro-matheus',
+      professionalName: 'Matheus',
+      dateIso: '2026-04-14',
+      timeLabel: '08:15',
+      startAtIso: '2026-04-14T11:15:00.000Z',
+      endAtIso: '2026-04-14T11:50:00.000Z',
+    },
+  ]
+
+  const reply = conversationTesting.buildExactTimeFallbackResponse({
+    exactTime: '10:00',
+    timezone: 'America/Sao_Paulo',
+    dateIso: '2026-04-14',
+    slots,
+    professionalName: 'Matheus',
+    previousAssistantText: 'Amanha de manha com Matheus eu tenho estes horarios livres para Corte Classic:\n\n- 08:00\n- 08:15\n\nPode me dizer qual prefere ou pedir outro horario.',
+  })
+
+  assert.match(reply, /10:00/)
+  assert.match(reply, /08:00/)
+  assert.match(reply, /08:15/)
+  assert.doesNotMatch(reply, /10h e manha|10:00 e manha/i)
+})

@@ -368,6 +368,11 @@ function parseExplicitTime(message: string) {
     return formatIsoTime(Number(hourOnlyMatch[1]), 0)
   }
 
+  const explicitHourRequest = message.match(/\b(?:as|às)\s*([01]?\d|2[0-3])\b/)
+  if (explicitHourRequest) {
+    return formatIsoTime(Number(explicitHourRequest[1]), 0)
+  }
+
   return null
 }
 

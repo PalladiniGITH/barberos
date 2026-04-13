@@ -311,3 +311,20 @@ test('trata respostas afirmativas amplas como confirmacao real no momento certo'
     assert.equal(agentTesting.isExplicitConfirmation(reply), true)
   })
 })
+
+test('interpreta horario explicito como busca exata prioritaria', async () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.state = 'WAITING_TIME'
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.requestedDateIso = '2026-04-14'
+  memory.requestedTimeLabel = 'MORNING'
+
+  const exactIntent = await interpretMessage('Quero às 10h da manhã', memory)
+  const exactIntentWithoutH = await interpretMessage('Quero às 10', memory)
+
+  assert.equal(exactIntent.exactTime, '10:00')
+  assert.equal(exactIntent.timePreference, 'EXACT')
+  assert.equal(exactIntentWithoutH.exactTime, '10:00')
+  assert.equal(exactIntentWithoutH.timePreference, 'EXACT')
+})

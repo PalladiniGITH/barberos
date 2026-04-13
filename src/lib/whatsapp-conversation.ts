@@ -903,6 +903,77 @@ function buildExactTimeUnavailableMessage(input: {
   return `${input.exactTime} nao esta disponivel ${dayLabel}. Vou te mostrar as opcoes mais proximas.`
 }
 
+function buildCompactNearbySlotSummary(slots: ConversationSlot[]) {
+  const uniqueLabels = slots
+    .map((slot) => `${slot.timeLabel}${slots.some((candidate) =>
+      candidate.timeLabel === slot.timeLabel
+      && candidate.professionalId !== slot.professionalId
+    ) ? ` com ${slot.professionalName}` : ''}`)
+    .filter((label, index, collection) => collection.indexOf(label) === index)
+
+  if (uniqueLabels.length === 0) {
+    return null
+  }
+
+  if (uniqueLabels.length === 1) {
+    return uniqueLabels[0]
+  }
+
+  if (uniqueLabels.length === 2) {
+    return `${uniqueLabels[0]} e ${uniqueLabels[1]}`
+  }
+
+  return `${uniqueLabels.slice(0, -1).join(', ')} e ${uniqueLabels.at(-1)}`
+}
+
+function shouldAvoidSemanticallyRepeatedResponse(input: {
+  previousAssistantText?: string | null
+  nextResponseText: string
+}) {
+  const previous = normalizeText(input.previousAssistantText ?? '')
+  const next = normalizeText(input.nextResponseText)
+
+  if (!previous || !next) {
+    return false
+  }
+
+  return previous === next
+    || previous.includes(next)
+    || next.includes(previous)
+}
+
+function buildExactTimeFallbackResponse(input: {
+  exactTime: string
+  timezone: string
+  dateIso: string
+  slots: ConversationSlot[]
+  professionalName?: string | null
+  previousAssistantText?: string | null
+}) {
+  const nearbySummary = buildCompactNearbySlotSummary(input.slots)
+  const unavailableMessage = buildExactTimeUnavailableMessage({
+    exactTime: input.exactTime,
+    timezone: input.timezone,
+    dateIso: input.dateIso,
+    professionalName: input.professionalName,
+  })
+
+  const conciseFollowUp = nearbySummary
+    ? `${unavailableMessage} Os horarios mais proximos que tenho sao ${nearbySummary}. Quer um deles ou prefere que eu procure em outro periodo?`
+    : `${unavailableMessage} Se quiser, eu posso procurar em outro periodo.`
+
+  if (shouldAvoidSemanticallyRepeatedResponse({
+    previousAssistantText: input.previousAssistantText,
+    nextResponseText: conciseFollowUp,
+  })) {
+    return nearbySummary
+      ? `Nao tenho ${input.exactTime}. Posso seguir com ${nearbySummary} ou buscar outro periodo.`
+      : `Nao tenho ${input.exactTime}. Posso buscar em outro periodo para voce.`
+  }
+
+  return conciseFollowUp
+}
+
 function clearDraftAvailability(draft: ConversationDraft) {
   draft.offeredSlots = []
   draft.selectedStoredSlot = null
@@ -1087,8 +1158,10 @@ async function offerFreshSlots(input: {
   professionalName: string | null
   timePreference: string | null
   exactTime: string | null
+  requestedExactTimeForFallback?: string | null
   usedAI: boolean
   responseLeadIn?: string | null
+  previousAssistantText?: string | null
 }): Promise<ConversationServiceResult> {
   const availability = await getAvailableWhatsAppSlots({
     barbershopId: input.barbershopId,
@@ -1144,10 +1217,22 @@ async function offerFreshSlots(input: {
     }
   }
 
-  const responseText = withLeadIn(
-    buildHumanSlotOfferMessage(availability.slots, input.serviceName, input.timezone, input.timePreference),
-    input.responseLeadIn
-  )
+  const slotOfferMessage = input.requestedExactTimeForFallback && !input.exactTime
+    ? buildExactTimeFallbackResponse({
+        exactTime: input.requestedExactTimeForFallback,
+        timezone: input.timezone,
+        dateIso: input.requestedDateIso,
+        slots: availability.slots,
+        professionalName: input.professionalName,
+        previousAssistantText: input.previousAssistantText,
+      })
+    : buildHumanSlotOfferMessage(
+        availability.slots,
+        input.serviceName,
+        input.timezone,
+        input.timePreference
+      )
+  const responseText = withLeadIn(slotOfferMessage, input.responseLeadIn)
 
   await prisma.whatsappConversation.update({
     where: { id: input.conversationId },
@@ -2305,14 +2390,21 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     exactTime: interpreted.exactTime,
     message: inboundText,
   })
+  const professionalIdForExactSearch = draft.allowAnyProfessional
+    ? null
+    : draft.selectedProfessionalId ?? contextualProfessionalPreference?.professionalId ?? null
+  const professionalNameForExactSearch = draft.allowAnyProfessional
+    ? null
+    : draft.selectedProfessionalName ?? contextualProfessionalPreference?.professionalName ?? null
 
   if (interpreted.exactTime) {
     console.info('[whatsapp-conversation] exact time requested', {
       customerId: input.customer.id,
       exactTimeRequested: interpreted.exactTime,
       requestedDateIso: draft.requestedDateIso,
-      selectedProfessionalId: draft.selectedProfessionalId,
-      selectedProfessionalName: draft.selectedProfessionalName,
+      selectedProfessionalId: professionalIdForExactSearch,
+      selectedProfessionalName: professionalNameForExactSearch,
+      contextualProfessionalSource: contextualProfessionalPreference?.source ?? 'none',
       offeredSlotsCount: draft.offeredSlots.length,
       offeredSlots: draft.offeredSlots.map((slot) => `${slot.timeLabel} com ${slot.professionalName}`),
     })
@@ -2331,11 +2423,11 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     })
   }
 
-  if (!slotForConfirmation && interpreted.exactTime && draft.selectedProfessionalId) {
+  if (!slotForConfirmation && interpreted.exactTime && professionalIdForExactSearch) {
     slotForConfirmation = await findExactAvailableWhatsAppSlot({
       barbershopId: input.barbershop.id,
       serviceId: draft.selectedServiceId,
-      professionalId: draft.selectedProfessionalId,
+      professionalId: professionalIdForExactSearch,
       dateIso: draft.requestedDateIso,
       timeLabel: interpreted.exactTime,
       timezone,
@@ -2359,7 +2451,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       serviceId: draft.selectedServiceId,
       dateIso: draft.requestedDateIso,
       timezone,
-      professionalId: draft.allowAnyProfessional ? null : draft.selectedProfessionalId,
+      professionalId: professionalIdForExactSearch,
       timePreference: 'EXACT',
       exactTime: interpreted.exactTime,
       limit: 8,
@@ -2368,8 +2460,8 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     console.info('[whatsapp-conversation] exact time validation result', {
       customerId: input.customer.id,
       exactTimeRequested: interpreted.exactTime,
-      selectedProfessionalId: draft.allowAnyProfessional ? null : draft.selectedProfessionalId,
-      selectedProfessionalName: draft.allowAnyProfessional ? null : draft.selectedProfessionalName,
+      selectedProfessionalId: professionalIdForExactSearch,
+      selectedProfessionalName: professionalNameForExactSearch,
       freeSlotsReturned: exactTimeAvailability.slots.length,
       slots: exactTimeAvailability.slots.map((slot) => `${slot.timeLabel} com ${slot.professionalName}`),
       finalReason: exactTimeAvailability.diagnostics.finalReason,
@@ -2392,22 +2484,15 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
         professionalName: draft.allowAnyProfessional ? null : draft.selectedProfessionalName,
         timePreference: 'EXACT',
         exactTime: interpreted.exactTime,
+        requestedExactTimeForFallback: interpreted.exactTime,
         usedAI,
         responseLeadIn,
+        previousAssistantText: conversation.lastAssistantText,
       })
     }
   }
 
   if (!slotForConfirmation) {
-    const exactTimeUnavailableLeadIn = interpreted.exactTime
-      ? buildExactTimeUnavailableMessage({
-          exactTime: interpreted.exactTime,
-          timezone,
-          dateIso: draft.requestedDateIso,
-          professionalName: draft.allowAnyProfessional ? null : draft.selectedProfessionalName,
-        })
-      : null
-
     return offerFreshSlots({
       conversationId: conversation.id,
       customerId: input.customer.id,
@@ -2426,10 +2511,10 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
           ? interpreted.timePreference
           : draft.requestedTimeLabel,
       exactTime: interpreted.exactTime ? null : (draft.requestedTimeLabel?.includes(':') ? draft.requestedTimeLabel : null),
+      requestedExactTimeForFallback: interpreted.exactTime,
       usedAI,
-      responseLeadIn: exactTimeUnavailableLeadIn
-        ? withLeadIn(exactTimeUnavailableLeadIn, responseLeadIn)
-        : responseLeadIn,
+      responseLeadIn,
+      previousAssistantText: conversation.lastAssistantText,
     })
   }
 
@@ -2575,15 +2660,19 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       professionalName: draft.allowAnyProfessional ? null : draft.selectedProfessionalName,
       timePreference: draft.requestedTimeLabel,
       exactTime: draft.requestedTimeLabel?.includes(':') ? draft.requestedTimeLabel : null,
+      requestedExactTimeForFallback: null,
       usedAI,
       responseLeadIn: 'Esse horario nao estava mais livre no momento de confirmar. Vou te mostrar opcoes atualizadas.',
+      previousAssistantText: conversation.lastAssistantText,
     })
   }
 }
 
 export const __testing = {
+  buildCompactNearbySlotSummary,
   buildEmptyConversationDraft,
   buildExactTimeUnavailableMessage,
+  buildExactTimeFallbackResponse,
   buildRecentConfirmedGreeting,
   buildProfessionalQuestion,
   buildHumanSlotOfferMessage,
