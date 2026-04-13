@@ -9,6 +9,28 @@ const MIN_TIMEOUT_MS = 1000
 const MAX_TIMEOUT_MS = 20000
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses'
 
+const NAME_STOPWORDS = [
+  'quero',
+  'preciso',
+  'marcar',
+  'agendar',
+  'hoje',
+  'amanha',
+  'amanhã',
+  'tarde',
+  'manha',
+  'manhã',
+  'noite',
+  'depois',
+  'horario',
+  'horário',
+  'qualquer',
+  'barbeiro',
+  'servico',
+  'serviço',
+  'outro',
+]
+
 const WEEKDAY_INDEX: Record<string, number> = {
   domingo: 0,
   segunda: 1,
@@ -31,6 +53,7 @@ const IntentSchema = z.object({
   intent: z.enum(['BOOK_APPOINTMENT', 'CONFIRM', 'DECLINE', 'CHANGE_REQUEST', 'UNKNOWN']),
   serviceName: z.string().min(1).max(120).nullable(),
   mentionedName: z.string().min(1).max(120).nullable(),
+  preferredPeriod: z.enum(['MORNING', 'AFTERNOON', 'EVENING']).nullable(),
   allowAnyProfessional: z.boolean(),
   requestedDateIso: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
   timePreference: z.enum(['NONE', 'EXACT', 'MORNING', 'AFTERNOON', 'LATE_AFTERNOON', 'EVENING']),
@@ -56,6 +79,9 @@ const INTENT_JSON_SCHEMA = {
     },
     mentionedName: {
       anyOf: [{ type: 'string' }, { type: 'null' }],
+    },
+    preferredPeriod: {
+      anyOf: [{ type: 'string', enum: ['MORNING', 'AFTERNOON', 'EVENING'] }, { type: 'null' }],
     },
     allowAnyProfessional: { type: 'boolean' },
     requestedDateIso: {
@@ -84,6 +110,7 @@ const INTENT_JSON_SCHEMA = {
     'intent',
     'serviceName',
     'mentionedName',
+    'preferredPeriod',
     'allowAnyProfessional',
     'requestedDateIso',
     'timePreference',
@@ -167,6 +194,136 @@ function normalizeText(value: string) {
     .trim()
 }
 
+const NORMALIZED_NAME_STOPWORDS = new Set(NAME_STOPWORDS.map((term) => normalizeText(term)))
+
+function tokenizeNormalized(value: string) {
+  return normalizeText(value).split(/[^a-z0-9]+/).filter(Boolean)
+}
+
+function isNameStopwordToken(token: string) {
+  return NORMALIZED_NAME_STOPWORDS.has(token)
+}
+
+function derivePreferredPeriod(timePreference: z.infer<typeof IntentSchema>['timePreference']) {
+  if (timePreference === 'MORNING') return 'MORNING' as const
+  if (timePreference === 'AFTERNOON' || timePreference === 'LATE_AFTERNOON') return 'AFTERNOON' as const
+  if (timePreference === 'EVENING') return 'EVENING' as const
+  return null
+}
+
+function scoreProfessionalNameSimilarity(rawName: string, professionalName: string) {
+  const normalizedRaw = normalizeText(rawName)
+  const normalizedProfessional = normalizeText(professionalName)
+
+  if (!normalizedRaw || !normalizedProfessional) {
+    return 0
+  }
+
+  if (normalizedRaw === normalizedProfessional) {
+    return 1
+  }
+
+  if (
+    normalizedRaw.length >= 4
+    && (normalizedProfessional.includes(normalizedRaw) || normalizedRaw.includes(normalizedProfessional))
+  ) {
+    return 0.94
+  }
+
+  const rawTokens = tokenizeNormalized(rawName).filter((token) => !isNameStopwordToken(token))
+  const professionalTokens = tokenizeNormalized(professionalName)
+
+  if (rawTokens.length === 0 || professionalTokens.length === 0) {
+    return 0
+  }
+
+  let exactMatches = 0
+  let prefixMatches = 0
+
+  for (const rawToken of rawTokens) {
+    if (professionalTokens.some((professionalToken) => professionalToken === rawToken)) {
+      exactMatches += 1
+      continue
+    }
+
+    if (
+      rawToken.length >= 4
+      && professionalTokens.some((professionalToken) => professionalToken.startsWith(rawToken))
+    ) {
+      prefixMatches += 1
+      continue
+    }
+
+    return 0
+  }
+
+  const coverage = (exactMatches + prefixMatches) / rawTokens.length
+  const exactBonus = exactMatches / rawTokens.length * 0.1
+  return 0.72 + coverage * 0.12 + exactBonus
+}
+
+function isPlausibleHumanNameCandidate(rawName: string) {
+  const normalized = normalizeText(rawName)
+  if (!normalized) {
+    return false
+  }
+
+  const tokens = tokenizeNormalized(rawName)
+  if (tokens.length === 0 || tokens.some((token) => token.length < 3)) {
+    return false
+  }
+
+  if (tokens.every((token) => isNameStopwordToken(token))) {
+    return false
+  }
+
+  return /^[a-zA-ZÀ-ÿ\s]+$/.test(rawName.trim())
+}
+
+function sanitizeMentionedNameCandidate(
+  rawName: string | null,
+  professionals: Array<{ name: string }>,
+  allowLooseFallback: boolean
+) {
+  if (!rawName) {
+    return null
+  }
+
+  const trimmed = rawName.trim()
+  const normalizedTokens = tokenizeNormalized(trimmed)
+
+  if (normalizedTokens.length === 0 || normalizedTokens.every((token) => isNameStopwordToken(token))) {
+    return null
+  }
+
+  const exactMatch = professionals.find((professional) => normalizeText(professional.name) === normalizeText(trimmed))
+  if (exactMatch) {
+    return exactMatch.name
+  }
+
+  const scoredMatches = professionals
+    .map((professional) => ({
+      name: professional.name,
+      score: scoreProfessionalNameSimilarity(trimmed, professional.name),
+    }))
+    .filter((match) => match.score >= 0.84)
+    .sort((left, right) => right.score - left.score)
+
+  if (scoredMatches.length > 0) {
+    if (scoredMatches.length === 1 || scoredMatches[0].score - scoredMatches[1].score >= 0.08) {
+      return scoredMatches[0].name
+    }
+
+    return null
+  }
+
+  if (!allowLooseFallback || !isPlausibleHumanNameCandidate(trimmed)) {
+    return null
+  }
+
+  return trimmed
+}
+
 function extractResponseText(payload: unknown) {
   if (!payload || typeof payload !== 'object') {
     return ''
@@ -214,25 +371,12 @@ function parseExplicitTime(message: string) {
   return null
 }
 
-function extractMentionedName(message: string) {
+function extractMentionedName(message: string, professionals: Array<{ name: string }>) {
   const directMatch = message.match(/\b(?:com|do|da)\s+([a-zA-ZÀ-ÿ]+(?:\s+[a-zA-ZÀ-ÿ]+){0,2})/i)
   const fallbackMatch = message.match(/\b([A-ZÀ-Ý][a-zà-ÿ]+(?:\s+[A-ZÀ-Ý][a-zà-ÿ]+){0,2})\b/)
   const rawName = directMatch?.[1] ?? fallbackMatch?.[1] ?? null
 
-  if (!rawName) {
-    return null
-  }
-
-  const normalized = normalizeText(rawName)
-  if (
-    normalized.includes('qualquer')
-    || normalized.includes('barbeiro')
-    || normalized.includes('horario')
-  ) {
-    return null
-  }
-
-  return rawName.trim()
+  return sanitizeMentionedNameCandidate(rawName, professionals, Boolean(directMatch))
 }
 
 function parseRelativeDate(message: string, todayIsoDate: string) {
@@ -493,7 +637,7 @@ function inferCorrectionTarget(input: {
 function buildFallbackIntent(input: WhatsAppInterpreterInput): WhatsAppIntent {
   const timePreference = inferTimePreference(input.message)
   const serviceName = findBestNamedMatch(input.services, input.message)
-  const mentionedName = extractMentionedName(input.message)
+  const mentionedName = extractMentionedName(input.message, input.professionals)
   const allowAnyProfessional = /\b(qualquer um|qualquer barbeiro|tanto faz|sem preferencia)\b/.test(
     normalizeText(input.message)
   )
@@ -513,6 +657,7 @@ function buildFallbackIntent(input: WhatsAppInterpreterInput): WhatsAppIntent {
     intent: inferIntent(input.message, input.conversationState),
     serviceName,
     mentionedName,
+    preferredPeriod: derivePreferredPeriod(timePreference.timePreference),
     allowAnyProfessional,
     requestedDateIso,
     timePreference: timePreference.timePreference,
@@ -548,9 +693,11 @@ function buildInterpreterPrompt(input: WhatsAppInterpreterInput) {
     'Regras obrigatorias:',
     '- serviceName deve ser exatamente um servico valido ou null.',
     '- mentionedName deve conter apenas o nome citado pelo cliente ou null.',
-    '- Nao assuma que mentionedName e barbeiro; so extraia o nome mencionado.',
+    '- Nao assuma que mentionedName e barbeiro; so extraia nomes realmente plausiveis.',
+    '- Palavras como quero, marcar, agendar, hoje, amanha, manha, tarde, noite e horario nunca sao nomes.',
     '- requestedDateIso deve ser yyyy-mm-dd apenas quando a data estiver clara.',
     '- Para "hoje", "amanha" e "depois de amanha", use a data local da barbearia.',
+    '- preferredPeriod deve ser MORNING, AFTERNOON, EVENING ou null.',
     '- timePreference deve ser EXACT, MORNING, AFTERNOON, LATE_AFTERNOON, EVENING ou NONE.',
     '- exactTime so deve ser preenchido quando o horario exato estiver explicito.',
     '- selectedOptionNumber so deve ser preenchido quando o cliente escolher uma opcao oferecida.',
@@ -563,12 +710,19 @@ function buildInterpreterPrompt(input: WhatsAppInterpreterInput) {
 }
 
 function mergeWithFallback(parsed: z.infer<typeof IntentSchema>, fallback: WhatsAppIntent): WhatsAppIntent {
+  const preferredPeriod = parsed.preferredPeriod ?? fallback.preferredPeriod
+  const mergedTimePreference = parsed.timePreference === 'NONE' && preferredPeriod
+    ? preferredPeriod
+    : parsed.timePreference
+
   return {
     ...parsed,
     serviceName: parsed.serviceName ?? fallback.serviceName,
     mentionedName: parsed.mentionedName ?? fallback.mentionedName,
+    preferredPeriod,
     requestedDateIso: parsed.requestedDateIso ?? fallback.requestedDateIso,
     exactTime: parsed.exactTime ?? fallback.exactTime,
+    timePreference: mergedTimePreference,
     selectedOptionNumber: parsed.selectedOptionNumber ?? fallback.selectedOptionNumber,
     correctionTarget: parsed.correctionTarget === 'NONE' ? fallback.correctionTarget : parsed.correctionTarget,
     greetingOnly: parsed.greetingOnly || fallback.greetingOnly,
@@ -640,7 +794,13 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
       return fallback
     }
 
-    return mergeWithFallback(parsed.data, fallback)
+    const merged = mergeWithFallback(parsed.data, fallback)
+
+    return {
+      ...merged,
+      mentionedName: sanitizeMentionedNameCandidate(merged.mentionedName, input.professionals, true),
+      preferredPeriod: merged.preferredPeriod ?? derivePreferredPeriod(merged.timePreference),
+    }
   } catch (error) {
     console.warn('[whatsapp-interpreter/openai] fallback request_failed', {
       error: error instanceof Error ? error.message : 'unknown_error',
