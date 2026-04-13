@@ -1,11 +1,20 @@
 import 'server-only'
 
 import { prisma } from '@/lib/prisma'
-
-const BUSINESS_OPEN_HOUR = 8
-const BUSINESS_CLOSE_HOUR = 21
-const SLOT_STEP_MINUTES = 15
-const DEFAULT_OPERATIONAL_BUFFER_MINUTES = 5
+import {
+  SCHEDULE_END_HOUR,
+  SCHEDULE_SLOT_STEP_MINUTES,
+  SCHEDULE_START_HOUR,
+  buildLocalDate,
+  describeTimePreferenceWindow,
+  formatLocalDate,
+  formatTimeLabel,
+  getNowRoundedToStep,
+  getOperationalBufferMinutes,
+  hasBufferedConflict,
+  listBlockingAppointmentsForDay,
+  matchesTimePreference,
+} from '@/lib/agendamentos/availability'
 
 export interface WhatsAppBookingSlot {
   key: string
@@ -17,116 +26,95 @@ export interface WhatsAppBookingSlot {
   endAtIso: string
 }
 
-function buildLocalDate(baseDateIso: string, hours = 0, minutes = 0) {
-  const [year, month, day] = baseDateIso.split('-').map(Number)
-  return new Date(year, month - 1, day, hours, minutes, 0, 0)
+export interface WhatsAppAvailabilityDiagnostics {
+  professionalId: string | null
+  professionalName: string | null
+  date: string
+  period: string
+  periodWindow: string
+  serviceDuration: number | null
+  bufferMinutes: number
+  busyAppointmentsFound: number
+  freeSlotsReturned: number
+  finalReason:
+    | 'success'
+    | 'service_not_found'
+    | 'professional_not_found'
+    | 'no_active_professionals'
+    | 'no_slots_available'
+    | 'no_slots_in_requested_period'
+    | 'exact_time_unavailable'
 }
 
-function formatTimeLabel(date: Date) {
-  return date.toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+interface SchedulingServiceOption {
+  id: string
+  name: string
+  duration: number
+  price: number
 }
 
-function formatLocalDate(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function getNowRoundedToStep() {
-  const now = new Date()
-  now.setSeconds(0, 0)
-
-  const roundedMinutes = Math.ceil(now.getMinutes() / SLOT_STEP_MINUTES) * SLOT_STEP_MINUTES
-  if (roundedMinutes >= 60) {
-    now.setHours(now.getHours() + 1, 0, 0, 0)
-  } else {
-    now.setMinutes(roundedMinutes, 0, 0)
-  }
-
-  return now
-}
-
-function getOperationalBufferMinutes() {
-  const rawValue = process.env.WHATSAPP_APPOINTMENT_BUFFER_MINUTES
-  const parsed = Number(rawValue)
-
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    return DEFAULT_OPERATIONAL_BUFFER_MINUTES
-  }
-
-  return Math.min(30, Math.round(parsed))
+export interface WhatsAppAvailabilityResult {
+  service: SchedulingServiceOption | null
+  slots: WhatsAppBookingSlot[]
+  diagnostics: WhatsAppAvailabilityDiagnostics
 }
 
 function getSlotKey(professionalId: string, startAt: Date) {
   return `${professionalId}:${startAt.toISOString()}`
 }
 
-function overlaps(startAt: Date, endAt: Date, blockedStart: Date, blockedEnd: Date) {
-  return startAt < blockedEnd && endAt > blockedStart
+function normalizeTimePreference(value?: string | null) {
+  const normalized = value?.trim().toUpperCase()
+  return normalized && normalized !== 'NONE' ? normalized : 'NONE'
 }
 
-function hasBufferedConflict(input: {
-  candidateStart: Date
-  candidateEnd: Date
-  blockedStart: Date
-  blockedEnd: Date
+function buildDiagnostics(input: {
+  professionalId?: string | null
+  professionalName?: string | null
+  date: string
+  period?: string | null
+  serviceDuration?: number | null
   bufferMinutes: number
-}) {
-  const bufferMs = input.bufferMinutes * 60_000
-  const candidateBufferedEnd = new Date(input.candidateEnd.getTime() + bufferMs)
-  const blockedBufferedEnd = new Date(input.blockedEnd.getTime() + bufferMs)
+  busyAppointmentsFound?: number
+  freeSlotsReturned?: number
+  finalReason: WhatsAppAvailabilityDiagnostics['finalReason']
+}): WhatsAppAvailabilityDiagnostics {
+  const period = normalizeTimePreference(input.period)
 
-  return overlaps(input.candidateStart, candidateBufferedEnd, input.blockedStart, blockedBufferedEnd)
-}
-
-function normalizeTimeLabel(value?: string | null) {
-  if (!value) {
-    return null
+  return {
+    professionalId: input.professionalId ?? null,
+    professionalName: input.professionalName ?? null,
+    date: input.date,
+    period,
+    periodWindow: describeTimePreferenceWindow(period),
+    serviceDuration: input.serviceDuration ?? null,
+    bufferMinutes: input.bufferMinutes,
+    busyAppointmentsFound: input.busyAppointmentsFound ?? 0,
+    freeSlotsReturned: input.freeSlotsReturned ?? 0,
+    finalReason: input.finalReason,
   }
-
-  const normalized = value.trim().toUpperCase()
-  return normalized || null
 }
 
-function filterSlotsByTimePreference(input: {
+function logAvailabilityLookup(input: {
+  barbershopId: string
+  serviceId: string
+  diagnostics: WhatsAppAvailabilityDiagnostics
   slots: WhatsAppBookingSlot[]
-  timePreference?: string | null
-  exactTime?: string | null
 }) {
-  const timePreference = normalizeTimeLabel(input.timePreference)
-
-  if (timePreference === 'EXACT' && input.exactTime) {
-    return input.slots.filter((slot) => slot.timeLabel === input.exactTime)
-  }
-
-  if (!timePreference || timePreference === 'NONE') {
-    return input.slots
-  }
-
-  return input.slots.filter((slot) => {
-    const [hours] = slot.timeLabel.split(':').map(Number)
-
-    if (timePreference === 'MORNING') {
-      return hours >= 8 && hours < 12
-    }
-
-    if (timePreference === 'AFTERNOON') {
-      return hours >= 12 && hours < 17
-    }
-
-    if (timePreference === 'LATE_AFTERNOON') {
-      return hours >= 17 && hours < 19
-    }
-
-    if (timePreference === 'EVENING') {
-      return hours >= 18 && hours < BUSINESS_CLOSE_HOUR
-    }
-
-    return true
+  console.info('[whatsapp-booking] availability computed', {
+    barbershopId: input.barbershopId,
+    serviceId: input.serviceId,
+    professionalId: input.diagnostics.professionalId,
+    professionalName: input.diagnostics.professionalName,
+    date: input.diagnostics.date,
+    period: input.diagnostics.period,
+    periodWindow: input.diagnostics.periodWindow,
+    serviceDuration: input.diagnostics.serviceDuration,
+    bufferMinutes: input.diagnostics.bufferMinutes,
+    busyAppointmentsFound: input.diagnostics.busyAppointmentsFound,
+    freeSlotsReturned: input.diagnostics.freeSlotsReturned,
+    finalReason: input.diagnostics.finalReason,
+    slotsReturned: input.slots.map((slot) => slot.timeLabel),
   })
 }
 
@@ -177,7 +165,10 @@ export async function getAvailableWhatsAppSlots(input: {
   timePreference?: string | null
   exactTime?: string | null
   limit?: number
-}) {
+}): Promise<WhatsAppAvailabilityResult> {
+  const operationalBufferMinutes = getOperationalBufferMinutes()
+  const normalizedPeriod = normalizeTimePreference(input.timePreference)
+
   const service = await prisma.service.findFirst({
     where: {
       id: input.serviceId,
@@ -193,9 +184,26 @@ export async function getAvailableWhatsAppSlots(input: {
   })
 
   if (!service) {
+    const diagnostics = buildDiagnostics({
+      professionalId: input.professionalId,
+      date: input.dateIso,
+      period: normalizedPeriod,
+      serviceDuration: null,
+      bufferMinutes: operationalBufferMinutes,
+      finalReason: 'service_not_found',
+    })
+
+    logAvailabilityLookup({
+      barbershopId: input.barbershopId,
+      serviceId: input.serviceId,
+      diagnostics,
+      slots: [],
+    })
+
     return {
       service: null,
       slots: [],
+      diagnostics,
     }
   }
 
@@ -213,6 +221,22 @@ export async function getAvailableWhatsAppSlots(input: {
   })
 
   if (professionals.length === 0) {
+    const diagnostics = buildDiagnostics({
+      professionalId: input.professionalId,
+      date: input.dateIso,
+      period: normalizedPeriod,
+      serviceDuration: service.duration,
+      bufferMinutes: operationalBufferMinutes,
+      finalReason: input.professionalId ? 'professional_not_found' : 'no_active_professionals',
+    })
+
+    logAvailabilityLookup({
+      barbershopId: input.barbershopId,
+      serviceId: input.serviceId,
+      diagnostics,
+      slots: [],
+    })
+
     return {
       service: {
         id: service.id,
@@ -221,56 +245,47 @@ export async function getAvailableWhatsAppSlots(input: {
         price: Number(service.price),
       },
       slots: [],
+      diagnostics,
     }
   }
 
-  const dayOpen = buildLocalDate(input.dateIso, BUSINESS_OPEN_HOUR, 0)
-  const dayClose = buildLocalDate(input.dateIso, BUSINESS_CLOSE_HOUR, 0)
+  const dayOpen = buildLocalDate(input.dateIso, SCHEDULE_START_HOUR, 0)
+  const dayClose = buildLocalDate(input.dateIso, SCHEDULE_END_HOUR, 0)
   const currentRoundedTime = getNowRoundedToStep()
   const isToday = input.dateIso === formatLocalDate(new Date())
-  const operationalBufferMinutes = getOperationalBufferMinutes()
-  const slotWindowMinutes = service.duration + operationalBufferMinutes
-
-  const appointments = await prisma.appointment.findMany({
-    where: {
-      barbershopId: input.barbershopId,
-      professionalId: {
-        in: professionals.map((professional) => professional.id),
-      },
-      status: {
-        in: ['PENDING', 'CONFIRMED'],
-      },
-      startAt: { lt: dayClose },
-      endAt: { gt: dayOpen },
-    },
-    orderBy: { startAt: 'asc' },
-    select: {
-      professionalId: true,
-      startAt: true,
-      endAt: true,
-    },
+  const blockingAppointments = await listBlockingAppointmentsForDay({
+    barbershopId: input.barbershopId,
+    dateIso: input.dateIso,
+    professionalIds: professionals.map((professional) => professional.id),
   })
 
-  const appointmentsByProfessional = new Map<string, typeof appointments>()
+  const appointmentsByProfessional = new Map<string, typeof blockingAppointments>()
   professionals.forEach((professional) => {
     appointmentsByProfessional.set(
       professional.id,
-      appointments.filter((appointment) => appointment.professionalId === professional.id)
+      blockingAppointments.filter((appointment) => appointment.professionalId === professional.id)
     )
   })
 
-  const slots: WhatsAppBookingSlot[] = []
+  const openSlotsBeforePeriodFilter: WhatsAppBookingSlot[] = []
+  const openSlotsAfterPeriodFilter: WhatsAppBookingSlot[] = []
 
   for (const professional of professionals) {
     const blockedSlots = appointmentsByProfessional.get(professional.id) ?? []
 
     for (
       let candidate = new Date(dayOpen);
-      candidate.getTime() + slotWindowMinutes * 60_000 <= dayClose.getTime();
-      candidate = new Date(candidate.getTime() + SLOT_STEP_MINUTES * 60_000)
+      candidate.getTime() + service.duration * 60_000 <= dayClose.getTime();
+      candidate = new Date(candidate.getTime() + SCHEDULE_SLOT_STEP_MINUTES * 60_000)
     ) {
       const slotEnd = new Date(candidate.getTime() + service.duration * 60_000)
+      const bufferedEnd = new Date(slotEnd.getTime() + operationalBufferMinutes * 60_000)
+
       if (isToday && candidate < currentRoundedTime) {
+        continue
+      }
+
+      if (bufferedEnd > dayClose) {
         continue
       }
 
@@ -288,7 +303,7 @@ export async function getAvailableWhatsAppSlots(input: {
         continue
       }
 
-      slots.push({
+      const slot = {
         key: getSlotKey(professional.id, candidate),
         professionalId: professional.id,
         professionalName: professional.name,
@@ -296,14 +311,54 @@ export async function getAvailableWhatsAppSlots(input: {
         timeLabel: formatTimeLabel(candidate),
         startAtIso: candidate.toISOString(),
         endAtIso: slotEnd.toISOString(),
-      })
+      } satisfies WhatsAppBookingSlot
+
+      openSlotsBeforePeriodFilter.push(slot)
+
+      if (
+        matchesTimePreference({
+          startAt: candidate,
+          preference: normalizedPeriod,
+          exactTime: input.exactTime,
+        })
+      ) {
+        openSlotsAfterPeriodFilter.push(slot)
+      }
     }
   }
 
-  const filtered = filterSlotsByTimePreference({
+  const slots = openSlotsAfterPeriodFilter
+    .sort((left, right) => new Date(left.startAtIso).getTime() - new Date(right.startAtIso).getTime())
+    .slice(0, input.limit ?? 4)
+
+  let finalReason: WhatsAppAvailabilityDiagnostics['finalReason'] = 'success'
+  if (slots.length === 0) {
+    if (normalizedPeriod === 'EXACT' && input.exactTime) {
+      finalReason = 'exact_time_unavailable'
+    } else if (openSlotsBeforePeriodFilter.length === 0) {
+      finalReason = 'no_slots_available'
+    } else {
+      finalReason = 'no_slots_in_requested_period'
+    }
+  }
+
+  const diagnostics = buildDiagnostics({
+    professionalId: professionals.length === 1 ? professionals[0].id : input.professionalId ?? null,
+    professionalName: professionals.length === 1 ? professionals[0].name : null,
+    date: input.dateIso,
+    period: normalizedPeriod,
+    serviceDuration: service.duration,
+    bufferMinutes: operationalBufferMinutes,
+    busyAppointmentsFound: blockingAppointments.length,
+    freeSlotsReturned: slots.length,
+    finalReason,
+  })
+
+  logAvailabilityLookup({
+    barbershopId: input.barbershopId,
+    serviceId: input.serviceId,
+    diagnostics,
     slots,
-    timePreference: input.timePreference,
-    exactTime: input.exactTime,
   })
 
   return {
@@ -313,9 +368,8 @@ export async function getAvailableWhatsAppSlots(input: {
       duration: service.duration,
       price: Number(service.price),
     },
-    slots: filtered
-      .sort((left, right) => new Date(left.startAtIso).getTime() - new Date(right.startAtIso).getTime())
-      .slice(0, input.limit ?? 4),
+    slots,
+    diagnostics,
   }
 }
 
@@ -395,30 +449,21 @@ export async function createAppointmentFromWhatsApp(input: {
   const endAt = new Date(startAt.getTime() + service.duration * 60_000)
   const operationalBufferMinutes = getOperationalBufferMinutes()
   const bufferedEndAt = new Date(endAt.getTime() + operationalBufferMinutes * 60_000)
-  const dateIso = input.startAtIso.slice(0, 10)
-  const openAt = buildLocalDate(dateIso, BUSINESS_OPEN_HOUR, 0)
-  const closeAt = buildLocalDate(dateIso, BUSINESS_CLOSE_HOUR, 0)
+  const dateIso = formatLocalDate(startAt)
+  const openAt = buildLocalDate(dateIso, SCHEDULE_START_HOUR, 0)
+  const closeAt = buildLocalDate(dateIso, SCHEDULE_END_HOUR, 0)
 
   if (startAt < openAt || bufferedEndAt > closeAt) {
     throw new Error('O horario selecionado esta fora da janela de atendimento.')
   }
 
-  const conflictingAppointments = await prisma.appointment.findMany({
-    where: {
-      barbershopId: input.barbershopId,
-      professionalId: input.professionalId,
-      status: { in: ['PENDING', 'CONFIRMED'] },
-      startAt: { lt: bufferedEndAt },
-      endAt: { gt: new Date(startAt.getTime() - operationalBufferMinutes * 60_000) },
-    },
-    select: {
-      id: true,
-      startAt: true,
-      endAt: true,
-    },
+  const blockingAppointments = await listBlockingAppointmentsForDay({
+    barbershopId: input.barbershopId,
+    dateIso,
+    professionalIds: [input.professionalId],
   })
 
-  const conflictingAppointment = conflictingAppointments.find((appointment) =>
+  const conflictingAppointment = blockingAppointments.find((appointment) =>
     hasBufferedConflict({
       candidateStart: startAt,
       candidateEnd: endAt,

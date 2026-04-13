@@ -461,6 +461,8 @@ function pickOfferedSlot(input: {
 
 async function offerFreshSlots(input: {
   conversationId: string
+  customerId: string
+  conversationStep: ConversationState
   baseUpdate: {
     lastInboundText: string
     lastIntent: Prisma.InputJsonValue
@@ -490,6 +492,21 @@ async function offerFreshSlots(input: {
     timePreference: input.timePreference,
     exactTime: input.exactTime,
     limit: 4,
+  })
+
+  console.info('[whatsapp-conversation] availability lookup', {
+    customerId: input.customerId,
+    conversationStep: input.conversationStep,
+    selectedProfessionalId: input.professionalId,
+    selectedProfessional: input.professionalName,
+    selectedDate: input.requestedDateIso,
+    selectedPeriod: input.timePreference ?? 'NONE',
+    selectedService: input.serviceName,
+    serviceDuration: availability.diagnostics.serviceDuration,
+    bufferMinutes: availability.diagnostics.bufferMinutes,
+    busyAppointmentsFound: availability.diagnostics.busyAppointmentsFound,
+    freeSlotsReturned: availability.diagnostics.freeSlotsReturned,
+    finalReason: availability.diagnostics.finalReason,
   })
 
   if (availability.slots.length === 0) {
@@ -570,6 +587,9 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   }
 
   const currentState = normalizeConversationState(conversation.state)
+  const conversationRequestedDateIso = conversation.requestedDate
+    ? formatDateIso(conversation.requestedDate)
+    : null
   const offeredSlots = parseConversationSlots(conversation.slotOptions)
   const selectedStoredSlot = parseSelectedSlot(conversation.selectedSlot)
 
@@ -594,7 +614,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
 
   const requestedDateIso =
     interpreted.requestedDateIso
-    ?? (conversation.requestedDate ? formatDateIso(conversation.requestedDate) : null)
+    ?? conversationRequestedDateIso
 
   const nameResolution = await resolveMentionedName({
     rawName: normalizeOptionalText(interpreted.mentionedName),
@@ -640,11 +660,45 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     allowAnyProfessional = true
   }
 
-  const requestedTimeLabel = resolveRequestedTimeLabel({
-    exactTime: interpreted.exactTime,
-    timePreference: interpreted.timePreference,
-    existingValue: conversation.requestedTimeLabel,
-  })
+  const hasNewTimePreference =
+    Boolean(interpreted.exactTime)
+    || Boolean(interpreted.timePreference && interpreted.timePreference !== 'NONE')
+  const serviceChanged =
+    Boolean(selectedServiceId && selectedServiceId !== conversation.selectedServiceId)
+  const professionalChanged =
+    selectedProfessionalId !== (conversation.selectedProfessionalId ?? null)
+    || allowAnyProfessional !== conversation.allowAnyProfessional
+  const dateChanged = requestedDateIso !== conversationRequestedDateIso
+  const shouldResetTimePreference =
+    !hasNewTimePreference
+    && (serviceChanged || professionalChanged || dateChanged)
+
+  const requestedTimeLabel = shouldResetTimePreference
+    ? null
+    : resolveRequestedTimeLabel({
+        exactTime: interpreted.exactTime,
+        timePreference: interpreted.timePreference,
+        existingValue: conversation.requestedTimeLabel,
+      })
+  const shouldDiscardStoredSlots =
+    serviceChanged
+    || professionalChanged
+    || dateChanged
+    || shouldResetTimePreference
+  const effectiveOfferedSlots = shouldDiscardStoredSlots ? [] : offeredSlots
+  const effectiveSelectedStoredSlot = shouldDiscardStoredSlots ? null : selectedStoredSlot
+
+  if (shouldDiscardStoredSlots) {
+    console.info('[whatsapp-conversation] cleared stale availability context', {
+      customerId: input.customer.id,
+      serviceChanged,
+      professionalChanged,
+      dateChanged,
+      resetTimePreference: shouldResetTimePreference,
+      previousRequestedTimeLabel: conversation.requestedTimeLabel,
+      nextRequestedTimeLabel: requestedTimeLabel,
+    })
+  }
 
   const baseUpdate = {
     lastInboundText: inboundText,
@@ -887,7 +941,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   }
 
   const selectedOfferedSlot = pickOfferedSlot({
-    offeredSlots,
+    offeredSlots: effectiveOfferedSlots,
     selectedOptionNumber: interpreted.selectedOptionNumber,
     exactTime: interpreted.exactTime,
     message: inboundText,
@@ -907,6 +961,8 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     if (!slotForConfirmation) {
       return offerFreshSlots({
         conversationId: conversation.id,
+        customerId: input.customer.id,
+        conversationStep: currentState,
         baseUpdate,
         barbershopId: input.barbershop.id,
         requestedDateIso,
@@ -935,6 +991,8 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     if (!slotForConfirmation) {
       return offerFreshSlots({
         conversationId: conversation.id,
+        customerId: input.customer.id,
+        conversationStep: currentState,
         baseUpdate,
         barbershopId: input.barbershop.id,
         requestedDateIso,
@@ -949,18 +1007,20 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     }
   }
 
-  if (!slotForConfirmation && currentState === 'WAITING_CONFIRMATION' && selectedStoredSlot) {
+  if (!slotForConfirmation && currentState === 'WAITING_CONFIRMATION' && effectiveSelectedStoredSlot) {
     slotForConfirmation = await findExactAvailableWhatsAppSlot({
       barbershopId: input.barbershop.id,
       serviceId: selectedServiceId,
-      professionalId: selectedStoredSlot.professionalId,
-      dateIso: selectedStoredSlot.dateIso,
-      timeLabel: selectedStoredSlot.timeLabel,
+      professionalId: effectiveSelectedStoredSlot.professionalId,
+      dateIso: effectiveSelectedStoredSlot.dateIso,
+      timeLabel: effectiveSelectedStoredSlot.timeLabel,
     })
 
     if (!slotForConfirmation) {
       return offerFreshSlots({
         conversationId: conversation.id,
+        customerId: input.customer.id,
+        conversationStep: currentState,
         baseUpdate,
         barbershopId: input.barbershop.id,
         requestedDateIso,
@@ -978,6 +1038,8 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   if (!slotForConfirmation) {
     return offerFreshSlots({
       conversationId: conversation.id,
+      customerId: input.customer.id,
+      conversationStep: currentState,
       baseUpdate,
       barbershopId: input.barbershop.id,
       requestedDateIso,
@@ -1068,6 +1130,8 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
 
     return offerFreshSlots({
       conversationId: conversation.id,
+      customerId: input.customer.id,
+      conversationStep: currentState,
       baseUpdate,
       barbershopId: input.barbershop.id,
       requestedDateIso,

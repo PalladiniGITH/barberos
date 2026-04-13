@@ -11,13 +11,17 @@ import {
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { prisma } from '@/lib/prisma'
+import {
+  ACTIVE_APPOINTMENT_STATUS_VALUES,
+  SCHEDULE_END_HOUR,
+  SCHEDULE_START_HOUR,
+} from '@/lib/agendamentos/availability'
 import { calcGoalProgress, capitalize } from '@/lib/utils'
 
-export const SCHEDULE_START_HOUR = 8
-export const SCHEDULE_END_HOUR = 21
+export { SCHEDULE_END_HOUR, SCHEDULE_START_HOUR } from '@/lib/agendamentos/availability'
 export const SCHEDULE_PX_PER_MINUTE = 2
 
-const ACTIVE_APPOINTMENT_STATUSES = new Set<string>(['PENDING', 'CONFIRMED'])
+const ACTIVE_APPOINTMENT_STATUSES = new Set<string>(ACTIVE_APPOINTMENT_STATUS_VALUES)
 
 export type ScheduleView = 'day' | 'barber'
 
