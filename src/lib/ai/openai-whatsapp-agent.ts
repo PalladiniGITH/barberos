@@ -624,6 +624,14 @@ function enforceNextActionFromMemory(
     return 'CONFIRM_BOOKING'
   }
 
+  if (requestedAction === 'ASK_CONFIRMATION' && !memory.selectedSlot) {
+    if (memory.offeredSlots.length > 0) {
+      return 'OFFER_SLOTS'
+    }
+
+    return 'ASK_CLARIFICATION'
+  }
+
   if (memory.selectedSlot) {
     return 'ASK_CONFIRMATION'
   }
@@ -636,7 +644,7 @@ function enforceNextActionFromMemory(
 }
 
 function isExplicitConfirmation(message: string) {
-  return /\b(sim|confirmo|confirmar|fechado|pode confirmar|pode marcar|pode agendar|pode ser)\b/.test(normalizeText(message))
+  return /\b(sim|desejo|quero|confirmo|confirmar|confirmado|confirma|fechado|ok|beleza|pode confirmar|pode marcar|pode agendar|pode ser)\b/.test(normalizeText(message))
 }
 
 function extractResponseText(payload: ResponsePayload) {
@@ -857,6 +865,18 @@ function clearPromotedAvailability(memory: WorkingMemory) {
   memory.selectedSlot = null
 }
 
+function selectedSlotMatchesCurrentContext(memory: WorkingMemory, slot: WhatsAppBookingSlot | null) {
+  if (!slot) {
+    return false
+  }
+
+  const matchesProfessional = !memory.selectedProfessionalId || memory.selectedProfessionalId === slot.professionalId
+  const matchesDate = !memory.requestedDateIso || memory.requestedDateIso === slot.dateIso
+  const matchesTime = !memory.requestedTimeLabel || memory.requestedTimeLabel === slot.timeLabel
+
+  return Boolean(memory.selectedServiceId) && matchesProfessional && matchesDate && matchesTime
+}
+
 function resetWorkingMemory(memory: WorkingMemory) {
   memory.state = 'IDLE'
   memory.selectedServiceId = null
@@ -970,6 +990,8 @@ function promoteIntentContextToMemory(input: {
   professionals: WhatsAppAgentInput['professionals']
 }) {
   const { memory, intent, services, professionals } = input
+  const previousSelectedSlot = memory.selectedSlot
+  const previousOfferedSlots = memory.offeredSlots
 
   if (intent.restartConversation) {
     resetWorkingMemory(memory)
@@ -1031,6 +1053,19 @@ function promoteIntentContextToMemory(input: {
     || memory.allowAnyProfessional !== baseline.allowAnyProfessional
   const dateChanged = memory.requestedDateIso !== baseline.requestedDateIso
   const timeChanged = memory.requestedTimeLabel !== baseline.requestedTimeLabel
+
+  if (
+    previousSelectedSlot
+    && !serviceChanged
+    && !professionalChanged
+    && !dateChanged
+    && timeChanged
+    && selectedSlotMatchesCurrentContext(memory, previousSelectedSlot)
+  ) {
+    memory.selectedSlot = previousSelectedSlot
+    memory.offeredSlots = previousOfferedSlots
+    return
+  }
 
   if (serviceChanged || professionalChanged || dateChanged || timeChanged || intent.correctionTarget !== 'NONE') {
     clearPromotedAvailability(memory)
@@ -1744,6 +1779,38 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
       professionals: input.professionals,
     })
 
+    const requestedConfirmationTime =
+      structuredDraft.requestedTime && /^\d{2}:\d{2}$/.test(structuredDraft.requestedTime)
+        ? structuredDraft.requestedTime
+        : (memory.requestedTimeLabel && /^\d{2}:\d{2}$/.test(memory.requestedTimeLabel)
+          ? memory.requestedTimeLabel
+          : null)
+
+    if (
+      !memory.selectedSlot
+      && memory.selectedServiceId
+      && memory.selectedProfessionalId
+      && memory.requestedDateIso
+      && requestedConfirmationTime
+    ) {
+      memory.selectedSlot = await findExactAvailableWhatsAppSlot({
+        barbershopId: input.barbershop.id,
+        serviceId: memory.selectedServiceId,
+        professionalId: memory.selectedProfessionalId,
+        dateIso: memory.requestedDateIso,
+        timeLabel: requestedConfirmationTime,
+        timezone: input.barbershop.timezone,
+      })
+
+      if (memory.selectedSlot) {
+        console.info('[whatsapp-agent] confirmation slot restored', {
+          customerId: input.customer.id,
+          conversationId: input.conversation.id,
+          restoredSlot: memory.selectedSlot,
+        })
+      }
+    }
+
     if (structuredDraft.correctionTarget !== 'NONE') {
       appendCorrection(
         memory,
@@ -1818,4 +1885,5 @@ export const __testing = {
   enforceNextActionFromMemory,
   buildGuardrailReplyText,
   referencesPreferredProfessional,
+  isExplicitConfirmation,
 }

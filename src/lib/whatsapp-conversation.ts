@@ -873,6 +873,8 @@ async function offerFreshSlots(input: {
     selectedService: input.serviceName,
     serviceDuration: availability.diagnostics.serviceDuration,
     bufferMinutes: availability.diagnostics.bufferMinutes,
+    leadTimeMinutes: availability.diagnostics.leadTimeMinutes,
+    firstEligibleSlotTime: availability.diagnostics.firstEligibleSlotTime,
     busyAppointmentsFound: availability.diagnostics.busyAppointmentsFound,
     freeSlotsReturned: availability.diagnostics.freeSlotsReturned,
     finalReason: availability.diagnostics.finalReason,
@@ -1052,7 +1054,30 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       agentResult.structured.nextAction === 'RESET_CONTEXT'
       || agentResult.structured.nextAction === 'GREET'
 
+    if (agentResult.conversationState === 'WAITING_CONFIRMATION') {
+      console.info('[whatsapp-conversation] confirmation state transition', {
+        mode: 'agent',
+        conversationId: conversation.id,
+        stateBefore: effectiveState,
+        stateAfter: agentResult.conversationState,
+        inboundText,
+        selectedServiceId: agentResult.memory.selectedServiceId,
+        requestedDateIso: agentResult.memory.requestedDateIso,
+        requestedTimeLabel: agentResult.memory.requestedTimeLabel,
+        selectedSlot: agentResult.memory.selectedSlot,
+      })
+    }
+
     if (agentResult.shouldCreateAppointment && agentResult.memory.selectedSlot && agentResult.memory.selectedServiceId) {
+      console.info('[whatsapp-conversation] confirmation received', {
+        mode: 'agent',
+        conversationId: conversation.id,
+        stateBefore: effectiveState,
+        inboundText,
+        selectedSlot: agentResult.memory.selectedSlot,
+        selectedServiceId: agentResult.memory.selectedServiceId,
+      })
+
       try {
         const appointment = await createAppointmentFromWhatsApp({
           barbershopId: input.barbershop.id,
@@ -1797,6 +1822,18 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       responseLeadIn
     )
 
+    console.info('[whatsapp-conversation] confirmation state transition', {
+      mode: 'legacy',
+      conversationId: conversation.id,
+      stateBefore: effectiveState,
+      stateAfter: 'WAITING_CONFIRMATION',
+      inboundText,
+      selectedServiceId: draft.selectedServiceId,
+      requestedDateIso: draft.requestedDateIso,
+      requestedTimeLabel: draft.requestedTimeLabel,
+      selectedSlot: slotForConfirmation,
+    })
+
     await prisma.whatsappConversation.update({
       where: { id: conversation.id },
       data: {
@@ -1821,6 +1858,15 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   }
 
   try {
+    console.info('[whatsapp-conversation] confirmation received', {
+      mode: 'legacy',
+      conversationId: conversation.id,
+      stateBefore: effectiveState,
+      inboundText,
+      selectedSlot: slotForConfirmation,
+      selectedServiceId: draft.selectedServiceId,
+    })
+
     const appointment = await createAppointmentFromWhatsApp({
       barbershopId: input.barbershop.id,
       customerId: input.customer.id,

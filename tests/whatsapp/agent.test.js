@@ -250,3 +250,46 @@ test('guardrail de barbeiro usa o barbeiro preferencial quando ele existe', () =
   assert.match(reply, /Matheus/)
   assert.match(reply, /de novo|prefere outro/i)
 })
+
+test('preserva o slot quando o cliente escolhe um horario exato antes da confirmacao', async () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.state = 'WAITING_TIME'
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.selectedProfessionalId = 'pro-lucas'
+  memory.selectedProfessionalName = 'Lucas'
+  memory.requestedDateIso = '2026-04-13'
+  memory.requestedTimeLabel = 'AFTERNOON'
+  memory.offeredSlots = [
+    {
+      key: 'pro-lucas:2026-04-13T19:00:00.000Z',
+      professionalId: 'pro-lucas',
+      professionalName: 'Lucas',
+      dateIso: '2026-04-13',
+      timeLabel: '16:00',
+      startAtIso: '2026-04-13T19:00:00.000Z',
+      endAtIso: '2026-04-13T19:35:00.000Z',
+    },
+  ]
+  memory.selectedSlot = memory.offeredSlots[0]
+
+  const exactIntent = await interpretMessage('16hr', memory)
+  agentTesting.promoteIntentContextToMemory({
+    memory,
+    intent: exactIntent,
+    services: SERVICES,
+    professionals: PROFESSIONALS,
+  })
+
+  assert.equal(exactIntent.exactTime, '16:00')
+  assert.equal(memory.requestedTimeLabel, '16:00')
+  assert.equal(memory.selectedSlot?.timeLabel, '16:00')
+})
+
+test('trata respostas afirmativas amplas como confirmacao real no momento certo', () => {
+  const affirmativeReplies = ['sim', 'desejo', 'quero', 'pode marcar', 'confirmar', 'fechado', 'ok']
+
+  affirmativeReplies.forEach((reply) => {
+    assert.equal(agentTesting.isExplicitConfirmation(reply), true)
+  })
+})

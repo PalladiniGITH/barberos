@@ -63,7 +63,7 @@ const IntentSchema = z.object({
   greetingOnly: z.boolean(),
   restartConversation: z.boolean(),
   confidence: z.number().min(0).max(1),
-  reasoning: z.string().max(240),
+  reasoning: z.string().max(500),
 })
 
 const INTENT_JSON_SCHEMA = {
@@ -104,7 +104,7 @@ const INTENT_JSON_SCHEMA = {
     greetingOnly: { type: 'boolean' },
     restartConversation: { type: 'boolean' },
     confidence: { type: 'number', minimum: 0, maximum: 1 },
-    reasoning: { type: 'string' },
+    reasoning: { type: 'string', maxLength: 500 },
   },
   required: [
     'intent',
@@ -358,12 +358,12 @@ function formatIsoTime(hours: number, minutes: number) {
 }
 
 function parseExplicitTime(message: string) {
-  const exactMatch = message.match(/\b([01]?\d|2[0-3])[:h]([0-5]\d)\b/)
+  const exactMatch = message.match(/\b([01]?\d|2[0-3])(?:[:h]|hr|hrs)([0-5]\d)\b/)
   if (exactMatch) {
     return formatIsoTime(Number(exactMatch[1]), Number(exactMatch[2]))
   }
 
-  const hourOnlyMatch = message.match(/\b([01]?\d|2[0-3])\s*(?:h|horas?)\b/)
+  const hourOnlyMatch = message.match(/\b([01]?\d|2[0-3])\s*(?:h|hr|hrs|hora|horas)\b/)
   if (hourOnlyMatch) {
     return formatIsoTime(Number(hourOnlyMatch[1]), 0)
   }
@@ -511,8 +511,16 @@ function shouldRestartConversation(message: string) {
 
 function inferIntent(message: string, conversationState: string) {
   const normalized = normalizeText(message)
+  const confirmationPattern = /\b(sim|desejo|quero|confirmo|confirmar|confirmado|confirma|fechado|pode ser|perfeito|ok|beleza|pode marcar|pode agendar)\b/
 
-  if (/\b(sim|confirmo|confirmar|fechado|pode ser|perfeito|ok|beleza)\b/.test(normalized)) {
+  if (
+    conversationState === 'WAITING_CONFIRMATION'
+    && confirmationPattern.test(normalized)
+  ) {
+    return 'CONFIRM' as const
+  }
+
+  if (/\b(sim|confirmo|confirmar|fechado|pode ser|perfeito|ok|beleza|confirmado|confirma)\b/.test(normalized)) {
     return 'CONFIRM' as const
   }
 
@@ -731,6 +739,23 @@ function mergeWithFallback(parsed: z.infer<typeof IntentSchema>, fallback: Whats
   }
 }
 
+function sanitizeOpenAiIntentPayload(payload: unknown) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return payload
+  }
+
+  const candidate = payload as Record<string, unknown>
+
+  return {
+    ...candidate,
+    serviceName: typeof candidate.serviceName === 'string' ? candidate.serviceName.trim().slice(0, 120) : candidate.serviceName,
+    mentionedName: typeof candidate.mentionedName === 'string' ? candidate.mentionedName.trim().slice(0, 120) : candidate.mentionedName,
+    exactTime: typeof candidate.exactTime === 'string' ? candidate.exactTime.trim().slice(0, 5) : candidate.exactTime,
+    requestedDateIso: typeof candidate.requestedDateIso === 'string' ? candidate.requestedDateIso.trim().slice(0, 10) : candidate.requestedDateIso,
+    reasoning: typeof candidate.reasoning === 'string' ? candidate.reasoning.trim().slice(0, 500) : 'OpenAI interpretation.',
+  }
+}
+
 export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput): Promise<WhatsAppIntent> {
   const fallback = buildFallbackIntent(input)
   const config = getOpenAIConfig()
@@ -784,7 +809,7 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
       return fallback
     }
 
-    const parsedJson = JSON.parse(outputText)
+    const parsedJson = sanitizeOpenAiIntentPayload(JSON.parse(outputText))
     const parsed = IntentSchema.safeParse(parsedJson)
 
     if (!parsed.success) {

@@ -10,7 +10,8 @@ import {
   describeTimePreferenceWindow,
   formatLocalDate,
   formatTimeLabel,
-  getNowRoundedToStep,
+  getEarliestCustomerSlotStart,
+  getMinimumLeadTimeMinutes,
   getOperationalBufferMinutes,
   hasBufferedConflict,
   listBlockingAppointmentsForDay,
@@ -61,6 +62,8 @@ export interface WhatsAppAvailabilityDiagnostics {
   periodWindow: string
   serviceDuration: number | null
   bufferMinutes: number
+  leadTimeMinutes: number
+  firstEligibleSlotTime: string | null
   busyAppointmentsFound: number
   freeSlotsReturned: number
   finalReason:
@@ -102,6 +105,8 @@ function buildDiagnostics(input: {
   period?: string | null
   serviceDuration?: number | null
   bufferMinutes: number
+  leadTimeMinutes: number
+  firstEligibleSlotTime?: string | null
   busyAppointmentsFound?: number
   freeSlotsReturned?: number
   finalReason: WhatsAppAvailabilityDiagnostics['finalReason']
@@ -116,6 +121,8 @@ function buildDiagnostics(input: {
     periodWindow: describeTimePreferenceWindow(period),
     serviceDuration: input.serviceDuration ?? null,
     bufferMinutes: input.bufferMinutes,
+    leadTimeMinutes: input.leadTimeMinutes,
+    firstEligibleSlotTime: input.firstEligibleSlotTime ?? null,
     busyAppointmentsFound: input.busyAppointmentsFound ?? 0,
     freeSlotsReturned: input.freeSlotsReturned ?? 0,
     finalReason: input.finalReason,
@@ -138,6 +145,8 @@ function logAvailabilityLookup(input: {
     periodWindow: input.diagnostics.periodWindow,
     serviceDuration: input.diagnostics.serviceDuration,
     bufferMinutes: input.diagnostics.bufferMinutes,
+    leadTimeMinutes: input.diagnostics.leadTimeMinutes,
+    firstEligibleSlotTime: input.diagnostics.firstEligibleSlotTime,
     busyAppointmentsFound: input.diagnostics.busyAppointmentsFound,
     freeSlotsReturned: input.diagnostics.freeSlotsReturned,
     finalReason: input.diagnostics.finalReason,
@@ -196,6 +205,7 @@ export async function getAvailableWhatsAppSlots(input: {
 }): Promise<WhatsAppAvailabilityResult> {
   const resolvedTimezone = resolveBusinessTimezone(input.timezone)
   const operationalBufferMinutes = getOperationalBufferMinutes()
+  const minimumLeadTimeMinutes = getMinimumLeadTimeMinutes()
   const normalizedPeriod = normalizeTimePreference(input.timePreference)
 
   const service = await prisma.service.findFirst({
@@ -219,6 +229,7 @@ export async function getAvailableWhatsAppSlots(input: {
       period: normalizedPeriod,
       serviceDuration: null,
       bufferMinutes: operationalBufferMinutes,
+      leadTimeMinutes: minimumLeadTimeMinutes,
       finalReason: 'service_not_found',
     })
 
@@ -256,6 +267,7 @@ export async function getAvailableWhatsAppSlots(input: {
       period: normalizedPeriod,
       serviceDuration: service.duration,
       bufferMinutes: operationalBufferMinutes,
+      leadTimeMinutes: minimumLeadTimeMinutes,
       finalReason: input.professionalId ? 'professional_not_found' : 'no_active_professionals',
     })
 
@@ -280,8 +292,16 @@ export async function getAvailableWhatsAppSlots(input: {
 
   const dayOpen = buildLocalDate(input.dateIso, SCHEDULE_START_HOUR, 0, resolvedTimezone)
   const dayClose = buildLocalDate(input.dateIso, SCHEDULE_END_HOUR, 0, resolvedTimezone)
-  const currentRoundedTime = getNowRoundedToStep(resolvedTimezone)
   const isToday = input.dateIso === getTodayIsoInTimezone(resolvedTimezone)
+  const firstEligibleStartAt = isToday
+    ? getEarliestCustomerSlotStart({
+        timezone: resolvedTimezone,
+        leadTimeMinutes: minimumLeadTimeMinutes,
+      })
+    : dayOpen
+  const firstEligibleSlotTime = isToday
+    ? formatTimeLabel(firstEligibleStartAt, resolvedTimezone)
+    : formatTimeLabel(dayOpen, resolvedTimezone)
   const blockingAppointments = await listBlockingAppointmentsForDay({
     barbershopId: input.barbershopId,
     dateIso: input.dateIso,
@@ -311,7 +331,7 @@ export async function getAvailableWhatsAppSlots(input: {
       const slotEnd = new Date(candidate.getTime() + service.duration * 60_000)
       const bufferedEnd = new Date(slotEnd.getTime() + operationalBufferMinutes * 60_000)
 
-      if (isToday && candidate < currentRoundedTime) {
+      if (isToday && candidate < firstEligibleStartAt) {
         continue
       }
 
@@ -380,6 +400,8 @@ export async function getAvailableWhatsAppSlots(input: {
     period: normalizedPeriod,
     serviceDuration: service.duration,
     bufferMinutes: operationalBufferMinutes,
+    leadTimeMinutes: minimumLeadTimeMinutes,
+    firstEligibleSlotTime,
     busyAppointmentsFound: blockingAppointments.length,
     freeSlotsReturned: slots.length,
     finalReason,

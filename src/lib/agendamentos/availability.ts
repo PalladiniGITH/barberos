@@ -14,6 +14,7 @@ export const SCHEDULE_END_HOUR = 21
 export const SCHEDULE_SLOT_STEP_MINUTES = 15
 export const ACTIVE_APPOINTMENT_STATUS_VALUES = ['PENDING', 'CONFIRMED'] as const
 export const DEFAULT_OPERATIONAL_BUFFER_MINUTES = 5
+export const DEFAULT_MIN_LEAD_TIME_MINUTES = 20
 
 export type AvailabilityTimePreference =
   | 'NONE'
@@ -62,22 +63,55 @@ export function getOperationalBufferMinutes() {
   return Math.min(30, Math.round(parsed))
 }
 
-export function getNowRoundedToStep(timezone?: string | null) {
-  const resolvedTimezone = resolveBusinessTimezone(timezone)
-  const nowContext = getCurrentDateTimeInTimezone(resolvedTimezone)
-  const now = buildLocalDate(nowContext.dateIso, nowContext.hour, nowContext.minute, resolvedTimezone)
-  now.setSeconds(0, 0)
+function roundDateUpToStep(date: Date) {
+  const rounded = new Date(date)
+  rounded.setSeconds(0, 0)
 
   const roundedMinutes =
-    Math.ceil(now.getMinutes() / SCHEDULE_SLOT_STEP_MINUTES) * SCHEDULE_SLOT_STEP_MINUTES
+    Math.ceil(rounded.getMinutes() / SCHEDULE_SLOT_STEP_MINUTES) * SCHEDULE_SLOT_STEP_MINUTES
 
   if (roundedMinutes >= 60) {
-    now.setHours(now.getHours() + 1, 0, 0, 0)
+    rounded.setHours(rounded.getHours() + 1, 0, 0, 0)
   } else {
-    now.setMinutes(roundedMinutes, 0, 0)
+    rounded.setMinutes(roundedMinutes, 0, 0)
   }
 
-  return now
+  return rounded
+}
+
+export function getMinimumLeadTimeMinutes() {
+  const rawValue = process.env.WHATSAPP_MIN_LEAD_TIME_MINUTES
+  const parsed = Number(rawValue)
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return DEFAULT_MIN_LEAD_TIME_MINUTES
+  }
+
+  return Math.min(240, Math.round(parsed))
+}
+
+export function getNowRoundedToStep(timezone?: string | null, referenceDate = new Date()) {
+  const resolvedTimezone = resolveBusinessTimezone(timezone)
+  const nowContext = getCurrentDateTimeInTimezone(resolvedTimezone, referenceDate)
+  const now = buildLocalDate(nowContext.dateIso, nowContext.hour, nowContext.minute, resolvedTimezone)
+  return roundDateUpToStep(now)
+}
+
+export function getEarliestCustomerSlotStart(input: {
+  timezone?: string | null
+  leadTimeMinutes?: number | null
+  referenceDate?: Date
+}) {
+  const resolvedTimezone = resolveBusinessTimezone(input.timezone)
+  const leadTimeMinutes = typeof input.leadTimeMinutes === 'number'
+    ? Math.max(0, Math.round(input.leadTimeMinutes))
+    : getMinimumLeadTimeMinutes()
+  const referenceDate = input.referenceDate ?? new Date()
+  const nowContext = getCurrentDateTimeInTimezone(resolvedTimezone, referenceDate)
+  const now = buildLocalDate(nowContext.dateIso, nowContext.hour, nowContext.minute, resolvedTimezone)
+  const withLeadTime = new Date(now.getTime() + leadTimeMinutes * 60_000)
+
+  return roundDateUpToStep(withLeadTime)
 }
 
 export function overlaps(startAt: Date, endAt: Date, blockedStart: Date, blockedEnd: Date) {
@@ -174,4 +208,9 @@ export async function listBlockingAppointmentsForDay(input: {
       endAt: true,
     },
   })
+}
+
+export const __testing = {
+  getMinimumLeadTimeMinutes,
+  getEarliestCustomerSlotStart,
 }
