@@ -134,6 +134,8 @@ export interface WhatsAppAgentInput {
     name: string
     created: boolean
     phone?: string | null
+    preferredProfessionalId?: string | null
+    preferredProfessionalName?: string | null
   }
   inboundText: string
   rawMessages?: string[]
@@ -809,6 +811,22 @@ function buildRuntimeSummary(memory: WorkingMemory) {
   return `Estado=${memory.state}; servico=${service}; barbeiro=${barber}; data=${date}; horario_ou_periodo=${time}; slot=${slot}.`
 }
 
+function referencesPreferredProfessional(message: string) {
+  const normalized = normalizeText(message)
+  return /\b(meu barbeiro|o de sempre|de sempre|mesmo de sempre|meu de sempre|manter com o meu barbeiro|com o mesmo)\b/.test(normalized)
+}
+
+function assignPreferredProfessionalToMemory(input: {
+  memory: WorkingMemory
+  preferredProfessionalId: string
+  preferredProfessionalName: string
+}) {
+  input.memory.allowAnyProfessional = false
+  input.memory.selectedProfessionalId = input.preferredProfessionalId
+  input.memory.selectedProfessionalName = input.preferredProfessionalName
+  clearPromotedAvailability(input.memory)
+}
+
 function buildBookingDraft(memory: WorkingMemory) {
   return {
     selectedServiceId: memory.selectedServiceId,
@@ -1066,6 +1084,7 @@ function buildToolPhasePrompt(input: {
     `Mensagem recebida: """${input.agentInput.inboundText}""".`,
     `Mensagens brutas desta janela: ${input.agentInput.rawMessages?.join(' | ') || input.agentInput.inboundText}.`,
     `Estado atual: ${input.memory.state}.`,
+    `Barbeiro preferencial real do cliente: ${input.agentInput.customer.preferredProfessionalName ?? 'nenhum'}.`,
     `Resumo persistido: ${input.memory.conversationSummary ?? 'nenhum'}.`,
     `Resumo do draft atual: ${buildRuntimeSummary(input.memory)}.`,
     `Campos faltantes reais no backend: ${validation.missingFields.join(', ') || 'nenhum'}.`,
@@ -1098,6 +1117,7 @@ function buildFinalPrompt(input: {
     `Mensagens brutas desta janela: ${input.agentInput.rawMessages?.join(' | ') || input.agentInput.inboundText}.`,
     `Barbearia: ${input.agentInput.barbershop.name}.`,
     `Data/hora local: ${input.agentInput.nowContext.dateTimeLabel}.`,
+    `Barbeiro preferencial real do cliente: ${input.agentInput.customer.preferredProfessionalName ?? 'nenhum'}.`,
     `Resumo atualizado do contexto: ${buildRuntimeSummary(input.memory)}.`,
     `Campos faltantes reais no backend: ${validation.missingFields.join(', ') || 'nenhum'}.`,
     `Periodos validos agora: ${validation.availablePeriods.join(', ') || 'nenhum'}.`,
@@ -1113,6 +1133,7 @@ function buildFallbackStructuredOutput(input: {
   memory: WorkingMemory
   customerName: string
   barbershopName: string
+  preferredProfessionalName?: string | null
   nowContext: WhatsAppAgentInput['nowContext']
 }) {
   const firstName = input.customerName.trim().split(' ')[0]
@@ -1138,6 +1159,7 @@ function buildFallbackStructuredOutput(input: {
       memory: input.memory,
       customerName: input.customerName,
       barbershopName: input.barbershopName,
+      preferredProfessionalName: input.preferredProfessionalName ?? null,
       nowContext: input.nowContext,
     })
     ?? replyText
@@ -1161,6 +1183,7 @@ function buildGuardrailReplyText(input: {
   memory: WorkingMemory
   customerName: string
   barbershopName: string
+  preferredProfessionalName?: string | null
   nowContext?: WhatsAppAgentInput['nowContext']
 }) {
   const firstName = input.customerName.trim().split(' ')[0]
@@ -1180,7 +1203,15 @@ function buildGuardrailReplyText(input: {
   }
 
   if (input.nextAction === 'ASK_PROFESSIONAL') {
-    return 'Tem preferencia de barbeiro?'
+    if (input.preferredProfessionalName) {
+      return `Quer marcar com ${input.preferredProfessionalName} de novo ou prefere outro barbeiro?`
+    }
+
+    if (input.memory.selectedProfessionalName) {
+      return `Posso buscar com ${input.memory.selectedProfessionalName} ou, se preferir, vejo outro barbeiro.`
+    }
+
+    return 'Tem preferencia de barbeiro ou posso procurar com qualquer um?'
   }
 
   if (input.nextAction === 'ASK_PERIOD') {
@@ -1237,6 +1268,12 @@ async function executeAgentTool(input: {
       state: memory.state,
       draft: buildBookingDraft(memory),
       recentCorrections: memory.recentCorrections,
+      preferredProfessional: agentInput.customer.preferredProfessionalId
+        ? {
+            id: agentInput.customer.preferredProfessionalId,
+            name: agentInput.customer.preferredProfessionalName,
+          }
+        : null,
     }
   }
 
@@ -1528,11 +1565,40 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     professionals: input.professionals,
   })
 
+  const shouldUsePreferredProfessional =
+    Boolean(
+      input.customer.preferredProfessionalId
+      && input.customer.preferredProfessionalName
+      && !memory.selectedProfessionalId
+      && !memory.allowAnyProfessional
+      && (
+        referencesPreferredProfessional(input.inboundText)
+        || (
+          memory.state === 'WAITING_PROFESSIONAL'
+          && Boolean(input.conversation.lastAssistantText?.includes(input.customer.preferredProfessionalName ?? ''))
+          && isExplicitConfirmation(input.inboundText)
+        )
+      )
+    )
+
+  if (
+    shouldUsePreferredProfessional
+    && input.customer.preferredProfessionalId
+    && input.customer.preferredProfessionalName
+  ) {
+    assignPreferredProfessionalToMemory({
+      memory,
+      preferredProfessionalId: input.customer.preferredProfessionalId,
+      preferredProfessionalName: input.customer.preferredProfessionalName,
+    })
+  }
+
   const fallbackStructured = buildFallbackStructuredOutput({
     fallbackIntent,
     memory,
     customerName: input.customer.name,
     barbershopName: input.barbershop.name,
+    preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
     nowContext: input.nowContext,
   })
 
@@ -1686,11 +1752,12 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
       )
     }
 
+    const explicitConfirmation = isExplicitConfirmation(input.inboundText)
     const shouldCreateAppointment =
-      structuredDraft.nextAction === 'CONFIRM_BOOKING'
+      explicitConfirmation
+      && memory.state === 'WAITING_CONFIRMATION'
       && Boolean(memory.selectedServiceId)
       && Boolean(memory.selectedSlot)
-      && isExplicitConfirmation(input.inboundText)
 
     const normalizedNextAction = enforceNextActionFromMemory(
       structuredDraft.nextAction,
@@ -1704,6 +1771,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
           memory,
           customerName: input.customer.name,
           barbershopName: input.barbershop.name,
+          preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
           nowContext: input.nowContext,
         })
       : null
@@ -1749,4 +1817,5 @@ export const __testing = {
   validateMissingFields,
   enforceNextActionFromMemory,
   buildGuardrailReplyText,
+  referencesPreferredProfessional,
 }

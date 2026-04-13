@@ -1,25 +1,36 @@
 import 'server-only'
 
-import { cache } from 'react'
+import * as React from 'react'
 import {
   endOfDay,
   endOfMonth,
   format,
-  isSameDay,
   startOfDay,
   startOfMonth,
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import {
   ACTIVE_APPOINTMENT_STATUS_VALUES,
   SCHEDULE_END_HOUR,
   SCHEDULE_START_HOUR,
 } from '@/lib/agendamentos/availability'
+import {
+  formatDateInTimezone,
+  formatDateTimeInTimezone,
+  formatIsoDateInTimezone,
+  formatTimeInTimezone,
+  getMinutesOfDayInTimezone,
+  resolveBusinessTimezone,
+} from '@/lib/timezone'
 import { calcGoalProgress, capitalize } from '@/lib/utils'
 
 export { SCHEDULE_END_HOUR, SCHEDULE_START_HOUR } from '@/lib/agendamentos/availability'
 export const SCHEDULE_PX_PER_MINUTE = 2
+const cache = typeof React.cache === 'function'
+  ? React.cache
+  : (<TArgs extends unknown[], TResult>(fn: (...args: TArgs) => TResult) => fn)
 
 const ACTIVE_APPOINTMENT_STATUSES = new Set<string>(ACTIVE_APPOINTMENT_STATUS_VALUES)
 
@@ -69,6 +80,13 @@ export interface ScheduleAppointmentItem {
   billingModel: 'AVULSO' | 'SUBSCRIPTION_INCLUDED' | 'SUBSCRIPTION_EXTRA'
   startAt: string
   endAt: string
+  localDateIso: string
+  localDateLabel: string
+  startTimeLabel: string
+  endTimeLabel: string
+  startDateTimeLabel: string
+  endDateTimeLabel: string
+  startMinutesOfDay: number
   durationMinutes: number
   priceSnapshot: number
   notes: string | null
@@ -167,6 +185,74 @@ function buildHours() {
   )
 }
 
+type ScheduleAppointmentRecord = Prisma.AppointmentGetPayload<{
+  include: {
+    customer: {
+      select: {
+        id: true
+        name: true
+        phone: true
+        email: true
+        type: true
+        subscriptionPrice: true
+      }
+    }
+    professional: {
+      select: {
+        id: true
+        name: true
+      }
+    }
+    service: {
+      select: {
+        id: true
+        name: true
+      }
+    }
+  }
+}>
+
+function serializeScheduleAppointment(input: {
+  appointment: ScheduleAppointmentRecord
+  timezone: string
+}) {
+  const { appointment, timezone } = input
+  const localDateIso = formatIsoDateInTimezone(appointment.startAt, timezone)
+  const startTimeLabel = formatTimeInTimezone(appointment.startAt, timezone)
+  const endTimeLabel = formatTimeInTimezone(appointment.endAt, timezone)
+
+  return {
+    id: appointment.id,
+    customerId: appointment.customerId,
+    customerName: appointment.customer.name,
+    customerPhone: appointment.customer.phone,
+    customerEmail: appointment.customer.email,
+    customerType: appointment.customer.type,
+    customerSubscriptionPrice: appointment.customer.subscriptionPrice
+      ? Number(appointment.customer.subscriptionPrice)
+      : null,
+    professionalId: appointment.professionalId,
+    professionalName: appointment.professional.name,
+    serviceId: appointment.serviceId,
+    serviceName: appointment.service.name,
+    status: appointment.status,
+    source: appointment.source,
+    billingModel: appointment.billingModel,
+    startAt: appointment.startAt.toISOString(),
+    endAt: appointment.endAt.toISOString(),
+    localDateIso,
+    localDateLabel: formatDateInTimezone(appointment.startAt, timezone),
+    startTimeLabel,
+    endTimeLabel,
+    startDateTimeLabel: formatDateTimeInTimezone(appointment.startAt, timezone),
+    endDateTimeLabel: formatDateTimeInTimezone(appointment.endAt, timezone),
+    startMinutesOfDay: getMinutesOfDayInTimezone(appointment.startAt, timezone),
+    durationMinutes: appointment.durationMinutes,
+    priceSnapshot: Number(appointment.priceSnapshot),
+    notes: appointment.notes,
+  } satisfies ScheduleAppointmentItem
+}
+
 const getCachedSchedulePageData = cache(
   async (
     barbershopId: string,
@@ -180,8 +266,12 @@ const getCachedSchedulePageData = cache(
     const monthStart = startOfMonth(baseDate)
     const monthEnd = endOfMonth(baseDate)
 
-    const [professionals, services, recentCustomers, monthlyGoal, monthRevenueTotal, monthRevenueByProfessional, appointments] =
+    const [barbershop, professionals, services, recentCustomers, monthlyGoal, monthRevenueTotal, monthRevenueByProfessional, appointments] =
       await Promise.all([
+        prisma.barbershop.findUnique({
+          where: { id: barbershopId },
+          select: { timezone: true },
+        }),
         prisma.professional.findMany({
           where: { barbershopId, active: true },
           select: { id: true, name: true },
@@ -272,6 +362,7 @@ const getCachedSchedulePageData = cache(
         }),
       ])
 
+    const timezone = resolveBusinessTimezone(barbershop?.timezone)
     const selectedProfessional = rawProfessionalId
       ? professionals.find((professional) => professional.id === rawProfessionalId) ?? null
       : null
@@ -279,32 +370,15 @@ const getCachedSchedulePageData = cache(
     const visibleProfessionals = selectedProfessional ? [selectedProfessional] : professionals
     const laneMap = Object.fromEntries(visibleProfessionals.map((professional, index) => [professional.id, index]))
 
-    const serializedAppointments: ScheduleAppointmentItem[] = appointments.map((appointment) => ({
-      id: appointment.id,
-      customerId: appointment.customerId,
-      customerName: appointment.customer.name,
-      customerPhone: appointment.customer.phone,
-      customerEmail: appointment.customer.email,
-      customerType: appointment.customer.type,
-      customerSubscriptionPrice: appointment.customer.subscriptionPrice
-        ? Number(appointment.customer.subscriptionPrice)
-        : null,
-      professionalId: appointment.professionalId,
-      professionalName: appointment.professional.name,
-      serviceId: appointment.serviceId,
-      serviceName: appointment.service.name,
-      status: appointment.status,
-      source: appointment.source,
-      billingModel: appointment.billingModel,
-      startAt: appointment.startAt.toISOString(),
-      endAt: appointment.endAt.toISOString(),
-      durationMinutes: appointment.durationMinutes,
-      priceSnapshot: Number(appointment.priceSnapshot),
-      notes: appointment.notes,
-    }))
+    const serializedAppointments: ScheduleAppointmentItem[] = appointments.map((appointment) =>
+      serializeScheduleAppointment({
+        appointment,
+        timezone,
+      })
+    )
 
     const selectedDayAppointments = serializedAppointments.filter((appointment) =>
-      isSameDay(new Date(appointment.startAt), baseDate)
+      appointment.localDateIso === normalizedDate
     )
 
     const focusProfessionalId = selectedProfessional?.id
@@ -329,6 +403,20 @@ const getCachedSchedulePageData = cache(
     )
 
     const upcomingToday = activeDayAppointments.slice(0, 5)
+
+    activeDayAppointments
+      .filter((appointment) => appointment.source === 'WHATSAPP')
+      .forEach((appointment) => {
+        console.info('[schedule] appointment_projection', {
+          appointmentId: appointment.id,
+          source: appointment.source,
+          timezone,
+          datetimePersistedUtc: appointment.startAt,
+          datetimeConvertedForAgenda: appointment.startDateTimeLabel,
+          datetimeConvertedForQueue: `${appointment.localDateIso} ${appointment.startTimeLabel}`,
+          datetimeFinalDisplayed: appointment.startTimeLabel,
+        })
+      })
 
     const panelRevenue = selectedProfessional
       ? monthRevenueByProfessionalMap[focusProfessionalId ?? ''] ?? 0
@@ -429,4 +517,8 @@ export async function getSchedulePageData(input: {
     input.view,
     input.professionalId ?? null
   )
+}
+
+export const __testing = {
+  serializeScheduleAppointment,
 }

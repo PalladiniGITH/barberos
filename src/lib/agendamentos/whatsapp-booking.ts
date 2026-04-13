@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import {
   SCHEDULE_END_HOUR,
@@ -18,9 +19,29 @@ import {
 import {
   buildBusinessDateTimeFromTimeLabel,
   formatDateTimeInTimezone,
+  formatIsoDateInTimezone,
   getTodayIsoInTimezone,
   resolveBusinessTimezone,
 } from '@/lib/timezone'
+
+function safeRevalidateSchedulePath(path: string) {
+  try {
+    revalidatePath(path)
+  } catch (error) {
+    if (
+      error instanceof Error
+      && error.message.includes('static generation store missing')
+    ) {
+      console.info('[whatsapp-booking] revalidate skipped', {
+        path,
+        reason: 'static_generation_store_missing',
+      })
+      return
+    }
+
+    throw error
+  }
+}
 
 export interface WhatsAppBookingSlot {
   key: string
@@ -545,7 +566,10 @@ export async function createAppointmentFromWhatsApp(input: {
     datetimePersistedUtc: appointment.startAt.toISOString(),
     datetimeReturnedToAgendaUtc: appointment.startAt.toISOString(),
     datetimeReturnedToAgendaLocal: formatDateTimeInTimezone(appointment.startAt, resolvedTimezone),
+    datetimeReturnedToQueueLocal: `${formatIsoDateInTimezone(appointment.startAt, resolvedTimezone)} ${formatTimeLabel(appointment.startAt, resolvedTimezone)}`,
   })
+
+  safeRevalidateSchedulePath('/agendamentos')
 
   return {
     id: appointment.id,

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { format } from 'date-fns'
 import * as Dialog from '@radix-ui/react-dialog'
 import * as Popover from '@radix-ui/react-popover'
 import {
@@ -28,8 +27,6 @@ import {
   CUSTOMER_TYPE_LABELS,
   cn,
   formatCurrency,
-  formatDate,
-  formatTime,
 } from '@/lib/utils'
 
 interface PositionedAppointment extends ScheduleAppointmentItem {
@@ -108,9 +105,8 @@ function getEventLeft(laneIndex: number, laneCount: number) {
   return `calc(${EVENT_GAP}px + ${laneIndex} * (${width} + ${EVENT_GAP}px))`
 }
 
-function getAppointmentTop(date: string, pxPerMinute: number) {
-  const start = new Date(date)
-  return (((start.getHours() - 8) * 60) + start.getMinutes()) * pxPerMinute
+function getAppointmentTop(startMinutesOfDay: number, pxPerMinute: number) {
+  return (startMinutesOfDay - (8 * 60)) * pxPerMinute
 }
 
 function DetailPill({
@@ -144,7 +140,7 @@ function AppointmentPreview({
     <div className="space-y-4">
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
-          {formatDate(appointment.startAt)} / {formatTime(appointment.startAt)} - {formatTime(appointment.endAt)}
+          {appointment.localDateLabel} / {appointment.startTimeLabel} - {appointment.endTimeLabel}
         </p>
         <p className="mt-2 text-base font-semibold text-white">{appointment.customerName}</p>
         <p className="mt-1 text-sm text-slate-300">{appointment.serviceName}</p>
@@ -216,7 +212,7 @@ function AppointmentDetailsDialog({
           <div className="flex items-start justify-between gap-4 border-b border-[rgba(255,255,255,0.06)] px-6 py-5">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
-                {formatDate(appointment.startAt)} / {formatTime(appointment.startAt)} - {formatTime(appointment.endAt)}
+                {appointment.localDateLabel} / {appointment.startTimeLabel} - {appointment.endTimeLabel}
               </p>
               <Dialog.Title className="mt-2 truncate text-2xl font-semibold text-white">
                 {appointment.customerName}
@@ -331,8 +327,8 @@ function AppointmentDetailsDialog({
                     subscriptionPrice: appointment.customerSubscriptionPrice,
                     professionalId: appointment.professionalId,
                     serviceId: appointment.serviceId,
-                    date: format(new Date(appointment.startAt), 'yyyy-MM-dd'),
-                    time: format(new Date(appointment.startAt), 'HH:mm'),
+                    date: appointment.localDateIso,
+                    time: appointment.startTimeLabel,
                     status: appointment.status,
                     source: appointment.source,
                     billingModel: appointment.billingModel,
@@ -370,7 +366,7 @@ function ScheduleAppointmentCard({
 }) {
   const [previewOpen, setPreviewOpen] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const top = getAppointmentTop(appointment.startAt, schedulePxPerMinute)
+  const top = getAppointmentTop(appointment.startMinutesOfDay, schedulePxPerMinute)
   const height = Math.max(
     appointment.durationMinutes * schedulePxPerMinute,
     view === 'barber' ? 84 : 92
@@ -407,7 +403,7 @@ function ScheduleAppointmentCard({
             <div className="flex h-full min-w-0 flex-col justify-between px-3 py-3">
               <div className="flex items-start justify-between gap-2">
                 <span className="inline-flex rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(15,23,42,0.52)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-200">
-                  {formatTime(appointment.startAt)}
+                  {appointment.startTimeLabel}
                 </span>
                 <span className={cn('h-2.5 w-2.5 flex-shrink-0 rounded-full border border-white/10', compact ? 'mt-1' : 'mt-0.5', statusMeta.badge)} />
               </div>

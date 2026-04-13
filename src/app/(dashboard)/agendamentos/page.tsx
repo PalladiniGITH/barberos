@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import { format } from 'date-fns'
 import {
   CalendarClock,
   CheckCircle2,
@@ -21,7 +20,7 @@ import {
 import { ScheduleCalendar } from '@/components/agendamentos/schedule-calendar'
 import { ScheduleToolbar } from '@/components/agendamentos/schedule-toolbar'
 import { PageHeader } from '@/components/layout/page-header'
-import { cn, formatCurrency, formatPercent, formatTime } from '@/lib/utils'
+import { cn, formatCurrency, formatPercent } from '@/lib/utils'
 
 export const metadata: Metadata = { title: 'Agendamentos' }
 
@@ -108,7 +107,7 @@ function buildPositionedAppointments(appointments: ScheduleAppointmentItem[]): P
 function buildDayViewColumns(data: Awaited<ReturnType<typeof getSchedulePageData>>): ScheduleCalendarColumn[] {
   const selectedDay = data.days[0]?.key
   const appointments = data.appointments.filter((appointment) =>
-    format(new Date(appointment.startAt), 'yyyy-MM-dd') === selectedDay
+    appointment.localDateIso === selectedDay
   )
 
   return [
@@ -129,7 +128,7 @@ function buildBarberViewColumns(data: Awaited<ReturnType<typeof getSchedulePageD
   return data.visibleProfessionals.map((professional) => {
     const appointments = data.appointments.filter((appointment) =>
       appointment.professionalId === professional.id
-      && format(new Date(appointment.startAt), 'yyyy-MM-dd') === selectedDay
+      && appointment.localDateIso === selectedDay
     )
 
     return {
@@ -364,7 +363,7 @@ export default async function AgendamentosPage({ searchParams }: Props) {
                       </p>
                     </div>
                     <span className="rounded-[0.7rem] bg-[rgba(255,255,255,0.05)] px-2.5 py-1 text-xs font-medium text-slate-200">
-                      {formatTime(appointment.startAt)}
+                      {appointment.startTimeLabel}
                     </span>
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-400">

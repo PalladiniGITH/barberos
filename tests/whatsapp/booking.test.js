@@ -120,3 +120,32 @@ test('cobre o caso completo de hoje + servico + tarde + escolha 13:15 sem offset
     }
   )
 })
+
+test('nao finge sucesso quando a persistencia final do agendamento falha', async () => {
+  await withPrismaMocks(
+    {
+      customerFindFirst: async () => ({ id: 'cust-1', type: 'WALK_IN' }),
+      serviceFindFirst: async () => ({ id: 'svc-classic', duration: 35, price: 55 }),
+      professionalFindFirst: async () => ({ id: 'pro-matheus' }),
+      appointmentFindMany: async () => [],
+      appointmentCreate: async () => {
+        throw new Error('db_write_failed')
+      },
+    },
+    async () => {
+      await assert.rejects(
+        () => createAppointmentFromWhatsApp({
+          barbershopId: 'shop-1',
+          customerId: 'cust-1',
+          serviceId: 'svc-classic',
+          professionalId: 'pro-matheus',
+          dateIso: '2026-04-13',
+          timeLabel: '13:15',
+          timezone: 'America/Sao_Paulo',
+          sourceReference: 'whatsapp:failure',
+        }),
+        /db_write_failed/
+      )
+    }
+  )
+})

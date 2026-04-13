@@ -203,3 +203,50 @@ test('guardrail de periodo pergunta apenas o que faz sentido no horario atual', 
   assert.match(reply, /tarde ou noite/i)
   assert.doesNotMatch(reply, /manha/i)
 })
+
+test('backend fecha o fluxo quando ja existe resumo final e o cliente confirma', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.state = 'WAITING_CONFIRMATION'
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.selectedProfessionalId = 'pro-lucas'
+  memory.selectedProfessionalName = 'Lucas'
+  memory.requestedDateIso = '2026-04-13'
+  memory.requestedTimeLabel = '13:15'
+  memory.selectedSlot = {
+    key: 'pro-lucas:2026-04-13T16:15:00.000Z',
+    professionalId: 'pro-lucas',
+    professionalName: 'Lucas',
+    dateIso: '2026-04-13',
+    timeLabel: '13:15',
+    startAtIso: '2026-04-13T16:15:00.000Z',
+    endAtIso: '2026-04-13T16:50:00.000Z',
+  }
+
+  const corrected = agentTesting.enforceNextActionFromMemory(
+    'ASK_SERVICE',
+    memory,
+    true,
+    createAgentInput().nowContext
+  )
+
+  assert.equal(corrected, 'CONFIRM_BOOKING')
+})
+
+test('guardrail de barbeiro usa o barbeiro preferencial quando ele existe', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+
+  const reply = agentTesting.buildGuardrailReplyText({
+    nextAction: 'ASK_PROFESSIONAL',
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    preferredProfessionalName: 'Matheus',
+    nowContext: createAgentInput().nowContext,
+  })
+
+  assert.match(reply, /Matheus/)
+  assert.match(reply, /de novo|prefere outro/i)
+})

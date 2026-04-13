@@ -4,6 +4,12 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { assertOwnership, requireSession } from '@/lib/auth'
+import {
+  buildBusinessDateTimeFromTimeLabel,
+  formatTimeInTimezone,
+  resolveBusinessTimezone,
+} from '@/lib/timezone'
+import { syncCustomerPreferredProfessional } from '@/lib/customers/preferred-professional'
 
 type ActionResult = { success: true } | { success: false; error: string }
 
@@ -58,10 +64,17 @@ function normalizeBillingModel(
   return billingModel === 'AVULSO' ? 'SUBSCRIPTION_INCLUDED' : billingModel
 }
 
-function buildStartAt(date: string, time: string) {
-  const [year, month, day] = date.split('-').map(Number)
-  const [hours, minutes] = time.split(':').map(Number)
-  return new Date(year, month - 1, day, hours, minutes, 0, 0)
+async function getBarbershopTimezone(barbershopId: string) {
+  const barbershop = await prisma.barbershop.findUnique({
+    where: { id: barbershopId },
+    select: { timezone: true },
+  })
+
+  return resolveBusinessTimezone(barbershop?.timezone)
+}
+
+function buildStartAt(date: string, time: string, timezone: string) {
+  return buildBusinessDateTimeFromTimeLabel(date, time, timezone)
 }
 
 async function resolveCustomerId(input: {
@@ -174,6 +187,7 @@ async function ensureAppointmentSlotAvailable(input: {
   professionalId: string
   startAt: Date
   endAt: Date
+  timezone: string
 }) {
   const conflictingAppointment = await prisma.appointment.findFirst({
     where: {
@@ -192,14 +206,8 @@ async function ensureAppointmentSlotAvailable(input: {
   })
 
   if (conflictingAppointment) {
-    const startLabel = conflictingAppointment.startAt.toLocaleTimeString('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-    const endLabel = conflictingAppointment.endAt.toLocaleTimeString('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+    const startLabel = formatTimeInTimezone(conflictingAppointment.startAt, input.timezone)
+    const endLabel = formatTimeInTimezone(conflictingAppointment.endAt, input.timezone)
 
     return {
       success: false as const,
@@ -227,6 +235,7 @@ export async function createAppointment(rawData: unknown): Promise<ActionResult>
     const data = parsed.data
     const customerName = data.customerName.trim()
     const billingModel = normalizeBillingModel(data.customerType, data.billingModel)
+    const timezone = await getBarbershopTimezone(barbershopId)
 
     await Promise.all([
       assertOwnership(barbershopId, 'professional', data.professionalId),
@@ -243,10 +252,10 @@ export async function createAppointment(rawData: unknown): Promise<ActionResult>
       return { success: false, error: 'Servico indisponivel para agendamento.' }
     }
 
-    const startAt = buildStartAt(data.date, data.time)
+    const startAt = buildStartAt(data.date, data.time, timezone)
     const endAt = new Date(startAt.getTime() + service.duration * 60_000)
-    const openAt = buildStartAt(data.date, '08:00')
-    const closeAt = buildStartAt(data.date, '21:00')
+    const openAt = buildStartAt(data.date, '08:00', timezone)
+    const closeAt = buildStartAt(data.date, '21:00', timezone)
 
     if (startAt < openAt || endAt > closeAt) {
       return { success: false, error: 'A agenda aceita horarios apenas entre 08:00 e 21:00.' }
@@ -257,6 +266,7 @@ export async function createAppointment(rawData: unknown): Promise<ActionResult>
       professionalId: data.professionalId,
       startAt,
       endAt,
+      timezone,
     })
 
     if (!availability.success) {
@@ -294,6 +304,13 @@ export async function createAppointment(rawData: unknown): Promise<ActionResult>
       },
     })
 
+    if (data.status === 'COMPLETED') {
+      await syncCustomerPreferredProfessional({
+        barbershopId,
+        customerId,
+      })
+    }
+
     revalidateSchedulePaths()
     return { success: true }
   } catch (error) {
@@ -323,6 +340,7 @@ export async function updateAppointment(id: string, rawData: unknown): Promise<A
   try {
     const data = parsed.data
     const billingModel = normalizeBillingModel(data.customerType, data.billingModel)
+    const timezone = await getBarbershopTimezone(barbershopId)
 
     await Promise.all([
       assertOwnership(barbershopId, 'professional', data.professionalId),
@@ -339,10 +357,10 @@ export async function updateAppointment(id: string, rawData: unknown): Promise<A
       return { success: false, error: 'Servico indisponivel para agendamento.' }
     }
 
-    const startAt = buildStartAt(data.date, data.time)
+    const startAt = buildStartAt(data.date, data.time, timezone)
     const endAt = new Date(startAt.getTime() + service.duration * 60_000)
-    const openAt = buildStartAt(data.date, '08:00')
-    const closeAt = buildStartAt(data.date, '21:00')
+    const openAt = buildStartAt(data.date, '08:00', timezone)
+    const closeAt = buildStartAt(data.date, '21:00', timezone)
 
     if (startAt < openAt || endAt > closeAt) {
       return { success: false, error: 'A agenda aceita horarios apenas entre 08:00 e 21:00.' }
@@ -354,6 +372,7 @@ export async function updateAppointment(id: string, rawData: unknown): Promise<A
       professionalId: data.professionalId,
       startAt,
       endAt,
+      timezone,
     })
 
     if (!availability.success) {
@@ -391,6 +410,11 @@ export async function updateAppointment(id: string, rawData: unknown): Promise<A
       },
     })
 
+    await syncCustomerPreferredProfessional({
+      barbershopId,
+      customerId,
+    })
+
     revalidateSchedulePaths()
     return { success: true }
   } catch (error) {
@@ -410,7 +434,7 @@ export async function updateAppointmentStatus(id: string, rawStatus: unknown): P
 
   const existingAppointment = await prisma.appointment.findUnique({
     where: { id },
-    select: { id: true, barbershopId: true },
+    select: { id: true, barbershopId: true, customerId: true },
   })
 
   if (!existingAppointment || existingAppointment.barbershopId !== barbershopId) {
@@ -428,6 +452,11 @@ export async function updateAppointmentStatus(id: string, rawStatus: unknown): P
         cancelledAt: status === 'CANCELLED' ? new Date() : null,
         completedAt: status === 'COMPLETED' ? new Date() : null,
       },
+    })
+
+    await syncCustomerPreferredProfessional({
+      barbershopId,
+      customerId: existingAppointment.customerId,
     })
 
     revalidateSchedulePaths()

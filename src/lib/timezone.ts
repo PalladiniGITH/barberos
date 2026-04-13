@@ -223,6 +223,25 @@ export function formatDateTimeInTimezone(date: Date, timezone?: string | null) {
   return getDateTimePartsInTimezone(date, resolvedTimezone).dateTimeLabel
 }
 
+export function formatDateInTimezone(
+  date: Date,
+  timezone?: string | null,
+  locale = 'pt-BR'
+) {
+  const resolvedTimezone = resolveBusinessTimezone(timezone)
+  return date.toLocaleDateString(locale, {
+    timeZone: resolvedTimezone,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+}
+
+export function getMinutesOfDayInTimezone(date: Date, timezone?: string | null) {
+  const [hours, minutes] = formatTimeInTimezone(date, timezone).split(':').map(Number)
+  return hours * 60 + minutes
+}
+
 export function getCurrentBusinessPeriod(
   input: Pick<TimezoneNowContext, 'hour' | 'minute'>
 ): BusinessPeriod {

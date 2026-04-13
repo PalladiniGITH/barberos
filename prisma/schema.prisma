@@ -133,6 +133,7 @@ model Professional {
 
   revenues          Revenue[]
   appointments      Appointment[]
+  preferredByCustomers Customer[] @relation("CustomerPreferredProfessional")
   professionalGoals ProfessionalGoal[]
   challengeResults  ChallengeResult[]
   commissions       Commission[]
@@ -276,6 +277,9 @@ model Customer {
   subscriptionStatus    SubscriptionStatus?
   subscriptionPrice     Decimal?            @db.Decimal(10, 2)
   subscriptionStartedAt DateTime?
+  preferredProfessionalId String?
+  preferredProfessional Professional?      @relation("CustomerPreferredProfessional", fields: [preferredProfessionalId], references: [id])
+  preferredProfessionalUpdatedAt DateTime?
   active                Boolean             @default(true)
   barbershopId          String
   barbershop            Barbershop          @relation(fields: [barbershopId], references: [id])
@@ -290,6 +294,7 @@ model Customer {
   @@index([barbershopId, name])
   @@index([barbershopId, phone])
   @@index([barbershopId, email])
+  @@index([barbershopId, preferredProfessionalId])
   @@map("customers")
 }
 

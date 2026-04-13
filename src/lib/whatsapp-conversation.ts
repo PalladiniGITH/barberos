@@ -19,6 +19,7 @@ import {
   getTodayIsoInTimezone,
   resolveBusinessTimezone,
 } from '@/lib/timezone'
+import { resolveCustomerPreferredProfessional } from '@/lib/customers/preferred-professional'
 
 type ConversationState =
   | 'IDLE'
@@ -194,8 +195,20 @@ function buildServiceQuestion(serviceNames: string[]) {
   return `Perfeito. Voce quer corte, barba ou outro servico? ${preview ? `Hoje temos: ${preview}.` : ''}`.trim()
 }
 
-function buildProfessionalQuestion(professionalNames: string[]) {
+function buildProfessionalQuestion(
+  professionalNames: string[],
+  preferredProfessionalName?: string | null
+) {
+  if (preferredProfessionalName) {
+    return `Quer marcar com ${preferredProfessionalName} de novo ou prefere outro barbeiro?`
+  }
+
   return `Tem preferencia de barbeiro? Posso buscar com ${professionalNames.slice(0, 6).join(', ')}. Se preferir, tambem posso ver com qualquer um.`
+}
+
+function referencesPreferredProfessional(message: string) {
+  const normalized = normalizeText(message)
+  return /\b(meu barbeiro|o de sempre|de sempre|mesmo de sempre|meu de sempre|manter com o meu barbeiro|com o mesmo)\b/.test(normalized)
 }
 
 function buildDateQuestion() {
@@ -296,11 +309,11 @@ function buildHumanSlotOfferMessage(
 }
 
 function buildConfirmationMessage(slot: ConversationSlot, serviceName: string, timezone: string) {
-  return `Posso confirmar ${serviceName} para ${formatDayLabel(slot.dateIso, timezone).toLowerCase()} as ${slot.timeLabel} com ${slot.professionalName}? Se estiver certo, me responde com sim.`
+  return `Posso confirmar ${serviceName} para ${formatDayLabel(slot.dateIso, timezone).toLowerCase()} as ${slot.timeLabel} com ${slot.professionalName}?`
 }
 
 function buildSuccessMessage(slot: ConversationSlot, serviceName: string, timezone: string) {
-  return `Agendamento confirmado: ${serviceName} em ${formatDayLabel(slot.dateIso, timezone).toLowerCase()} as ${slot.timeLabel} com ${slot.professionalName}. Se quiser ajustar depois, me chama por aqui.`
+  return `Perfeito, ficou marcado.\n\nSeu horario esta confirmado para ${formatDayLabel(slot.dateIso, timezone).toLowerCase()} as ${slot.timeLabel} com ${slot.professionalName} para ${serviceName}.\n\nSe quiser remarcar ou cancelar depois, e so me chamar aqui.`
 }
 
 function buildRescheduleMessage() {
@@ -333,13 +346,17 @@ function buildResumeMessage(input: {
   }
   draft: ConversationDraft
   professionals: NameMatch[]
+  preferredProfessionalName?: string | null
 }) {
   if (input.state === 'WAITING_SERVICE') {
     return `Oi! Posso continuar por aqui. ${buildServiceQuestion([])}`
   }
 
   if (input.state === 'WAITING_PROFESSIONAL') {
-    return `Oi! Posso continuar por aqui. ${buildProfessionalQuestion(input.professionals.map((professional) => professional.name))}`
+    return `Oi! Posso continuar por aqui. ${buildProfessionalQuestion(
+      input.professionals.map((professional) => professional.name),
+      input.preferredProfessionalName
+    )}`
   }
 
   if (input.state === 'WAITING_DATE') {
@@ -922,6 +939,18 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     customerId: input.customer.id,
     phone: input.customer.phone ?? null,
   })
+  const preferredProfessional = await resolveCustomerPreferredProfessional({
+    barbershopId: input.barbershop.id,
+    customerId: input.customer.id,
+  })
+
+  console.info('[whatsapp-conversation] preferred professional', {
+    customerId: input.customer.id,
+    preferredProfessionalId: preferredProfessional.professionalId,
+    preferredProfessionalName: preferredProfessional.professionalName,
+    reason: preferredProfessional.reason,
+    completedAppointmentsCount: preferredProfessional.completedAppointmentsCount,
+  })
 
   if (services.length === 0 || professionals.length === 0) {
     const responseText = 'Ainda nao consigo fechar agendamento por aqui porque a agenda da barbearia ainda esta sem servicos ou profissionais ativos.'
@@ -981,7 +1010,11 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
 
   const agentResult = await processWhatsAppConversationWithAgent({
     barbershop: input.barbershop,
-    customer: input.customer,
+    customer: {
+      ...input.customer,
+      preferredProfessionalId: preferredProfessional.professionalId,
+      preferredProfessionalName: preferredProfessional.professionalName,
+    },
     inboundText,
     rawMessages: input.rawMessages,
     conversation: {
@@ -1079,10 +1112,67 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
           usedAI: true,
         }
       } catch (error) {
-        console.warn('[whatsapp-conversation] agent booking fallback_to_legacy', {
-          error: error instanceof Error ? error.message : 'unknown_error',
+        const errorMessage = error instanceof Error ? error.message : 'unknown_error'
+
+        console.warn('[whatsapp-conversation] agent booking failed', {
+          error: errorMessage,
           conversationId: conversation.id,
         })
+
+        const responseText =
+          'Tive um problema para concluir esse agendamento no sistema agora e nao vou te confirmar antes de salvar de verdade. Se quiser, eu posso buscar esse horario de novo para voce.'
+
+        await prisma.whatsappConversation.update({
+          where: { id: conversation.id },
+          data: {
+            state: 'WAITING_CONFIRMATION',
+            selectedServiceId: agentResult.memory.selectedServiceId,
+            selectedServiceName: agentResult.memory.selectedServiceName,
+            selectedProfessionalId: agentResult.memory.selectedProfessionalId,
+            selectedProfessionalName: agentResult.memory.selectedProfessionalName,
+            allowAnyProfessional: agentResult.memory.allowAnyProfessional,
+            requestedDate: agentResult.memory.requestedDateIso
+              ? buildDateAnchorUtc(agentResult.memory.requestedDateIso)
+              : null,
+            requestedTimeLabel: agentResult.memory.requestedTimeLabel,
+            slotOptions: agentResult.memory.offeredSlots.length
+              ? buildJsonValue(agentResult.memory.offeredSlots)
+              : JSON_NULL,
+            selectedSlot: agentResult.memory.selectedSlot
+              ? buildJsonValue(agentResult.memory.selectedSlot)
+              : JSON_NULL,
+            conversationSummary: agentResult.memory.conversationSummary,
+            bookingDraft: buildJsonValue({
+              selectedServiceId: agentResult.memory.selectedServiceId,
+              selectedServiceName: agentResult.memory.selectedServiceName,
+              selectedProfessionalId: agentResult.memory.selectedProfessionalId,
+              selectedProfessionalName: agentResult.memory.selectedProfessionalName,
+              allowAnyProfessional: agentResult.memory.allowAnyProfessional,
+              requestedDateIso: agentResult.memory.requestedDateIso,
+              requestedTimeLabel: agentResult.memory.requestedTimeLabel,
+              selectedSlot: agentResult.memory.selectedSlot,
+            }),
+            recentCorrections: agentResult.memory.recentCorrections.length
+              ? buildJsonValue(agentResult.memory.recentCorrections)
+              : JSON_NULL,
+            lastInboundText: inboundText,
+            lastIntent: buildJsonValue({
+              source: 'agent',
+              structured: agentResult.structured,
+              toolTrace: agentResult.toolTrace,
+              bookingFailure: errorMessage,
+            }),
+            lastAssistantText: responseText,
+          },
+        })
+
+        return {
+          responseText,
+          flow: 'await_confirmation',
+          conversationId: conversation.id,
+          conversationState: 'WAITING_CONFIRMATION',
+          usedAI: true,
+        }
       }
     } else {
       await prisma.whatsappConversation.update({
@@ -1219,6 +1309,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       nowContext,
       draft: draftForInterpreter,
       professionals: professionals.map((professional) => ({ id: professional.id, name: professional.name })),
+      preferredProfessionalName: preferredProfessional.professionalName,
     })
 
     await prisma.whatsappConversation.update({
@@ -1296,6 +1387,21 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     && Boolean(conversation.lastAssistantText?.includes('Quer que eu veja com outro barbeiro?'))
     && interpreted.intent === 'CONFIRM'
     && nameResolution.action === 'none'
+  const acceptedPreferredProfessional =
+    Boolean(
+      preferredProfessional.professionalId
+      && preferredProfessional.professionalName
+      && !baselineDraft.selectedProfessionalId
+      && !baselineDraft.allowAnyProfessional
+      && (
+        referencesPreferredProfessional(inboundText)
+        || (
+          effectiveState === 'WAITING_PROFESSIONAL'
+          && Boolean(conversation.lastAssistantText?.includes(preferredProfessional.professionalName ?? ''))
+          && interpreted.intent === 'CONFIRM'
+        )
+      )
+    )
 
   const responseLeadIn = buildCorrectionLeadIn(interpreted.correctionTarget)
   const draft: ConversationDraft = { ...baselineDraft }
@@ -1309,6 +1415,16 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   if (nameResolution.action === 'professional' && nameResolution.resolvedProfessional) {
     draft.selectedProfessionalId = nameResolution.resolvedProfessional.id
     draft.selectedProfessionalName = nameResolution.resolvedProfessional.name
+    draft.allowAnyProfessional = false
+  }
+
+  if (
+    acceptedPreferredProfessional
+    && preferredProfessional.professionalId
+    && preferredProfessional.professionalName
+  ) {
+    draft.selectedProfessionalId = preferredProfessional.professionalId
+    draft.selectedProfessionalName = preferredProfessional.professionalName
     draft.allowAnyProfessional = false
   }
 
@@ -1510,7 +1626,13 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
           })}`,
           responseLeadIn
         )
-      : withLeadIn(buildProfessionalQuestion(professionals.map((professional) => professional.name)), responseLeadIn)
+      : withLeadIn(
+          buildProfessionalQuestion(
+            professionals.map((professional) => professional.name),
+            preferredProfessional.professionalName
+          ),
+          responseLeadIn
+        )
 
     await prisma.whatsappConversation.update({
       where: { id: conversation.id },
@@ -1775,7 +1897,9 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
 
 export const __testing = {
   buildEmptyConversationDraft,
+  buildProfessionalQuestion,
   isConversationContextReliable,
   isShortGreetingMessage,
+  referencesPreferredProfessional,
   shouldResetConversationOnGreeting,
 }
