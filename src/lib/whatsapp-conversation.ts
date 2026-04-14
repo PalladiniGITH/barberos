@@ -1614,9 +1614,39 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   })
 
   if (agentResult) {
+    const agentHasUsefulProgress = hasUsefulConversationProgress({
+      selectedServiceId: agentResult.memory.selectedServiceId,
+      selectedServiceName: agentResult.memory.selectedServiceName,
+      selectedProfessionalId: agentResult.memory.selectedProfessionalId,
+      selectedProfessionalName: agentResult.memory.selectedProfessionalName,
+      allowAnyProfessional: agentResult.memory.allowAnyProfessional,
+      requestedDateIso: agentResult.memory.requestedDateIso,
+      requestedTimeLabel: agentResult.memory.requestedTimeLabel,
+      offeredSlots: agentResult.memory.offeredSlots,
+      selectedStoredSlot: agentResult.memory.selectedSlot,
+    })
     const shouldResetPersistedContext =
+      (
+        agentResult.structured.nextAction === 'RESET_CONTEXT'
+        || agentResult.structured.nextAction === 'GREET'
+      )
+      && !agentHasUsefulProgress
+
+    if (!shouldResetPersistedContext && agentHasUsefulProgress && (
       agentResult.structured.nextAction === 'RESET_CONTEXT'
       || agentResult.structured.nextAction === 'GREET'
+    )) {
+      console.info('[whatsapp-conversation] preserving progress despite unreliable context', {
+        mode: 'agent',
+        conversationId: conversation.id,
+        action: agentResult.structured.nextAction,
+        selectedServiceId: agentResult.memory.selectedServiceId,
+        requestedDateIso: agentResult.memory.requestedDateIso,
+        requestedTimeLabel: agentResult.memory.requestedTimeLabel,
+        offeredSlots: agentResult.memory.offeredSlots.length,
+        hasSelectedSlot: Boolean(agentResult.memory.selectedSlot),
+      })
+    }
 
     if (agentResult.conversationState === 'WAITING_CONFIRMATION') {
       console.info('[whatsapp-conversation] confirmation state transition', {
@@ -2428,6 +2458,17 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       offeredSlotsCount: draft.offeredSlots.length,
       offeredSlots: draft.offeredSlots.map((slot) => `${slot.timeLabel} com ${slot.professionalName}`),
     })
+
+    if (draft.offeredSlots.length === 0) {
+      console.info('[whatsapp-conversation] no offeredSlots available', {
+        customerId: input.customer.id,
+        requestedDateIso: draft.requestedDateIso,
+        requestedTimeLabel: draft.requestedTimeLabel,
+        exactTimeRequested: interpreted.exactTime,
+        selectedServiceId: draft.selectedServiceId,
+        selectedProfessionalId: professionalIdForExactSearch,
+      })
+    }
   }
 
   let slotForConfirmation: ConversationSlot | null = null

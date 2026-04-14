@@ -395,3 +395,102 @@ test('interpreta horario explicito como busca exata prioritaria', async () => {
   assert.equal(exactIntentWithoutH.exactTime, '10:00')
   assert.equal(exactIntentWithoutH.timePreference, 'EXACT')
 })
+
+test('erro de search_availability por servico inexistente volta para a lista real de servicos', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+
+  const override = agentTesting.resolveToolFailureOverride({
+    toolTrace: [
+      {
+        name: 'search_availability',
+        arguments: {},
+        result: {
+          status: 'error',
+          reason: 'service_not_found',
+        },
+      },
+    ],
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    preferredProfessionalName: null,
+    serviceNames: SERVICES.map((service) => service.name),
+    nowContext: createAgentInput().nowContext,
+  })
+
+  assert.equal(override.nextAction, 'ASK_SERVICE')
+  assert.match(override.replyText, /Corte Classic/)
+  assert.match(override.replyText, /Barba/)
+})
+
+test('fluxo com progresso util nao volta para IDLE quando ainda nao existe slot real', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.requestedDateIso = '2026-04-14'
+  memory.requestedTimeLabel = '15:00'
+  memory.offeredSlots = []
+  memory.selectedSlot = null
+
+  const corrected = agentTesting.enforceNextActionFromMemory(
+    'GREET',
+    memory,
+    false,
+    createAgentInput().nowContext
+  )
+  const state = agentTesting.inferConversationState(
+    corrected,
+    memory,
+    createAgentInput().nowContext
+  )
+
+  assert.equal(corrected, 'ASK_PROFESSIONAL')
+  assert.equal(state, 'WAITING_PROFESSIONAL')
+})
+
+test('horario pedido sem slot real responde de forma objetiva e sem loop', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.selectedProfessionalId = 'pro-matheus'
+  memory.selectedProfessionalName = 'Matheus'
+  memory.requestedDateIso = '2026-04-14'
+  memory.requestedTimeLabel = '15:00'
+  memory.offeredSlots = [
+    {
+      key: 'pro-matheus:2026-04-14T16:15:00.000Z',
+      professionalId: 'pro-matheus',
+      professionalName: 'Matheus',
+      dateIso: '2026-04-14',
+      timeLabel: '13:15',
+      startAtIso: '2026-04-14T16:15:00.000Z',
+      endAtIso: '2026-04-14T16:50:00.000Z',
+    },
+  ]
+
+  const override = agentTesting.resolveToolFailureOverride({
+    toolTrace: [
+      {
+        name: 'confirm_booking',
+        arguments: {
+          requestedTime: '15:00',
+        },
+        result: {
+          status: 'error',
+          reason: 'slot_not_found',
+          nearbySlots: memory.offeredSlots,
+        },
+      },
+    ],
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    preferredProfessionalName: null,
+    serviceNames: SERVICES.map((service) => service.name),
+    nowContext: createAgentInput().nowContext,
+  })
+
+  assert.equal(override.nextAction, 'OFFER_SLOTS')
+  assert.match(override.replyText, /13:15 com Matheus/)
+  assert.doesNotMatch(override.replyText, /Qual servico|Qual dia/i)
+})

@@ -517,12 +517,60 @@ function inferFlow(nextAction: WhatsAppAgentNextAction): WhatsAppAgentFlow {
   return 'greeting'
 }
 
-function inferConversationState(nextAction: WhatsAppAgentNextAction): WhatsAppAgentConversationState {
+function hasUsefulProgressInMemory(memory: WorkingMemory) {
+  return Boolean(
+    memory.selectedServiceId
+    || memory.selectedProfessionalId
+    || memory.allowAnyProfessional
+    || memory.requestedDateIso
+    || memory.requestedTimeLabel
+    || memory.offeredSlots.length > 0
+    || memory.selectedSlot
+  )
+}
+
+function deriveConversationStateFromMemory(
+  memory: WorkingMemory,
+  nowContext: WhatsAppAgentInput['nowContext']
+): WhatsAppAgentConversationState {
+  const validation = validateMissingFields({
+    memory,
+    nowContext,
+  })
+
+  if (memory.selectedSlot) {
+    return 'WAITING_CONFIRMATION'
+  }
+
+  if (validation.missingFields.includes('service')) {
+    return 'WAITING_SERVICE'
+  }
+
+  if (validation.missingFields.includes('professional')) {
+    return 'WAITING_PROFESSIONAL'
+  }
+
+  if (validation.shouldAskDateInsteadOfPeriod || validation.missingFields.includes('date')) {
+    return 'WAITING_DATE'
+  }
+
+  return 'WAITING_TIME'
+}
+
+function inferConversationState(
+  nextAction: WhatsAppAgentNextAction,
+  memory: WorkingMemory,
+  nowContext: WhatsAppAgentInput['nowContext']
+): WhatsAppAgentConversationState {
   if (nextAction === 'ASK_SERVICE') return 'WAITING_SERVICE'
   if (nextAction === 'ASK_PROFESSIONAL') return 'WAITING_PROFESSIONAL'
   if (nextAction === 'ASK_DATE') return 'WAITING_DATE'
   if (nextAction === 'ASK_PERIOD' || nextAction === 'OFFER_SLOTS') return 'WAITING_TIME'
   if (nextAction === 'ASK_CONFIRMATION') return 'WAITING_CONFIRMATION'
+  if (nextAction === 'CONFIRM_BOOKING') return 'WAITING_CONFIRMATION'
+  if (hasUsefulProgressInMemory(memory)) {
+    return deriveConversationStateFromMemory(memory, nowContext)
+  }
   return 'IDLE'
 }
 
@@ -602,6 +650,38 @@ function enforceNextActionFromMemory(
   })
 
   if (requestedAction === 'RESET_CONTEXT' || requestedAction === 'GREET') {
+    if (hasUsefulProgressInMemory(memory)) {
+      if (shouldCreateAppointment) {
+        return 'CONFIRM_BOOKING'
+      }
+
+      if (memory.selectedSlot) {
+        return 'ASK_CONFIRMATION'
+      }
+
+      if (memory.offeredSlots.length > 0) {
+        return 'OFFER_SLOTS'
+      }
+
+      if (validation.missingFields.includes('service')) {
+        return 'ASK_SERVICE'
+      }
+
+      if (validation.missingFields.includes('professional')) {
+        return 'ASK_PROFESSIONAL'
+      }
+
+      if (validation.shouldAskDateInsteadOfPeriod || validation.missingFields.includes('date')) {
+        return 'ASK_DATE'
+      }
+
+      if (validation.missingFields.includes('period')) {
+        return 'ASK_PERIOD'
+      }
+
+      return 'ASK_CLARIFICATION'
+    }
+
     return requestedAction
   }
 
@@ -644,6 +724,14 @@ function enforceNextActionFromMemory(
       return 'OFFER_SLOTS'
     }
 
+    return 'ASK_CLARIFICATION'
+  }
+
+  if (
+    memory.requestedTimeLabel?.includes(':')
+    && !memory.selectedSlot
+    && memory.offeredSlots.length === 0
+  ) {
     return 'ASK_CLARIFICATION'
   }
 
@@ -1339,6 +1427,144 @@ function buildGuardrailReplyText(input: {
   return null
 }
 
+function getLatestToolError(
+  toolTrace: ToolTraceEntry[],
+  toolName?: string
+) {
+  for (let index = toolTrace.length - 1; index >= 0; index -= 1) {
+    const trace = toolTrace[index]
+    if (toolName && trace.name !== toolName) {
+      continue
+    }
+
+    if (
+      trace.result
+      && typeof trace.result === 'object'
+      && !Array.isArray(trace.result)
+      && trace.result.status === 'error'
+      && typeof trace.result.reason === 'string'
+    ) {
+      return trace
+    }
+  }
+
+  return null
+}
+
+function buildNearbySlotsMessage(slots: WhatsAppBookingSlot[]) {
+  const labels = slots
+    .slice(0, 4)
+    .map((slot) => `${slot.timeLabel} com ${slot.professionalName}`)
+
+  return labels.length > 0
+    ? `Os horarios mais proximos que encontrei sao: ${labels.join(', ')}.`
+    : null
+}
+
+function resolveToolFailureOverride(input: {
+  toolTrace: ToolTraceEntry[]
+  memory: WorkingMemory
+  customerName: string
+  barbershopName: string
+  preferredProfessionalName?: string | null
+  serviceNames: string[]
+  nowContext: WhatsAppAgentInput['nowContext']
+}) {
+  const latestAvailabilityError =
+    getLatestToolError(input.toolTrace, 'search_availability')
+    ?? getLatestToolError(input.toolTrace, 'confirm_booking')
+    ?? getLatestToolError(input.toolTrace, 'create_booking_draft')
+
+  if (!latestAvailabilityError) {
+    return null
+  }
+
+  const reason = String(latestAvailabilityError.result.reason)
+
+  if (reason === 'service_not_found') {
+    const nextAction = 'ASK_SERVICE' as const
+    return {
+      nextAction,
+      replyText: buildGuardrailReplyText({
+        nextAction,
+        memory: input.memory,
+        customerName: input.customerName,
+        barbershopName: input.barbershopName,
+        preferredProfessionalName: input.preferredProfessionalName ?? null,
+        serviceNames: input.serviceNames,
+        nowContext: input.nowContext,
+      }) ?? buildServiceQuestionFromNames(input.serviceNames),
+    }
+  }
+
+  if (reason === 'professional_choice_required') {
+    const nextAction = 'ASK_PROFESSIONAL' as const
+    return {
+      nextAction,
+      replyText: buildGuardrailReplyText({
+        nextAction,
+        memory: input.memory,
+        customerName: input.customerName,
+        barbershopName: input.barbershopName,
+        preferredProfessionalName: input.preferredProfessionalName ?? null,
+        serviceNames: input.serviceNames,
+        nowContext: input.nowContext,
+      }) ?? 'Tem preferencia de barbeiro ou posso procurar com qualquer um?',
+    }
+  }
+
+  if (reason === 'date_required') {
+    const nextAction = 'ASK_DATE' as const
+    return {
+      nextAction,
+      replyText: buildGuardrailReplyText({
+        nextAction,
+        memory: input.memory,
+        customerName: input.customerName,
+        barbershopName: input.barbershopName,
+        preferredProfessionalName: input.preferredProfessionalName ?? null,
+        serviceNames: input.serviceNames,
+        nowContext: input.nowContext,
+      }) ?? 'Qual dia voce prefere?',
+    }
+  }
+
+  if (reason === 'multiple_professionals_for_exact_time') {
+    const slots = Array.isArray(latestAvailabilityError.result.slots)
+      ? latestAvailabilityError.result.slots as WhatsAppBookingSlot[]
+      : []
+    return {
+      nextAction: 'OFFER_SLOTS' as const,
+      replyText: buildNearbySlotsMessage(slots)
+        ?? 'Tenho mais de um barbeiro disponivel nesse horario. Quer que eu te mostre as opcoes?',
+    }
+  }
+
+  if (reason === 'slot_not_found') {
+    const nearbySlots = Array.isArray(latestAvailabilityError.result.nearbySlots)
+      ? latestAvailabilityError.result.nearbySlots as WhatsAppBookingSlot[]
+      : input.memory.offeredSlots
+
+    return {
+      nextAction: nearbySlots.length > 0 ? 'OFFER_SLOTS' as const : 'ASK_CLARIFICATION' as const,
+      replyText: buildNearbySlotsMessage(nearbySlots)
+        ?? 'Nao encontrei esse horario nas opcoes atuais. Vou buscar de novo para voce.',
+    }
+  }
+
+  if (reason === 'offered_slots_missing') {
+    return {
+      nextAction: 'ASK_CLARIFICATION' as const,
+      replyText: 'Nao consegui verificar os horarios agora, vou tentar novamente.',
+    }
+  }
+
+  return {
+    nextAction: 'ASK_CLARIFICATION' as const,
+    replyText: 'Nao consegui verificar os horarios agora, vou tentar novamente.',
+  }
+}
+
 async function executeAgentTool(input: {
   toolName: string
   args: Record<string, unknown>
@@ -1553,18 +1779,59 @@ async function executeAgentTool(input: {
     } else if (
       typeof args.requestedTime === 'string'
       && args.requestedTime
-      && memory.selectedServiceId
-      && memory.selectedProfessionalId
       && memory.requestedDateIso
     ) {
-      memory.selectedSlot = await findExactAvailableWhatsAppSlot({
-        barbershopId: agentInput.barbershop.id,
-        serviceId: memory.selectedServiceId,
-        professionalId: memory.selectedProfessionalId,
-        dateIso: memory.requestedDateIso,
-        timeLabel: args.requestedTime,
-        timezone: agentInput.barbershop.timezone,
-      })
+      if (!memory.selectedServiceId) {
+        return {
+          status: 'error',
+          reason: 'service_not_found',
+        }
+      }
+
+      if (memory.selectedProfessionalId) {
+        memory.selectedSlot = await findExactAvailableWhatsAppSlot({
+          barbershopId: agentInput.barbershop.id,
+          serviceId: memory.selectedServiceId,
+          professionalId: memory.selectedProfessionalId,
+          dateIso: memory.requestedDateIso,
+          timeLabel: args.requestedTime,
+          timezone: agentInput.barbershop.timezone,
+        })
+      } else if (memory.allowAnyProfessional) {
+        const exactAvailability = await getAvailableWhatsAppSlots({
+          barbershopId: agentInput.barbershop.id,
+          serviceId: memory.selectedServiceId,
+          dateIso: memory.requestedDateIso,
+          timezone: agentInput.barbershop.timezone,
+          professionalId: null,
+          timePreference: 'EXACT',
+          exactTime: args.requestedTime,
+          limit: 4,
+        })
+
+        if (exactAvailability.slots.length === 1) {
+          memory.selectedSlot = exactAvailability.slots[0]
+        } else if (exactAvailability.slots.length > 1) {
+          return {
+            status: 'error',
+            reason: 'multiple_professionals_for_exact_time',
+            slots: exactAvailability.slots,
+          }
+        }
+      } else if (memory.offeredSlots.length === 0) {
+        return {
+          status: 'error',
+          reason: 'offered_slots_missing',
+        }
+      }
+
+      if (!memory.selectedSlot) {
+        return {
+          status: 'error',
+          reason: memory.offeredSlots.length === 0 ? 'offered_slots_missing' : 'slot_not_found',
+          nearbySlots: memory.offeredSlots.slice(0, 4),
+        }
+      }
     }
 
     return {
@@ -1582,15 +1849,62 @@ async function executeAgentTool(input: {
       memory.selectedSlot = memory.offeredSlots[selectedOptionNumber - 1] ?? null
     }
 
-    if (!memory.selectedSlot && requestedTime && memory.selectedServiceId && memory.selectedProfessionalId && memory.requestedDateIso) {
-      memory.selectedSlot = await findExactAvailableWhatsAppSlot({
-        barbershopId: agentInput.barbershop.id,
-        serviceId: memory.selectedServiceId,
-        professionalId: memory.selectedProfessionalId,
-        dateIso: memory.requestedDateIso,
-        timeLabel: requestedTime,
-        timezone: agentInput.barbershop.timezone,
-      })
+    if (!memory.selectedSlot && requestedTime && memory.requestedDateIso) {
+      if (!memory.selectedServiceId) {
+        return {
+          status: 'error',
+          reason: 'service_not_found',
+          explicitConfirmationDetected: isExplicitConfirmation(agentInput.inboundText),
+        }
+      }
+
+      if (memory.selectedProfessionalId) {
+        memory.selectedSlot = await findExactAvailableWhatsAppSlot({
+          barbershopId: agentInput.barbershop.id,
+          serviceId: memory.selectedServiceId,
+          professionalId: memory.selectedProfessionalId,
+          dateIso: memory.requestedDateIso,
+          timeLabel: requestedTime,
+          timezone: agentInput.barbershop.timezone,
+        })
+      } else if (memory.allowAnyProfessional) {
+        const exactAvailability = await getAvailableWhatsAppSlots({
+          barbershopId: agentInput.barbershop.id,
+          serviceId: memory.selectedServiceId,
+          dateIso: memory.requestedDateIso,
+          timezone: agentInput.barbershop.timezone,
+          professionalId: null,
+          timePreference: 'EXACT',
+          exactTime: requestedTime,
+          limit: 4,
+        })
+
+        if (exactAvailability.slots.length === 1) {
+          memory.selectedSlot = exactAvailability.slots[0]
+        } else if (exactAvailability.slots.length > 1) {
+          return {
+            status: 'error',
+            reason: 'multiple_professionals_for_exact_time',
+            slots: exactAvailability.slots,
+            explicitConfirmationDetected: isExplicitConfirmation(agentInput.inboundText),
+          }
+        }
+      } else if (memory.offeredSlots.length === 0) {
+        return {
+          status: 'error',
+          reason: 'offered_slots_missing',
+          explicitConfirmationDetected: isExplicitConfirmation(agentInput.inboundText),
+        }
+      }
+    }
+
+    if (!memory.selectedSlot) {
+      return {
+        status: 'error',
+        reason: memory.offeredSlots.length === 0 ? 'offered_slots_missing' : 'slot_not_found',
+        nearbySlots: memory.offeredSlots.slice(0, 4),
+        explicitConfirmationDetected: isExplicitConfirmation(agentInput.inboundText),
+      }
     }
 
     return {
@@ -1921,37 +2235,56 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     }
 
     const explicitConfirmation = isExplicitConfirmation(input.inboundText)
-    const shouldCreateAppointment =
-      explicitConfirmation
-      && memory.state === 'WAITING_CONFIRMATION'
-      && Boolean(memory.selectedServiceId)
-      && Boolean(memory.selectedSlot)
+      const shouldCreateAppointment =
+        explicitConfirmation
+        && memory.state === 'WAITING_CONFIRMATION'
+        && Boolean(memory.selectedServiceId)
+        && Boolean(memory.selectedSlot)
 
-    const normalizedNextAction = enforceNextActionFromMemory(
-      structuredDraft.nextAction,
-      memory,
-      shouldCreateAppointment,
-      input.nowContext
-    )
-    const guardedReplyText = normalizedNextAction !== structuredDraft.nextAction
-      ? buildGuardrailReplyText({
-          nextAction: normalizedNextAction,
-          memory,
-          customerName: input.customer.name,
+      const toolFailureOverride = resolveToolFailureOverride({
+        toolTrace,
+        memory,
+        customerName: input.customer.name,
+        barbershopName: input.barbershop.name,
+        preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
+        serviceNames: input.services.map((service) => service.name),
+        nowContext: input.nowContext,
+      })
+
+      if (toolFailureOverride) {
+        console.info('[whatsapp-agent] tool failure guardrail', {
+          customerId: input.customer.id,
+          conversationId: input.conversation.id,
+          nextAction: toolFailureOverride.nextAction,
+          replyText: toolFailureOverride.replyText,
+        })
+      }
+
+      const normalizedNextAction = enforceNextActionFromMemory(
+        toolFailureOverride?.nextAction ?? structuredDraft.nextAction,
+        memory,
+        shouldCreateAppointment,
+        input.nowContext
+      )
+      const guardedReplyText = !toolFailureOverride && normalizedNextAction !== structuredDraft.nextAction
+        ? buildGuardrailReplyText({
+            nextAction: normalizedNextAction,
+            memory,
+            customerName: input.customer.name,
           barbershopName: input.barbershop.name,
           preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
           serviceNames: input.services.map((service) => service.name),
           nowContext: input.nowContext,
         })
       : null
-    const structured = {
-      ...structuredDraft,
-      nextAction: normalizedNextAction,
-      replyText: guardedReplyText ?? structuredDraft.replyText,
-    } satisfies AgentStructuredOutput
+      const structured = {
+        ...structuredDraft,
+        nextAction: normalizedNextAction,
+        replyText: toolFailureOverride?.replyText ?? guardedReplyText ?? structuredDraft.replyText,
+      } satisfies AgentStructuredOutput
 
-    memory.state = inferConversationState(structured.nextAction)
-    memory.conversationSummary = structured.summary || buildRuntimeSummary(memory)
+      memory.state = inferConversationState(structured.nextAction, memory, input.nowContext)
+      memory.conversationSummary = structured.summary || buildRuntimeSummary(memory)
 
     console.info('[whatsapp-agent] structured output', {
       customerId: input.customer.id,
@@ -1985,6 +2318,9 @@ export const __testing = {
   promoteIntentContextToMemory,
   validateMissingFields,
   enforceNextActionFromMemory,
+  inferConversationState,
+  hasUsefulProgressInMemory,
+  resolveToolFailureOverride,
   buildGuardrailReplyText,
   referencesPreferredProfessional,
   isExplicitConfirmation,
