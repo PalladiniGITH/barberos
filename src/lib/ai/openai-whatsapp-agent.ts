@@ -993,6 +993,38 @@ function sanitizeReplyTextAgainstProfessionalVocative(input: {
   return input.replyText.replace(match[0], `${leadIn}${punctuation}`)
 }
 
+function containsFinalConfirmationLanguage(replyText: string) {
+  return /\b(ficou marcado|agendamento confirmado|seu horario esta confirmado|horario confirmado|seu horário está confirmado|horário confirmado)\b/i.test(
+    normalizeText(replyText)
+  )
+}
+
+function sanitizePrematureConfirmationReply(input: {
+  replyText: string
+  nextAction: WhatsAppAgentNextAction
+  shouldCreateAppointment: boolean
+  memory: WorkingMemory
+  customerName: string
+  barbershopName: string
+  preferredProfessionalName?: string | null
+  serviceNames: string[]
+  nowContext: WhatsAppAgentInput['nowContext']
+}) {
+  if (input.shouldCreateAppointment || !containsFinalConfirmationLanguage(input.replyText)) {
+    return input.replyText
+  }
+
+  return buildGuardrailReplyText({
+    nextAction: input.nextAction,
+    memory: input.memory,
+    customerName: input.customerName,
+    barbershopName: input.barbershopName,
+    preferredProfessionalName: input.preferredProfessionalName ?? null,
+    serviceNames: input.serviceNames,
+    nowContext: input.nowContext,
+  }) ?? input.replyText
+}
+
 function assignPreferredProfessionalToMemory(input: {
   memory: WorkingMemory
   preferredProfessionalId: string
@@ -2107,7 +2139,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     lastAssistantText: input.conversation.lastAssistantText,
   })) {
     const responseText =
-      'Perfeito, ficou marcado.\n\nVou confirmar esse horario no sistema agora para voce.'
+      'Perfeito. Vou concluir esse agendamento no sistema agora para voce.'
 
     memory.conversationSummary = buildRuntimeSummary(memory)
 
@@ -2350,63 +2382,74 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     }
 
     const explicitConfirmation = isExplicitConfirmation(input.inboundText)
-      const shouldCreateAppointment =
-        explicitConfirmation
-        && memory.state === 'WAITING_CONFIRMATION'
-        && Boolean(memory.selectedServiceId)
-        && Boolean(memory.selectedSlot)
+    const shouldCreateAppointment =
+      explicitConfirmation
+      && memory.state === 'WAITING_CONFIRMATION'
+      && Boolean(memory.selectedServiceId)
+      && Boolean(memory.selectedSlot)
 
-      const toolFailureOverride = resolveToolFailureOverride({
-        toolTrace,
-        memory,
-        customerName: input.customer.name,
-        barbershopName: input.barbershop.name,
-        preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
-        serviceNames: input.services.map((service) => service.name),
-        nowContext: input.nowContext,
+    const toolFailureOverride = resolveToolFailureOverride({
+      toolTrace,
+      memory,
+      customerName: input.customer.name,
+      barbershopName: input.barbershop.name,
+      preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
+      serviceNames: input.services.map((service) => service.name),
+      nowContext: input.nowContext,
+    })
+
+    if (toolFailureOverride) {
+      console.info('[whatsapp-agent] tool failure guardrail', {
+        customerId: input.customer.id,
+        conversationId: input.conversation.id,
+        nextAction: toolFailureOverride.nextAction,
+        replyText: toolFailureOverride.replyText,
       })
+    }
 
-      if (toolFailureOverride) {
-        console.info('[whatsapp-agent] tool failure guardrail', {
-          customerId: input.customer.id,
-          conversationId: input.conversation.id,
-          nextAction: toolFailureOverride.nextAction,
-          replyText: toolFailureOverride.replyText,
-        })
-      }
-
-      const normalizedNextAction = enforceNextActionFromMemory(
-        toolFailureOverride?.nextAction ?? structuredDraft.nextAction,
-        memory,
-        shouldCreateAppointment,
-        input.nowContext
-      )
-      const guardedReplyText = !toolFailureOverride && normalizedNextAction !== structuredDraft.nextAction
-        ? buildGuardrailReplyText({
-            nextAction: normalizedNextAction,
-            memory,
-            customerName: input.customer.name,
+    const normalizedNextAction = enforceNextActionFromMemory(
+      toolFailureOverride?.nextAction ?? structuredDraft.nextAction,
+      memory,
+      shouldCreateAppointment,
+      input.nowContext
+    )
+    const guardedReplyText = !toolFailureOverride && normalizedNextAction !== structuredDraft.nextAction
+      ? buildGuardrailReplyText({
+          nextAction: normalizedNextAction,
+          memory,
+          customerName: input.customer.name,
           barbershopName: input.barbershop.name,
           preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
           serviceNames: input.services.map((service) => service.name),
           nowContext: input.nowContext,
         })
       : null
-      const sanitizedReplyText = sanitizeReplyTextAgainstProfessionalVocative({
-        replyText: toolFailureOverride?.replyText ?? guardedReplyText ?? structuredDraft.replyText,
-        customerName: input.customer.name,
-        selectedProfessionalName: memory.selectedProfessionalName,
-        mentionedName: structuredDraft.mentionedName,
-        professionals: input.professionals,
-      })
-      const structured = {
-        ...structuredDraft,
-        nextAction: normalizedNextAction,
-        replyText: sanitizedReplyText,
-      } satisfies AgentStructuredOutput
+    const sanitizedReplyText = sanitizeReplyTextAgainstProfessionalVocative({
+      replyText: toolFailureOverride?.replyText ?? guardedReplyText ?? structuredDraft.replyText,
+      customerName: input.customer.name,
+      selectedProfessionalName: memory.selectedProfessionalName,
+      mentionedName: structuredDraft.mentionedName,
+      professionals: input.professionals,
+    })
+    const safeReplyText = sanitizePrematureConfirmationReply({
+      replyText: sanitizedReplyText,
+      nextAction: normalizedNextAction,
+      shouldCreateAppointment,
+      memory,
+      customerName: input.customer.name,
+      barbershopName: input.barbershop.name,
+      preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
+      serviceNames: input.services.map((service) => service.name),
+      nowContext: input.nowContext,
+    })
+    const structured = {
+      ...structuredDraft,
+      nextAction: normalizedNextAction,
+      replyText: safeReplyText,
+    } satisfies AgentStructuredOutput
 
-      memory.state = inferConversationState(structured.nextAction, memory, input.nowContext)
-      memory.conversationSummary = structured.summary || buildRuntimeSummary(memory)
+    memory.state = inferConversationState(structured.nextAction, memory, input.nowContext)
+    memory.conversationSummary = structured.summary || buildRuntimeSummary(memory)
 
     console.info('[whatsapp-agent] structured output', {
       customerId: input.customer.id,
@@ -2448,5 +2491,6 @@ export const __testing = {
   isExplicitConfirmation,
   hasExplicitAnyProfessionalConsent,
   sanitizeReplyTextAgainstProfessionalVocative,
+  sanitizePrematureConfirmationReply,
   shouldUseDeterministicConfirmationShortcut,
 }

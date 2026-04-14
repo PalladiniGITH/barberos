@@ -1676,11 +1676,22 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
         conversationId: conversation.id,
         stateBefore: effectiveState,
         inboundText,
+        selectedProfessionalId: agentResult.memory.selectedProfessionalId,
+        allowAnyProfessional: agentResult.memory.allowAnyProfessional,
         selectedSlot: agentResult.memory.selectedSlot,
         selectedServiceId: agentResult.memory.selectedServiceId,
       })
 
       try {
+        console.info('[whatsapp-conversation] createAppointment started', {
+          mode: 'agent',
+          conversationId: conversation.id,
+          selectedProfessionalId: agentResult.memory.selectedSlot.professionalId,
+          allowAnyProfessional: agentResult.memory.allowAnyProfessional,
+          selectedSlot: agentResult.memory.selectedSlot,
+          selectedServiceId: agentResult.memory.selectedServiceId,
+        })
+
         const appointment = await createAppointmentFromWhatsApp({
           barbershopId: input.barbershop.id,
           customerId: input.customer.id,
@@ -1699,6 +1710,15 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
           agentResult.memory.selectedServiceName ?? 'o servico solicitado',
           timezone
         )
+
+        console.info('[whatsapp-conversation] createAppointment success', {
+          mode: 'agent',
+          conversationId: conversation.id,
+          appointmentId: appointment.id,
+          selectedProfessionalId: agentResult.memory.selectedSlot.professionalId,
+          allowAnyProfessional: agentResult.memory.allowAnyProfessional,
+          selectedSlot: agentResult.memory.selectedSlot,
+        })
 
         await prisma.whatsappConversation.update({
           where: { id: conversation.id },
@@ -1746,6 +1766,13 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
           appointmentId: appointment.id,
         })
 
+        console.info('[whatsapp-conversation] final confirmation message emitted', {
+          mode: 'agent',
+          conversationId: conversation.id,
+          appointmentId: appointment.id,
+          responseText,
+        })
+
         return {
           responseText,
           flow: 'appointment_created',
@@ -1757,9 +1784,13 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'unknown_error'
 
-        console.warn('[whatsapp-conversation] agent booking failed', {
+        console.warn('[whatsapp-conversation] createAppointment failed', {
+          mode: 'agent',
           error: errorMessage,
           conversationId: conversation.id,
+          selectedProfessionalId: agentResult.memory.selectedProfessionalId,
+          allowAnyProfessional: agentResult.memory.allowAnyProfessional,
+          selectedSlot: agentResult.memory.selectedSlot,
         })
 
         const responseText =
@@ -2633,6 +2664,17 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       conversationId: conversation.id,
       stateBefore: effectiveState,
       inboundText,
+      selectedProfessionalId: slotForConfirmation.professionalId,
+      allowAnyProfessional: draft.allowAnyProfessional,
+      selectedSlot: slotForConfirmation,
+      selectedServiceId: draft.selectedServiceId,
+    })
+
+    console.info('[whatsapp-conversation] createAppointment started', {
+      mode: 'legacy',
+      conversationId: conversation.id,
+      selectedProfessionalId: slotForConfirmation.professionalId,
+      allowAnyProfessional: draft.allowAnyProfessional,
       selectedSlot: slotForConfirmation,
       selectedServiceId: draft.selectedServiceId,
     })
@@ -2651,6 +2693,15 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     })
 
     const responseText = buildSuccessMessage(slotForConfirmation, draft.selectedServiceName, timezone)
+
+    console.info('[whatsapp-conversation] createAppointment success', {
+      mode: 'legacy',
+      conversationId: conversation.id,
+      appointmentId: appointment.id,
+      selectedProfessionalId: slotForConfirmation.professionalId,
+      allowAnyProfessional: draft.allowAnyProfessional,
+      selectedSlot: slotForConfirmation,
+    })
 
     await prisma.whatsappConversation.update({
       where: { id: conversation.id },
@@ -2687,6 +2738,13 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       },
     })
 
+    console.info('[whatsapp-conversation] final confirmation message emitted', {
+      mode: 'legacy',
+      conversationId: conversation.id,
+      appointmentId: appointment.id,
+      responseText,
+    })
+
     return {
       responseText,
       flow: 'appointment_created',
@@ -2696,10 +2754,12 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       usedAI,
     }
   } catch (error) {
-    console.warn('[whatsapp-conversation] appointment creation aborted', {
+    console.warn('[whatsapp-conversation] createAppointment failed', {
+      mode: 'legacy',
       error: error instanceof Error ? error.message : 'unknown_error',
       serviceId: draft.selectedServiceId,
       professionalId: slotForConfirmation.professionalId,
+      allowAnyProfessional: draft.allowAnyProfessional,
       startAtIso: slotForConfirmation.startAtIso,
     })
 

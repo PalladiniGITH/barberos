@@ -310,6 +310,12 @@ test('guardrail de servico mostra a lista real quando o servico ainda nao foi de
   assert.match(reply, /Barba/)
 })
 
+test('consentimento para qualquer barbeiro so vale quando o cliente fala isso explicitamente', () => {
+  assert.equal(agentTesting.hasExplicitAnyProfessionalConsent('quero 16:00'), false)
+  assert.equal(agentTesting.hasExplicitAnyProfessionalConsent('qualquer um'), true)
+  assert.equal(agentTesting.hasExplicitAnyProfessionalConsent('pode ser qualquer barbeiro'), true)
+})
+
 test('sem historico e sem liberacao para qualquer um o backend pergunta barbeiro antes de sugerir horarios', () => {
   const memory = agentTesting.buildInitialMemory(createAgentInput())
   memory.selectedServiceId = 'svc-classic'
@@ -435,6 +441,39 @@ test('remove vocativo ambiguo quando o nome citado e do barbeiro e nao do client
 
   assert.equal(reply.startsWith('Perfeito, Rafael'), false)
   assert.match(reply, /^Perfeito\./)
+})
+
+test('bloqueia linguagem de sucesso antes da persistencia real do agendamento', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.selectedProfessionalId = 'pro-rafael'
+  memory.selectedProfessionalName = 'Rafael Costa'
+  memory.requestedDateIso = '2026-04-13'
+  memory.selectedSlot = {
+    key: 'pro-rafael:2026-04-13T18:00:00.000Z',
+    professionalId: 'pro-rafael',
+    professionalName: 'Rafael Costa',
+    dateIso: '2026-04-13',
+    timeLabel: '15:00',
+    startAtIso: '2026-04-13T18:00:00.000Z',
+    endAtIso: '2026-04-13T18:35:00.000Z',
+  }
+
+  const reply = agentTesting.sanitizePrematureConfirmationReply({
+    replyText: 'Agendamento confirmado para hoje as 15:00 com Rafael Costa.',
+    nextAction: 'ASK_CONFIRMATION',
+    shouldCreateAppointment: false,
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    preferredProfessionalName: null,
+    serviceNames: SERVICES.map((service) => service.name),
+    nowContext: createAgentInput().nowContext,
+  })
+
+  assert.doesNotMatch(reply, /Agendamento confirmado/i)
+  assert.match(reply, /Posso confirmar/i)
 })
 
 test('atalho deterministico fecha a confirmacao quando o cliente responde afirmativamente', () => {
