@@ -112,10 +112,10 @@ export function buildExistingCustomerBookingResponse(input: {
 
   if (input.bookings.length === 0) {
     if (input.requestedDateIso) {
-      return `${describeQueryDay(input.requestedDateIso, timezone)} voce nao tem nenhum agendamento confirmado.${input.hasSchedulingContext ? ' Se quiser, continuo o novo agendamento por aqui.' : ''}`
+      return `${describeQueryDay(input.requestedDateIso, timezone)} voce nao tem nenhum horario confirmado.${input.hasSchedulingContext ? ' Se quiser, continuo o novo agendamento por aqui.' : ''}`
     }
 
-    return `No momento voce nao tem nenhum agendamento confirmado.${input.hasSchedulingContext ? ' Se quiser, continuo o novo agendamento por aqui.' : ''}`
+    return `No momento voce nao tem nenhum horario confirmado.${input.hasSchedulingContext ? ' Se quiser, continuo o novo agendamento por aqui.' : ''}`
   }
 
   if (input.bookings.length === 1) {
@@ -125,14 +125,14 @@ export function buildExistingCustomerBookingResponse(input: {
       : `para ${describeQueryDay(booking.dateIso, timezone)}`
 
     const leadIn = input.requestedDateIso
-      ? `Voce tem um horario ${dayDescription} as ${booking.timeLabel}`
-      : `Seu proximo horario esta marcado ${dayDescription} as ${booking.timeLabel}`
+      ? `${dayDescription.charAt(0).toUpperCase() + dayDescription.slice(1)} voce esta marcado as ${booking.timeLabel}`
+      : `Seu proximo horario e ${dayDescription} as ${booking.timeLabel}`
 
     return `${leadIn} com ${booking.professionalName} para ${booking.serviceName}.${continuationMessage}`
   }
 
   const header = input.requestedDateIso
-    ? `${describeQueryDay(input.requestedDateIso, timezone)} voce tem estes horarios:`
+    ? `${describeQueryDay(input.requestedDateIso, timezone).charAt(0).toUpperCase() + describeQueryDay(input.requestedDateIso, timezone).slice(1)} voce tem estes horarios confirmados:`
     : 'Seus proximos horarios sao:'
   const lines = input.bookings
     .slice(0, 3)

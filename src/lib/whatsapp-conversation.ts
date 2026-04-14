@@ -2,7 +2,10 @@ import 'server-only'
 
 import { MessagingProvider, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { interpretWhatsAppMessage } from '@/lib/ai/openai-whatsapp-interpreter'
+import {
+  detectExistingBookingQuestion,
+  interpretWhatsAppMessage,
+} from '@/lib/ai/openai-whatsapp-interpreter'
 import { processWhatsAppConversationWithAgent } from '@/lib/ai/openai-whatsapp-agent'
 import {
   createAppointmentFromWhatsApp,
@@ -11,6 +14,10 @@ import {
   loadBarbershopSchedulingOptions,
   type WhatsAppBookingSlot,
 } from '@/lib/agendamentos/whatsapp-booking'
+import {
+  buildExistingCustomerBookingResponse,
+  type ExistingCustomerBookingItem,
+} from '@/lib/agendamentos/customer-booking-status'
 import {
   buildDateAnchorUtc,
   formatIsoDateInTimezone,
@@ -119,15 +126,6 @@ interface RecentConversationMessage {
 }
 
 interface RecentConfirmedBookingMemory {
-  serviceName: string
-  professionalName: string
-  dateIso: string
-  timeLabel: string
-}
-
-interface ExistingCustomerBookingSummary {
-  id: string
-  status: 'PENDING' | 'CONFIRMED'
   serviceName: string
   professionalName: string
   dateIso: string
@@ -298,24 +296,18 @@ function isExistingBookingStatusQuestion(input: {
   lastCustomerMessage?: string | null
   lastAssistantMessage?: string | null
 }) {
-  const normalized = normalizeText(input.message)
-  const lastCustomer = normalizeText(input.lastCustomerMessage ?? '')
-  const lastAssistant = normalizeText(input.lastAssistantMessage ?? '')
-  const directQueryPattern =
-    /\b(eu tenho horario|tenho horario|tenho algo confirmado|ja tenho horario|ja tem horario|qual meu proximo|meu proximo horario|o que eu marquei|que horas eu marquei|com quem eu marquei|qual servico esta marcado|qual servico ta marcado|tenho algo hoje|tenho algo amanha|tenho algo para amanha|tenho horario hoje|tenho horario amanha)\b/
-  const followUpPattern =
-    /^(que horas|qual horario|com quem|qual servico|o que ficou marcado|o que eu marquei|me lembra|me confirma)\??$/
-  const existingBookingContextPattern =
-    /\b(proximo horario|horario confirmado|ja ficou marcado|voce tem um horario|voce nao tem nenhum agendamento|seus proximos horarios)\b/
-
-  return directQueryPattern.test(normalized)
-    || (
-      followUpPattern.test(normalized)
-      && (
-        existingBookingContextPattern.test(lastAssistant)
-        || existingBookingContextPattern.test(lastCustomer)
-      )
-    )
+  return detectExistingBookingQuestion({
+    message: input.message,
+    conversationSummary: {
+      selectedServiceName: null,
+      selectedProfessionalName: null,
+      requestedDateIso: null,
+      requestedTimeLabel: null,
+      allowAnyProfessional: false,
+      lastCustomerMessage: input.lastCustomerMessage ?? null,
+      lastAssistantMessage: input.lastAssistantMessage ?? null,
+    },
+  })
 }
 
 function buildBookingStatusFollowUp(draft: ConversationDraft) {
@@ -332,44 +324,22 @@ function buildBookingStatusFollowUp(draft: ConversationDraft) {
 
 function buildExistingBookingStatusMessage(input: {
   requestedDateIso: string | null
-  bookings: ExistingCustomerBookingSummary[]
+  bookings: ExistingCustomerBookingItem[]
   timezone: string
   draft: ConversationDraft
 }) {
-  const dateScopedBookings = input.requestedDateIso
-    ? input.bookings.filter((booking) => booking.dateIso === input.requestedDateIso)
-    : input.bookings
+  const baseMessage = buildExistingCustomerBookingResponse({
+    bookings: input.bookings,
+    requestedDateIso: input.requestedDateIso,
+    timezone: input.timezone,
+    hasSchedulingContext: false,
+  })
 
-  const replyTail = hasUsefulConversationProgress(input.draft)
-    ? `\n\n${buildBookingStatusFollowUp(input.draft)}`
-    : ''
-
-  if (input.requestedDateIso) {
-    const dayLabel = formatDayLabel(input.requestedDateIso, input.timezone).toLowerCase()
-
-    if (dateScopedBookings.length === 0) {
-      return `${dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1)} voce nao tem nenhum agendamento confirmado.${replyTail}`
-    }
-
-    if (dateScopedBookings.length === 1) {
-      const booking = dateScopedBookings[0]
-      return `Voce tem um horario confirmado ${dayLabel} as ${booking.timeLabel} com ${booking.professionalName} para ${booking.serviceName}.${replyTail}`
-    }
-
-    const lines = dateScopedBookings
-      .slice(0, 3)
-      .map((booking) => `- ${booking.timeLabel} com ${booking.professionalName} para ${booking.serviceName}`)
-      .join('\n')
-
-    return `Voce tem estes horarios confirmados ${dayLabel}:\n${lines}${replyTail}`
+  if (!hasUsefulConversationProgress(input.draft)) {
+    return baseMessage
   }
 
-  const nextBooking = input.bookings[0]
-  if (!nextBooking) {
-    return `Voce nao tem nenhum agendamento confirmado no momento.${replyTail}`
-  }
-
-  return `Seu proximo horario e ${formatDayLabel(nextBooking.dateIso, input.timezone).toLowerCase()} as ${nextBooking.timeLabel} com ${nextBooking.professionalName} para ${nextBooking.serviceName}.${replyTail}`
+  return `${baseMessage}\n\n${buildBookingStatusFollowUp(input.draft)}`
 }
 
 async function loadExistingCustomerBookings(input: {
@@ -412,12 +382,13 @@ async function loadExistingCustomerBookings(input: {
 
   return appointments.map((appointment) => ({
     id: appointment.id,
-    status: appointment.status as ExistingCustomerBookingSummary['status'],
+    status: appointment.status as ExistingCustomerBookingItem['status'],
     serviceName: appointment.service.name,
     professionalName: appointment.professional.name,
     dateIso: formatIsoDateInTimezone(appointment.startAt, input.timezone),
+    dateLabel: formatDayLabel(formatIsoDateInTimezone(appointment.startAt, input.timezone), input.timezone),
     timeLabel: formatTimeInTimezone(appointment.startAt, input.timezone),
-  } satisfies ExistingCustomerBookingSummary))
+  } satisfies ExistingCustomerBookingItem))
 }
 
 async function handleExistingBookingStatusQuery(input: {

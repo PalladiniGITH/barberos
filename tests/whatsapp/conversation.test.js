@@ -107,6 +107,27 @@ test('detecta topic switch quando o cliente pergunta sobre horario ja confirmado
   assert.equal(detected, true)
 })
 
+test('detecta consultas naturais sobre agendamentos ja confirmados', () => {
+  const messages = [
+    'quais horarios eu tenho amanha?',
+    'que horas eu marquei amanha?',
+    'tenho algo amanha?',
+    'com quem eu estou marcado amanha?',
+    'qual meu horario de amanha?',
+    'qual meu proximo horario?',
+  ]
+
+  messages.forEach((message) => {
+    const detected = conversationTesting.isExistingBookingStatusQuestion({
+      message,
+      lastCustomerMessage: 'quero marcar barba amanha',
+      lastAssistantMessage: 'Tem preferencia de barbeiro ou posso procurar com qualquer um?',
+    })
+
+    assert.equal(detected, true, message)
+  })
+})
+
 test('follow-up curto como "que horas?" consulta o agendamento ja encontrado', () => {
   const detected = conversationTesting.isExistingBookingStatusQuestion({
     message: 'que horas?',
@@ -178,6 +199,61 @@ test('consulta de agendamento existente responde com o horario encontrado e reto
   assert.match(reply, /continuo seu novo agendamento de Barba/i)
 })
 
+test('consulta de amanha com um unico horario responde de forma direta e natural', () => {
+  const reply = conversationTesting.buildExistingBookingStatusMessage({
+    requestedDateIso: '2026-04-15',
+    bookings: [
+      {
+        id: 'apt-1',
+        status: 'CONFIRMED',
+        serviceName: 'Hidratacao Capilar',
+        professionalName: 'Rafael Costa',
+        dateIso: '2026-04-15',
+        dateLabel: 'quarta-feira, 15/04',
+        timeLabel: '16:00',
+      },
+    ],
+    timezone: 'America/Sao_Paulo',
+    draft: conversationTesting.buildEmptyConversationDraft(),
+  })
+
+  assert.match(reply, /Amanha voce esta marcado as 16:00/i)
+  assert.match(reply, /Rafael Costa/)
+  assert.match(reply, /Hidratacao Capilar/)
+})
+
+test('consulta com multiplos horarios amanha lista todos de forma clara', () => {
+  const reply = conversationTesting.buildExistingBookingStatusMessage({
+    requestedDateIso: '2026-04-15',
+    bookings: [
+      {
+        id: 'apt-1',
+        status: 'CONFIRMED',
+        serviceName: 'Corte Classic',
+        professionalName: 'Matheus Lima',
+        dateIso: '2026-04-15',
+        dateLabel: 'quarta-feira, 15/04',
+        timeLabel: '10:00',
+      },
+      {
+        id: 'apt-2',
+        status: 'CONFIRMED',
+        serviceName: 'Barba Terapia',
+        professionalName: 'Rafael Costa',
+        dateIso: '2026-04-15',
+        dateLabel: 'quarta-feira, 15/04',
+        timeLabel: '16:00',
+      },
+    ],
+    timezone: 'America/Sao_Paulo',
+    draft: conversationTesting.buildEmptyConversationDraft(),
+  })
+
+  assert.match(reply, /Amanha voce tem estes horarios confirmados/i)
+  assert.match(reply, /10:00 com Matheus Lima para Corte Classic/i)
+  assert.match(reply, /16:00 com Rafael Costa para Barba Terapia/i)
+})
+
 test('consulta sem agendamento confirmado responde de forma objetiva', () => {
   const reply = conversationTesting.buildExistingBookingStatusMessage({
     requestedDateIso: '2026-04-15',
@@ -186,7 +262,7 @@ test('consulta sem agendamento confirmado responde de forma objetiva', () => {
     draft: conversationTesting.buildEmptyConversationDraft(),
   })
 
-  assert.match(reply, /nao tem nenhum agendamento confirmado/i)
+  assert.match(reply, /nao tem nenhum horario confirmado/i)
 })
 
 test('respostas afirmativas amplas sao aceitas para fechamento deterministico', () => {

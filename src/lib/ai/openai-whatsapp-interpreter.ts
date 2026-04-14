@@ -545,28 +545,92 @@ function shouldRestartConversation(message: string) {
   return /\b(recomeca|recomeca|comeca de novo|comeca do zero|do zero|esquece tudo|novo atendimento)\b/.test(normalized)
 }
 
-function isExistingBookingQuestion(input: {
+const DIRECT_EXISTING_BOOKING_QUERY_PHRASES = [
+  'quais horarios eu tenho',
+  'quais horarios tenho',
+  'que horas eu tenho',
+  'que horas tenho',
+  'que horas eu marquei',
+  'que horas marquei',
+  'o que eu marquei',
+  'o que marquei',
+  'eu tenho horario',
+  'tenho horario',
+  'eu tenho algo',
+  'tenho algo',
+  'amanha eu tenho horario',
+  'hoje eu tenho horario',
+  'amanha eu tenho algo',
+  'hoje eu tenho algo',
+  'com quem eu estou marcado',
+  'com quem estou marcado',
+  'com quem eu to marcado',
+  'com quem to marcado',
+  'com quem eu marquei',
+  'qual meu proximo horario',
+  'meu proximo horario',
+  'qual e meu proximo horario',
+  'qual meu horario de amanha',
+  'qual meu horario de hoje',
+  'qual horario eu tenho amanha',
+  'qual horario eu tenho hoje',
+  'que servico eu marquei',
+  'qual servico eu marquei',
+  'qual servico esta marcado',
+  'qual servico ta marcado',
+]
+
+const EXISTING_BOOKING_TEMPORAL_HINTS = [
+  'hoje',
+  'amanha',
+  'depois de amanha',
+  'proximo',
+]
+
+const EXISTING_BOOKING_CONTEXT_PHRASES = [
+  'proximo horario',
+  'horario confirmado',
+  'ja ficou marcado',
+  'voce tem um horario',
+  'voce nao tem nenhum agendamento',
+  'seus proximos horarios',
+  'voce esta marcado',
+]
+
+const EXISTING_BOOKING_FOLLOW_UP_PATTERN =
+  /^(que horas|qual horario|com quem|qual servico|o que ficou marcado|o que eu marquei|me lembra|me confirma)\??$/
+
+function includesAnyPhrase(normalized: string, phrases: string[]) {
+  return phrases.some((phrase) => normalized.includes(phrase))
+}
+
+export function detectExistingBookingQuestion(input: {
   message: string
   conversationSummary: WhatsAppInterpreterInput['conversationSummary']
 }) {
   const normalized = normalizeText(input.message)
   const lastCustomer = normalizeText(input.conversationSummary.lastCustomerMessage ?? '')
   const lastAssistant = normalizeText(input.conversationSummary.lastAssistantMessage ?? '')
-  const directQueryPattern =
-    /\b(eu tenho horario|tenho horario|tenho algo confirmado|ja tenho horario|ja tem horario|qual meu proximo|meu proximo horario|o que eu marquei|que horas eu marquei|com quem eu marquei|qual servico esta marcado|qual servico ta marcado|tenho algo hoje|tenho algo amanha|tenho algo para amanha|tenho horario hoje|tenho horario amanha)\b/
-  const followUpPattern =
-    /^(que horas|qual horario|com quem|qual servico|o que ficou marcado|o que eu marquei)\??$/
-  const existingBookingContextPattern =
-    /\b(proximo horario|horario confirmado|ja ficou marcado|voce tem um horario|voce nao tem nenhum agendamento|seus proximos horarios)\b/
-
-  return directQueryPattern.test(normalized)
-    || (
-      followUpPattern.test(normalized)
-      && (
-        existingBookingContextPattern.test(lastAssistant)
-        || existingBookingContextPattern.test(lastCustomer)
-      )
+  const hasDirectQueryPhrase = includesAnyPhrase(normalized, DIRECT_EXISTING_BOOKING_QUERY_PHRASES)
+  const hasTemporalHint = includesAnyPhrase(normalized, EXISTING_BOOKING_TEMPORAL_HINTS)
+  const asksAboutConfirmedBooking =
+    hasDirectQueryPhrase
+    && (
+      hasTemporalHint
+      || normalized.includes('marcado')
+      || normalized.includes('confirmado')
     )
+  const asksAboutNextBooking =
+    normalized.includes('proximo horario')
+    || normalized.includes('proximo agendamento')
+  const followUpToExistingBookingContext =
+    EXISTING_BOOKING_FOLLOW_UP_PATTERN.test(normalized)
+    && (
+      includesAnyPhrase(lastAssistant, EXISTING_BOOKING_CONTEXT_PHRASES)
+      || includesAnyPhrase(lastCustomer, EXISTING_BOOKING_CONTEXT_PHRASES)
+    )
+
+  return asksAboutConfirmedBooking || asksAboutNextBooking || followUpToExistingBookingContext
 }
 
 function inferIntent(
@@ -577,7 +641,7 @@ function inferIntent(
   const normalized = normalizeText(message)
   const confirmationPattern = /\b(sim|desejo|quero|confirmo|confirmar|confirmado|confirma|fechado|pode ser|perfeito|ok|beleza|pode marcar|pode agendar)\b/
 
-  if (isExistingBookingQuestion({
+  if (detectExistingBookingQuestion({
     message,
     conversationSummary,
   })) {

@@ -455,6 +455,42 @@ test('interpreta consulta de agendamento ja confirmado como CHECK_EXISTING_BOOKI
   assert.equal(intent.intent, 'CHECK_EXISTING_BOOKING')
 })
 
+test('interpreta frases naturais sobre horario ja marcado sem cair em novo agendamento', async () => {
+  const bookingQueries = [
+    'quais horarios eu tenho amanha?',
+    'que horas eu marquei amanha?',
+    'tenho algo amanha?',
+    'com quem eu estou marcado amanha?',
+    'qual meu horario de amanha?',
+    'qual meu proximo horario?',
+  ]
+
+  for (const message of bookingQueries) {
+    const intent = await interpretWhatsAppMessage({
+      message,
+      barbershopName: 'Linha Nobre',
+      barbershopTimezone: 'America/Sao_Paulo',
+      conversationState: 'WAITING_SERVICE',
+      offeredSlotCount: 0,
+      services: SERVICES.map((service) => ({ name: service.name })),
+      professionals: PROFESSIONALS.map((professional) => ({ name: professional.name })),
+      todayIsoDate: '2026-04-14',
+      currentLocalDateTime: '2026-04-14 10:30',
+      conversationSummary: {
+        selectedServiceName: 'Barba',
+        selectedProfessionalName: null,
+        requestedDateIso: '2026-04-15',
+        requestedTimeLabel: null,
+        allowAnyProfessional: false,
+        lastCustomerMessage: 'quero marcar barba amanha',
+        lastAssistantMessage: 'Tem preferencia de barbeiro ou posso procurar com qualquer um?',
+      },
+    })
+
+    assert.equal(intent.intent, 'CHECK_EXISTING_BOOKING', message)
+  }
+})
+
 test('remove vocativo ambiguo quando o nome citado e do barbeiro e nao do cliente', () => {
   const reply = agentTesting.sanitizeReplyTextAgainstProfessionalVocative({
     replyText: 'Perfeito, Rafael. Tenho o Corte Classic as 15:00 com o Rafael Costa para hoje. Posso confirmar?',
