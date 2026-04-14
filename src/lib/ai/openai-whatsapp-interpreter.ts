@@ -50,7 +50,7 @@ const WEEKDAY_INDEX: Record<string, number> = {
 }
 
 const IntentSchema = z.object({
-  intent: z.enum(['BOOK_APPOINTMENT', 'CONFIRM', 'DECLINE', 'CHANGE_REQUEST', 'UNKNOWN']),
+  intent: z.enum(['BOOK_APPOINTMENT', 'CHECK_EXISTING_BOOKING', 'CONFIRM', 'DECLINE', 'CHANGE_REQUEST', 'UNKNOWN']),
   serviceName: z.string().min(1).max(120).nullable(),
   mentionedName: z.string().min(1).max(120).nullable(),
   preferredPeriod: z.enum(['MORNING', 'AFTERNOON', 'EVENING']).nullable(),
@@ -72,7 +72,7 @@ const INTENT_JSON_SCHEMA = {
   properties: {
     intent: {
       type: 'string',
-      enum: ['BOOK_APPOINTMENT', 'CONFIRM', 'DECLINE', 'CHANGE_REQUEST', 'UNKNOWN'],
+      enum: ['BOOK_APPOINTMENT', 'CHECK_EXISTING_BOOKING', 'CONFIRM', 'DECLINE', 'CHANGE_REQUEST', 'UNKNOWN'],
     },
     serviceName: {
       anyOf: [{ type: 'string' }, { type: 'null' }],
@@ -545,9 +545,44 @@ function shouldRestartConversation(message: string) {
   return /\b(recomeca|recomeca|comeca de novo|comeca do zero|do zero|esquece tudo|novo atendimento)\b/.test(normalized)
 }
 
-function inferIntent(message: string, conversationState: string) {
+function isExistingBookingQuestion(input: {
+  message: string
+  conversationSummary: WhatsAppInterpreterInput['conversationSummary']
+}) {
+  const normalized = normalizeText(input.message)
+  const lastCustomer = normalizeText(input.conversationSummary.lastCustomerMessage ?? '')
+  const lastAssistant = normalizeText(input.conversationSummary.lastAssistantMessage ?? '')
+  const directQueryPattern =
+    /\b(eu tenho horario|tenho horario|tenho algo confirmado|ja tenho horario|ja tem horario|qual meu proximo|meu proximo horario|o que eu marquei|que horas eu marquei|com quem eu marquei|qual servico esta marcado|qual servico ta marcado|tenho algo hoje|tenho algo amanha|tenho algo para amanha|tenho horario hoje|tenho horario amanha)\b/
+  const followUpPattern =
+    /^(que horas|qual horario|com quem|qual servico|o que ficou marcado|o que eu marquei)\??$/
+  const existingBookingContextPattern =
+    /\b(proximo horario|horario confirmado|ja ficou marcado|voce tem um horario|voce nao tem nenhum agendamento|seus proximos horarios)\b/
+
+  return directQueryPattern.test(normalized)
+    || (
+      followUpPattern.test(normalized)
+      && (
+        existingBookingContextPattern.test(lastAssistant)
+        || existingBookingContextPattern.test(lastCustomer)
+      )
+    )
+}
+
+function inferIntent(
+  message: string,
+  conversationState: string,
+  conversationSummary: WhatsAppInterpreterInput['conversationSummary']
+) {
   const normalized = normalizeText(message)
   const confirmationPattern = /\b(sim|desejo|quero|confirmo|confirmar|confirmado|confirma|fechado|pode ser|perfeito|ok|beleza|pode marcar|pode agendar)\b/
+
+  if (isExistingBookingQuestion({
+    message,
+    conversationSummary,
+  })) {
+    return 'CHECK_EXISTING_BOOKING' as const
+  }
 
   if (
     conversationState === 'WAITING_CONFIRMATION'
@@ -698,7 +733,7 @@ function buildFallbackIntent(input: WhatsAppInterpreterInput): WhatsAppIntent {
   })
 
   return {
-    intent: inferIntent(input.message, input.conversationState),
+    intent: inferIntent(input.message, input.conversationState, input.conversationSummary),
     serviceName,
     mentionedName,
     preferredPeriod: derivePreferredPeriod(timePreference.timePreference),
@@ -749,7 +784,7 @@ function buildInterpreterPrompt(input: WhatsAppInterpreterInput) {
     '- correctionTarget deve indicar se o cliente esta corrigindo SERVICE, PROFESSIONAL, DATE, PERIOD, TIME, FLOW ou NONE.',
     '- greetingOnly=true apenas quando a mensagem for basicamente saudacao sem pedido concreto.',
     '- restartConversation=true apenas quando o cliente realmente quiser recomecar.',
-    '- intent deve ser BOOK_APPOINTMENT, CONFIRM, DECLINE, CHANGE_REQUEST ou UNKNOWN.',
+    '- intent deve ser BOOK_APPOINTMENT, CHECK_EXISTING_BOOKING, CONFIRM, DECLINE, CHANGE_REQUEST ou UNKNOWN.',
     `Mensagem do cliente: """${input.message}"""`,
   ].join('\n')
 }

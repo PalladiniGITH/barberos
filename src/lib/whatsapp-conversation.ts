@@ -13,9 +13,12 @@ import {
 } from '@/lib/agendamentos/whatsapp-booking'
 import {
   buildDateAnchorUtc,
+  formatIsoDateInTimezone,
+  formatTimeInTimezone,
   getAvailableBusinessPeriodsForDate,
   getCurrentDateTimeInTimezone,
   getTodayIsoInTimezone,
+  localDateTimeToUtc,
   resolveBusinessTimezone,
 } from '@/lib/timezone'
 import { resolveCustomerPreferredProfessional } from '@/lib/customers/preferred-professional'
@@ -50,6 +53,7 @@ interface ConversationServiceResult {
   responseText: string
   flow:
     | 'greeting'
+    | 'booking_status'
     | 'collect_service'
     | 'collect_professional'
     | 'collect_date'
@@ -115,6 +119,15 @@ interface RecentConversationMessage {
 }
 
 interface RecentConfirmedBookingMemory {
+  serviceName: string
+  professionalName: string
+  dateIso: string
+  timeLabel: string
+}
+
+interface ExistingCustomerBookingSummary {
+  id: string
+  status: 'PENDING' | 'CONFIRMED'
   serviceName: string
   professionalName: string
   dateIso: string
@@ -241,6 +254,252 @@ function buildRecentConfirmedGreeting(
   timezone: string
 ) {
   return `Oi! Seu horario ja ficou marcado para ${formatDayLabel(booking.dateIso, timezone).toLowerCase()} as ${booking.timeLabel} com ${booking.professionalName} para ${booking.serviceName}. Precisa de mais alguma coisa?`
+}
+
+function shiftDateIso(dateIso: string, days: number) {
+  const [year, month, day] = dateIso.split('-').map(Number)
+  const anchor = new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
+  anchor.setUTCDate(anchor.getUTCDate() + days)
+  return formatDateIso(anchor)
+}
+
+function parseRequestedDateFromExistingBookingQuestion(input: {
+  message: string
+  draft: ConversationDraft
+  recentBooking: RecentConfirmedBookingMemory | null
+  timezone: string
+}) {
+  const normalized = normalizeText(input.message)
+  const todayIso = getTodayIsoInTimezone(input.timezone)
+  const followUpPattern =
+    /^(que horas|qual horario|com quem|qual servico|o que ficou marcado|o que eu marquei|me lembra|me confirma)\??$/
+
+  if (normalized.includes('depois de amanha')) {
+    return shiftDateIso(todayIso, 2)
+  }
+
+  if (normalized.includes('amanha')) {
+    return shiftDateIso(todayIso, 1)
+  }
+
+  if (normalized.includes('hoje')) {
+    return todayIso
+  }
+
+  if (followUpPattern.test(normalized) && input.recentBooking?.dateIso) {
+    return input.recentBooking.dateIso
+  }
+
+  return input.draft.requestedDateIso ?? input.recentBooking?.dateIso ?? null
+}
+
+function isExistingBookingStatusQuestion(input: {
+  message: string
+  lastCustomerMessage?: string | null
+  lastAssistantMessage?: string | null
+}) {
+  const normalized = normalizeText(input.message)
+  const lastCustomer = normalizeText(input.lastCustomerMessage ?? '')
+  const lastAssistant = normalizeText(input.lastAssistantMessage ?? '')
+  const directQueryPattern =
+    /\b(eu tenho horario|tenho horario|tenho algo confirmado|ja tenho horario|ja tem horario|qual meu proximo|meu proximo horario|o que eu marquei|que horas eu marquei|com quem eu marquei|qual servico esta marcado|qual servico ta marcado|tenho algo hoje|tenho algo amanha|tenho algo para amanha|tenho horario hoje|tenho horario amanha)\b/
+  const followUpPattern =
+    /^(que horas|qual horario|com quem|qual servico|o que ficou marcado|o que eu marquei|me lembra|me confirma)\??$/
+  const existingBookingContextPattern =
+    /\b(proximo horario|horario confirmado|ja ficou marcado|voce tem um horario|voce nao tem nenhum agendamento|seus proximos horarios)\b/
+
+  return directQueryPattern.test(normalized)
+    || (
+      followUpPattern.test(normalized)
+      && (
+        existingBookingContextPattern.test(lastAssistant)
+        || existingBookingContextPattern.test(lastCustomer)
+      )
+    )
+}
+
+function buildBookingStatusFollowUp(draft: ConversationDraft) {
+  if (!hasUsefulConversationProgress(draft)) {
+    return 'Se quiser, eu tambem posso te ajudar a marcar outro horario por aqui.'
+  }
+
+  if (draft.selectedServiceName) {
+    return `Se quiser, eu continuo seu novo agendamento de ${draft.selectedServiceName} por aqui tambem.`
+  }
+
+  return 'Se quiser, eu continuo seu agendamento por aqui tambem.'
+}
+
+function buildExistingBookingStatusMessage(input: {
+  requestedDateIso: string | null
+  bookings: ExistingCustomerBookingSummary[]
+  timezone: string
+  draft: ConversationDraft
+}) {
+  const dateScopedBookings = input.requestedDateIso
+    ? input.bookings.filter((booking) => booking.dateIso === input.requestedDateIso)
+    : input.bookings
+
+  const replyTail = hasUsefulConversationProgress(input.draft)
+    ? `\n\n${buildBookingStatusFollowUp(input.draft)}`
+    : ''
+
+  if (input.requestedDateIso) {
+    const dayLabel = formatDayLabel(input.requestedDateIso, input.timezone).toLowerCase()
+
+    if (dateScopedBookings.length === 0) {
+      return `${dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1)} voce nao tem nenhum agendamento confirmado.${replyTail}`
+    }
+
+    if (dateScopedBookings.length === 1) {
+      const booking = dateScopedBookings[0]
+      return `Voce tem um horario confirmado ${dayLabel} as ${booking.timeLabel} com ${booking.professionalName} para ${booking.serviceName}.${replyTail}`
+    }
+
+    const lines = dateScopedBookings
+      .slice(0, 3)
+      .map((booking) => `- ${booking.timeLabel} com ${booking.professionalName} para ${booking.serviceName}`)
+      .join('\n')
+
+    return `Voce tem estes horarios confirmados ${dayLabel}:\n${lines}${replyTail}`
+  }
+
+  const nextBooking = input.bookings[0]
+  if (!nextBooking) {
+    return `Voce nao tem nenhum agendamento confirmado no momento.${replyTail}`
+  }
+
+  return `Seu proximo horario e ${formatDayLabel(nextBooking.dateIso, input.timezone).toLowerCase()} as ${nextBooking.timeLabel} com ${nextBooking.professionalName} para ${nextBooking.serviceName}.${replyTail}`
+}
+
+async function loadExistingCustomerBookings(input: {
+  barbershopId: string
+  customerId: string
+  timezone: string
+  nowDateIso: string
+}) {
+  const localDayStartUtc = localDateTimeToUtc({
+    dateIso: input.nowDateIso,
+    timeLabel: '00:00',
+    timezone: input.timezone,
+  }).startAtUtc
+
+  const appointments = await prisma.appointment.findMany({
+    where: {
+      barbershopId: input.barbershopId,
+      customerId: input.customerId,
+      status: { in: ['PENDING', 'CONFIRMED'] },
+      startAt: { gte: localDayStartUtc },
+    },
+    orderBy: { startAt: 'asc' },
+    take: 8,
+    select: {
+      id: true,
+      status: true,
+      startAt: true,
+      professional: {
+        select: {
+          name: true,
+        },
+      },
+      service: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  })
+
+  return appointments.map((appointment) => ({
+    id: appointment.id,
+    status: appointment.status as ExistingCustomerBookingSummary['status'],
+    serviceName: appointment.service.name,
+    professionalName: appointment.professional.name,
+    dateIso: formatIsoDateInTimezone(appointment.startAt, input.timezone),
+    timeLabel: formatTimeInTimezone(appointment.startAt, input.timezone),
+  } satisfies ExistingCustomerBookingSummary))
+}
+
+async function handleExistingBookingStatusQuery(input: {
+  conversationId: string
+  customerId: string
+  inboundText: string
+  effectiveState: ConversationState
+  draft: ConversationDraft
+  barbershopId: string
+  timezone: string
+  nowDateIso: string
+  recentBooking: RecentConfirmedBookingMemory | null
+}) {
+  const bookings = await loadExistingCustomerBookings({
+    barbershopId: input.barbershopId,
+    customerId: input.customerId,
+    timezone: input.timezone,
+    nowDateIso: input.nowDateIso,
+  })
+
+  if (input.effectiveState !== 'IDLE' || hasUsefulConversationProgress(input.draft)) {
+    console.info('[whatsapp-conversation] topic switch detected', {
+      customerId: input.customerId,
+      conversationId: input.conversationId,
+      stateBefore: input.effectiveState,
+      inboundText: input.inboundText,
+      requestedDateIso: input.draft.requestedDateIso,
+      selectedServiceId: input.draft.selectedServiceId,
+    })
+  }
+
+  console.info('[whatsapp-conversation] booking status query', {
+    customerId: input.customerId,
+    conversationId: input.conversationId,
+    inboundText: input.inboundText,
+    requestedDateIso: input.draft.requestedDateIso,
+    totalUpcomingBookings: bookings.length,
+  })
+
+  if (bookings.length > 0) {
+    console.info('[whatsapp-conversation] existing booking found', {
+      customerId: input.customerId,
+      conversationId: input.conversationId,
+      bookings: bookings.map((booking) => `${booking.dateIso} ${booking.timeLabel} com ${booking.professionalName} para ${booking.serviceName}`),
+    })
+  }
+
+  const requestedDateForQuery = parseRequestedDateFromExistingBookingQuestion({
+    message: input.inboundText,
+    draft: input.draft,
+    recentBooking: input.recentBooking,
+    timezone: input.timezone,
+  })
+
+  const responseText = buildExistingBookingStatusMessage({
+    requestedDateIso: requestedDateForQuery,
+    bookings,
+    timezone: input.timezone,
+    draft: input.draft,
+  })
+
+  await prisma.whatsappConversation.update({
+    where: { id: input.conversationId },
+    data: {
+      lastInboundText: input.inboundText,
+      lastIntent: buildJsonValue({
+        source: 'booking_status_query',
+        intent: 'CHECK_EXISTING_BOOKING',
+        requestedDateIso: requestedDateForQuery,
+        bookings: bookings.slice(0, 3),
+      }),
+      lastAssistantText: responseText,
+    },
+  })
+
+  return {
+    responseText,
+    flow: 'booking_status' as const,
+    conversationId: input.conversationId,
+    conversationState: input.effectiveState,
+    usedAI: false,
+  }
 }
 
 function buildServiceQuestion(serviceNames: string[]) {
@@ -1569,6 +1828,26 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     }
   }
 
+  const preAgentExistingBookingQuestion = isExistingBookingStatusQuestion({
+    message: inboundText,
+    lastCustomerMessage: canContinueFromContext ? conversation.lastInboundText : null,
+    lastAssistantMessage: canContinueFromContext ? conversation.lastAssistantText : null,
+  })
+
+  if (preAgentExistingBookingQuestion) {
+    return handleExistingBookingStatusQuery({
+      conversationId: conversation.id,
+      customerId: input.customer.id,
+      inboundText,
+      effectiveState,
+      draft: draftForInterpreter,
+      barbershopId: input.barbershop.id,
+      timezone,
+      nowDateIso: nowContext.dateIso,
+      recentBooking: recentConfirmedBooking,
+    })
+  }
+
   const agentResult = await processWhatsAppConversationWithAgent({
     barbershop: input.barbershop,
     customer: {
@@ -2786,17 +3065,21 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
 }
 
 export const __testing = {
+  buildBookingStatusFollowUp,
   buildCompactNearbySlotSummary,
   buildEmptyConversationDraft,
   buildExactTimeUnavailableMessage,
   buildExactTimeFallbackResponse,
+  buildExistingBookingStatusMessage,
   buildRecentConfirmedGreeting,
   buildProfessionalQuestion,
   buildHumanSlotOfferMessage,
   hasUsefulConversationProgress,
   hasRecentCompletedBookingContext,
+  isExistingBookingStatusQuestion,
   isAffirmativeConfirmationMessage,
   isConversationContextReliable,
+  parseRequestedDateFromExistingBookingQuestion,
   isShortGreetingMessage,
   referencesPreferredProfessional,
   resolveContextualProfessionalPreference,

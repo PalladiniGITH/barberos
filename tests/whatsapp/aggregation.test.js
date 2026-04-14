@@ -38,7 +38,7 @@ test('agregacao sensivel consolida horario e barbeiro em um unico turno util', a
 
   assert.equal(handlerTesting.isComplementaryShortMessage('16:45'), true)
   assert.equal(handlerTesting.isComplementaryShortMessage('com o rafael'), true)
-  assert.equal(aggregationWindowMs, 4000)
+  assert.equal(aggregationWindowMs, 3000)
   assert.equal(concatenatedMessage, '16:45 com o rafael')
   assert.equal(intent.exactTime, '16:45')
   assert.equal(intent.mentionedName, 'Rafael')
@@ -138,9 +138,9 @@ test('estados sensiveis usam janela de agregacao mais conservadora para mensagen
     previousMessages: [],
   })
 
-  assert.equal(windowForIdleGreeting, 4000)
-  assert.equal(windowForGreeting, 4000)
-  assert.equal(windowForConfirmation, 4000)
+  assert.equal(windowForIdleGreeting, 3000)
+  assert.equal(windowForGreeting, 3000)
+  assert.equal(windowForConfirmation, 3000)
 })
 
 test('mensagem de horarios nao repete linhas nem cria espacos em branco extras', () => {

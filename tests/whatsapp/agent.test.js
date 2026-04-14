@@ -430,6 +430,31 @@ test('interpreta "rafael" isolado como escolha de barbeiro no contexto certo', a
   assert.equal(intent.greetingOnly, false)
 })
 
+test('interpreta consulta de agendamento ja confirmado como CHECK_EXISTING_BOOKING', async () => {
+  const intent = await interpretWhatsAppMessage({
+    message: 'eu tenho horario amanha?',
+    barbershopName: 'Linha Nobre',
+    barbershopTimezone: 'America/Sao_Paulo',
+    conversationState: 'WAITING_SERVICE',
+    offeredSlotCount: 0,
+    services: SERVICES.map((service) => ({ name: service.name })),
+    professionals: PROFESSIONALS.map((professional) => ({ name: professional.name })),
+    todayIsoDate: '2026-04-14',
+    currentLocalDateTime: '2026-04-14 10:30',
+    conversationSummary: {
+      selectedServiceName: 'Barba',
+      selectedProfessionalName: null,
+      requestedDateIso: '2026-04-15',
+      requestedTimeLabel: null,
+      allowAnyProfessional: false,
+      lastCustomerMessage: 'quero marcar barba amanha',
+      lastAssistantMessage: 'Tem preferencia de barbeiro ou posso procurar com qualquer um?',
+    },
+  })
+
+  assert.equal(intent.intent, 'CHECK_EXISTING_BOOKING')
+})
+
 test('remove vocativo ambiguo quando o nome citado e do barbeiro e nao do cliente', () => {
   const reply = agentTesting.sanitizeReplyTextAgainstProfessionalVocative({
     replyText: 'Perfeito, Rafael. Tenho o Corte Classic as 15:00 com o Rafael Costa para hoje. Posso confirmar?',

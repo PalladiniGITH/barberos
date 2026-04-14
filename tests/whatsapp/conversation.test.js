@@ -97,6 +97,39 @@ test('retomada logo apos agendamento confirmado usa contexto recente em vez de s
   assert.match(reply, /ja ficou marcado|Precisa de mais alguma coisa/i)
 })
 
+test('detecta topic switch quando o cliente pergunta sobre horario ja confirmado', () => {
+  const detected = conversationTesting.isExistingBookingStatusQuestion({
+    message: 'eu tenho horario amanha ja marcado?',
+    lastCustomerMessage: 'quero marcar barba amanha',
+    lastAssistantMessage: 'Tem preferencia de barbeiro ou posso procurar com qualquer um?',
+  })
+
+  assert.equal(detected, true)
+})
+
+test('follow-up curto como "que horas?" consulta o agendamento ja encontrado', () => {
+  const detected = conversationTesting.isExistingBookingStatusQuestion({
+    message: 'que horas?',
+    lastCustomerMessage: 'eu tenho horario amanha?',
+    lastAssistantMessage: 'Voce tem um horario confirmado amanha as 17:00 com Matheus Lima para Pigmentacao Natural.',
+  })
+
+  const requestedDateIso = conversationTesting.parseRequestedDateFromExistingBookingQuestion({
+    message: 'que horas?',
+    draft: conversationTesting.buildEmptyConversationDraft(),
+    recentBooking: {
+      serviceName: 'Pigmentacao Natural',
+      professionalName: 'Matheus Lima',
+      dateIso: '2026-04-15',
+      timeLabel: '17:00',
+    },
+    timezone: 'America/Sao_Paulo',
+  })
+
+  assert.equal(detected, true)
+  assert.equal(requestedDateIso, '2026-04-15')
+})
+
 test('sem barbeiro definido a conversa pergunta preferencia antes de sugerir horarios', () => {
   const reply = conversationTesting.buildProfessionalQuestion(
     ['Lucas Ribeiro', 'Matheus Lima', 'Rafael Costa'],
@@ -115,6 +148,45 @@ test('com barbeiro recente ou preferencial a conversa usa pergunta mais contextu
 
   assert.match(reply, /Matheus Lima/)
   assert.match(reply, /de novo|prefere outro/i)
+})
+
+test('consulta de agendamento existente responde com o horario encontrado e retoma o fluxo se necessario', () => {
+  const draft = conversationTesting.buildEmptyConversationDraft()
+  draft.selectedServiceId = 'svc-barba'
+  draft.selectedServiceName = 'Barba'
+  draft.requestedDateIso = '2026-04-15'
+
+  const reply = conversationTesting.buildExistingBookingStatusMessage({
+    requestedDateIso: '2026-04-15',
+    bookings: [
+      {
+        id: 'apt-1',
+        status: 'CONFIRMED',
+        serviceName: 'Pigmentacao Natural',
+        professionalName: 'Matheus Lima',
+        dateIso: '2026-04-15',
+        timeLabel: '17:00',
+      },
+    ],
+    timezone: 'America/Sao_Paulo',
+    draft,
+  })
+
+  assert.match(reply, /17:00/)
+  assert.match(reply, /Matheus Lima/)
+  assert.match(reply, /Pigmentacao Natural/)
+  assert.match(reply, /continuo seu novo agendamento de Barba/i)
+})
+
+test('consulta sem agendamento confirmado responde de forma objetiva', () => {
+  const reply = conversationTesting.buildExistingBookingStatusMessage({
+    requestedDateIso: '2026-04-15',
+    bookings: [],
+    timezone: 'America/Sao_Paulo',
+    draft: conversationTesting.buildEmptyConversationDraft(),
+  })
+
+  assert.match(reply, /nao tem nenhum agendamento confirmado/i)
 })
 
 test('respostas afirmativas amplas sao aceitas para fechamento deterministico', () => {

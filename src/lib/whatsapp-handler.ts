@@ -55,7 +55,7 @@ interface AggregatedInboundMessage {
 }
 
 const MESSAGE_AGGREGATION_WINDOW_MS = 2000
-const SENSITIVE_MESSAGE_AGGREGATION_WINDOW_MS = 4000
+const SENSITIVE_MESSAGE_AGGREGATION_WINDOW_MS = 3000
 const IMMEDIATE_PROCESSING_GUARD_MS = 250
 const IMMEDIATE_MESSAGE_PATTERN =
   /^(oi+|ola+|ol[aá]|bom dia|boa tarde|boa noite|quero agendar|quero marcar|agendar|marcar horario)[!.,\s]*$/i
@@ -537,6 +537,14 @@ async function aggregateInboundMessages(input: {
     ? previousMessages
     : []
   const clearlyCompleteMessage = isClearlyCompleteMessage(normalizedMessage)
+
+  console.info('[whatsapp-agent] aggregation window used', {
+    conversationId: conversation.id,
+    state: aggregationState,
+    windowMs: activeWindowMs,
+    message: normalizedMessage,
+    bufferedMessages: previousBuffer,
+  })
 
   if (aggregationState === 'IDLE' && clearlyCompleteMessage && previousBuffer.length > 0) {
     console.info('[whatsapp-agent] blocked immediate processing due to pending buffer', {
