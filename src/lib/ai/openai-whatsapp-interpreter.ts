@@ -583,6 +583,13 @@ const DIRECT_EXISTING_BOOKING_QUERY_PHRASES = [
   'qual meu horario de hoje',
   'qual horario eu tenho amanha',
   'qual horario eu tenho hoje',
+  'qual horario eu marquei',
+  'que horario ficou',
+  'que horario ficou amanha',
+  'meu horario de amanha',
+  'o que eu tenho amanha',
+  'tem algo pra mim amanha',
+  'confirmar meu horario de amanha',
   'que servico eu marquei',
   'qual servico eu marquei',
   'qual servico esta marcado',
@@ -604,6 +611,7 @@ const EXISTING_BOOKING_CONTEXT_PHRASES = [
   'ja ficou marcado',
   'voce tem um horario',
   'voce nao tem nenhum agendamento',
+  'voce nao tem nenhum horario',
   'seus proximos horarios',
   'voce esta marcado',
 ]
@@ -634,6 +642,21 @@ export function detectExistingBookingQuestion(input: {
   const asksAboutNextBooking =
     normalized.includes('proximo horario')
     || normalized.includes('proximo agendamento')
+  const hasBookingSubject =
+    /\b(horario|horarios|agendamento|agendamentos|marcado|marcada|marquei|confirmado|confirmada|ficou)\b/.test(normalized)
+  const hasQueryCue =
+    /\b(qual|quais|que|com quem|meu|minha|pra mim|para mim|eu tenho|tenho|confirmar|me confirma|me lembra|o que)\b/.test(normalized)
+  const hasStrongTemporalCue =
+    /\b(hoje|amanha|depois de amanha|essa semana|dessa semana|proximo)\b/.test(normalized)
+  const fuzzyExistingBookingQuery =
+    hasBookingSubject
+    && hasQueryCue
+    && (
+      hasStrongTemporalCue
+      || normalized.includes('meu')
+      || normalized.includes('tenho')
+      || normalized.includes('confirmar')
+    )
   const followUpToExistingBookingContext =
     EXISTING_BOOKING_FOLLOW_UP_PATTERN.test(normalized)
     && (
@@ -641,7 +664,7 @@ export function detectExistingBookingQuestion(input: {
       || includesAnyPhrase(lastCustomer, EXISTING_BOOKING_CONTEXT_PHRASES)
     )
 
-  return asksAboutConfirmedBooking || asksAboutNextBooking || followUpToExistingBookingContext
+  return asksAboutConfirmedBooking || asksAboutNextBooking || fuzzyExistingBookingQuery || followUpToExistingBookingContext
 }
 
 function inferIntent(

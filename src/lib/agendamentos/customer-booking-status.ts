@@ -16,6 +16,7 @@ export type ExistingCustomerBookingQueryScope = 'NEXT' | 'DAY' | 'WEEK'
 export interface ExistingCustomerBookingItem {
   id: string
   status: 'PENDING' | 'CONFIRMED'
+  startAtUtc?: string
   dateIso: string
   dateLabel: string
   timeLabel: string
@@ -114,6 +115,7 @@ export async function getExistingCustomerBookings(input: {
   return appointments.map((appointment) => ({
     id: appointment.id,
     status: appointment.status as ExistingCustomerBookingItem['status'],
+    startAtUtc: appointment.startAt.toISOString(),
     dateIso: formatIsoDateInTimezone(appointment.startAt, timezone),
     dateLabel: formatDateInTimezone(appointment.startAt, timezone),
     timeLabel: formatTimeInTimezone(appointment.startAt, timezone),
@@ -155,7 +157,7 @@ export function buildExistingCustomerBookingResponse(input: {
   const queryScope = input.queryScope ?? (input.requestedDateIso ? 'DAY' : 'NEXT')
   const continuationMessage = input.hasSchedulingContext
     ? ' Quer manter esse e marcar outro tambem, ou prefere ajustar esse?'
-    : ' Se quiser, eu tambem posso te ajudar a marcar outro horario.'
+    : ''
 
   if (input.bookings.length === 0) {
     if (queryScope === 'WEEK') {
@@ -172,7 +174,7 @@ export function buildExistingCustomerBookingResponse(input: {
   if (input.bookings.length === 1) {
     const booking = input.bookings[0]
     if (queryScope === 'WEEK') {
-      return `Voce tem um horario na ${describeWeekday(booking.dateIso)} as ${booking.timeLabel} com ${booking.professionalName} para ${booking.serviceName}.${continuationMessage}`
+      return `Voce tem um horario na ${describeWeekday(booking.dateIso)} as ${booking.timeLabel} com ${booking.professionalName} para ${booking.serviceName}.${continuationMessage}`.trim()
     }
 
     const dayDescription = input.requestedDateIso
@@ -183,7 +185,7 @@ export function buildExistingCustomerBookingResponse(input: {
       ? `${dayDescription.charAt(0).toUpperCase() + dayDescription.slice(1)} voce esta marcado as ${booking.timeLabel}`
       : `Seu proximo horario e ${dayDescription} as ${booking.timeLabel}`
 
-    return `${leadIn} com ${booking.professionalName} para ${booking.serviceName}.${continuationMessage}`
+    return `${leadIn} com ${booking.professionalName} para ${booking.serviceName}.${continuationMessage}`.trim()
   }
 
   const header = queryScope === 'WEEK'
@@ -203,5 +205,7 @@ export function buildExistingCustomerBookingResponse(input: {
     })
     .join('\n')
 
-  return `${header}\n\n${lines}\n\n${continuationMessage.trim()}`
+  return continuationMessage
+    ? `${header}\n\n${lines}\n\n${continuationMessage.trim()}`
+    : `${header}\n\n${lines}`
 }

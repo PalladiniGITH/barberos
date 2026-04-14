@@ -118,6 +118,9 @@ test('detecta consultas naturais sobre agendamentos ja confirmados', () => {
     'quais horarios eu tenho essa semana?',
     'tenho algo essa semana?',
     'meus horarios dessa semana',
+    'nada eu so queria confirmar que horario ficou amanha',
+    'tem algo pra mim amanha?',
+    'o que eu tenho amanha?',
   ]
 
   messages.forEach((message) => {
@@ -152,12 +155,9 @@ test('follow-up curto como "que horas?" consulta o agendamento ja encontrado', (
 
   const requestedDateIso = conversationTesting.parseRequestedDateFromExistingBookingQuestion({
     message: 'que horas?',
-    draft: conversationTesting.buildEmptyConversationDraft(),
-    recentBooking: {
-      serviceName: 'Pigmentacao Natural',
-      professionalName: 'Matheus Lima',
-      dateIso: '2026-04-15',
-      timeLabel: '17:00',
+    previousQuery: {
+      scope: 'DAY',
+      requestedDateIso: '2026-04-15',
     },
     timezone: 'America/Sao_Paulo',
   })

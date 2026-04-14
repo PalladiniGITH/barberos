@@ -465,6 +465,9 @@ test('interpreta frases naturais sobre horario ja marcado sem cair em novo agend
     'qual meu proximo horario?',
     'quais horarios eu tenho essa semana?',
     'meus horarios dessa semana',
+    'nada eu so queria confirmar que horario ficou amanha',
+    'tem algo pra mim amanha?',
+    'o que eu tenho amanha?',
   ]
 
   for (const message of bookingQueries) {

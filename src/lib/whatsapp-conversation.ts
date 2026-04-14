@@ -137,6 +137,11 @@ interface ExistingBookingQuery {
   requestedDateIso: string | null
 }
 
+interface PreviousBookingStatusQueryMemory {
+  scope: ExistingCustomerBookingQueryScope
+  requestedDateIso: string | null
+}
+
 interface ContextualProfessionalPreference {
   professionalId: string
   professionalName: string
@@ -266,10 +271,26 @@ function shiftDateIso(dateIso: string, days: number) {
   return formatDateIso(anchor)
 }
 
+function parsePreviousBookingStatusQuery(raw: Prisma.JsonValue | null) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return null
+  }
+
+  const candidate = raw as Record<string, unknown>
+  if (candidate.source !== 'booking_status_query' || candidate.intent !== 'CHECK_EXISTING_BOOKING') {
+    return null
+  }
+
+  const scope = candidate.queryScope
+  return {
+    scope: scope === 'DAY' || scope === 'WEEK' || scope === 'NEXT' ? scope : 'NEXT',
+    requestedDateIso: typeof candidate.requestedDateIso === 'string' ? candidate.requestedDateIso : null,
+  } satisfies PreviousBookingStatusQueryMemory
+}
+
 function parseRequestedDateFromExistingBookingQuestion(input: {
   message: string
-  draft: ConversationDraft
-  recentBooking: RecentConfirmedBookingMemory | null
+  previousQuery: PreviousBookingStatusQueryMemory | null
   timezone: string
 }) {
   const normalized = normalizeText(input.message)
@@ -289,17 +310,16 @@ function parseRequestedDateFromExistingBookingQuestion(input: {
     return todayIso
   }
 
-  if (followUpPattern.test(normalized) && input.recentBooking?.dateIso) {
-    return input.recentBooking.dateIso
+  if (followUpPattern.test(normalized) && input.previousQuery?.requestedDateIso) {
+    return input.previousQuery.requestedDateIso
   }
 
-  return input.draft.requestedDateIso ?? input.recentBooking?.dateIso ?? null
+  return input.previousQuery?.requestedDateIso ?? null
 }
 
 function parseExistingBookingQuery(input: {
   message: string
-  draft: ConversationDraft
-  recentBooking: RecentConfirmedBookingMemory | null
+  previousQuery: PreviousBookingStatusQueryMemory | null
   timezone: string
 }) {
   const normalized = normalizeText(input.message)
@@ -317,7 +337,7 @@ function parseExistingBookingQuery(input: {
   }
 
   return {
-    scope: input.draft.requestedDateIso || input.recentBooking?.dateIso ? 'DAY' : 'NEXT',
+    scope: input.previousQuery?.requestedDateIso ? 'DAY' : 'NEXT',
     requestedDateIso: parseRequestedDateFromExistingBookingQuestion(input),
   } satisfies ExistingBookingQuery
 }
@@ -425,12 +445,11 @@ async function handleExistingBookingStatusQuery(input: {
   barbershopId: string
   timezone: string
   nowDateIso: string
-  recentBooking: RecentConfirmedBookingMemory | null
+  previousQuery: PreviousBookingStatusQueryMemory | null
 }) {
   const existingBookingQuery = parseExistingBookingQuery({
     message: input.inboundText,
-    draft: input.draft,
-    recentBooking: input.recentBooking,
+    previousQuery: input.previousQuery,
     timezone: input.timezone,
   })
 
@@ -458,8 +477,34 @@ async function handleExistingBookingStatusQuery(input: {
     customerId: input.customerId,
     conversationId: input.conversationId,
     inboundText: input.inboundText,
-    requestedDateIso: input.draft.requestedDateIso,
+    requestedDateIso: existingBookingQuery.requestedDateIso,
     totalUpcomingBookings: bookings.length,
+  })
+
+  console.info('[whatsapp-conversation] booking query source: database', {
+    customerId: input.customerId,
+    conversationId: input.conversationId,
+    queryScope: existingBookingQuery.scope,
+    requestedDateIso: existingBookingQuery.requestedDateIso,
+  })
+
+  console.info('[whatsapp-conversation] appointments fetched: X', {
+    customerId: input.customerId,
+    conversationId: input.conversationId,
+    appointmentsFetched: bookings.length,
+  })
+
+  console.info('[whatsapp-conversation] datetime local vs utc', {
+    customerId: input.customerId,
+    conversationId: input.conversationId,
+    appointments: bookings.map((booking) => ({
+      appointmentId: booking.id,
+      datetimePersistedUtc: booking.startAtUtc ?? null,
+      dateIsoLocal: booking.dateIso,
+      timeLabelLocal: booking.timeLabel,
+      professionalName: booking.professionalName,
+      serviceName: booking.serviceName,
+    })),
   })
 
   if (existingBookingQuery.scope === 'WEEK') {
@@ -1531,6 +1576,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     customerId: input.customer.id,
   })
   const recentConfirmedBooking = parseRecentConfirmedBookingMemory(conversation.lastIntent)
+  const previousBookingStatusQuery = parsePreviousBookingStatusQuery(conversation.lastIntent)
   const preferredProfessional = await resolveCustomerPreferredProfessional({
     barbershopId: input.barbershop.id,
     customerId: input.customer.id,
@@ -1836,6 +1882,26 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     }
   }
 
+  const preAgentExistingBookingQuestion = isExistingBookingStatusQuestion({
+    message: inboundText,
+    lastCustomerMessage: canContinueFromContext ? conversation.lastInboundText : null,
+    lastAssistantMessage: canContinueFromContext ? conversation.lastAssistantText : null,
+  })
+
+  if (preAgentExistingBookingQuestion) {
+    return handleExistingBookingStatusQuery({
+      conversationId: conversation.id,
+      customerId: input.customer.id,
+      inboundText,
+      effectiveState,
+      draft: draftForInterpreter,
+      barbershopId: input.barbershop.id,
+      timezone,
+      nowDateIso: nowContext.dateIso,
+      previousQuery: previousBookingStatusQuery,
+    })
+  }
+
   if (isAcknowledgementMessage(inboundText)) {
     console.info('[whatsapp-conversation] acknowledgement detected', {
       conversationId: conversation.id,
@@ -1894,26 +1960,6 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       conversationState: 'IDLE',
       usedAI: false,
     }
-  }
-
-  const preAgentExistingBookingQuestion = isExistingBookingStatusQuestion({
-    message: inboundText,
-    lastCustomerMessage: canContinueFromContext ? conversation.lastInboundText : null,
-    lastAssistantMessage: canContinueFromContext ? conversation.lastAssistantText : null,
-  })
-
-  if (preAgentExistingBookingQuestion) {
-    return handleExistingBookingStatusQuery({
-      conversationId: conversation.id,
-      customerId: input.customer.id,
-      inboundText,
-      effectiveState,
-      draft: draftForInterpreter,
-      barbershopId: input.barbershop.id,
-      timezone,
-      nowDateIso: nowContext.dateIso,
-      recentBooking: recentConfirmedBooking,
-    })
   }
 
   const agentResult = await processWhatsAppConversationWithAgent({
