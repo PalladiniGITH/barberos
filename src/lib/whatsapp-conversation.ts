@@ -22,6 +22,7 @@ import {
 } from '@/lib/agendamentos/customer-booking-status'
 import {
   buildDateAnchorUtc,
+  formatDayLabelFromIsoDate,
   getAvailableBusinessPeriodsForDate,
   getCurrentDateTimeInTimezone,
   getTodayIsoInTimezone,
@@ -224,23 +225,8 @@ function formatDateIso(date: Date) {
   return `${year}-${month}-${day}`
 }
 
-function isToday(dateIso: string, timezone: string) {
-  return dateIso === getTodayIsoInTimezone(timezone)
-}
-
 function formatDayLabel(dateIso: string, timezone: string) {
-  if (isToday(dateIso, timezone)) {
-    return 'Hoje'
-  }
-
-  const [year, month, day] = dateIso.split('-').map(Number)
-  const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
-  return date.toLocaleDateString('pt-BR', {
-    timeZone: timezone,
-    weekday: 'long',
-    day: '2-digit',
-    month: '2-digit',
-  })
+  return formatDayLabelFromIsoDate(dateIso, timezone)
 }
 
 function buildGreeting(barbershopName: string, customerName?: string | null) {
@@ -1266,8 +1252,12 @@ function buildExactTimeFallbackResponse(input: {
   })
 
   const conciseFollowUp = nearbySummary
-    ? `${unavailableMessage} Os horarios mais proximos que tenho sao ${nearbySummary}. Quer um deles ou prefere que eu procure em outro periodo?`
-    : `${unavailableMessage} Se quiser, eu posso procurar em outro periodo.`
+    ? input.professionalName
+      ? `${unavailableMessage} Tenho ${nearbySummary} com ${input.professionalName}. Quer um deles ou prefere que eu procure outro horario?`
+      : `${unavailableMessage} Os horarios mais proximos que tenho sao ${nearbySummary}. Quer um deles ou prefere que eu procure em outro periodo?`
+    : input.professionalName
+      ? `${unavailableMessage} Se quiser, eu posso procurar outro horario com ${input.professionalName} ou outro periodo.`
+      : `${unavailableMessage} Se quiser, eu posso procurar em outro periodo.`
 
   if (shouldAvoidSemanticallyRepeatedResponse({
     previousAssistantText: input.previousAssistantText,

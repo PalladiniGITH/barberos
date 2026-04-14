@@ -160,6 +160,38 @@ export function buildDateAnchorUtc(dateIso: string) {
   return new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
 }
 
+export function formatWeekdayFromIsoDate(
+  dateIso: string,
+  timezone?: string | null,
+  locale = 'pt-BR'
+) {
+  const resolvedTimezone = resolveBusinessTimezone(timezone)
+
+  return buildDateAnchorUtc(dateIso).toLocaleDateString(locale, {
+    timeZone: resolvedTimezone,
+    weekday: 'long',
+  })
+}
+
+export function formatDayLabelFromIsoDate(
+  dateIso: string,
+  timezone?: string | null,
+  locale = 'pt-BR'
+) {
+  const resolvedTimezone = resolveBusinessTimezone(timezone)
+
+  if (dateIso === getTodayIsoInTimezone(resolvedTimezone)) {
+    return locale === 'pt-BR' ? 'Hoje' : 'Today'
+  }
+
+  return buildDateAnchorUtc(dateIso).toLocaleDateString(locale, {
+    timeZone: resolvedTimezone,
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+  })
+}
+
 export function getTimezoneOffsetMinutes(timezone: string, referenceDate = new Date()) {
   const resolvedTimezone = resolveBusinessTimezone(timezone)
   const parts = getDateTimePartsInTimezone(referenceDate, resolvedTimezone)

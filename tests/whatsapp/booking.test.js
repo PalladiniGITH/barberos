@@ -6,7 +6,12 @@ const {
   createAppointmentFromWhatsApp,
   resolveWhatsAppAppointmentStartAt,
 } = require('@/lib/agendamentos/whatsapp-booking')
-const { formatDateTimeInTimezone, localDateTimeToUtc } = require('@/lib/timezone')
+const {
+  formatDateTimeInTimezone,
+  formatDayLabelFromIsoDate,
+  formatWeekdayFromIsoDate,
+  localDateTimeToUtc,
+} = require('@/lib/timezone')
 
 test('localDateTimeToUtc preserva o horario local escolhido ao converter para UTC', () => {
   const { startAtUtc } = localDateTimeToUtc({
@@ -17,6 +22,17 @@ test('localDateTimeToUtc preserva o horario local escolhido ao converter para UT
 
   assert.equal(startAtUtc.toISOString(), '2026-04-13T20:30:00.000Z')
   assert.equal(formatDateTimeInTimezone(startAtUtc, 'America/Sao_Paulo'), '2026-04-13 17:30')
+})
+
+test('17/04 usa sempre a mesma projecao local para dia da semana', () => {
+  assert.equal(
+    formatWeekdayFromIsoDate('2026-04-17', 'America/Sao_Paulo'),
+    'sexta-feira'
+  )
+  assert.equal(
+    formatDayLabelFromIsoDate('2026-04-17', 'America/Sao_Paulo'),
+    'sexta-feira, 17/04'
+  )
 })
 
 function withPrismaMocks(mocks, fn) {

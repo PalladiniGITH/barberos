@@ -361,6 +361,65 @@ test('backend nao confirma horario enquanto o barbeiro nao estiver definido ou l
   assert.equal(corrected, 'ASK_PROFESSIONAL')
 })
 
+test('servico + barbeiro + data + periodo ainda nao bastam para pedir confirmacao', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.selectedProfessionalId = 'pro-matheus'
+  memory.selectedProfessionalName = 'Matheus'
+  memory.requestedDateIso = '2026-04-17'
+  memory.requestedTimeLabel = 'AFTERNOON'
+
+  const corrected = agentTesting.enforceNextActionFromMemory(
+    'ASK_CONFIRMATION',
+    memory,
+    false,
+    createAgentInput().nowContext
+  )
+
+  const reply = agentTesting.buildGuardrailReplyText({
+    nextAction: corrected,
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    nowContext: createAgentInput().nowContext,
+  })
+
+  assert.equal(corrected, 'ASK_PERIOD')
+  assert.match(reply, /Qual horario voce gostaria/i)
+  assert.doesNotMatch(reply, /Posso confirmar/i)
+})
+
+test('servico + barbeiro + slot validado liberam confirmacao real', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.selectedProfessionalId = 'pro-matheus'
+  memory.selectedProfessionalName = 'Matheus'
+  memory.requestedDateIso = '2026-04-17'
+  memory.requestedTimeLabel = '15:00'
+  memory.selectedSlot = {
+    key: 'pro-matheus:2026-04-17T18:00:00.000Z',
+    professionalId: 'pro-matheus',
+    professionalName: 'Matheus',
+    dateIso: '2026-04-17',
+    timeLabel: '15:00',
+    startAtIso: '2026-04-17T18:00:00.000Z',
+    endAtIso: '2026-04-17T18:35:00.000Z',
+  }
+
+  assert.equal(agentTesting.canAskForBookingConfirmation(memory), true)
+  assert.equal(
+    agentTesting.enforceNextActionFromMemory(
+      'ASK_CONFIRMATION',
+      memory,
+      false,
+      createAgentInput().nowContext
+    ),
+    'ASK_CONFIRMATION'
+  )
+})
+
 test('preserva o slot quando o cliente escolhe um horario exato antes da confirmacao', async () => {
   const memory = agentTesting.buildInitialMemory(createAgentInput())
   memory.state = 'WAITING_TIME'

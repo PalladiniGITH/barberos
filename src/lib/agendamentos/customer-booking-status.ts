@@ -3,6 +3,7 @@ import 'server-only'
 import { prisma } from '@/lib/prisma'
 import {
   formatDateInTimezone,
+  formatWeekdayFromIsoDate,
   formatIsoDateInTimezone,
   formatTimeInTimezone,
   getTodayIsoInTimezone,
@@ -137,13 +138,8 @@ function describeQueryDay(dateIso: string, timezone: string) {
   return `em ${dateIso.split('-').reverse().join('/')}`
 }
 
-function describeWeekday(dateIso: string) {
-  const [year, month, day] = dateIso.split('-').map(Number)
-  const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
-  return date.toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    timeZone: 'UTC',
-  }).toLowerCase()
+function describeWeekday(dateIso: string, timezone: string) {
+  return formatWeekdayFromIsoDate(dateIso, timezone).toLowerCase()
 }
 
 export function buildExistingCustomerBookingResponse(input: {
@@ -174,7 +170,7 @@ export function buildExistingCustomerBookingResponse(input: {
   if (input.bookings.length === 1) {
     const booking = input.bookings[0]
     if (queryScope === 'WEEK') {
-      return `Voce tem um horario na ${describeWeekday(booking.dateIso)} as ${booking.timeLabel} com ${booking.professionalName} para ${booking.serviceName}.${continuationMessage}`.trim()
+      return `Voce tem um horario na ${describeWeekday(booking.dateIso, timezone)} as ${booking.timeLabel} com ${booking.professionalName} para ${booking.serviceName}.${continuationMessage}`.trim()
     }
 
     const dayDescription = input.requestedDateIso
@@ -197,7 +193,7 @@ export function buildExistingCustomerBookingResponse(input: {
     .slice(0, 3)
     .map((booking) => {
       const datePrefix = queryScope === 'WEEK'
-        ? `${describeWeekday(booking.dateIso)} as `
+        ? `${describeWeekday(booking.dateIso, timezone)} as `
         : input.requestedDateIso
           ? ''
           : `${describeQueryDay(booking.dateIso, timezone)} as `

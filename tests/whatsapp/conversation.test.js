@@ -377,5 +377,6 @@ test('quando o horario exato nao existe a resposta avanca com alternativas proxi
   assert.match(reply, /10:00/)
   assert.match(reply, /08:00/)
   assert.match(reply, /08:15/)
+  assert.match(reply, /Matheus/)
   assert.doesNotMatch(reply, /10h e manha|10:00 e manha/i)
 })

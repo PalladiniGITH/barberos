@@ -9,6 +9,7 @@ import {
 } from '@/lib/agendamentos/whatsapp-booking'
 import { interpretWhatsAppMessage } from '@/lib/ai/openai-whatsapp-interpreter'
 import {
+  formatDayLabelFromIsoDate,
   getAvailableBusinessPeriodsForDate,
   getCurrentBusinessPeriod,
   type BusinessPeriod,
@@ -530,6 +531,31 @@ function hasUsefulProgressInMemory(memory: WorkingMemory) {
   )
 }
 
+function hasExactTimeSelection(memory: WorkingMemory) {
+  return Boolean(
+    memory.selectedSlot?.timeLabel
+    || (memory.requestedTimeLabel && memory.requestedTimeLabel.includes(':'))
+  )
+}
+
+function hasResolvedProfessionalSelection(memory: WorkingMemory) {
+  return Boolean(
+    memory.selectedSlot?.professionalId
+    || memory.selectedProfessionalId
+    || memory.allowAnyProfessional
+  )
+}
+
+function canAskForBookingConfirmation(memory: WorkingMemory) {
+  return Boolean(
+    memory.selectedServiceId
+    && memory.selectedSlot
+    && memory.selectedSlot.dateIso
+    && memory.selectedSlot.timeLabel
+    && hasResolvedProfessionalSelection(memory)
+  )
+}
+
 function deriveConversationStateFromMemory(
   memory: WorkingMemory,
   nowContext: WhatsAppAgentInput['nowContext']
@@ -641,14 +667,15 @@ function enforceNextActionFromMemory(
     memory,
     nowContext,
   })
+  const canConfirmBooking = canAskForBookingConfirmation(memory)
 
   if (requestedAction === 'RESET_CONTEXT' || requestedAction === 'GREET') {
     if (hasUsefulProgressInMemory(memory)) {
-      if (shouldCreateAppointment) {
+      if (shouldCreateAppointment && canConfirmBooking) {
         return 'CONFIRM_BOOKING'
       }
 
-      if (memory.selectedSlot) {
+      if (canConfirmBooking) {
         return 'ASK_CONFIRMATION'
       }
 
@@ -684,7 +711,7 @@ function enforceNextActionFromMemory(
     }
 
     if (!validation.missingFields.includes('date')) {
-      return memory.selectedSlot ? 'ASK_CONFIRMATION' : memory.offeredSlots.length > 0 ? 'OFFER_SLOTS' : requestedAction
+      return canConfirmBooking ? 'ASK_CONFIRMATION' : memory.offeredSlots.length > 0 ? 'OFFER_SLOTS' : requestedAction
     }
   }
 
@@ -708,27 +735,43 @@ function enforceNextActionFromMemory(
     return 'ASK_PERIOD'
   }
 
-  if (shouldCreateAppointment) {
+  if (shouldCreateAppointment && canConfirmBooking) {
     return 'CONFIRM_BOOKING'
   }
 
-  if (requestedAction === 'ASK_CONFIRMATION' && !memory.selectedSlot) {
+  if (requestedAction === 'ASK_CONFIRMATION' && !canConfirmBooking) {
     if (memory.offeredSlots.length > 0) {
       return 'OFFER_SLOTS'
+    }
+
+    if (!hasExactTimeSelection(memory)) {
+      return 'ASK_PERIOD'
+    }
+
+    return 'ASK_CLARIFICATION'
+  }
+
+  if (requestedAction === 'CONFIRM_BOOKING' && !canConfirmBooking) {
+    if (memory.offeredSlots.length > 0) {
+      return 'OFFER_SLOTS'
+    }
+
+    if (!hasExactTimeSelection(memory)) {
+      return 'ASK_PERIOD'
     }
 
     return 'ASK_CLARIFICATION'
   }
 
   if (
-    memory.requestedTimeLabel?.includes(':')
+    hasExactTimeSelection(memory)
     && !memory.selectedSlot
     && memory.offeredSlots.length === 0
   ) {
     return 'ASK_CLARIFICATION'
   }
 
-  if (memory.selectedSlot) {
+  if (canConfirmBooking) {
     return 'ASK_CONFIRMATION'
   }
 
@@ -1000,6 +1043,12 @@ function containsFinalConfirmationLanguage(replyText: string) {
   )
 }
 
+function containsConfirmationPromptLanguage(replyText: string) {
+  return /\b(posso confirmar|quer que eu confirme|me confirma|posso fechar|posso agendar)\b/i.test(
+    normalizeText(replyText)
+  )
+}
+
 function sanitizePrematureConfirmationReply(input: {
   replyText: string
   nextAction: WhatsAppAgentNextAction
@@ -1011,7 +1060,22 @@ function sanitizePrematureConfirmationReply(input: {
   serviceNames: string[]
   nowContext: WhatsAppAgentInput['nowContext']
 }) {
-  if (input.shouldCreateAppointment || !containsFinalConfirmationLanguage(input.replyText)) {
+  if (input.shouldCreateAppointment) {
+    return input.replyText
+  }
+
+  const hasFinalConfirmationLanguage = containsFinalConfirmationLanguage(input.replyText)
+  const hasConfirmationPromptLanguage = containsConfirmationPromptLanguage(input.replyText)
+
+  if (!hasFinalConfirmationLanguage && !hasConfirmationPromptLanguage) {
+    return input.replyText
+  }
+
+  if (
+    !hasFinalConfirmationLanguage
+    && input.nextAction === 'ASK_CONFIRMATION'
+    && canAskForBookingConfirmation(input.memory)
+  ) {
     return input.replyText
   }
 
@@ -1511,7 +1575,7 @@ function buildGuardrailReplyText(input: {
   }
 
   if (input.nextAction === 'ASK_CONFIRMATION' && input.memory.selectedSlot && input.memory.selectedServiceName) {
-    return `Posso confirmar ${input.memory.selectedServiceName} para ${input.memory.selectedSlot.dateIso} as ${input.memory.selectedSlot.timeLabel} com ${input.memory.selectedSlot.professionalName}?`
+    return `Posso confirmar ${input.memory.selectedServiceName} para ${formatDayLabelFromIsoDate(input.memory.selectedSlot.dateIso).toLowerCase()} as ${input.memory.selectedSlot.timeLabel} com ${input.memory.selectedSlot.professionalName}?`
   }
 
   if (input.nextAction === 'OFFER_SLOTS' && input.memory.offeredSlots.length > 0) {
@@ -2481,6 +2545,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
 
 export const __testing = {
   buildInitialMemory,
+  canAskForBookingConfirmation,
   promoteIntentContextToMemory,
   validateMissingFields,
   enforceNextActionFromMemory,
