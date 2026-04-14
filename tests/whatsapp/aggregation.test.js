@@ -239,3 +239,31 @@ test('quando ha varios barbeiros no mesmo horario a mensagem mostra o nome de ca
   assert.match(message, /09:00 com Lucas Ribeiro/)
   assert.match(message, /09:00 com Matheus Lima/)
 })
+
+test('oi seguido de intencao completa em IDLE continua em um unico turno agregado', () => {
+  const fullMessage = 'Queria marcar horario pra hoje'
+
+  assert.equal(
+    handlerTesting.hasPendingBufferedMessages({
+      bufferedMessages: ['Oi'],
+      lastMessageTimestamp: new Date(),
+      activeWindowMs: 4000,
+      referenceTime: Date.now(),
+    }),
+    true
+  )
+
+  assert.equal(
+    handlerTesting.shouldProcessImmediately({
+      state: 'IDLE',
+      message: fullMessage,
+      previousMessages: ['Oi'],
+    }),
+    false
+  )
+
+  assert.equal(
+    handlerTesting.buildConcatenatedMessage(['Oi', fullMessage]),
+    'Oi Queria marcar horario pra hoje'
+  )
+})

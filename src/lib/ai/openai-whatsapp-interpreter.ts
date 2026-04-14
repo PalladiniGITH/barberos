@@ -363,6 +363,24 @@ function parseExplicitTime(message: string) {
     return formatIsoTime(Number(exactMatch[1]), Number(exactMatch[2]))
   }
 
+  const meridiemMatch = message.match(/\b([1-9]|1[0-2])(?::([0-5]\d))?\s*(?:da|de)\s+(manha|tarde|noite)\b/)
+  if (meridiemMatch) {
+    const rawHour = Number(meridiemMatch[1])
+    const minutes = Number(meridiemMatch[2] ?? '0')
+    const period = meridiemMatch[3]
+    let hours = rawHour
+
+    if (period === 'tarde' && rawHour < 12) {
+      hours = rawHour + 12
+    } else if (period === 'noite' && rawHour < 12) {
+      hours = rawHour === 12 ? 0 : rawHour + 12
+    } else if (period === 'manha' && rawHour === 12) {
+      hours = 0
+    }
+
+    return formatIsoTime(hours, minutes)
+  }
+
   const hourOnlyMatch = message.match(/\b([01]?\d|2[0-3])\s*(?:h|hr|hrs|hora|horas)\b/)
   if (hourOnlyMatch) {
     return formatIsoTime(Number(hourOnlyMatch[1]), 0)

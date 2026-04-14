@@ -596,14 +596,6 @@ function validateMissingFields(input: {
   })
   const currentBusinessPeriod = getCurrentBusinessPeriod(normalizedNow)
 
-  if (
-    input.memory.requestedDateIso
-    && !input.memory.requestedTimeLabel
-    && availablePeriods.length === 1
-  ) {
-    input.memory.requestedTimeLabel = availablePeriods[0]
-  }
-
   const missingFields: MissingFieldsValidation['missingFields'] = []
 
   if (!input.memory.selectedServiceId) {
@@ -614,16 +606,16 @@ function validateMissingFields(input: {
     missingFields.push('professional')
   }
 
+  if (!input.memory.requestedDateIso) {
+    missingFields.push('date')
+  }
+
   if (!input.memory.requestedTimeLabel) {
     if (input.memory.requestedDateIso && availablePeriods.length === 0) {
       missingFields.push('date')
     } else {
       missingFields.push('period')
     }
-  }
-
-  if (!input.memory.requestedDateIso) {
-    missingFields.push('date')
   }
 
   return {
@@ -707,12 +699,12 @@ function enforceNextActionFromMemory(
     return 'ASK_DATE'
   }
 
-  if (validation.missingFields.includes('period')) {
-    return 'ASK_PERIOD'
-  }
-
   if (validation.missingFields.includes('date')) {
     return 'ASK_DATE'
+  }
+
+  if (validation.missingFields.includes('period')) {
+    return 'ASK_PERIOD'
   }
 
   if (shouldCreateAppointment) {
@@ -1262,6 +1254,7 @@ function buildToolPhasePrompt(input: {
     'Quando faltar contexto, prefira perguntar em vez de assumir.',
     'Nunca pergunte novamente por um campo que o backend ja tem preenchido.',
     'Se o servico ainda nao estiver definido, use list_services para trazer a lista real completa da barbearia.',
+    'Pergunte o horario especifico antes de perguntar periodo. Use manha/tarde/noite so como fallback quando o cliente nao tiver horario especifico.',
     'Nao busque horarios nem confirme slot antes de existir barbeiro definido, barbeiro preferencial valido ou allowAnyProfessional explicito.',
   ].join('\n')
 }
@@ -1295,6 +1288,7 @@ function buildFinalPrompt(input: {
     `Ultimas mensagens: ${input.recentMessages.map((message) => `${message.direction}:${message.text}`).join(' | ') || 'nenhuma'}.`,
     'Escolha nextAction coerente com o estado do backend.',
     'Se faltar servico, responda mostrando a lista real de servicos disponiveis.',
+    'Pergunte o horario especifico antes de sugerir periodo sempre que o cliente ainda nao tiver dado um horario claro.',
     'Se faltar definicao de barbeiro, pergunte preferencia antes de confirmar horario.',
   ].join('\n')
 }
@@ -1315,10 +1309,10 @@ function buildFallbackStructuredOutput(input: {
       ? 'Perfeito. Qual servico voce quer fazer?'
       : (!input.memory.selectedProfessionalId && !input.memory.allowAnyProfessional
         ? 'Tem preferencia de barbeiro?'
-        : (!input.memory.requestedTimeLabel
-          ? 'Voce prefere manha, tarde ou noite?'
-          : (!input.memory.requestedDateIso
-            ? 'Qual dia voce prefere?'
+        : (!input.memory.requestedDateIso
+          ? 'Qual dia voce prefere?'
+          : (!input.memory.requestedTimeLabel
+            ? 'Qual horario voce gostaria? Se preferir, tambem posso procurar por periodo.'
             : 'Me confirma rapidinho como voce quer seguir por aqui.'))))
 
   const nextAction: WhatsAppAgentNextAction =
@@ -1395,17 +1389,15 @@ function buildGuardrailReplyText(input: {
 
     if (validation?.availablePeriods.length === 1) {
       return validation.availablePeriods[0] === 'EVENING'
-        ? 'Perfeito. Para hoje eu consigo te atender na noite. Quer que eu te mostre os horarios?'
+        ? 'Perfeito. Para esse dia eu consigo te atender na noite. Qual horario voce gostaria?'
         : validation.availablePeriods[0] === 'AFTERNOON'
-          ? 'Perfeito. Para hoje eu consigo te atender na tarde. Quer que eu te mostre os horarios?'
-          : 'Perfeito. Para hoje eu consigo te atender na manha. Quer que eu te mostre os horarios?'
+          ? 'Perfeito. Para esse dia eu consigo te atender na tarde. Qual horario voce gostaria?'
+          : 'Perfeito. Para esse dia eu consigo te atender na manha. Qual horario voce gostaria?'
     }
 
-    if (validation?.availablePeriods.length === 2 && validation.currentBusinessPeriod !== 'MORNING') {
-      return 'Voce prefere tarde ou noite?'
+    if (validation?.availablePeriods.length) {
+      return 'Qual horario voce gostaria? Se preferir, tambem posso procurar por periodo.'
     }
-
-    return 'Voce prefere manha, tarde ou noite?'
   }
 
   if (input.nextAction === 'ASK_DATE') {

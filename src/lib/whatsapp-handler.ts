@@ -56,6 +56,7 @@ interface AggregatedInboundMessage {
 
 const MESSAGE_AGGREGATION_WINDOW_MS = 2000
 const SENSITIVE_MESSAGE_AGGREGATION_WINDOW_MS = 4000
+const IMMEDIATE_PROCESSING_GUARD_MS = 250
 const IMMEDIATE_MESSAGE_PATTERN =
   /^(oi+|ola+|ol[aá]|bom dia|boa tarde|boa noite|quero agendar|quero marcar|agendar|marcar horario)[!.,\s]*$/i
 
@@ -203,6 +204,19 @@ function parseMessageBuffer(raw: Prisma.JsonValue | null) {
 
 async function wait(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function hasPendingBufferedMessages(input: {
+  bufferedMessages: string[]
+  lastMessageTimestamp: Date | null
+  activeWindowMs: number
+  referenceTime: number
+}) {
+  return Boolean(
+    input.bufferedMessages.length > 0
+    && input.lastMessageTimestamp
+    && input.referenceTime - input.lastMessageTimestamp.getTime() <= input.activeWindowMs
+  )
 }
 
 function buildFallbackCustomerName(phone: string) {
@@ -508,55 +522,102 @@ async function aggregateInboundMessages(input: {
   })
   const aggregationState = normalizeConversationStateForAggregation(conversation.state)
   const previousMessages = parseMessageBuffer(conversation.messageBuffer)
-  const activeWindowMs = resolveAggregationWindowMs({
+  let activeWindowMs = resolveAggregationWindowMs({
     state: aggregationState,
     currentMessage: normalizedMessage,
     previousMessages,
   })
+  const now = new Date()
+  let previousBuffer = hasPendingBufferedMessages({
+    bufferedMessages: previousMessages,
+    lastMessageTimestamp: conversation.lastMessageTimestamp,
+    activeWindowMs,
+    referenceTime: now.getTime(),
+  })
+    ? previousMessages
+    : []
+  const clearlyCompleteMessage = isClearlyCompleteMessage(normalizedMessage)
+
+  if (aggregationState === 'IDLE' && clearlyCompleteMessage && previousBuffer.length > 0) {
+    console.info('[whatsapp-agent] blocked immediate processing due to pending buffer', {
+      conversationId: conversation.id,
+      state: aggregationState,
+      message: normalizedMessage,
+      bufferedMessages: previousBuffer,
+    })
+  }
 
   if (shouldProcessImmediately({
     state: aggregationState,
     message: normalizedMessage,
-    previousMessages,
+    previousMessages: previousBuffer,
   })) {
-    await prisma.whatsappConversation.update({
+    await wait(IMMEDIATE_PROCESSING_GUARD_MS)
+
+    const refreshedConversation = await prisma.whatsappConversation.findUnique({
       where: { id: conversation.id },
-      data: {
-        phone: input.phone ?? null,
-        messageBuffer: Prisma.JsonNull,
-        lastMessageTimestamp: null,
+      select: {
+        id: true,
+        messageBuffer: true,
+        lastMessageTimestamp: true,
       },
     })
+    const refreshedMessages = parseMessageBuffer(refreshedConversation?.messageBuffer ?? null)
+    activeWindowMs = resolveAggregationWindowMs({
+      state: aggregationState,
+      currentMessage: normalizedMessage,
+      previousMessages: refreshedMessages,
+    })
+    const refreshedPendingBuffer = hasPendingBufferedMessages({
+      bufferedMessages: refreshedMessages,
+      lastMessageTimestamp: refreshedConversation?.lastMessageTimestamp ?? null,
+      activeWindowMs,
+      referenceTime: Date.now(),
+    })
 
-    console.info('[whatsapp-agent] immediate processing allowed', {
+    if (!refreshedPendingBuffer) {
+      await prisma.whatsappConversation.update({
+        where: { id: conversation.id },
+        data: {
+          phone: input.phone ?? null,
+          messageBuffer: Prisma.JsonNull,
+          lastMessageTimestamp: null,
+        },
+      })
+
+      console.info('[whatsapp-agent] immediate processing allowed', {
+        conversationId: conversation.id,
+        state: aggregationState,
+        message: normalizedMessage,
+        reason: 'clearly_complete_message',
+      })
+
+      console.info('[whatsapp-agent] message aggregation', {
+        state: aggregationState,
+        windowMs: activeWindowMs,
+        rawMessages: [normalizedMessage],
+        concatenatedMessage: normalizedMessage,
+      })
+
+      return {
+        shouldProcess: true,
+        conversationId: conversation.id,
+        rawMessages: [normalizedMessage],
+        concatenatedMessage: normalizedMessage,
+        reason: 'immediate',
+      }
+    }
+
+    previousBuffer = refreshedMessages
+
+    console.info('[whatsapp-agent] blocked immediate processing due to pending buffer', {
       conversationId: conversation.id,
       state: aggregationState,
       message: normalizedMessage,
-      reason: 'clearly_complete_message',
+      bufferedMessages: previousBuffer,
     })
-
-    console.info('[whatsapp-agent] message aggregation', {
-      state: aggregationState,
-      windowMs: activeWindowMs,
-      rawMessages: [normalizedMessage],
-      concatenatedMessage: normalizedMessage,
-    })
-
-    return {
-      shouldProcess: true,
-      conversationId: conversation.id,
-      rawMessages: [normalizedMessage],
-      concatenatedMessage: normalizedMessage,
-      reason: 'immediate',
-    }
   }
 
-  const now = new Date()
-  const previousBuffer =
-    conversation.lastMessageTimestamp
-    && now.getTime() - conversation.lastMessageTimestamp.getTime() <= activeWindowMs
-      ? previousMessages
-      : []
   const nextBuffer = [...previousBuffer, normalizedMessage]
 
   await prisma.whatsappConversation.update({
@@ -567,6 +628,15 @@ async function aggregateInboundMessages(input: {
       lastMessageTimestamp: now,
     },
   })
+
+  if (previousBuffer.length > 0) {
+    console.info('[whatsapp-agent] merged into existing pending buffer', {
+      conversationId: conversation.id,
+      state: aggregationState,
+      rawMessages: nextBuffer,
+      concatenatedMessage: buildConcatenatedMessage(nextBuffer),
+    })
+  }
 
   console.info('[whatsapp-agent] buffered message', {
     conversationId: conversation.id,
@@ -941,6 +1011,7 @@ export const __testing = {
   isClearlyCompleteMessage,
   isStronglyAggregatedMessage,
   buildConcatenatedMessage,
+  hasPendingBufferedMessages,
   resolveAggregationWindowMs,
   shouldProcessImmediately,
 }

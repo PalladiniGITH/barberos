@@ -14,7 +14,6 @@ import {
 import {
   buildDateAnchorUtc,
   getAvailableBusinessPeriodsForDate,
-  getCurrentBusinessPeriod,
   getCurrentDateTimeInTimezone,
   getTodayIsoInTimezone,
   resolveBusinessTimezone,
@@ -312,7 +311,7 @@ function buildPeriodQuestion(input?: {
   }
 }) {
   if (!input?.requestedDateIso || !input.nowContext) {
-    return 'Perfeito. Voce prefere de manha, a tarde ou a noite?'
+    return 'Perfeito. Tem algum horario especifico que voce prefere? Se quiser, tambem posso procurar por periodo.'
   }
 
   const availablePeriods = getAvailableBusinessPeriodsForDate({
@@ -326,17 +325,13 @@ function buildPeriodQuestion(input?: {
 
   if (availablePeriods.length === 1) {
     return availablePeriods[0] === 'EVENING'
-      ? 'Perfeito. Para esse dia eu consigo te atender na noite. Quer que eu te mostre os horarios?'
+      ? 'Perfeito. Para esse dia eu consigo te atender na noite. Qual horario voce gostaria?'
       : availablePeriods[0] === 'AFTERNOON'
-        ? 'Perfeito. Para esse dia eu consigo te atender na tarde. Quer que eu te mostre os horarios?'
-        : 'Perfeito. Para esse dia eu consigo te atender na manha. Quer que eu te mostre os horarios?'
+        ? 'Perfeito. Para esse dia eu consigo te atender na tarde. Qual horario voce gostaria?'
+        : 'Perfeito. Para esse dia eu consigo te atender na manha. Qual horario voce gostaria?'
   }
 
-  if (getCurrentBusinessPeriod(input.nowContext) !== 'MORNING' && availablePeriods.length === 2) {
-    return 'Perfeito. Voce prefere tarde ou noite?'
-  }
-
-  return 'Perfeito. Voce prefere de manha, a tarde ou a noite?'
+  return 'Qual horario voce gostaria? Se preferir, tambem posso procurar por periodo.'
 }
 
 function buildNoAvailabilityMessage(dateIso: string, timezone: string) {
@@ -2153,19 +2148,6 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     })
   }
 
-  const availablePeriodsForDraft = getAvailableBusinessPeriodsForDate({
-    selectedDateIso: draft.requestedDateIso,
-    nowContext,
-  })
-
-  if (
-    draft.requestedDateIso
-    && !draft.requestedTimeLabel
-    && availablePeriodsForDraft.length === 1
-  ) {
-    draft.requestedTimeLabel = availablePeriodsForDraft[0]
-  }
-
   console.info('[whatsapp-conversation] scheduling field normalization', {
     customerId: input.customer.id,
     requestedDateBefore: baselineDraft.requestedDateIso,
@@ -2325,10 +2307,12 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   if (!draft.allowAnyProfessional && !draft.selectedProfessionalId) {
     const responseText = professionals.length === 1
       ? withLeadIn(
-          `Perfeito. Vou buscar com ${professionals[0].name}. ${buildPeriodQuestion({
-            requestedDateIso: draft.requestedDateIso,
-            nowContext,
-          })}`,
+          `Perfeito. Vou buscar com ${professionals[0].name}. ${draft.requestedDateIso
+            ? buildPeriodQuestion({
+                requestedDateIso: draft.requestedDateIso,
+                nowContext,
+              })
+            : buildDateQuestion()}`,
           responseLeadIn
         )
       : withLeadIn(
@@ -2341,52 +2325,32 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
 
     await prisma.whatsappConversation.update({
       where: { id: conversation.id },
-      data: {
-        ...baseUpdate,
-        state: professionals.length === 1 ? 'WAITING_TIME' : 'WAITING_PROFESSIONAL',
-        selectedProfessionalId: professionals.length === 1 ? professionals[0].id : null,
-        selectedProfessionalName: professionals.length === 1 ? professionals[0].name : null,
-        allowAnyProfessional: draft.allowAnyProfessional,
-        slotOptions: JSON_NULL,
+        data: {
+          ...baseUpdate,
+          state: professionals.length === 1
+            ? (draft.requestedDateIso ? 'WAITING_TIME' : 'WAITING_DATE')
+            : 'WAITING_PROFESSIONAL',
+          selectedProfessionalId: professionals.length === 1 ? professionals[0].id : null,
+          selectedProfessionalName: professionals.length === 1 ? professionals[0].name : null,
+          allowAnyProfessional: draft.allowAnyProfessional,
+          slotOptions: JSON_NULL,
         selectedSlot: JSON_NULL,
         lastAssistantText: responseText,
       },
     })
 
-    return {
-      responseText,
-      flow: professionals.length === 1 ? 'collect_period' : 'collect_professional',
-      conversationId: conversation.id,
-      conversationState: professionals.length === 1 ? 'WAITING_TIME' : 'WAITING_PROFESSIONAL',
-      usedAI,
+      return {
+        responseText,
+        flow: professionals.length === 1
+          ? (draft.requestedDateIso ? 'collect_period' : 'collect_date')
+          : 'collect_professional',
+        conversationId: conversation.id,
+        conversationState: professionals.length === 1
+          ? (draft.requestedDateIso ? 'WAITING_TIME' : 'WAITING_DATE')
+          : 'WAITING_PROFESSIONAL',
+        usedAI,
+      }
     }
-  }
-
-  if (!hasResolvedTimePreference(draft.requestedTimeLabel)) {
-    const responseText = withLeadIn(buildPeriodQuestion({
-      requestedDateIso: draft.requestedDateIso,
-      nowContext,
-    }), responseLeadIn)
-
-    await prisma.whatsappConversation.update({
-      where: { id: conversation.id },
-      data: {
-        ...baseUpdate,
-        state: 'WAITING_TIME',
-        slotOptions: JSON_NULL,
-        selectedSlot: JSON_NULL,
-        lastAssistantText: responseText,
-      },
-    })
-
-    return {
-      responseText,
-      flow: 'collect_period',
-      conversationId: conversation.id,
-      conversationState: 'WAITING_TIME',
-      usedAI,
-    }
-  }
 
   if (effectiveState === 'WAITING_CONFIRMATION' && interpreted.intent === 'DECLINE') {
     const responseText = withLeadIn(buildRescheduleMessage(), responseLeadIn)
@@ -2430,6 +2394,32 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       flow: 'collect_date',
       conversationId: conversation.id,
       conversationState: 'WAITING_DATE',
+      usedAI,
+    }
+  }
+
+  if (!hasResolvedTimePreference(draft.requestedTimeLabel)) {
+    const responseText = withLeadIn(buildPeriodQuestion({
+      requestedDateIso: draft.requestedDateIso,
+      nowContext,
+    }), responseLeadIn)
+
+    await prisma.whatsappConversation.update({
+      where: { id: conversation.id },
+      data: {
+        ...baseUpdate,
+        state: 'WAITING_TIME',
+        slotOptions: JSON_NULL,
+        selectedSlot: JSON_NULL,
+        lastAssistantText: responseText,
+      },
+    })
+
+    return {
+      responseText,
+      flow: 'collect_period',
+      conversationId: conversation.id,
+      conversationState: 'WAITING_TIME',
       usedAI,
     }
   }

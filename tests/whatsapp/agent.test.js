@@ -217,7 +217,7 @@ test('validateMissingFields nao oferece manha quando ja e tarde e a data e hoje'
   assert.deepEqual(validation.missingFields, ['period'])
 })
 
-test('guardrail de periodo pergunta apenas o que faz sentido no horario atual', () => {
+test('guardrail de horario pergunta primeiro por horario especifico quando a data ja esta definida', () => {
   const input = createAgentInput()
   input.nowContext = {
     dateIso: '2026-04-13',
@@ -241,8 +241,9 @@ test('guardrail de periodo pergunta apenas o que faz sentido no horario atual', 
     nowContext: input.nowContext,
   })
 
-  assert.match(reply, /tarde ou noite/i)
-  assert.doesNotMatch(reply, /manha/i)
+  assert.match(reply, /Qual horario voce gostaria/i)
+  assert.match(reply, /periodo/i)
+  assert.doesNotMatch(reply, /Voce prefere manha, tarde ou noite/i)
 })
 
 test('backend fecha o fluxo quando ja existe resumo final e o cliente confirma', () => {
