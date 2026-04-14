@@ -397,7 +397,20 @@ function parseExplicitTime(message: string) {
 function extractMentionedName(message: string, professionals: Array<{ name: string }>) {
   const directMatch = message.match(/\b(?:com|do|da)\s+([a-zA-ZÀ-ÿ]+(?:\s+[a-zA-ZÀ-ÿ]+){0,2})/i)
   const fallbackMatch = message.match(/\b([A-ZÀ-Ý][a-zà-ÿ]+(?:\s+[A-ZÀ-Ý][a-zà-ÿ]+){0,2})\b/)
+  const normalizedMessage = normalizeText(message)
   const rawName = directMatch?.[1] ?? fallbackMatch?.[1] ?? null
+
+  if (!rawName) {
+    const exactCandidates = professionals.filter((professional) => {
+      const normalizedProfessional = normalizeText(professional.name)
+      const normalizedFirstName = normalizeText(professional.name.split(/\s+/)[0] ?? '')
+      return normalizedMessage === normalizedProfessional || normalizedMessage === normalizedFirstName
+    })
+
+    if (exactCandidates.length === 1 && !isNameStopwordToken(normalizedMessage)) {
+      return exactCandidates[0].name
+    }
+  }
 
   return sanitizeMentionedNameCandidate(rawName, professionals, Boolean(directMatch))
 }
@@ -726,6 +739,7 @@ function buildInterpreterPrompt(input: WhatsAppInterpreterInput) {
     '- mentionedName deve conter apenas o nome citado pelo cliente ou null.',
     '- Nao assuma que mentionedName e barbeiro; so extraia nomes realmente plausiveis.',
     '- Palavras como quero, marcar, agendar, hoje, amanha, manha, tarde, noite e horario nunca sao nomes.',
+    '- Se a mensagem vier so com um nome valido de barbeiro, trate isso como escolha de profissional.',
     '- requestedDateIso deve ser yyyy-mm-dd apenas quando a data estiver clara.',
     '- Para "hoje", "amanha" e "depois de amanha", use a data local da barbearia.',
     '- preferredPeriod deve ser MORNING, AFTERNOON, EVENING ou null.',

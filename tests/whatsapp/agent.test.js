@@ -12,6 +12,7 @@ const SERVICES = [
 const PROFESSIONALS = [
   { id: 'pro-matheus', name: 'Matheus' },
   { id: 'pro-lucas', name: 'Lucas' },
+  { id: 'pro-rafael', name: 'Rafael Costa' },
 ]
 
 function createAgentInput() {
@@ -309,6 +310,23 @@ test('guardrail de servico mostra a lista real quando o servico ainda nao foi de
   assert.match(reply, /Barba/)
 })
 
+test('sem historico e sem liberacao para qualquer um o backend pergunta barbeiro antes de sugerir horarios', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.requestedDateIso = '2026-04-13'
+  memory.requestedTimeLabel = '15:00'
+
+  const corrected = agentTesting.enforceNextActionFromMemory(
+    'OFFER_SLOTS',
+    memory,
+    false,
+    createAgentInput().nowContext
+  )
+
+  assert.equal(corrected, 'ASK_PROFESSIONAL')
+})
+
 test('backend nao confirma horario enquanto o barbeiro nao estiver definido ou liberado como qualquer um', () => {
   const memory = agentTesting.buildInitialMemory(createAgentInput())
   memory.selectedServiceId = 'svc-classic'
@@ -376,8 +394,75 @@ test('trata respostas afirmativas amplas como confirmacao real no momento certo'
   const affirmativeReplies = ['sim', 'desejo', 'quero', 'pode marcar', 'confirmar', 'fechado', 'ok']
 
   affirmativeReplies.forEach((reply) => {
-    assert.equal(agentTesting.isExplicitConfirmation(reply), true)
+  assert.equal(agentTesting.isExplicitConfirmation(reply), true)
   })
+})
+
+test('interpreta "rafael" isolado como escolha de barbeiro no contexto certo', async () => {
+  const intent = await interpretWhatsAppMessage({
+    message: 'rafael',
+    barbershopName: 'Linha Nobre',
+    barbershopTimezone: 'America/Sao_Paulo',
+    conversationState: 'WAITING_PROFESSIONAL',
+    offeredSlotCount: 0,
+    services: SERVICES.map((service) => ({ name: service.name })),
+    professionals: PROFESSIONALS.map((professional) => ({ name: professional.name })),
+    todayIsoDate: '2026-04-13',
+    currentLocalDateTime: '2026-04-13 10:30',
+    conversationSummary: {
+      selectedServiceName: 'Corte Classic',
+      selectedProfessionalName: null,
+      requestedDateIso: '2026-04-13',
+      requestedTimeLabel: null,
+      allowAnyProfessional: false,
+      lastCustomerMessage: 'corte',
+      lastAssistantMessage: 'Tem preferencia de barbeiro ou posso procurar com qualquer um?',
+    },
+  })
+
+  assert.equal(intent.mentionedName, 'Rafael Costa')
+  assert.equal(intent.greetingOnly, false)
+})
+
+test('remove vocativo ambiguo quando o nome citado e do barbeiro e nao do cliente', () => {
+  const reply = agentTesting.sanitizeReplyTextAgainstProfessionalVocative({
+    replyText: 'Perfeito, Rafael. Tenho o Corte Classic as 15:00 com o Rafael Costa para hoje. Posso confirmar?',
+    customerName: 'Gustavo',
+    selectedProfessionalName: 'Rafael Costa',
+    mentionedName: 'Rafael Costa',
+    professionals: PROFESSIONALS,
+  })
+
+  assert.equal(reply.startsWith('Perfeito, Rafael'), false)
+  assert.match(reply, /^Perfeito\./)
+})
+
+test('atalho deterministico fecha a confirmacao quando o cliente responde afirmativamente', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.state = 'WAITING_CONFIRMATION'
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.selectedProfessionalId = 'pro-rafael'
+  memory.selectedProfessionalName = 'Rafael Costa'
+  memory.requestedDateIso = '2026-04-13'
+  memory.selectedSlot = {
+    key: 'pro-rafael:2026-04-13T18:00:00.000Z',
+    professionalId: 'pro-rafael',
+    professionalName: 'Rafael Costa',
+    dateIso: '2026-04-13',
+    timeLabel: '15:00',
+    startAtIso: '2026-04-13T18:00:00.000Z',
+    endAtIso: '2026-04-13T18:35:00.000Z',
+  }
+
+  assert.equal(
+    agentTesting.shouldUseDeterministicConfirmationShortcut({
+      memory,
+      inboundText: 'pode',
+      lastAssistantText: 'Posso confirmar esse horario para voce?',
+    }),
+    true
+  )
 })
 
 test('interpreta horario explicito como busca exata prioritaria', async () => {

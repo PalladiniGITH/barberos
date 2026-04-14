@@ -739,7 +739,7 @@ function enforceNextActionFromMemory(
 }
 
 function isExplicitConfirmation(message: string) {
-  return /\b(sim|desejo|quero|confirmo|confirmar|confirmado|confirma|fechado|ok|beleza|pode confirmar|pode marcar|pode agendar|pode ser)\b/.test(normalizeText(message))
+  return /\b(sim|desejo|quero|confirmo|confirmar|confirmado|confirma|fechado|ok|beleza|pode|pode confirmar|pode marcar|pode agendar|pode ser)\b/.test(normalizeText(message))
 }
 
 function extractResponseText(payload: ResponsePayload) {
@@ -922,6 +922,75 @@ function buildServiceQuestionFromNames(serviceNames: string[]) {
 function referencesPreferredProfessional(message: string) {
   const normalized = normalizeText(message)
   return /\b(meu barbeiro|o de sempre|de sempre|mesmo de sempre|meu de sempre|manter com o meu barbeiro|com o mesmo)\b/.test(normalized)
+}
+
+function hasExplicitAnyProfessionalConsent(message: string) {
+  return /\b(qualquer um|qualquer barbeiro|tanto faz|sem preferencia|sem preferência)\b/.test(
+    normalizeText(message)
+  )
+}
+
+function shouldUseDeterministicConfirmationShortcut(input: {
+  memory: WorkingMemory
+  inboundText: string
+  lastAssistantText?: string | null
+}) {
+  if (
+    input.memory.state !== 'WAITING_CONFIRMATION'
+    || !input.memory.selectedServiceId
+    || !input.memory.selectedSlot
+    || !isExplicitConfirmation(input.inboundText)
+  ) {
+    return false
+  }
+
+  if (!input.lastAssistantText) {
+    return true
+  }
+
+  return /(posso confirmar|me confirma|quer que eu confirme|pode confirmar)/i.test(
+    normalizeText(input.lastAssistantText)
+  )
+}
+
+function sanitizeReplyTextAgainstProfessionalVocative(input: {
+  replyText: string
+  customerName: string
+  selectedProfessionalName?: string | null
+  mentionedName?: string | null
+  professionals: WhatsAppAgentInput['professionals']
+}) {
+  const match = input.replyText.match(/^(Oi|Perfeito|Certo|Beleza|Boa|Show|Fechado),\s+([A-Za-zÀ-ÿ]+)([!,.]?\s*)/i)
+  if (!match) {
+    return input.replyText
+  }
+
+  const leadIn = match[1]
+  const vocativeName = normalizeText(match[2])
+  const customerFirstName = normalizeText(input.customerName.trim().split(/\s+/)[0] ?? '')
+  const professionalNames = new Set<string>()
+
+  if (input.selectedProfessionalName) {
+    professionalNames.add(normalizeText(input.selectedProfessionalName))
+    professionalNames.add(normalizeText(input.selectedProfessionalName.split(/\s+/)[0] ?? ''))
+  }
+
+  if (input.mentionedName) {
+    professionalNames.add(normalizeText(input.mentionedName))
+    professionalNames.add(normalizeText(input.mentionedName.split(/\s+/)[0] ?? ''))
+  }
+
+  input.professionals.forEach((professional) => {
+    professionalNames.add(normalizeText(professional.name))
+    professionalNames.add(normalizeText(professional.name.split(/\s+/)[0] ?? ''))
+  })
+
+  if (vocativeName === customerFirstName || !professionalNames.has(vocativeName)) {
+    return input.replyText
+  }
+
+  const punctuation = leadIn.toLowerCase() === 'oi' ? '! ' : '. '
+  return input.replyText.replace(match[0], `${leadIn}${punctuation}`)
 }
 
 function assignPreferredProfessionalToMemory(input: {
@@ -1256,6 +1325,8 @@ function buildToolPhasePrompt(input: {
     'Se o servico ainda nao estiver definido, use list_services para trazer a lista real completa da barbearia.',
     'Pergunte o horario especifico antes de perguntar periodo. Use manha/tarde/noite so como fallback quando o cliente nao tiver horario especifico.',
     'Nao busque horarios nem confirme slot antes de existir barbeiro definido, barbeiro preferencial valido ou allowAnyProfessional explicito.',
+    'Se o cliente responder apenas com um nome de barbeiro, trate isso como escolha de profissional.',
+    'Nao use o nome do barbeiro escolhido como vocativo do cliente na resposta.',
   ].join('\n')
 }
 
@@ -1290,6 +1361,8 @@ function buildFinalPrompt(input: {
     'Se faltar servico, responda mostrando a lista real de servicos disponiveis.',
     'Pergunte o horario especifico antes de sugerir periodo sempre que o cliente ainda nao tiver dado um horario claro.',
     'Se faltar definicao de barbeiro, pergunte preferencia antes de confirmar horario.',
+    'Se o cliente respondeu afirmativamente depois de um "Posso confirmar?", finalize o agendamento; nao repita a pre-confirmacao.',
+    'Se o cliente responder apenas com um nome de barbeiro, trate isso como escolha de profissional e nao como vocativo.',
   ].join('\n')
 }
 
@@ -1642,9 +1715,14 @@ async function executeAgentTool(input: {
 
     let professionalId = typeof args.professionalId === 'string' ? args.professionalId : memory.selectedProfessionalId
     let professionalName = typeof args.professionalName === 'string' ? args.professionalName : memory.selectedProfessionalName
-    const allowAnyProfessional = typeof args.allowAnyProfessional === 'boolean'
-      ? args.allowAnyProfessional
-      : memory.allowAnyProfessional
+    const allowAnyProfessional = Boolean(
+      memory.allowAnyProfessional
+      || (
+        typeof args.allowAnyProfessional === 'boolean'
+        && args.allowAnyProfessional
+        && hasExplicitAnyProfessionalConsent(agentInput.inboundText)
+      )
+    )
 
     if (!professionalId && !allowAnyProfessional && agentInput.customer.preferredProfessionalId) {
       professionalId = agentInput.customer.preferredProfessionalId
@@ -1731,9 +1809,14 @@ async function executeAgentTool(input: {
       memory.selectedServiceName = service.name
     }
 
-    const allowAnyProfessional = typeof args.allowAnyProfessional === 'boolean'
-      ? args.allowAnyProfessional
-      : memory.allowAnyProfessional
+    const allowAnyProfessional = Boolean(
+      memory.allowAnyProfessional
+      || (
+        typeof args.allowAnyProfessional === 'boolean'
+        && args.allowAnyProfessional
+        && hasExplicitAnyProfessionalConsent(agentInput.inboundText)
+      )
+    )
 
     if (allowAnyProfessional) {
       memory.allowAnyProfessional = true
@@ -2018,6 +2101,46 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     })
   }
 
+  if (shouldUseDeterministicConfirmationShortcut({
+    memory,
+    inboundText: input.inboundText,
+    lastAssistantText: input.conversation.lastAssistantText,
+  })) {
+    const responseText =
+      'Perfeito, ficou marcado.\n\nVou confirmar esse horario no sistema agora para voce.'
+
+    memory.conversationSummary = buildRuntimeSummary(memory)
+
+    console.info('[whatsapp-agent] deterministic confirmation shortcut', {
+      customerId: input.customer.id,
+      conversationId: input.conversation.id,
+      selectedServiceId: memory.selectedServiceId,
+      selectedSlot: memory.selectedSlot,
+    })
+
+    return {
+      responseText,
+      flow: 'appointment_created',
+      conversationState: 'WAITING_CONFIRMATION',
+      shouldCreateAppointment: true,
+      memory,
+      structured: {
+        intent: 'CONFIRM',
+        correctionTarget: 'NONE',
+        mentionedName: fallbackIntent.mentionedName,
+        preferredPeriod: fallbackIntent.preferredPeriod,
+        requestedDate: memory.requestedDateIso,
+        requestedTime: memory.selectedSlot?.timeLabel ?? memory.requestedTimeLabel,
+        confidence: 0.99,
+        nextAction: 'CONFIRM_BOOKING',
+        replyText: responseText,
+        summary: memory.conversationSummary,
+      },
+      toolTrace: [],
+      usedAI: false,
+    }
+  }
+
   const fallbackStructured = buildFallbackStructuredOutput({
     fallbackIntent,
     memory,
@@ -2269,10 +2392,17 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
           nowContext: input.nowContext,
         })
       : null
+      const sanitizedReplyText = sanitizeReplyTextAgainstProfessionalVocative({
+        replyText: toolFailureOverride?.replyText ?? guardedReplyText ?? structuredDraft.replyText,
+        customerName: input.customer.name,
+        selectedProfessionalName: memory.selectedProfessionalName,
+        mentionedName: structuredDraft.mentionedName,
+        professionals: input.professionals,
+      })
       const structured = {
         ...structuredDraft,
         nextAction: normalizedNextAction,
-        replyText: toolFailureOverride?.replyText ?? guardedReplyText ?? structuredDraft.replyText,
+        replyText: sanitizedReplyText,
       } satisfies AgentStructuredOutput
 
       memory.state = inferConversationState(structured.nextAction, memory, input.nowContext)
@@ -2316,4 +2446,7 @@ export const __testing = {
   buildGuardrailReplyText,
   referencesPreferredProfessional,
   isExplicitConfirmation,
+  hasExplicitAnyProfessionalConsent,
+  sanitizeReplyTextAgainstProfessionalVocative,
+  shouldUseDeterministicConfirmationShortcut,
 }

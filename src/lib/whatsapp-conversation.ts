@@ -1694,6 +1694,12 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
           notes: 'Agendamento criado via agente conversacional do WhatsApp.',
         })
 
+        const responseText = buildSuccessMessage(
+          agentResult.memory.selectedSlot,
+          agentResult.memory.selectedServiceName ?? 'o servico solicitado',
+          timezone
+        )
+
         await prisma.whatsappConversation.update({
           where: { id: conversation.id },
           data: {
@@ -1728,7 +1734,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
                 timeLabel: agentResult.memory.selectedSlot.timeLabel,
               },
             }),
-            lastAssistantText: agentResult.responseText,
+            lastAssistantText: responseText,
             completedAt: new Date(),
           },
         })
@@ -1741,7 +1747,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
         })
 
         return {
-          responseText: agentResult.responseText,
+          responseText,
           flow: 'appointment_created',
           conversationId: conversation.id,
           conversationState: 'IDLE',
