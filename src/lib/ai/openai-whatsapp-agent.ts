@@ -93,7 +93,7 @@ interface ToolTraceEntry {
 }
 
 interface AgentStructuredOutput {
-  intent: 'BOOK_APPOINTMENT' | 'CHECK_EXISTING_BOOKING' | 'CONFIRM' | 'DECLINE' | 'CHANGE_REQUEST' | 'UNKNOWN'
+  intent: 'BOOK_APPOINTMENT' | 'CHECK_EXISTING_BOOKING' | 'ACKNOWLEDGEMENT' | 'CONFIRM' | 'DECLINE' | 'CHANGE_REQUEST' | 'UNKNOWN'
   correctionTarget: 'NONE' | 'SERVICE' | 'PROFESSIONAL' | 'DATE' | 'PERIOD' | 'TIME' | 'FLOW'
   mentionedName: string | null
   preferredPeriod: 'MORNING' | 'AFTERNOON' | 'EVENING' | null
@@ -210,7 +210,7 @@ const AGENT_OUTPUT_SCHEMA = {
   properties: {
     intent: {
       type: 'string',
-      enum: ['BOOK_APPOINTMENT', 'CHECK_EXISTING_BOOKING', 'CONFIRM', 'DECLINE', 'CHANGE_REQUEST', 'UNKNOWN'],
+      enum: ['BOOK_APPOINTMENT', 'CHECK_EXISTING_BOOKING', 'ACKNOWLEDGEMENT', 'CONFIRM', 'DECLINE', 'CHANGE_REQUEST', 'UNKNOWN'],
     },
     correctionTarget: {
       type: 'string',

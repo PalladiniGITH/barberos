@@ -16,16 +16,15 @@ import {
 } from '@/lib/agendamentos/whatsapp-booking'
 import {
   buildExistingCustomerBookingResponse,
+  getExistingCustomerBookings,
+  type ExistingCustomerBookingQueryScope,
   type ExistingCustomerBookingItem,
 } from '@/lib/agendamentos/customer-booking-status'
 import {
   buildDateAnchorUtc,
-  formatIsoDateInTimezone,
-  formatTimeInTimezone,
   getAvailableBusinessPeriodsForDate,
   getCurrentDateTimeInTimezone,
   getTodayIsoInTimezone,
-  localDateTimeToUtc,
   resolveBusinessTimezone,
 } from '@/lib/timezone'
 import { resolveCustomerPreferredProfessional } from '@/lib/customers/preferred-professional'
@@ -60,6 +59,7 @@ interface ConversationServiceResult {
   responseText: string
   flow:
     | 'greeting'
+    | 'acknowledgement'
     | 'booking_status'
     | 'collect_service'
     | 'collect_professional'
@@ -130,6 +130,11 @@ interface RecentConfirmedBookingMemory {
   professionalName: string
   dateIso: string
   timeLabel: string
+}
+
+interface ExistingBookingQuery {
+  scope: ExistingCustomerBookingQueryScope
+  requestedDateIso: string | null
 }
 
 interface ContextualProfessionalPreference {
@@ -291,6 +296,54 @@ function parseRequestedDateFromExistingBookingQuestion(input: {
   return input.draft.requestedDateIso ?? input.recentBooking?.dateIso ?? null
 }
 
+function parseExistingBookingQuery(input: {
+  message: string
+  draft: ConversationDraft
+  recentBooking: RecentConfirmedBookingMemory | null
+  timezone: string
+}) {
+  const normalized = normalizeText(input.message)
+
+  if (
+    normalized.includes('essa semana')
+    || normalized.includes('dessa semana')
+    || normalized.includes('meus horarios da semana')
+    || normalized.includes('meus horarios dessa semana')
+  ) {
+    return {
+      scope: 'WEEK',
+      requestedDateIso: null,
+    } satisfies ExistingBookingQuery
+  }
+
+  return {
+    scope: input.draft.requestedDateIso || input.recentBooking?.dateIso ? 'DAY' : 'NEXT',
+    requestedDateIso: parseRequestedDateFromExistingBookingQuestion(input),
+  } satisfies ExistingBookingQuery
+}
+
+function isAcknowledgementMessage(message: string) {
+  return /^(ok|obrigado|obg|valeu|blz|beleza|fechou|show|perfeito|maravilha|tudo certo|tranquilo)[!.\s]*$/i.test(
+    normalizeText(message)
+  )
+}
+
+function buildAcknowledgementResponse(input: {
+  recentBooking: RecentConfirmedBookingMemory | null
+  timezone: string
+  effectiveState: ConversationState
+}) {
+  if (input.recentBooking) {
+    return 'Perfeito! Qualquer coisa e so me chamar 🙂'
+  }
+
+  if (input.effectiveState !== 'IDLE') {
+    return 'Perfeito! Qualquer coisa e so me chamar 🙂'
+  }
+
+  return 'Tudo certo 🙂'
+}
+
 function isExistingBookingStatusQuestion(input: {
   message: string
   lastCustomerMessage?: string | null
@@ -323,6 +376,7 @@ function buildBookingStatusFollowUp(draft: ConversationDraft) {
 }
 
 function buildExistingBookingStatusMessage(input: {
+  queryScope: ExistingCustomerBookingQueryScope
   requestedDateIso: string | null
   bookings: ExistingCustomerBookingItem[]
   timezone: string
@@ -330,6 +384,7 @@ function buildExistingBookingStatusMessage(input: {
 }) {
   const baseMessage = buildExistingCustomerBookingResponse({
     bookings: input.bookings,
+    queryScope: input.queryScope,
     requestedDateIso: input.requestedDateIso,
     timezone: input.timezone,
     hasSchedulingContext: false,
@@ -347,48 +402,18 @@ async function loadExistingCustomerBookings(input: {
   customerId: string
   timezone: string
   nowDateIso: string
+  queryScope: ExistingCustomerBookingQueryScope
+  requestedDateIso: string | null
 }) {
-  const localDayStartUtc = localDateTimeToUtc({
-    dateIso: input.nowDateIso,
-    timeLabel: '00:00',
+  return getExistingCustomerBookings({
+    barbershopId: input.barbershopId,
+    customerId: input.customerId,
     timezone: input.timezone,
-  }).startAtUtc
-
-  const appointments = await prisma.appointment.findMany({
-    where: {
-      barbershopId: input.barbershopId,
-      customerId: input.customerId,
-      status: { in: ['PENDING', 'CONFIRMED'] },
-      startAt: { gte: localDayStartUtc },
-    },
-    orderBy: { startAt: 'asc' },
-    take: 8,
-    select: {
-      id: true,
-      status: true,
-      startAt: true,
-      professional: {
-        select: {
-          name: true,
-        },
-      },
-      service: {
-        select: {
-          name: true,
-        },
-      },
-    },
+    requestedDateIso: input.requestedDateIso,
+    queryScope: input.queryScope,
+    referenceDateIso: input.nowDateIso,
+    limit: input.queryScope === 'WEEK' ? 6 : 8,
   })
-
-  return appointments.map((appointment) => ({
-    id: appointment.id,
-    status: appointment.status as ExistingCustomerBookingItem['status'],
-    serviceName: appointment.service.name,
-    professionalName: appointment.professional.name,
-    dateIso: formatIsoDateInTimezone(appointment.startAt, input.timezone),
-    dateLabel: formatDayLabel(formatIsoDateInTimezone(appointment.startAt, input.timezone), input.timezone),
-    timeLabel: formatTimeInTimezone(appointment.startAt, input.timezone),
-  } satisfies ExistingCustomerBookingItem))
 }
 
 async function handleExistingBookingStatusQuery(input: {
@@ -402,15 +427,24 @@ async function handleExistingBookingStatusQuery(input: {
   nowDateIso: string
   recentBooking: RecentConfirmedBookingMemory | null
 }) {
+  const existingBookingQuery = parseExistingBookingQuery({
+    message: input.inboundText,
+    draft: input.draft,
+    recentBooking: input.recentBooking,
+    timezone: input.timezone,
+  })
+
   const bookings = await loadExistingCustomerBookings({
     barbershopId: input.barbershopId,
     customerId: input.customerId,
     timezone: input.timezone,
     nowDateIso: input.nowDateIso,
+    queryScope: existingBookingQuery.scope,
+    requestedDateIso: existingBookingQuery.requestedDateIso,
   })
 
   if (input.effectiveState !== 'IDLE' || hasUsefulConversationProgress(input.draft)) {
-    console.info('[whatsapp-conversation] topic switch detected', {
+    console.info('[whatsapp-conversation] topic switch forced', {
       customerId: input.customerId,
       conversationId: input.conversationId,
       stateBefore: input.effectiveState,
@@ -428,6 +462,14 @@ async function handleExistingBookingStatusQuery(input: {
     totalUpcomingBookings: bookings.length,
   })
 
+  if (existingBookingQuery.scope === 'WEEK') {
+    console.info('[whatsapp-conversation] weekly booking query', {
+      customerId: input.customerId,
+      conversationId: input.conversationId,
+      totalUpcomingBookings: bookings.length,
+    })
+  }
+
   if (bookings.length > 0) {
     console.info('[whatsapp-conversation] existing booking found', {
       customerId: input.customerId,
@@ -436,15 +478,9 @@ async function handleExistingBookingStatusQuery(input: {
     })
   }
 
-  const requestedDateForQuery = parseRequestedDateFromExistingBookingQuestion({
-    message: input.inboundText,
-    draft: input.draft,
-    recentBooking: input.recentBooking,
-    timezone: input.timezone,
-  })
-
   const responseText = buildExistingBookingStatusMessage({
-    requestedDateIso: requestedDateForQuery,
+    queryScope: existingBookingQuery.scope,
+    requestedDateIso: existingBookingQuery.requestedDateIso,
     bookings,
     timezone: input.timezone,
     draft: input.draft,
@@ -457,7 +493,8 @@ async function handleExistingBookingStatusQuery(input: {
       lastIntent: buildJsonValue({
         source: 'booking_status_query',
         intent: 'CHECK_EXISTING_BOOKING',
-        requestedDateIso: requestedDateForQuery,
+        queryScope: existingBookingQuery.scope,
+        requestedDateIso: existingBookingQuery.requestedDateIso,
         bookings: bookings.slice(0, 3),
       }),
       lastAssistantText: responseText,
@@ -1799,6 +1836,66 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     }
   }
 
+  if (isAcknowledgementMessage(inboundText)) {
+    console.info('[whatsapp-conversation] acknowledgement detected', {
+      conversationId: conversation.id,
+      customerId: input.customer.id,
+      stateBefore: effectiveState,
+      inboundText,
+      hasRecentConfirmedBooking,
+    })
+
+    if (effectiveState !== 'IDLE' || hasUsefulConversationProgress(draftForInterpreter)) {
+      console.info('[whatsapp-conversation] topic switch forced', {
+        conversationId: conversation.id,
+        customerId: input.customer.id,
+        stateBefore: effectiveState,
+        inboundText,
+        reason: 'acknowledgement',
+      })
+    }
+
+    const responseText = buildAcknowledgementResponse({
+      recentBooking: hasRecentConfirmedBooking ? recentConfirmedBooking : null,
+      timezone,
+      effectiveState,
+    })
+
+    await prisma.whatsappConversation.update({
+      where: { id: conversation.id },
+      data: {
+        state: 'IDLE',
+        selectedServiceId: null,
+        selectedServiceName: null,
+        selectedProfessionalId: null,
+        selectedProfessionalName: null,
+        allowAnyProfessional: false,
+        requestedDate: null,
+        requestedTimeLabel: null,
+        slotOptions: JSON_NULL,
+        selectedSlot: JSON_NULL,
+        bookingDraft: JSON_NULL,
+        recentCorrections: JSON_NULL,
+        lastInboundText: inboundText,
+        lastIntent: buildJsonValue({
+          source: 'acknowledgement',
+          intent: 'ACKNOWLEDGEMENT',
+          recentBooking: recentConfirmedBooking,
+        }),
+        lastAssistantText: responseText,
+        completedAt: hasRecentConfirmedBooking ? conversation.completedAt : null,
+      },
+    })
+
+    return {
+      responseText,
+      flow: 'acknowledgement',
+      conversationId: conversation.id,
+      conversationState: 'IDLE',
+      usedAI: false,
+    }
+  }
+
   const preAgentExistingBookingQuestion = isExistingBookingStatusQuestion({
     message: inboundText,
     lastCustomerMessage: canContinueFromContext ? conversation.lastInboundText : null,
@@ -3036,6 +3133,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
 }
 
 export const __testing = {
+  buildAcknowledgementResponse,
   buildBookingStatusFollowUp,
   buildCompactNearbySlotSummary,
   buildEmptyConversationDraft,
@@ -3047,9 +3145,11 @@ export const __testing = {
   buildHumanSlotOfferMessage,
   hasUsefulConversationProgress,
   hasRecentCompletedBookingContext,
+  isAcknowledgementMessage,
   isExistingBookingStatusQuestion,
   isAffirmativeConfirmationMessage,
   isConversationContextReliable,
+  parseExistingBookingQuery,
   parseRequestedDateFromExistingBookingQuestion,
   isShortGreetingMessage,
   referencesPreferredProfessional,

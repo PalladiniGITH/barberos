@@ -11,6 +11,8 @@ import {
   shiftIsoDate,
 } from '@/lib/timezone'
 
+export type ExistingCustomerBookingQueryScope = 'NEXT' | 'DAY' | 'WEEK'
+
 export interface ExistingCustomerBookingItem {
   id: string
   status: 'PENDING' | 'CONFIRMED'
@@ -26,12 +28,24 @@ export async function getExistingCustomerBookings(input: {
   customerId: string
   timezone: string
   requestedDateIso?: string | null
+  queryScope?: ExistingCustomerBookingQueryScope
+  referenceDateIso?: string | null
   limit?: number
 }) {
   const timezone = resolveBusinessTimezone(input.timezone)
   const limit = input.limit ?? 3
+  const queryScope = input.queryScope ?? (input.requestedDateIso ? 'DAY' : 'NEXT')
+  const referenceDateIso = input.referenceDateIso ?? getTodayIsoInTimezone(timezone)
 
-  const startAtFilter = input.requestedDateIso
+  const nextWeekStartIso = (() => {
+    const [year, month, day] = referenceDateIso.split('-').map(Number)
+    const anchor = new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
+    const weekday = anchor.getUTCDay()
+    const daysUntilNextMonday = weekday === 0 ? 1 : 8 - weekday
+    return shiftIsoDate(referenceDateIso, daysUntilNextMonday)
+  })()
+
+  const startAtFilter = queryScope === 'DAY' && input.requestedDateIso
     ? (() => {
         const startOfDay = localDateTimeToUtc({
           dateIso: input.requestedDateIso,
@@ -49,8 +63,30 @@ export async function getExistingCustomerBookings(input: {
           lt: startOfNextDay,
         }
       })()
+    : queryScope === 'WEEK'
+      ? (() => {
+          const startOfReferenceDay = localDateTimeToUtc({
+            dateIso: referenceDateIso,
+            timeLabel: '00:00',
+            timezone,
+          }).startAtUtc
+          const startOfNextWeek = localDateTimeToUtc({
+            dateIso: nextWeekStartIso,
+            timeLabel: '00:00',
+            timezone,
+          }).startAtUtc
+
+          return {
+            gte: startOfReferenceDay,
+            lt: startOfNextWeek,
+          }
+        })()
     : {
-        gte: new Date(),
+        gte: localDateTimeToUtc({
+          dateIso: referenceDateIso,
+          timeLabel: '00:00',
+          timezone,
+        }).startAtUtc,
       }
 
   const appointments = await prisma.appointment.findMany({
@@ -99,18 +135,33 @@ function describeQueryDay(dateIso: string, timezone: string) {
   return `em ${dateIso.split('-').reverse().join('/')}`
 }
 
+function describeWeekday(dateIso: string) {
+  const [year, month, day] = dateIso.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
+  return date.toLocaleDateString('pt-BR', {
+    weekday: 'long',
+    timeZone: 'UTC',
+  }).toLowerCase()
+}
+
 export function buildExistingCustomerBookingResponse(input: {
   bookings: ExistingCustomerBookingItem[]
   requestedDateIso?: string | null
+  queryScope?: ExistingCustomerBookingQueryScope
   timezone: string
   hasSchedulingContext: boolean
 }) {
   const timezone = resolveBusinessTimezone(input.timezone)
+  const queryScope = input.queryScope ?? (input.requestedDateIso ? 'DAY' : 'NEXT')
   const continuationMessage = input.hasSchedulingContext
     ? ' Quer manter esse e marcar outro tambem, ou prefere ajustar esse?'
     : ' Se quiser, eu tambem posso te ajudar a marcar outro horario.'
 
   if (input.bookings.length === 0) {
+    if (queryScope === 'WEEK') {
+      return `Voce nao tem nenhum horario confirmado essa semana.${input.hasSchedulingContext ? ' Se quiser, continuo o novo agendamento por aqui.' : ''}`
+    }
+
     if (input.requestedDateIso) {
       return `${describeQueryDay(input.requestedDateIso, timezone)} voce nao tem nenhum horario confirmado.${input.hasSchedulingContext ? ' Se quiser, continuo o novo agendamento por aqui.' : ''}`
     }
@@ -120,6 +171,10 @@ export function buildExistingCustomerBookingResponse(input: {
 
   if (input.bookings.length === 1) {
     const booking = input.bookings[0]
+    if (queryScope === 'WEEK') {
+      return `Voce tem um horario na ${describeWeekday(booking.dateIso)} as ${booking.timeLabel} com ${booking.professionalName} para ${booking.serviceName}.${continuationMessage}`
+    }
+
     const dayDescription = input.requestedDateIso
       ? describeQueryDay(booking.dateIso, timezone)
       : `para ${describeQueryDay(booking.dateIso, timezone)}`
@@ -131,13 +186,19 @@ export function buildExistingCustomerBookingResponse(input: {
     return `${leadIn} com ${booking.professionalName} para ${booking.serviceName}.${continuationMessage}`
   }
 
-  const header = input.requestedDateIso
+  const header = queryScope === 'WEEK'
+    ? 'Essa semana voce tem estes horarios confirmados:'
+    : input.requestedDateIso
     ? `${describeQueryDay(input.requestedDateIso, timezone).charAt(0).toUpperCase() + describeQueryDay(input.requestedDateIso, timezone).slice(1)} voce tem estes horarios confirmados:`
     : 'Seus proximos horarios sao:'
   const lines = input.bookings
     .slice(0, 3)
     .map((booking) => {
-      const datePrefix = input.requestedDateIso ? '' : `${describeQueryDay(booking.dateIso, timezone)} as `
+      const datePrefix = queryScope === 'WEEK'
+        ? `${describeWeekday(booking.dateIso)} as `
+        : input.requestedDateIso
+          ? ''
+          : `${describeQueryDay(booking.dateIso, timezone)} as `
       return `- ${datePrefix}${booking.timeLabel} com ${booking.professionalName} para ${booking.serviceName}`
     })
     .join('\n')

@@ -463,6 +463,8 @@ test('interpreta frases naturais sobre horario ja marcado sem cair em novo agend
     'com quem eu estou marcado amanha?',
     'qual meu horario de amanha?',
     'qual meu proximo horario?',
+    'quais horarios eu tenho essa semana?',
+    'meus horarios dessa semana',
   ]
 
   for (const message of bookingQueries) {
@@ -489,6 +491,31 @@ test('interpreta frases naturais sobre horario ja marcado sem cair em novo agend
 
     assert.equal(intent.intent, 'CHECK_EXISTING_BOOKING', message)
   }
+})
+
+test('interpreta encerramentos simples como acknowledgement fora da confirmacao', async () => {
+  const intent = await interpretWhatsAppMessage({
+    message: 'obrigado',
+    barbershopName: 'Linha Nobre',
+    barbershopTimezone: 'America/Sao_Paulo',
+    conversationState: 'IDLE',
+    offeredSlotCount: 0,
+    services: SERVICES.map((service) => ({ name: service.name })),
+    professionals: PROFESSIONALS.map((professional) => ({ name: professional.name })),
+    todayIsoDate: '2026-04-14',
+    currentLocalDateTime: '2026-04-14 10:30',
+    conversationSummary: {
+      selectedServiceName: null,
+      selectedProfessionalName: null,
+      requestedDateIso: null,
+      requestedTimeLabel: null,
+      allowAnyProfessional: false,
+      lastCustomerMessage: 'pode confirmar',
+      lastAssistantMessage: 'Perfeito, ficou marcado.',
+    },
+  })
+
+  assert.equal(intent.intent, 'ACKNOWLEDGEMENT')
 })
 
 test('remove vocativo ambiguo quando o nome citado e do barbeiro e nao do cliente', () => {

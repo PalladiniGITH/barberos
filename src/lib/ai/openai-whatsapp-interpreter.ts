@@ -50,7 +50,7 @@ const WEEKDAY_INDEX: Record<string, number> = {
 }
 
 const IntentSchema = z.object({
-  intent: z.enum(['BOOK_APPOINTMENT', 'CHECK_EXISTING_BOOKING', 'CONFIRM', 'DECLINE', 'CHANGE_REQUEST', 'UNKNOWN']),
+  intent: z.enum(['BOOK_APPOINTMENT', 'CHECK_EXISTING_BOOKING', 'ACKNOWLEDGEMENT', 'CONFIRM', 'DECLINE', 'CHANGE_REQUEST', 'UNKNOWN']),
   serviceName: z.string().min(1).max(120).nullable(),
   mentionedName: z.string().min(1).max(120).nullable(),
   preferredPeriod: z.enum(['MORNING', 'AFTERNOON', 'EVENING']).nullable(),
@@ -72,7 +72,7 @@ const INTENT_JSON_SCHEMA = {
   properties: {
     intent: {
       type: 'string',
-      enum: ['BOOK_APPOINTMENT', 'CHECK_EXISTING_BOOKING', 'CONFIRM', 'DECLINE', 'CHANGE_REQUEST', 'UNKNOWN'],
+      enum: ['BOOK_APPOINTMENT', 'CHECK_EXISTING_BOOKING', 'ACKNOWLEDGEMENT', 'CONFIRM', 'DECLINE', 'CHANGE_REQUEST', 'UNKNOWN'],
     },
     serviceName: {
       anyOf: [{ type: 'string' }, { type: 'null' }],
@@ -547,17 +547,26 @@ function shouldRestartConversation(message: string) {
 
 const DIRECT_EXISTING_BOOKING_QUERY_PHRASES = [
   'quais horarios eu tenho',
+  'quais horarios eu tenho essa semana',
   'quais horarios tenho',
   'que horas eu tenho',
+  'que horas eu tenho essa semana',
   'que horas tenho',
   'que horas eu marquei',
+  'que horas eu marquei essa semana',
   'que horas marquei',
   'o que eu marquei',
+  'o que eu marquei essa semana',
   'o que marquei',
   'eu tenho horario',
   'tenho horario',
   'eu tenho algo',
   'tenho algo',
+  'tenho algo essa semana',
+  'meus horarios dessa semana',
+  'meus horarios da semana',
+  'com quem eu estou marcado essa semana',
+  'com quem estou marcado essa semana',
   'amanha eu tenho horario',
   'hoje eu tenho horario',
   'amanha eu tenho algo',
@@ -585,6 +594,8 @@ const EXISTING_BOOKING_TEMPORAL_HINTS = [
   'amanha',
   'depois de amanha',
   'proximo',
+  'essa semana',
+  'dessa semana',
 ]
 
 const EXISTING_BOOKING_CONTEXT_PHRASES = [
@@ -640,12 +651,17 @@ function inferIntent(
 ) {
   const normalized = normalizeText(message)
   const confirmationPattern = /\b(sim|desejo|quero|confirmo|confirmar|confirmado|confirma|fechado|pode ser|perfeito|ok|beleza|pode marcar|pode agendar)\b/
+  const acknowledgementPattern = /^(ok|obrigado|obg|valeu|blz|beleza|fechou|show)[!.\s]*$/
 
   if (detectExistingBookingQuestion({
     message,
     conversationSummary,
   })) {
     return 'CHECK_EXISTING_BOOKING' as const
+  }
+
+  if (conversationState !== 'WAITING_CONFIRMATION' && acknowledgementPattern.test(normalized)) {
+    return 'ACKNOWLEDGEMENT' as const
   }
 
   if (
@@ -848,7 +864,7 @@ function buildInterpreterPrompt(input: WhatsAppInterpreterInput) {
     '- correctionTarget deve indicar se o cliente esta corrigindo SERVICE, PROFESSIONAL, DATE, PERIOD, TIME, FLOW ou NONE.',
     '- greetingOnly=true apenas quando a mensagem for basicamente saudacao sem pedido concreto.',
     '- restartConversation=true apenas quando o cliente realmente quiser recomecar.',
-    '- intent deve ser BOOK_APPOINTMENT, CHECK_EXISTING_BOOKING, CONFIRM, DECLINE, CHANGE_REQUEST ou UNKNOWN.',
+    '- intent deve ser BOOK_APPOINTMENT, CHECK_EXISTING_BOOKING, ACKNOWLEDGEMENT, CONFIRM, DECLINE, CHANGE_REQUEST ou UNKNOWN.',
     `Mensagem do cliente: """${input.message}"""`,
   ].join('\n')
 }

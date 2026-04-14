@@ -115,6 +115,9 @@ test('detecta consultas naturais sobre agendamentos ja confirmados', () => {
     'com quem eu estou marcado amanha?',
     'qual meu horario de amanha?',
     'qual meu proximo horario?',
+    'quais horarios eu tenho essa semana?',
+    'tenho algo essa semana?',
+    'meus horarios dessa semana',
   ]
 
   messages.forEach((message) => {
@@ -126,6 +129,18 @@ test('detecta consultas naturais sobre agendamentos ja confirmados', () => {
 
     assert.equal(detected, true, message)
   })
+})
+
+test('consulta dessa semana vira escopo semanal em vez de novo agendamento', () => {
+  const query = conversationTesting.parseExistingBookingQuery({
+    message: 'quais horarios eu tenho essa semana?',
+    draft: conversationTesting.buildEmptyConversationDraft(),
+    recentBooking: null,
+    timezone: 'America/Sao_Paulo',
+  })
+
+  assert.equal(query.scope, 'WEEK')
+  assert.equal(query.requestedDateIso, null)
 })
 
 test('follow-up curto como "que horas?" consulta o agendamento ja encontrado', () => {
@@ -178,6 +193,7 @@ test('consulta de agendamento existente responde com o horario encontrado e reto
   draft.requestedDateIso = '2026-04-15'
 
   const reply = conversationTesting.buildExistingBookingStatusMessage({
+    queryScope: 'DAY',
     requestedDateIso: '2026-04-15',
     bookings: [
       {
@@ -201,6 +217,7 @@ test('consulta de agendamento existente responde com o horario encontrado e reto
 
 test('consulta de amanha com um unico horario responde de forma direta e natural', () => {
   const reply = conversationTesting.buildExistingBookingStatusMessage({
+    queryScope: 'DAY',
     requestedDateIso: '2026-04-15',
     bookings: [
       {
@@ -224,6 +241,7 @@ test('consulta de amanha com um unico horario responde de forma direta e natural
 
 test('consulta com multiplos horarios amanha lista todos de forma clara', () => {
   const reply = conversationTesting.buildExistingBookingStatusMessage({
+    queryScope: 'DAY',
     requestedDateIso: '2026-04-15',
     bookings: [
       {
@@ -256,6 +274,7 @@ test('consulta com multiplos horarios amanha lista todos de forma clara', () => 
 
 test('consulta sem agendamento confirmado responde de forma objetiva', () => {
   const reply = conversationTesting.buildExistingBookingStatusMessage({
+    queryScope: 'DAY',
     requestedDateIso: '2026-04-15',
     bookings: [],
     timezone: 'America/Sao_Paulo',
@@ -263,6 +282,57 @@ test('consulta sem agendamento confirmado responde de forma objetiva', () => {
   })
 
   assert.match(reply, /nao tem nenhum horario confirmado/i)
+})
+
+test('consulta dessa semana responde com os horarios futuros da semana de forma natural', () => {
+  const reply = conversationTesting.buildExistingBookingStatusMessage({
+    queryScope: 'WEEK',
+    requestedDateIso: null,
+    bookings: [
+      {
+        id: 'apt-1',
+        status: 'CONFIRMED',
+        serviceName: 'Hidratacao Capilar',
+        professionalName: 'Rafael Costa',
+        dateIso: '2026-04-17',
+        dateLabel: '17/04/2026',
+        timeLabel: '18:00',
+      },
+      {
+        id: 'apt-2',
+        status: 'CONFIRMED',
+        serviceName: 'Corte Classic',
+        professionalName: 'Matheus Lima',
+        dateIso: '2026-04-18',
+        dateLabel: '18/04/2026',
+        timeLabel: '10:00',
+      },
+    ],
+    timezone: 'America/Sao_Paulo',
+    draft: conversationTesting.buildEmptyConversationDraft(),
+  })
+
+  assert.match(reply, /Essa semana voce tem estes horarios confirmados/i)
+  assert.match(reply, /sexta/i)
+  assert.match(reply, /18:00 com Rafael Costa para Hidratacao Capilar/i)
+  assert.match(reply, /s[áa]bado/i)
+})
+
+test('ok apos agendamento concluido vira encerramento leve em vez de novo fluxo', () => {
+  assert.equal(conversationTesting.isAcknowledgementMessage('ok'), true)
+
+  const reply = conversationTesting.buildAcknowledgementResponse({
+    recentBooking: {
+      serviceName: 'Corte Classic',
+      professionalName: 'Matheus Lima',
+      dateIso: '2026-04-15',
+      timeLabel: '16:00',
+    },
+    timezone: 'America/Sao_Paulo',
+    effectiveState: 'IDLE',
+  })
+
+  assert.match(reply, /Qualquer coisa e so me chamar/i)
 })
 
 test('respostas afirmativas amplas sao aceitas para fechamento deterministico', () => {
