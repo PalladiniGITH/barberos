@@ -111,6 +111,11 @@ interface MissingFieldsValidation {
   shouldAskDateInsteadOfPeriod: boolean
 }
 
+interface PromotedSchedulingSnapshot {
+  requestedDateIso: string | null
+  requestedTimeLabel: string | null
+}
+
 export interface WhatsAppAgentResult {
   responseText: string
   flow: WhatsAppAgentFlow
@@ -829,6 +834,11 @@ function buildRuntimeSummary(memory: WorkingMemory) {
   return `Estado=${memory.state}; servico=${service}; barbeiro=${barber}; data=${date}; horario_ou_periodo=${time}; slot=${slot}.`
 }
 
+function buildServiceQuestionFromNames(serviceNames: string[]) {
+  const preview = serviceNames.slice(0, 6).join(', ')
+  return `Perfeito. Qual servico voce quer fazer? ${preview ? `Hoje temos: ${preview}.` : ''}`.trim()
+}
+
 function referencesPreferredProfessional(message: string) {
   const normalized = normalizeText(message)
   return /\b(meu barbeiro|o de sempre|de sempre|mesmo de sempre|meu de sempre|manter com o meu barbeiro|com o mesmo)\b/.test(normalized)
@@ -950,8 +960,6 @@ function applyCorrectionTargetToMemory(memory: WorkingMemory, correctionTarget: 
   if (correctionTarget === 'SERVICE') {
     memory.selectedServiceId = null
     memory.selectedServiceName = null
-    memory.requestedDateIso = null
-    memory.requestedTimeLabel = null
     clearPromotedAvailability(memory)
     return
   }
@@ -1082,6 +1090,32 @@ function promoteIntentContextToMemory(input: {
   }
 }
 
+function preservePromotedSchedulingContext(input: {
+  memory: WorkingMemory
+  snapshot: PromotedSchedulingSnapshot
+  correctionTarget: string
+}) {
+  const shouldRestoreDate =
+    input.snapshot.requestedDateIso
+    && input.correctionTarget !== 'DATE'
+    && input.correctionTarget !== 'FLOW'
+
+  const shouldRestoreTime =
+    input.snapshot.requestedTimeLabel
+    && input.correctionTarget !== 'TIME'
+    && input.correctionTarget !== 'PERIOD'
+    && input.correctionTarget !== 'DATE'
+    && input.correctionTarget !== 'FLOW'
+
+  if (shouldRestoreDate && !input.memory.requestedDateIso) {
+    input.memory.requestedDateIso = input.snapshot.requestedDateIso
+  }
+
+  if (shouldRestoreTime && !input.memory.requestedTimeLabel) {
+    input.memory.requestedTimeLabel = input.snapshot.requestedTimeLabel
+  }
+}
+
 async function findCustomerCandidates(input: {
   barbershopId: string
   name: string
@@ -1139,6 +1173,8 @@ function buildToolPhasePrompt(input: {
     'Use as ferramentas para validar servico, barbeiro, disponibilidade e rascunho antes de responder.',
     'Quando faltar contexto, prefira perguntar em vez de assumir.',
     'Nunca pergunte novamente por um campo que o backend ja tem preenchido.',
+    'Se o servico ainda nao estiver definido, use list_services para trazer a lista real completa da barbearia.',
+    'Nao busque horarios nem confirme slot antes de existir barbeiro definido, barbeiro preferencial valido ou allowAnyProfessional explicito.',
   ].join('\n')
 }
 
@@ -1170,6 +1206,8 @@ function buildFinalPrompt(input: {
     `Ferramentas chamadas nesta rodada: ${input.toolTrace.map((trace) => `${trace.name}:${JSON.stringify(trace.result)}`).join(' | ') || 'nenhuma'}.`,
     `Ultimas mensagens: ${input.recentMessages.map((message) => `${message.direction}:${message.text}`).join(' | ') || 'nenhuma'}.`,
     'Escolha nextAction coerente com o estado do backend.',
+    'Se faltar servico, responda mostrando a lista real de servicos disponiveis.',
+    'Se faltar definicao de barbeiro, pergunte preferencia antes de confirmar horario.',
   ].join('\n')
 }
 
@@ -1179,6 +1217,7 @@ function buildFallbackStructuredOutput(input: {
   customerName: string
   barbershopName: string
   preferredProfessionalName?: string | null
+  services: WhatsAppAgentInput['services']
   nowContext: WhatsAppAgentInput['nowContext']
 }) {
   const firstName = input.customerName.trim().split(' ')[0]
@@ -1205,6 +1244,7 @@ function buildFallbackStructuredOutput(input: {
       customerName: input.customerName,
       barbershopName: input.barbershopName,
       preferredProfessionalName: input.preferredProfessionalName ?? null,
+      serviceNames: input.services.map((service) => service.name),
       nowContext: input.nowContext,
     })
     ?? replyText
@@ -1229,6 +1269,7 @@ function buildGuardrailReplyText(input: {
   customerName: string
   barbershopName: string
   preferredProfessionalName?: string | null
+  serviceNames?: string[]
   nowContext?: WhatsAppAgentInput['nowContext']
 }) {
   const firstName = input.customerName.trim().split(' ')[0]
@@ -1244,7 +1285,7 @@ function buildGuardrailReplyText(input: {
   }
 
   if (input.nextAction === 'ASK_SERVICE') {
-    return 'Perfeito. Qual servico voce quer fazer?'
+    return buildServiceQuestionFromNames(input.serviceNames ?? [])
   }
 
   if (input.nextAction === 'ASK_PROFESSIONAL') {
@@ -1324,12 +1365,14 @@ async function executeAgentTool(input: {
 
   if (toolName === 'list_services') {
     const query = typeof args.query === 'string' ? args.query : null
-    const services = query
+    const filteredServices = query
       ? agentInput.services.filter((service) => normalizeText(service.name).includes(normalizeText(query)))
       : agentInput.services
+    const services = filteredServices.length > 0 ? filteredServices : agentInput.services
 
     return {
       status: 'ok',
+      mode: filteredServices.length > 0 ? 'filtered' : 'all_services_fallback',
       services: services.map((service) => ({
         id: service.id,
         name: service.name,
@@ -1385,11 +1428,29 @@ async function executeAgentTool(input: {
       ? args.allowAnyProfessional
       : memory.allowAnyProfessional
 
+    if (!professionalId && !allowAnyProfessional && agentInput.customer.preferredProfessionalId) {
+      professionalId = agentInput.customer.preferredProfessionalId
+      professionalName = agentInput.customer.preferredProfessionalName ?? null
+    }
+
     if (!professionalId && professionalName) {
       const candidates = findProfessionalCandidates(agentInput.professionals, professionalName)
       if (candidates.length === 1) {
         professionalId = candidates[0].id
         professionalName = candidates[0].name
+      }
+    }
+
+    if (!professionalId && !allowAnyProfessional) {
+      return {
+        status: 'error',
+        reason: 'professional_choice_required',
+        preferredProfessional: agentInput.customer.preferredProfessionalId
+          ? {
+              id: agentInput.customer.preferredProfessionalId,
+              name: agentInput.customer.preferredProfessionalName,
+            }
+          : null,
       }
     }
 
@@ -1577,6 +1638,10 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
   }
 
   const memory = buildInitialMemory(input)
+  const schedulingBeforeTurn = {
+    requestedDateIso: memory.requestedDateIso,
+    requestedTimeLabel: memory.requestedTimeLabel,
+  } satisfies PromotedSchedulingSnapshot
   const recentMessages = await loadRecentMessages({
     barbershopId: input.barbershop.id,
     customerId: input.customer.id,
@@ -1608,6 +1673,15 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     intent: fallbackIntent,
     services: input.services,
     professionals: input.professionals,
+  })
+
+  console.info('[whatsapp-agent] scheduling context promotion', {
+    customerId: input.customer.id,
+    conversationId: input.conversation.id,
+    requestedDateBeforeTurn: schedulingBeforeTurn.requestedDateIso,
+    requestedDateAfterPromotion: memory.requestedDateIso,
+    requestedTimeBeforeTurn: schedulingBeforeTurn.requestedTimeLabel,
+    requestedTimeAfterPromotion: memory.requestedTimeLabel,
   })
 
   const shouldUsePreferredProfessional =
@@ -1644,6 +1718,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     customerName: input.customer.name,
     barbershopName: input.barbershop.name,
     preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
+    services: input.services,
     nowContext: input.nowContext,
   })
 
@@ -1789,6 +1864,22 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
       professionals: input.professionals,
     })
 
+    preservePromotedSchedulingContext({
+      memory,
+      snapshot: {
+        requestedDateIso: fallbackIntent.requestedDateIso ?? schedulingBeforeTurn.requestedDateIso,
+        requestedTimeLabel:
+          fallbackIntent.exactTime
+          ?? resolvePromotedTimeLabel({
+            preferredPeriod: fallbackIntent.preferredPeriod,
+            timePreference: fallbackIntent.timePreference,
+            exactTime: fallbackIntent.exactTime,
+          })
+          ?? schedulingBeforeTurn.requestedTimeLabel,
+      },
+      correctionTarget: structuredDraft.correctionTarget,
+    })
+
     const requestedConfirmationTime =
       structuredDraft.requestedTime && /^\d{2}:\d{2}$/.test(structuredDraft.requestedTime)
         ? structuredDraft.requestedTime
@@ -1849,6 +1940,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
           customerName: input.customer.name,
           barbershopName: input.barbershop.name,
           preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
+          serviceNames: input.services.map((service) => service.name),
           nowContext: input.nowContext,
         })
       : null

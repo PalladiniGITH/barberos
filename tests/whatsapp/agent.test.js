@@ -121,6 +121,29 @@ test('promove imediatamente data, servico e periodo para a memoria do agente', a
   assert.equal(memory.requestedTimeLabel, 'AFTERNOON')
 })
 
+test('requestedDate promovido nao volta para null quando o cliente informa o servico no turno seguinte', async () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+
+  const dateIntent = await interpretMessage('Quero marcar horario hoje', memory)
+  agentTesting.promoteIntentContextToMemory({
+    memory,
+    intent: dateIntent,
+    services: SERVICES,
+    professionals: PROFESSIONALS,
+  })
+
+  const serviceIntent = await interpretMessage('Corte classic', memory)
+  agentTesting.promoteIntentContextToMemory({
+    memory,
+    intent: serviceIntent,
+    services: SERVICES,
+    professionals: PROFESSIONALS,
+  })
+
+  assert.equal(memory.requestedDateIso, '2026-04-13')
+  assert.equal(memory.selectedServiceId, 'svc-classic')
+})
+
 test('backend corrige nextAction quando a IA tenta perguntar algo ja preenchido', () => {
   const memory = agentTesting.buildInitialMemory(createAgentInput())
 
@@ -267,6 +290,50 @@ test('guardrail de barbeiro usa o barbeiro preferencial quando ele existe', () =
 
   assert.match(reply, /Matheus/)
   assert.match(reply, /de novo|prefere outro/i)
+})
+
+test('guardrail de servico mostra a lista real quando o servico ainda nao foi definido', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+
+  const reply = agentTesting.buildGuardrailReplyText({
+    nextAction: 'ASK_SERVICE',
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    serviceNames: SERVICES.map((service) => service.name),
+    nowContext: createAgentInput().nowContext,
+  })
+
+  assert.match(reply, /Corte Classic/)
+  assert.match(reply, /Barba/)
+})
+
+test('backend nao confirma horario enquanto o barbeiro nao estiver definido ou liberado como qualquer um', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.requestedDateIso = '2026-04-13'
+  memory.requestedTimeLabel = 'AFTERNOON'
+  memory.offeredSlots = [
+    {
+      key: 'pro-matheus:2026-04-13T16:15:00.000Z',
+      professionalId: 'pro-matheus',
+      professionalName: 'Matheus',
+      dateIso: '2026-04-13',
+      timeLabel: '13:15',
+      startAtIso: '2026-04-13T16:15:00.000Z',
+      endAtIso: '2026-04-13T16:50:00.000Z',
+    },
+  ]
+
+  const corrected = agentTesting.enforceNextActionFromMemory(
+    'ASK_CONFIRMATION',
+    memory,
+    false,
+    createAgentInput().nowContext
+  )
+
+  assert.equal(corrected, 'ASK_PROFESSIONAL')
 })
 
 test('preserva o slot quando o cliente escolhe um horario exato antes da confirmacao', async () => {

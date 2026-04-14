@@ -120,6 +120,12 @@ test('mensagem completa sozinha pode processar imediatamente, mas nao se ja exis
 })
 
 test('estados sensiveis usam janela de agregacao mais conservadora para mensagens curtas', () => {
+  const windowForIdleGreeting = handlerTesting.resolveAggregationWindowMs({
+    state: 'IDLE',
+    currentMessage: 'oi',
+    previousMessages: [],
+  })
+
   const windowForGreeting = handlerTesting.resolveAggregationWindowMs({
     state: 'WAITING_SERVICE',
     currentMessage: 'barba',
@@ -132,6 +138,7 @@ test('estados sensiveis usam janela de agregacao mais conservadora para mensagen
     previousMessages: [],
   })
 
+  assert.equal(windowForIdleGreeting, 4000)
   assert.equal(windowForGreeting, 4000)
   assert.equal(windowForConfirmation, 4000)
 })

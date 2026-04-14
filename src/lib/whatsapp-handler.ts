@@ -172,6 +172,9 @@ function resolveAggregationWindowMs(input: {
   previousMessages: string[]
 }) {
   const state = normalizeConversationStateForAggregation(input.state)
+  const hasStrongAggregationSignal =
+    isComplementaryShortMessage(input.currentMessage)
+    || input.previousMessages.some((message) => isComplementaryShortMessage(message))
   const usesConservativeState =
     state === 'WAITING_SERVICE'
     || state === 'WAITING_PROFESSIONAL'
@@ -179,10 +182,10 @@ function resolveAggregationWindowMs(input: {
     || state === 'WAITING_TIME'
     || state === 'WAITING_CONFIRMATION'
   const shouldUseSensitiveWindow =
-    usesConservativeState
+    hasStrongAggregationSignal
     && (
-      isComplementaryShortMessage(input.currentMessage)
-      || input.previousMessages.some((message) => isComplementaryShortMessage(message))
+      usesConservativeState
+      || state === 'IDLE'
     )
 
   return shouldUseSensitiveWindow

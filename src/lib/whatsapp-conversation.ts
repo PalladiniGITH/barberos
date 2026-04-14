@@ -1787,6 +1787,14 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
         }
       }
     } else {
+      console.info('[whatsapp-conversation] scheduling field persistence', {
+        conversationId: conversation.id,
+        requestedDateBeforeBackendAction: draftForInterpreter.requestedDateIso,
+        requestedDateAfterBackendAction: shouldResetPersistedContext ? null : agentResult.memory.requestedDateIso,
+        requestedTimeBeforeBackendAction: draftForInterpreter.requestedTimeLabel,
+        requestedTimeAfterBackendAction: shouldResetPersistedContext ? null : agentResult.memory.requestedTimeLabel,
+      })
+
       await prisma.whatsappConversation.update({
         where: { id: conversation.id },
         data: {
