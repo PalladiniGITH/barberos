@@ -62,6 +62,15 @@ const IMMEDIATE_MESSAGE_PATTERN =
 const COMPLEMENTARY_SHORT_MESSAGE_PATTERN =
   /^(?:\d{1,2}(?::\d{2})?\s*(?:h|hr|hrs|hora|horas)?|com\s+.+|qualquer um|qualquer barbeiro|com o mesmo|com meu barbeiro|com o de sempre|sim|ok|beleza|fechado|pode ser)$/i
 
+const STRONGLY_AGGREGATED_MESSAGE_PATTERN =
+  /^(?:!+|\?+|oi+|ola+|ol[aÃ¡]|bom dia|boa tarde|boa noite|hoje|amanha|amanhÃ£|de manha|manha|manhÃ£|a tarde|tarde|a noite|noite|fim da tarde|depois de amanha|depois de amanhÃ£|depois das \d{1,2}(?::\d{2})?|\d{1,2}(?::\d{2})?\s*(?:h|hr|hrs|hora|horas)?|as \d{1,2}(?::\d{2})?|Ã s \d{1,2}(?::\d{2})?|com\s+.+|qualquer um|qualquer barbeiro|sem preferencia|sem preferÃªncia|com o mesmo|com meu barbeiro|com o de sempre|sim|ok|beleza|fechado|pode ser|barba|corte|barba terapia)$/i
+
+const COMPLETE_MESSAGE_INTENT_PATTERN =
+  /\b(?:quero|preciso|gostaria|pode|quero marcar|quero agendar|marcar|agendar)\b/i
+
+const COMPLETE_MESSAGE_CONTEXT_PATTERN =
+  /\b(?:hoje|amanha|amanhÃ£|depois de amanha|depois de amanhÃ£|de manha|manha|manhÃ£|tarde|noite|fim da tarde|com\s+[a-zÃ -Ã¿]+|corte|barba|\d{1,2}(?::\d{2})?\s*(?:h|hr|hrs|hora|horas)?)\b/i
+
 function normalizePhoneDigits(value?: string | null) {
   if (!value) {
     return null
@@ -75,14 +84,53 @@ function normalizeMessageText(value?: string | null) {
   return value?.trim() ?? ''
 }
 
-function shouldProcessImmediately(message: string) {
-  return IMMEDIATE_MESSAGE_PATTERN.test(
-    message
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .trim()
-  )
+function normalizeAggregationText(message: string) {
+  return message
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
+function isStronglyAggregatedMessage(message: string) {
+  const normalized = normalizeAggregationText(message)
+  return normalized.length > 0
+    && normalized.length <= 60
+    && STRONGLY_AGGREGATED_MESSAGE_PATTERN.test(normalized)
+}
+
+function isClearlyCompleteMessage(message: string) {
+  const normalized = normalizeAggregationText(message)
+  const wordCount = normalized.split(/\s+/).filter(Boolean).length
+
+  if (normalized.length < 18 || wordCount < 4) {
+    return false
+  }
+
+  if (isStronglyAggregatedMessage(normalized)) {
+    return false
+  }
+
+  return COMPLETE_MESSAGE_INTENT_PATTERN.test(normalized)
+    && COMPLETE_MESSAGE_CONTEXT_PATTERN.test(normalized)
+}
+
+function shouldProcessImmediately(input: {
+  state: string
+  message: string
+  previousMessages: string[]
+}) {
+  const state = normalizeConversationStateForAggregation(input.state)
+
+  if (state !== 'IDLE') {
+    return false
+  }
+
+  if (input.previousMessages.length > 0) {
+    return false
+  }
+
+  return isClearlyCompleteMessage(input.message)
 }
 
 function normalizeConversationStateForAggregation(state?: string | null) {
@@ -100,10 +148,13 @@ function normalizeConversationStateForAggregation(state?: string | null) {
 }
 
 function isComplementaryShortMessage(message: string) {
-  const normalized = normalizeMessageText(message)
+  const normalized = normalizeAggregationText(message)
   return normalized.length > 0
     && normalized.length <= 40
-    && COMPLEMENTARY_SHORT_MESSAGE_PATTERN.test(normalized)
+    && (
+      COMPLEMENTARY_SHORT_MESSAGE_PATTERN.test(normalized)
+      || isStronglyAggregatedMessage(normalized)
+    )
 }
 
 function buildConcatenatedMessage(rawMessages: string[]) {
@@ -121,8 +172,14 @@ function resolveAggregationWindowMs(input: {
   previousMessages: string[]
 }) {
   const state = normalizeConversationStateForAggregation(input.state)
+  const usesConservativeState =
+    state === 'WAITING_SERVICE'
+    || state === 'WAITING_PROFESSIONAL'
+    || state === 'WAITING_DATE'
+    || state === 'WAITING_TIME'
+    || state === 'WAITING_CONFIRMATION'
   const shouldUseSensitiveWindow =
-    (state === 'WAITING_TIME' || state === 'WAITING_CONFIRMATION')
+    usesConservativeState
     && (
       isComplementaryShortMessage(input.currentMessage)
       || input.previousMessages.some((message) => isComplementaryShortMessage(message))
@@ -447,13 +504,18 @@ async function aggregateInboundMessages(input: {
     phone: input.phone ?? null,
   })
   const aggregationState = normalizeConversationStateForAggregation(conversation.state)
+  const previousMessages = parseMessageBuffer(conversation.messageBuffer)
   const activeWindowMs = resolveAggregationWindowMs({
     state: aggregationState,
     currentMessage: normalizedMessage,
-    previousMessages: parseMessageBuffer(conversation.messageBuffer),
+    previousMessages,
   })
 
-  if (shouldProcessImmediately(normalizedMessage)) {
+  if (shouldProcessImmediately({
+    state: aggregationState,
+    message: normalizedMessage,
+    previousMessages,
+  })) {
     await prisma.whatsappConversation.update({
       where: { id: conversation.id },
       data: {
@@ -461,6 +523,13 @@ async function aggregateInboundMessages(input: {
         messageBuffer: Prisma.JsonNull,
         lastMessageTimestamp: null,
       },
+    })
+
+    console.info('[whatsapp-agent] immediate processing allowed', {
+      conversationId: conversation.id,
+      state: aggregationState,
+      message: normalizedMessage,
+      reason: 'clearly_complete_message',
     })
 
     console.info('[whatsapp-agent] message aggregation', {
@@ -483,7 +552,7 @@ async function aggregateInboundMessages(input: {
   const previousBuffer =
     conversation.lastMessageTimestamp
     && now.getTime() - conversation.lastMessageTimestamp.getTime() <= activeWindowMs
-      ? parseMessageBuffer(conversation.messageBuffer)
+      ? previousMessages
       : []
   const nextBuffer = [...previousBuffer, normalizedMessage]
 
@@ -494,6 +563,22 @@ async function aggregateInboundMessages(input: {
       messageBuffer: nextBuffer as Prisma.InputJsonValue,
       lastMessageTimestamp: now,
     },
+  })
+
+  console.info('[whatsapp-agent] buffered message', {
+    conversationId: conversation.id,
+    state: aggregationState,
+    windowMs: activeWindowMs,
+    message: normalizedMessage,
+    previousBufferedCount: previousBuffer.length,
+    nextBufferedCount: nextBuffer.length,
+  })
+
+  console.info('[whatsapp-agent] waiting for aggregation window', {
+    conversationId: conversation.id,
+    state: aggregationState,
+    windowMs: activeWindowMs,
+    bufferedMessages: nextBuffer,
   })
 
   await wait(activeWindowMs)
@@ -850,6 +935,9 @@ export async function handleIncomingWhatsAppMessage(input: IncomingWhatsAppMessa
 
 export const __testing = {
   isComplementaryShortMessage,
+  isClearlyCompleteMessage,
+  isStronglyAggregatedMessage,
   buildConcatenatedMessage,
   resolveAggregationWindowMs,
+  shouldProcessImmediately,
 }

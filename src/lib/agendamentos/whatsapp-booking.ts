@@ -160,7 +160,7 @@ function logAvailabilityLookup(input: {
     busyAppointmentsFound: input.diagnostics.busyAppointmentsFound,
     freeSlotsReturned: input.diagnostics.freeSlotsReturned,
     finalReason: input.diagnostics.finalReason,
-    slotsReturned: input.slots.map((slot) => slot.timeLabel),
+    slotsReturned: input.slots.map((slot) => `${slot.timeLabel} com ${slot.professionalName}`),
   })
 }
 

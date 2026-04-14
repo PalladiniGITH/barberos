@@ -2077,6 +2077,18 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     draft.allowAnyProfessional = true
   }
 
+  console.info('[whatsapp-conversation] professional routing decision', {
+    customerId: input.customer.id,
+    inferredByName: nameResolution.resolvedProfessional?.name ?? null,
+    allowAnyProfessional: draft.allowAnyProfessional,
+    contextualProfessionalName: contextualProfessionalPreference?.professionalName ?? null,
+    contextualProfessionalSource: contextualProfessionalPreference?.source ?? null,
+    selectedProfessionalId: draft.selectedProfessionalId,
+    selectedProfessionalName: draft.selectedProfessionalName,
+    recentBookingProfessional: recentConfirmedBooking?.professionalName ?? null,
+    preferredProfessionalApplied: acceptedPreferredProfessional,
+  })
+
   if (interpreted.requestedDateIso) {
     draft.requestedDateIso = interpreted.requestedDateIso
   }

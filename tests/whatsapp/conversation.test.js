@@ -97,6 +97,26 @@ test('retomada logo apos agendamento confirmado usa contexto recente em vez de s
   assert.match(reply, /ja ficou marcado|Precisa de mais alguma coisa/i)
 })
 
+test('sem barbeiro definido a conversa pergunta preferencia antes de sugerir horarios', () => {
+  const reply = conversationTesting.buildProfessionalQuestion(
+    ['Lucas Ribeiro', 'Matheus Lima', 'Rafael Costa'],
+    null
+  )
+
+  assert.match(reply, /preferencia de barbeiro|qualquer um/i)
+  assert.match(reply, /Lucas Ribeiro/)
+})
+
+test('com barbeiro recente ou preferencial a conversa usa pergunta mais contextual', () => {
+  const reply = conversationTesting.buildProfessionalQuestion(
+    ['Lucas Ribeiro', 'Matheus Lima', 'Rafael Costa'],
+    'Matheus Lima'
+  )
+
+  assert.match(reply, /Matheus Lima/)
+  assert.match(reply, /de novo|prefere outro/i)
+})
+
 test('respostas afirmativas amplas sao aceitas para fechamento deterministico', () => {
   const affirmativeReplies = ['sim', 's', 'ok', 'pode', 'confirmar', 'quero', 'desejo', 'fechado']
 

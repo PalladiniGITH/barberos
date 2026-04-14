@@ -44,6 +44,98 @@ test('agregacao sensivel consolida horario e barbeiro em um unico turno util', a
   assert.equal(intent.mentionedName, 'Rafael')
 })
 
+test('saudacoes curtas e fragmentos entram no debounce em vez de responder na hora', () => {
+  assert.equal(handlerTesting.isStronglyAggregatedMessage('!'), true)
+  assert.equal(handlerTesting.isStronglyAggregatedMessage('oi'), true)
+  assert.equal(handlerTesting.isStronglyAggregatedMessage('amanhã'), true)
+  assert.equal(handlerTesting.isStronglyAggregatedMessage('de manhã'), true)
+  assert.equal(handlerTesting.isStronglyAggregatedMessage('sim'), true)
+
+  assert.equal(
+    handlerTesting.shouldProcessImmediately({
+      state: 'IDLE',
+      message: 'oi',
+      previousMessages: [],
+    }),
+    false
+  )
+
+  assert.equal(
+    handlerTesting.shouldProcessImmediately({
+      state: 'WAITING_CONFIRMATION',
+      message: 'sim',
+      previousMessages: [],
+    }),
+    false
+  )
+})
+
+test('sequencias curtas como exclamação e saudacao viram um unico turno agregado', () => {
+  const rawMessages = ['!', 'oi']
+  const concatenatedMessage = handlerTesting.buildConcatenatedMessage(rawMessages)
+
+  assert.equal(concatenatedMessage, '! oi')
+  assert.equal(
+    handlerTesting.shouldProcessImmediately({
+      state: 'IDLE',
+      message: 'oi',
+      previousMessages: ['!'],
+    }),
+    false
+  )
+})
+
+test('fragmentos de servico, dia e periodo tambem sao consolidados antes da resposta', () => {
+  const rawMessages = ['barba', 'amanhã', 'de manhã']
+  const concatenatedMessage = handlerTesting.buildConcatenatedMessage(rawMessages)
+
+  assert.equal(concatenatedMessage, 'barba amanhã de manhã')
+  assert.equal(handlerTesting.isStronglyAggregatedMessage('barba'), true)
+  assert.equal(handlerTesting.isStronglyAggregatedMessage('amanhã'), true)
+  assert.equal(handlerTesting.isStronglyAggregatedMessage('de manhã'), true)
+})
+
+test('mensagem completa sozinha pode processar imediatamente, mas nao se ja existir buffer', () => {
+  const fullMessage = 'Quero marcar um horário amanhã de manhã para barba'
+
+  assert.equal(handlerTesting.isClearlyCompleteMessage(fullMessage), true)
+
+  assert.equal(
+    handlerTesting.shouldProcessImmediately({
+      state: 'IDLE',
+      message: fullMessage,
+      previousMessages: [],
+    }),
+    true
+  )
+
+  assert.equal(
+    handlerTesting.shouldProcessImmediately({
+      state: 'IDLE',
+      message: 'quero marcar amanhã',
+      previousMessages: ['oi'],
+    }),
+    false
+  )
+})
+
+test('estados sensiveis usam janela de agregacao mais conservadora para mensagens curtas', () => {
+  const windowForGreeting = handlerTesting.resolveAggregationWindowMs({
+    state: 'WAITING_SERVICE',
+    currentMessage: 'barba',
+    previousMessages: [],
+  })
+
+  const windowForConfirmation = handlerTesting.resolveAggregationWindowMs({
+    state: 'WAITING_CONFIRMATION',
+    currentMessage: 'sim',
+    previousMessages: [],
+  })
+
+  assert.equal(windowForGreeting, 4000)
+  assert.equal(windowForConfirmation, 4000)
+})
+
 test('mensagem de horarios nao repete linhas nem cria espacos em branco extras', () => {
   const message = conversationTesting.buildHumanSlotOfferMessage(
     [
@@ -108,4 +200,35 @@ test('deduplica offeredSlots sem esconder horarios iguais com barbeiros diferent
 
   assert.equal(deduped.length, 2)
   assert.equal(deduped.filter((slot) => slot.timeLabel === '16:45').length, 2)
+})
+
+test('quando ha varios barbeiros no mesmo horario a mensagem mostra o nome de cada um', () => {
+  const message = conversationTesting.buildHumanSlotOfferMessage(
+    [
+      {
+        key: 'pro-lucas:2026-04-14T12:00:00.000Z',
+        professionalId: 'pro-lucas',
+        professionalName: 'Lucas Ribeiro',
+        dateIso: '2026-04-14',
+        timeLabel: '09:00',
+        startAtIso: '2026-04-14T12:00:00.000Z',
+        endAtIso: '2026-04-14T12:35:00.000Z',
+      },
+      {
+        key: 'pro-matheus:2026-04-14T12:00:00.000Z',
+        professionalId: 'pro-matheus',
+        professionalName: 'Matheus Lima',
+        dateIso: '2026-04-14',
+        timeLabel: '09:00',
+        startAtIso: '2026-04-14T12:00:00.000Z',
+        endAtIso: '2026-04-14T12:35:00.000Z',
+      },
+    ],
+    'Corte Classic',
+    'America/Sao_Paulo',
+    'MORNING'
+  )
+
+  assert.match(message, /09:00 com Lucas Ribeiro/)
+  assert.match(message, /09:00 com Matheus Lima/)
 })
