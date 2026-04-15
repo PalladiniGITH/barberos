@@ -55,8 +55,10 @@ interface AggregatedInboundMessage {
 }
 
 const MESSAGE_AGGREGATION_WINDOW_MS = 3000
-const FRAGMENTED_MESSAGE_AGGREGATION_WINDOW_MS = 4500
-const SENSITIVE_MESSAGE_AGGREGATION_WINDOW_MS = 5500
+const FRAGMENTED_MESSAGE_AGGREGATION_WINDOW_MS = 5500
+const SENSITIVE_MESSAGE_AGGREGATION_WINDOW_MS = 6000
+const FORMING_BOOKING_TURN_IDLE_WINDOW_MS = 6200
+const FORMING_BOOKING_TURN_SENSITIVE_WINDOW_MS = 6800
 const FAST_COMPLETE_MESSAGE_DEBOUNCE_MS = 1800
 const IMMEDIATE_MESSAGE_PATTERN =
   /^(oi+|ola+|ol[aá]|bom dia|boa tarde|boa noite|quero agendar|quero marcar|agendar|marcar horario)[!.,\s]*$/i
@@ -72,6 +74,24 @@ const COMPLETE_MESSAGE_INTENT_PATTERN =
 
 const COMPLETE_MESSAGE_CONTEXT_PATTERN =
   /\b(?:hoje|amanha|amanhÃ£|depois de amanha|depois de amanhÃ£|de manha|manha|manhÃ£|tarde|noite|fim da tarde|com\s+[a-zÃ -Ã¿]+|corte|barba|\d{1,2}(?::\d{2})?\s*(?:h|hr|hrs|hora|horas)?)\b/i
+
+const SCHEDULING_GREETING_FRAGMENT_PATTERN =
+  /^(?:oi+|ola+|ol[aÃ¡]|bom dia|boa tarde|boa noite|opa|e ai|eai|oie|hey)[!.,\s]*$/i
+
+const SCHEDULING_INTENT_FRAGMENT_PATTERN =
+  /(?:quero marcar(?:\s+um)?\s+horario|quero agendar(?:\s+um)?\s+horario|quero marcar|quero agendar|marcar horario|agendar horario|marcar um horario|agendar um horario|preciso marcar|preciso agendar)/i
+
+const SCHEDULING_DATE_FRAGMENT_PATTERN =
+  /(?:hoje|amanha|amanhÃƒÂ£|depois de amanha|depois de amanhÃƒÂ£|segunda|terca|terça|quarta|quinta|sexta|sabado|sábado|domingo|semana que vem|proxima semana|pr[oó]xima semana|(?:na\s+)?sexta que vem|(?:na\s+)?quinta que vem|(?:na\s+)?quarta que vem|(?:na\s+)?terca que vem|(?:na\s+)?terça que vem|(?:na\s+)?segunda que vem|(?:no\s+)?sabado que vem|(?:no\s+)?sábado que vem|(?:no\s+)?domingo que vem)/i
+
+const SCHEDULING_SERVICE_FRAGMENT_PATTERN =
+  /^(?:barba|barba terapia|corte|corte classic|corte \+ barba premium|degrade|degrad[eê] signature|hidratacao|hidrata[cç][aã]o capilar|pigmentacao|pigmenta[cç][aã]o natural)$/i
+
+const SCHEDULING_PROFESSIONAL_FRAGMENT_PATTERN =
+  /^(?:com\s+.+|com o mesmo|com meu barbeiro|com o de sempre)$/i
+
+const SCHEDULING_TIME_FRAGMENT_PATTERN =
+  /^(?:\d{1,2}(?::\d{2})?\s*(?:h|hr|hrs|hora|horas)?|as\s+\d{1,2}(?::\d{2})?|de manha|manha|manhÃƒÂ£|a tarde|tarde|a noite|noite|fim da tarde)$/i
 
 function normalizePhoneDigits(value?: string | null) {
   if (!value) {
@@ -150,6 +170,73 @@ function isComplementaryShortMessage(message: string) {
     )
 }
 
+function classifySchedulingFragment(message: string) {
+  const normalized = normalizeAggregationText(message)
+
+  return {
+    normalized,
+    greeting: SCHEDULING_GREETING_FRAGMENT_PATTERN.test(normalized),
+    intent: SCHEDULING_INTENT_FRAGMENT_PATTERN.test(normalized),
+    date: SCHEDULING_DATE_FRAGMENT_PATTERN.test(normalized),
+    service: SCHEDULING_SERVICE_FRAGMENT_PATTERN.test(normalized),
+    professional: SCHEDULING_PROFESSIONAL_FRAGMENT_PATTERN.test(normalized),
+    time: SCHEDULING_TIME_FRAGMENT_PATTERN.test(normalized),
+    short: normalized.length > 0 && normalized.length <= 60,
+  }
+}
+
+function detectFragmentedBookingTurn(input: {
+  state: string
+  currentMessage: string
+  previousMessages: string[]
+}) {
+  const fragments = [...input.previousMessages, input.currentMessage]
+    .map(classifySchedulingFragment)
+    .filter((fragment) => fragment.normalized.length > 0)
+
+  const summary = fragments.reduce((accumulator, fragment) => ({
+    greeting: accumulator.greeting || fragment.greeting,
+    intent: accumulator.intent || fragment.intent,
+    date: accumulator.date || fragment.date,
+    service: accumulator.service || fragment.service,
+    professional: accumulator.professional || fragment.professional,
+    time: accumulator.time || fragment.time,
+    shortOnly: accumulator.shortOnly && fragment.short,
+  }), {
+    greeting: false,
+    intent: false,
+    date: false,
+    service: false,
+    professional: false,
+    time: false,
+    shortOnly: true,
+  })
+
+  const hasSchedulingContext =
+    summary.intent
+    || summary.date
+    || summary.service
+    || summary.professional
+    || summary.time
+
+  const meaningfulCombination =
+    (summary.greeting && hasSchedulingContext)
+    || (summary.intent && (summary.date || summary.service || summary.professional || summary.time))
+    || (summary.service && (summary.date || summary.professional || summary.time))
+    || (summary.date && (summary.professional || summary.time))
+    || (summary.professional && summary.time)
+    || (fragments.length >= 3 && hasSchedulingContext)
+
+  return {
+    active:
+      fragments.length >= 2
+      && summary.shortOnly
+      && meaningfulCombination,
+    fragments: fragments.map((fragment) => fragment.normalized),
+    summary,
+  }
+}
+
 function buildConcatenatedMessage(rawMessages: string[]) {
   return rawMessages
     .map((message) => normalizeMessageText(message))
@@ -165,15 +252,35 @@ function resolveAggregationWindowMs(input: {
   previousMessages: string[]
 }) {
   const state = normalizeConversationStateForAggregation(input.state)
+  const currentFragment = classifySchedulingFragment(input.currentMessage)
+  const fragmentedBookingTurn = detectFragmentedBookingTurn({
+    state,
+    currentMessage: input.currentMessage,
+    previousMessages: input.previousMessages,
+  })
   const hasFragmentedSignal =
     isComplementaryShortMessage(input.currentMessage)
     || input.previousMessages.some((message) => isComplementaryShortMessage(message))
+    || currentFragment.short && (
+      currentFragment.greeting
+      || currentFragment.intent
+      || currentFragment.date
+      || currentFragment.service
+      || currentFragment.professional
+      || currentFragment.time
+    )
   const usesConservativeState =
     state === 'WAITING_SERVICE'
     || state === 'WAITING_PROFESSIONAL'
     || state === 'WAITING_DATE'
     || state === 'WAITING_TIME'
     || state === 'WAITING_CONFIRMATION'
+
+  if (fragmentedBookingTurn.active) {
+    return usesConservativeState
+      ? FORMING_BOOKING_TURN_SENSITIVE_WINDOW_MS
+      : FORMING_BOOKING_TURN_IDLE_WINDOW_MS
+  }
 
   if (usesConservativeState) {
     return SENSITIVE_MESSAGE_AGGREGATION_WINDOW_MS
@@ -528,6 +635,11 @@ async function aggregateInboundMessages(input: {
   })
   const aggregationState = normalizeConversationStateForAggregation(conversation.state)
   const previousMessages = parseMessageBuffer(conversation.messageBuffer)
+  const fragmentedBookingTurn = detectFragmentedBookingTurn({
+    state: aggregationState,
+    currentMessage: normalizedMessage,
+    previousMessages,
+  })
   let activeWindowMs = resolveAggregationWindowMs({
     state: aggregationState,
     currentMessage: normalizedMessage,
@@ -548,14 +660,36 @@ async function aggregateInboundMessages(input: {
     windowMs: activeWindowMs,
     message: normalizedMessage,
     bufferedMessages: previousBuffer,
+    fragmentedBookingTurn: fragmentedBookingTurn.active,
   })
 
   if (previousBuffer.length > 0 && aggregationState === 'IDLE') {
-    console.info('[whatsapp-agent] blocked immediate processing due to pending buffer', {
+    console.info(
+      fragmentedBookingTurn.active
+        ? '[whatsapp-agent] blocked immediate processing due to in-progress turn'
+        : '[whatsapp-agent] blocked immediate processing due to pending buffer',
+      {
       conversationId: conversation.id,
       state: aggregationState,
       message: normalizedMessage,
       bufferedMessages: previousBuffer,
+      }
+    )
+  }
+
+  if (fragmentedBookingTurn.active) {
+    console.info('[whatsapp-agent] turn still forming', {
+      conversationId: conversation.id,
+      state: aggregationState,
+      rawMessages: [...previousBuffer, normalizedMessage],
+      fragments: fragmentedBookingTurn.summary,
+    })
+
+    console.info('[whatsapp-agent] delayed due to fragmented scheduling intent', {
+      conversationId: conversation.id,
+      state: aggregationState,
+      windowMs: activeWindowMs,
+      rawMessages: [...previousBuffer, normalizedMessage],
     })
   }
 
@@ -577,6 +711,15 @@ async function aggregateInboundMessages(input: {
       rawMessages: nextBuffer,
       concatenatedMessage: buildConcatenatedMessage(nextBuffer),
     })
+
+    if (fragmentedBookingTurn.active) {
+      console.info('[whatsapp-agent] merged fragmented booking turn', {
+        conversationId: conversation.id,
+        state: aggregationState,
+        rawMessages: nextBuffer,
+        concatenatedMessage: buildConcatenatedMessage(nextBuffer),
+      })
+    }
   }
 
   console.info('[whatsapp-agent] buffered message', {
@@ -958,6 +1101,8 @@ export const __testing = {
   isComplementaryShortMessage,
   isClearlyCompleteMessage,
   isStronglyAggregatedMessage,
+  classifySchedulingFragment,
+  detectFragmentedBookingTurn,
   buildConcatenatedMessage,
   hasPendingBufferedMessages,
   shouldFinalizeDebouncedTurn,

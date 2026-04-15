@@ -38,7 +38,7 @@ test('agregacao sensivel consolida horario e barbeiro em um unico turno util', a
 
   assert.equal(handlerTesting.isComplementaryShortMessage('16:45'), true)
   assert.equal(handlerTesting.isComplementaryShortMessage('com o rafael'), true)
-  assert.equal(aggregationWindowMs, 5500)
+  assert.equal(aggregationWindowMs, 6000)
   assert.equal(concatenatedMessage, '16:45 com o rafael')
   assert.equal(intent.exactTime, '16:45')
   assert.equal(intent.mentionedName, 'Rafael')
@@ -127,6 +127,17 @@ test('mensagem completa sozinha usa debounce curto, mas nunca responde de forma 
   )
 })
 
+test('intencao curta de agendamento sozinha ja recebe debounce mais conservador', () => {
+  assert.equal(
+    handlerTesting.resolveAggregationWindowMs({
+      state: 'IDLE',
+      currentMessage: 'quero marcar um horario',
+      previousMessages: [],
+    }),
+    5500
+  )
+})
+
 test('estados sensiveis usam janela de agregacao mais conservadora para mensagens curtas', () => {
   const windowForIdleGreeting = handlerTesting.resolveAggregationWindowMs({
     state: 'IDLE',
@@ -146,9 +157,9 @@ test('estados sensiveis usam janela de agregacao mais conservadora para mensagen
     previousMessages: [],
   })
 
-  assert.equal(windowForIdleGreeting, 4500)
-  assert.equal(windowForGreeting, 5500)
-  assert.equal(windowForConfirmation, 5500)
+  assert.equal(windowForIdleGreeting, 5500)
+  assert.equal(windowForGreeting, 6000)
+  assert.equal(windowForConfirmation, 6000)
 })
 
 test('debounce reinicia quando chega nova mensagem antes do timer acabar', () => {
@@ -296,6 +307,15 @@ test('oi seguido de intencao completa em IDLE continua em um unico turno agregad
     handlerTesting.buildConcatenatedMessage(['Oi', fullMessage]),
     'Oi Queria marcar horario pra hoje'
   )
+
+  assert.equal(
+    handlerTesting.detectFragmentedBookingTurn({
+      state: 'IDLE',
+      currentMessage: fullMessage,
+      previousMessages: ['Oi'],
+    }).active,
+    true
+  )
 })
 
 test('barba, amanha e com o matheus continuam em um unico bloco agregado', () => {
@@ -310,6 +330,104 @@ test('barba, amanha e com o matheus continuam em um unico bloco agregado', () =>
       currentMessage: 'com o matheus',
       previousMessages: ['barba', 'amanha'],
     }),
-    5500
+    6800
+  )
+})
+
+test('oi, quero marcar um horario e sexta que vem formam um turno fragmentado unico', () => {
+  const rawMessages = ['Oi', 'quero marcar um horario', 'sexta que vem']
+
+  assert.equal(
+    handlerTesting.buildConcatenatedMessage(rawMessages),
+    'Oi quero marcar um horario sexta que vem'
+  )
+
+  const fragmentedTurn = handlerTesting.detectFragmentedBookingTurn({
+    state: 'IDLE',
+    currentMessage: 'sexta que vem',
+    previousMessages: ['Oi', 'quero marcar um horario'],
+  })
+
+  assert.equal(fragmentedTurn.active, true)
+  assert.equal(fragmentedTurn.summary.greeting, true)
+  assert.equal(fragmentedTurn.summary.intent, true)
+  assert.equal(fragmentedTurn.summary.date, true)
+  assert.equal(
+    handlerTesting.resolveAggregationWindowMs({
+      state: 'IDLE',
+      currentMessage: 'sexta que vem',
+      previousMessages: ['Oi', 'quero marcar um horario'],
+    }),
+    6200
+  )
+})
+
+test('barba e amanha continuam em formacao ate o debounce final', () => {
+  const fragmentedTurn = handlerTesting.detectFragmentedBookingTurn({
+    state: 'WAITING_SERVICE',
+    currentMessage: 'amanha',
+    previousMessages: ['barba'],
+  })
+
+  assert.equal(fragmentedTurn.active, true)
+  assert.equal(fragmentedTurn.summary.service, true)
+  assert.equal(fragmentedTurn.summary.date, true)
+  assert.equal(
+    handlerTesting.resolveAggregationWindowMs({
+      state: 'WAITING_SERVICE',
+      currentMessage: 'amanha',
+      previousMessages: ['barba'],
+    }),
+    6800
+  )
+})
+
+test('corte, sexta e com o matheus viram um unico turno fragmentado de agendamento', () => {
+  const rawMessages = ['corte', 'sexta', 'com o matheus']
+
+  assert.equal(
+    handlerTesting.buildConcatenatedMessage(rawMessages),
+    'corte sexta com o matheus'
+  )
+
+  const fragmentedTurn = handlerTesting.detectFragmentedBookingTurn({
+    state: 'WAITING_DATE',
+    currentMessage: 'com o matheus',
+    previousMessages: ['corte', 'sexta'],
+  })
+
+  assert.equal(fragmentedTurn.active, true)
+  assert.equal(fragmentedTurn.summary.service, true)
+  assert.equal(fragmentedTurn.summary.date, true)
+  assert.equal(fragmentedTurn.summary.professional, true)
+  assert.equal(
+    handlerTesting.resolveAggregationWindowMs({
+      state: 'WAITING_DATE',
+      currentMessage: 'com o matheus',
+      previousMessages: ['corte', 'sexta'],
+    }),
+    6800
+  )
+})
+
+test('debounce nao finaliza no meio do bloco quando chega uma nova mensagem fragmentada', () => {
+  const firstWaitStartedAt = new Date('2026-04-15T15:00:00.000Z')
+  const restartedAt = new Date('2026-04-15T15:00:04.000Z')
+
+  assert.equal(
+    handlerTesting.shouldFinalizeDebouncedTurn({
+      waitStartedAt: firstWaitStartedAt,
+      lastMessageTimestamp: restartedAt,
+    }),
+    false
+  )
+
+  assert.equal(
+    handlerTesting.detectFragmentedBookingTurn({
+      state: 'IDLE',
+      currentMessage: 'sexta que vem',
+      previousMessages: ['Oi', 'quero marcar um horario'],
+    }).active,
+    true
   )
 })
