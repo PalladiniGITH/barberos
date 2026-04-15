@@ -140,8 +140,8 @@ export async function getExistingCustomerBookings(input: {
   ) satisfies ExistingCustomerBookingItem[]
 }
 
-function describeQueryDay(dateIso: string, timezone: string) {
-  const todayIso = getTodayIsoInTimezone(timezone)
+function describeQueryDay(dateIso: string, timezone: string, referenceDateIso?: string | null) {
+  const todayIso = referenceDateIso ?? getTodayIsoInTimezone(timezone)
   if (dateIso === todayIso) {
     return 'hoje'
   }
@@ -163,9 +163,11 @@ export function buildExistingCustomerBookingResponse(input: {
   queryScope?: ExistingCustomerBookingQueryScope
   timezone: string
   hasSchedulingContext: boolean
+  referenceDateIso?: string | null
 }) {
   const timezone = resolveBusinessTimezone(input.timezone)
   const queryScope = input.queryScope ?? (input.requestedDateIso ? 'DAY' : 'NEXT')
+  const referenceDateIso = input.referenceDateIso ?? getTodayIsoInTimezone(timezone)
   const continuationMessage = input.hasSchedulingContext
     ? ' Quer manter esse e marcar outro tambem, ou prefere ajustar esse?'
     : ''
@@ -176,7 +178,7 @@ export function buildExistingCustomerBookingResponse(input: {
     }
 
     if (input.requestedDateIso) {
-      return `${describeQueryDay(input.requestedDateIso, timezone)} voce nao tem nenhum horario confirmado.${input.hasSchedulingContext ? ' Se quiser, continuo o novo agendamento por aqui.' : ''}`
+      return `${describeQueryDay(input.requestedDateIso, timezone, referenceDateIso)} voce nao tem nenhum horario confirmado.${input.hasSchedulingContext ? ' Se quiser, continuo o novo agendamento por aqui.' : ''}`
     }
 
     return `No momento voce nao tem nenhum horario confirmado.${input.hasSchedulingContext ? ' Se quiser, continuo o novo agendamento por aqui.' : ''}`
@@ -189,8 +191,8 @@ export function buildExistingCustomerBookingResponse(input: {
     }
 
     const dayDescription = input.requestedDateIso
-      ? describeQueryDay(booking.dateIso, timezone)
-      : `para ${describeQueryDay(booking.dateIso, timezone)}`
+      ? describeQueryDay(booking.dateIso, timezone, referenceDateIso)
+      : `para ${describeQueryDay(booking.dateIso, timezone, referenceDateIso)}`
 
     const leadIn = input.requestedDateIso
       ? `${dayDescription.charAt(0).toUpperCase() + dayDescription.slice(1)} voce esta marcado as ${booking.timeLabel}`
@@ -202,7 +204,7 @@ export function buildExistingCustomerBookingResponse(input: {
   const header = queryScope === 'WEEK'
     ? 'Essa semana voce tem estes horarios confirmados:'
     : input.requestedDateIso
-    ? `${describeQueryDay(input.requestedDateIso, timezone).charAt(0).toUpperCase() + describeQueryDay(input.requestedDateIso, timezone).slice(1)} voce tem estes horarios confirmados:`
+    ? `${describeQueryDay(input.requestedDateIso, timezone, referenceDateIso).charAt(0).toUpperCase() + describeQueryDay(input.requestedDateIso, timezone, referenceDateIso).slice(1)} voce tem estes horarios confirmados:`
     : 'Seus proximos horarios sao:'
   const lines = input.bookings
     .map((booking) => {
@@ -210,7 +212,7 @@ export function buildExistingCustomerBookingResponse(input: {
         ? `${describeWeekday(booking.dateIso, timezone)} as `
         : input.requestedDateIso
           ? ''
-          : `${describeQueryDay(booking.dateIso, timezone)} as `
+          : `${describeQueryDay(booking.dateIso, timezone, referenceDateIso)} as `
       return `- ${datePrefix}${booking.timeLabel} com ${booking.professionalName} para ${booking.serviceName}`
     })
     .join('\n')

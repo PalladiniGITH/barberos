@@ -207,6 +207,7 @@ test('consulta de agendamento existente responde com o horario encontrado e reto
     ],
     timezone: 'America/Sao_Paulo',
     draft,
+    referenceDateIso: '2026-04-14',
   })
 
   assert.match(reply, /17:00/)
@@ -232,6 +233,7 @@ test('consulta de amanha com um unico horario responde de forma direta e natural
     ],
     timezone: 'America/Sao_Paulo',
     draft: conversationTesting.buildEmptyConversationDraft(),
+    referenceDateIso: '2026-04-14',
   })
 
   assert.match(reply, /Amanha voce esta marcado as 16:00/i)
@@ -265,6 +267,7 @@ test('consulta com multiplos horarios amanha lista todos de forma clara', () => 
     ],
     timezone: 'America/Sao_Paulo',
     draft: conversationTesting.buildEmptyConversationDraft(),
+    referenceDateIso: '2026-04-14',
   })
 
   assert.match(reply, /Amanha voce tem estes horarios confirmados/i)
@@ -279,6 +282,7 @@ test('consulta sem agendamento confirmado responde de forma objetiva', () => {
     bookings: [],
     timezone: 'America/Sao_Paulo',
     draft: conversationTesting.buildEmptyConversationDraft(),
+    referenceDateIso: '2026-04-14',
   })
 
   assert.match(reply, /nao tem nenhum horario confirmado/i)
@@ -310,6 +314,7 @@ test('consulta dessa semana responde com os horarios futuros da semana de forma 
     ],
     timezone: 'America/Sao_Paulo',
     draft: conversationTesting.buildEmptyConversationDraft(),
+    referenceDateIso: '2026-04-14',
   })
 
   assert.match(reply, /Essa semana voce tem estes horarios confirmados/i)

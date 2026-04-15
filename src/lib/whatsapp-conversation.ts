@@ -391,6 +391,7 @@ function buildExistingBookingStatusMessage(input: {
   bookings: ExistingCustomerBookingItem[]
   timezone: string
   draft: ConversationDraft
+  referenceDateIso?: string | null
 }) {
   const baseMessage = buildExistingCustomerBookingResponse({
     bookings: input.bookings,
@@ -398,6 +399,7 @@ function buildExistingBookingStatusMessage(input: {
     requestedDateIso: input.requestedDateIso,
     timezone: input.timezone,
     hasSchedulingContext: false,
+    referenceDateIso: input.referenceDateIso,
   })
 
   if (!hasUsefulConversationProgress(input.draft)) {
@@ -528,6 +530,7 @@ async function handleExistingBookingStatusQuery(input: {
     bookings,
     timezone: input.timezone,
     draft: input.draft,
+    referenceDateIso: input.nowDateIso,
   })
 
   console.info('[whatsapp-conversation] final booking status response', {
