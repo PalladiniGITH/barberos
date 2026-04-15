@@ -256,6 +256,34 @@ export function localDateTimeToUtc(input: {
   }
 }
 
+export function getUtcRangeForLocalDate(input: {
+  dateIso: string
+  timezone?: string | null
+}) {
+  const resolvedTimezone = resolveBusinessTimezone(input.timezone)
+  const startAtUtc = buildBusinessDateTime(input.dateIso, 0, 0, resolvedTimezone)
+  const endAtUtc = buildBusinessDateTime(shiftIsoDate(input.dateIso, 1), 0, 0, resolvedTimezone)
+
+  return {
+    timezone: resolvedTimezone,
+    startAtUtc,
+    endAtUtc,
+  }
+}
+
+export function serializeDateTimeInTimezone(date: Date, timezone?: string | null) {
+  const resolvedTimezone = resolveBusinessTimezone(timezone)
+
+  return {
+    timezone: resolvedTimezone,
+    startAtUtc: date.toISOString(),
+    dateIso: formatIsoDateInTimezone(date, resolvedTimezone),
+    dateLabel: formatDateInTimezone(date, resolvedTimezone),
+    timeLabel: formatTimeInTimezone(date, resolvedTimezone),
+    dateTimeLabel: formatDateTimeInTimezone(date, resolvedTimezone),
+  }
+}
+
 export function formatIsoDateInTimezone(date: Date, timezone?: string | null) {
   const resolvedTimezone = resolveBusinessTimezone(timezone)
   return getDateTimePartsInTimezone(date, resolvedTimezone).dateIso

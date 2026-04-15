@@ -335,6 +335,14 @@ test('ok apos agendamento concluido vira encerramento leve em vez de novo fluxo'
   assert.match(reply, /Qualquer coisa e so me chamar/i)
 })
 
+test('encerramentos naturais como "ok obrigado", "nenhum" e "nao quero" saem do fluxo', () => {
+  const closingMessages = ['ok obrigado', 'nenhum', 'nao quero', 'so isso', 'deixa assim']
+
+  closingMessages.forEach((message) => {
+    assert.equal(conversationTesting.isAcknowledgementMessage(message), true, message)
+  })
+})
+
 test('respostas afirmativas amplas sao aceitas para fechamento deterministico', () => {
   const affirmativeReplies = ['sim', 's', 'ok', 'pode', 'confirmar', 'quero', 'desejo', 'fechado']
 

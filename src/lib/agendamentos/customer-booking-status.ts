@@ -2,13 +2,11 @@ import 'server-only'
 
 import { prisma } from '@/lib/prisma'
 import {
-  formatDateInTimezone,
   formatWeekdayFromIsoDate,
-  formatIsoDateInTimezone,
-  formatTimeInTimezone,
   getTodayIsoInTimezone,
-  localDateTimeToUtc,
+  getUtcRangeForLocalDate,
   resolveBusinessTimezone,
+  serializeDateTimeInTimezone,
   shiftIsoDate,
 } from '@/lib/timezone'
 
@@ -23,6 +21,30 @@ export interface ExistingCustomerBookingItem {
   timeLabel: string
   professionalName: string
   serviceName: string
+}
+
+function serializeExistingCustomerBooking(input: {
+  appointment: {
+    id: string
+    status: 'PENDING' | 'CONFIRMED'
+    startAt: Date
+    professional: { name: string }
+    service: { name: string }
+  }
+  timezone: string
+}) {
+  const dateTime = serializeDateTimeInTimezone(input.appointment.startAt, input.timezone)
+
+  return {
+    id: input.appointment.id,
+    status: input.appointment.status,
+    startAtUtc: dateTime.startAtUtc,
+    dateIso: dateTime.dateIso,
+    dateLabel: dateTime.dateLabel,
+    timeLabel: dateTime.timeLabel,
+    professionalName: input.appointment.professional.name,
+    serviceName: input.appointment.service.name,
+  } satisfies ExistingCustomerBookingItem
 }
 
 export async function getExistingCustomerBookings(input: {
@@ -49,16 +71,10 @@ export async function getExistingCustomerBookings(input: {
 
   const startAtFilter = queryScope === 'DAY' && input.requestedDateIso
     ? (() => {
-        const startOfDay = localDateTimeToUtc({
+        const { startAtUtc: startOfDay, endAtUtc: startOfNextDay } = getUtcRangeForLocalDate({
           dateIso: input.requestedDateIso,
-          timeLabel: '00:00',
           timezone,
-        }).startAtUtc
-        const startOfNextDay = localDateTimeToUtc({
-          dateIso: shiftIsoDate(input.requestedDateIso, 1),
-          timeLabel: '00:00',
-          timezone,
-        }).startAtUtc
+        })
 
         return {
           gte: startOfDay,
@@ -67,26 +83,23 @@ export async function getExistingCustomerBookings(input: {
       })()
     : queryScope === 'WEEK'
       ? (() => {
-          const startOfReferenceDay = localDateTimeToUtc({
+          const { startAtUtc: startOfReferenceDay } = getUtcRangeForLocalDate({
             dateIso: referenceDateIso,
-            timeLabel: '00:00',
             timezone,
-          }).startAtUtc
-          const startOfNextWeek = localDateTimeToUtc({
+          })
+          const { startAtUtc: startOfNextWeek } = getUtcRangeForLocalDate({
             dateIso: nextWeekStartIso,
-            timeLabel: '00:00',
             timezone,
-          }).startAtUtc
+          })
 
           return {
             gte: startOfReferenceDay,
             lt: startOfNextWeek,
           }
-        })()
+      })()
     : {
-        gte: localDateTimeToUtc({
+        gte: getUtcRangeForLocalDate({
           dateIso: referenceDateIso,
-          timeLabel: '00:00',
           timezone,
         }).startAtUtc,
       }
@@ -113,16 +126,18 @@ export async function getExistingCustomerBookings(input: {
     },
   })
 
-  return appointments.map((appointment) => ({
-    id: appointment.id,
-    status: appointment.status as ExistingCustomerBookingItem['status'],
-    startAtUtc: appointment.startAt.toISOString(),
-    dateIso: formatIsoDateInTimezone(appointment.startAt, timezone),
-    dateLabel: formatDateInTimezone(appointment.startAt, timezone),
-    timeLabel: formatTimeInTimezone(appointment.startAt, timezone),
-    professionalName: appointment.professional.name,
-    serviceName: appointment.service.name,
-  })) satisfies ExistingCustomerBookingItem[]
+  return appointments.map((appointment) =>
+    serializeExistingCustomerBooking({
+      appointment: {
+        id: appointment.id,
+        status: appointment.status as ExistingCustomerBookingItem['status'],
+        startAt: appointment.startAt,
+        professional: appointment.professional,
+        service: appointment.service,
+      },
+      timezone,
+    })
+  ) satisfies ExistingCustomerBookingItem[]
 }
 
 function describeQueryDay(dateIso: string, timezone: string) {
@@ -190,7 +205,6 @@ export function buildExistingCustomerBookingResponse(input: {
     ? `${describeQueryDay(input.requestedDateIso, timezone).charAt(0).toUpperCase() + describeQueryDay(input.requestedDateIso, timezone).slice(1)} voce tem estes horarios confirmados:`
     : 'Seus proximos horarios sao:'
   const lines = input.bookings
-    .slice(0, 3)
     .map((booking) => {
       const datePrefix = queryScope === 'WEEK'
         ? `${describeWeekday(booking.dateIso, timezone)} as `
@@ -204,4 +218,8 @@ export function buildExistingCustomerBookingResponse(input: {
   return continuationMessage
     ? `${header}\n\n${lines}\n\n${continuationMessage.trim()}`
     : `${header}\n\n${lines}`
+}
+
+export const __testing = {
+  serializeExistingCustomerBooking,
 }

@@ -622,28 +622,32 @@ test('interpreta frases naturais sobre horario ja marcado sem cair em novo agend
 })
 
 test('interpreta encerramentos simples como acknowledgement fora da confirmacao', async () => {
-  const intent = await interpretWhatsAppMessage({
-    message: 'obrigado',
-    barbershopName: 'Linha Nobre',
-    barbershopTimezone: 'America/Sao_Paulo',
-    conversationState: 'IDLE',
-    offeredSlotCount: 0,
-    services: SERVICES.map((service) => ({ name: service.name })),
-    professionals: PROFESSIONALS.map((professional) => ({ name: professional.name })),
-    todayIsoDate: '2026-04-14',
-    currentLocalDateTime: '2026-04-14 10:30',
-    conversationSummary: {
-      selectedServiceName: null,
-      selectedProfessionalName: null,
-      requestedDateIso: null,
-      requestedTimeLabel: null,
-      allowAnyProfessional: false,
-      lastCustomerMessage: 'pode confirmar',
-      lastAssistantMessage: 'Perfeito, ficou marcado.',
-    },
-  })
+  const samples = ['obrigado', 'ok obrigado', 'nenhum', 'nao quero', 'so isso']
 
-  assert.equal(intent.intent, 'ACKNOWLEDGEMENT')
+  for (const message of samples) {
+    const intent = await interpretWhatsAppMessage({
+      message,
+      barbershopName: 'Linha Nobre',
+      barbershopTimezone: 'America/Sao_Paulo',
+      conversationState: 'IDLE',
+      offeredSlotCount: 0,
+      services: SERVICES.map((service) => ({ name: service.name })),
+      professionals: PROFESSIONALS.map((professional) => ({ name: professional.name })),
+      todayIsoDate: '2026-04-14',
+      currentLocalDateTime: '2026-04-14 10:30',
+      conversationSummary: {
+        selectedServiceName: null,
+        selectedProfessionalName: null,
+        requestedDateIso: null,
+        requestedTimeLabel: null,
+        allowAnyProfessional: false,
+        lastCustomerMessage: 'pode confirmar',
+        lastAssistantMessage: 'Perfeito, ficou marcado.',
+      },
+    })
+
+    assert.equal(intent.intent, 'ACKNOWLEDGEMENT', message)
+  }
 })
 
 test('remove vocativo ambiguo quando o nome citado e do barbeiro e nao do cliente', () => {

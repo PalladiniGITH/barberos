@@ -621,8 +621,46 @@ const EXISTING_BOOKING_CONTEXT_PHRASES = [
 const EXISTING_BOOKING_FOLLOW_UP_PATTERN =
   /^(que horas|qual horario|com quem|qual servico|o que ficou marcado|o que eu marquei|me lembra|me confirma)\??$/
 
+const ACKNOWLEDGEMENT_PHRASES = [
+  'ok',
+  'ok obrigado',
+  'obrigado',
+  'obg',
+  'valeu',
+  'blz',
+  'beleza',
+  'fechou',
+  'show',
+  'nenhum',
+  'nao quero',
+  'não quero',
+  'nada',
+  'so isso',
+  'só isso',
+  'era so isso',
+  'era só isso',
+  'por enquanto nao',
+  'por enquanto não',
+  'tranquilo',
+  'deixa assim',
+]
+
 function includesAnyPhrase(normalized: string, phrases: string[]) {
   return phrases.some((phrase) => normalized.includes(phrase))
+}
+
+export function detectAcknowledgementMessage(message: string) {
+  const normalized = normalizeText(message)
+
+  if (!normalized) {
+    return false
+  }
+
+  if (includesAnyPhrase(normalized, ACKNOWLEDGEMENT_PHRASES)) {
+    return true
+  }
+
+  return /^(ok|obrigado|obg|valeu|blz|beleza|fechou|show|nenhum|nada|tranquilo)[!.\s]*$/.test(normalized)
 }
 
 export function detectExistingBookingQuestion(input: {
@@ -659,6 +697,9 @@ export function detectExistingBookingQuestion(input: {
       || normalized.includes('tenho')
       || normalized.includes('confirmar')
     )
+  const heuristicExistingBookingFallback =
+    /\b(horario|horarios|agendamento|agendamentos|marcado|marcada|marquei|confirmado|confirmada|ficou)\b/.test(normalized)
+    && /\b(amanha|hoje|essa semana|dessa semana|proximo|meu|minha|tenho|confirmar|pra mim|para mim)\b/.test(normalized)
   const followUpToExistingBookingContext =
     EXISTING_BOOKING_FOLLOW_UP_PATTERN.test(normalized)
     && (
@@ -666,7 +707,13 @@ export function detectExistingBookingQuestion(input: {
       || includesAnyPhrase(lastCustomer, EXISTING_BOOKING_CONTEXT_PHRASES)
     )
 
-  return asksAboutConfirmedBooking || asksAboutNextBooking || fuzzyExistingBookingQuery || followUpToExistingBookingContext
+  return (
+    asksAboutConfirmedBooking
+    || asksAboutNextBooking
+    || fuzzyExistingBookingQuery
+    || heuristicExistingBookingFallback
+    || followUpToExistingBookingContext
+  )
 }
 
 function inferIntent(
@@ -677,7 +724,6 @@ function inferIntent(
 ) {
   const normalized = normalizeText(message)
   const confirmationPattern = /\b(sim|desejo|quero|confirmo|confirmar|confirmado|confirma|fechado|pode ser|perfeito|ok|beleza|pode marcar|pode agendar)\b/
-  const acknowledgementPattern = /^(ok|obrigado|obg|valeu|blz|beleza|fechou|show)[!.\s]*$/
 
   if (detectExistingBookingQuestion({
     message,
@@ -686,7 +732,7 @@ function inferIntent(
     return 'CHECK_EXISTING_BOOKING' as const
   }
 
-  if (conversationState !== 'WAITING_CONFIRMATION' && acknowledgementPattern.test(normalized)) {
+  if (conversationState !== 'WAITING_CONFIRMATION' && detectAcknowledgementMessage(message)) {
     return 'ACKNOWLEDGEMENT' as const
   }
 
@@ -1024,14 +1070,22 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
 
     if (!response.ok) {
       console.warn('[whatsapp-interpreter/openai] fallback bad_status', { status: response.status })
-      return fallback
+      return prioritizeExplicitTimeOverConfirmation({
+        interpreted: fallback,
+        conversationState: input.conversationState,
+        conversationSummary: input.conversationSummary,
+      })
     }
 
     const payload = await response.json()
     const outputText = extractResponseText(payload)
     if (!outputText) {
       console.warn('[whatsapp-interpreter/openai] fallback empty_output')
-      return fallback
+      return prioritizeExplicitTimeOverConfirmation({
+        interpreted: fallback,
+        conversationState: input.conversationState,
+        conversationSummary: input.conversationSummary,
+      })
     }
 
     const parsedJson = sanitizeOpenAiIntentPayload(JSON.parse(outputText))
@@ -1041,7 +1095,11 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
       console.warn('[whatsapp-interpreter/openai] fallback invalid_schema', {
         issues: parsed.error.issues.map((issue) => `${issue.path.join('.') || 'root'}:${issue.message}`),
       })
-      return fallback
+      return prioritizeExplicitTimeOverConfirmation({
+        interpreted: fallback,
+        conversationState: input.conversationState,
+        conversationSummary: input.conversationSummary,
+      })
     }
 
     const merged = mergeWithFallback(parsed.data, fallback)
@@ -1059,7 +1117,11 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
     console.warn('[whatsapp-interpreter/openai] fallback request_failed', {
       error: error instanceof Error ? error.message : 'unknown_error',
     })
-    return fallback
+    return prioritizeExplicitTimeOverConfirmation({
+      interpreted: fallback,
+      conversationState: input.conversationState,
+      conversationSummary: input.conversationSummary,
+    })
   } finally {
     clearTimeout(timeout)
   }

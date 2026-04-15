@@ -2,10 +2,8 @@ import 'server-only'
 
 import * as React from 'react'
 import {
-  endOfDay,
   endOfMonth,
   format,
-  startOfDay,
   startOfMonth,
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -21,6 +19,7 @@ import {
   formatDateTimeInTimezone,
   formatIsoDateInTimezone,
   formatTimeInTimezone,
+  getUtcRangeForLocalDate,
   getMinutesOfDayInTimezone,
   resolveBusinessTimezone,
 } from '@/lib/timezone'
@@ -161,13 +160,6 @@ function resolveScheduleView(value?: string): ScheduleView {
   return value === 'barber' || value === 'week' ? 'barber' : 'day'
 }
 
-function getRange(date: Date, view: ScheduleView) {
-  return {
-    start: startOfDay(date),
-    end: endOfDay(date),
-  }
-}
-
 function buildDayEntries(baseDate: Date, view: ScheduleView) {
   return [
     {
@@ -262,16 +254,22 @@ const getCachedSchedulePageData = cache(
   ): Promise<SchedulePageData> => {
     const normalizedDate = normalizeDate(rawDate)
     const baseDate = new Date(`${normalizedDate}T09:00:00`)
-    const { start, end } = getRange(baseDate, rawView)
     const monthStart = startOfMonth(baseDate)
     const monthEnd = endOfMonth(baseDate)
 
-    const [barbershop, professionals, services, recentCustomers, monthlyGoal, monthRevenueTotal, monthRevenueByProfessional, appointments] =
+    const barbershop = await prisma.barbershop.findUnique({
+      where: { id: barbershopId },
+      select: { timezone: true },
+    })
+
+    const timezone = resolveBusinessTimezone(barbershop?.timezone)
+    const { startAtUtc: start, endAtUtc: end } = getUtcRangeForLocalDate({
+      dateIso: normalizedDate,
+      timezone,
+    })
+
+    const [professionals, services, recentCustomers, monthlyGoal, monthRevenueTotal, monthRevenueByProfessional, appointments] =
       await Promise.all([
-        prisma.barbershop.findUnique({
-          where: { id: barbershopId },
-          select: { timezone: true },
-        }),
         prisma.professional.findMany({
           where: { barbershopId, active: true },
           select: { id: true, name: true },
@@ -332,7 +330,7 @@ const getCachedSchedulePageData = cache(
           where: {
             barbershopId,
             professionalId: rawProfessionalId ?? undefined,
-            startAt: { gte: start, lte: end },
+            startAt: { gte: start, lt: end },
           },
           include: {
             customer: {
@@ -361,8 +359,6 @@ const getCachedSchedulePageData = cache(
           orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
         }),
       ])
-
-    const timezone = resolveBusinessTimezone(barbershop?.timezone)
     const selectedProfessional = rawProfessionalId
       ? professionals.find((professional) => professional.id === rawProfessionalId) ?? null
       : null

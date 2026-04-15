@@ -3,6 +3,7 @@ import 'server-only'
 import { MessagingProvider, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import {
+  detectAcknowledgementMessage,
   detectExistingBookingQuestion,
   extractExplicitTimeFromMessage,
   interpretWhatsAppMessage,
@@ -334,9 +335,7 @@ function parseExistingBookingQuery(input: {
 }
 
 function isAcknowledgementMessage(message: string) {
-  return /^(ok|obrigado|obg|valeu|blz|beleza|fechou|show|perfeito|maravilha|tudo certo|tranquilo)[!.\s]*$/i.test(
-    normalizeText(message)
-  )
+  return detectAcknowledgementMessage(message)
 }
 
 function buildAcknowledgementResponse(input: {
@@ -485,6 +484,15 @@ async function handleExistingBookingStatusQuery(input: {
     appointmentsFetched: bookings.length,
   })
 
+  console.info('[whatsapp-conversation] raw startAt from db', {
+    customerId: input.customerId,
+    conversationId: input.conversationId,
+    rawStartAtValues: bookings.map((booking) => ({
+      appointmentId: booking.id,
+      startAtUtc: booking.startAtUtc ?? null,
+    })),
+  })
+
   console.info('[whatsapp-conversation] datetime local vs utc', {
     customerId: input.customerId,
     conversationId: input.conversationId,
@@ -520,6 +528,12 @@ async function handleExistingBookingStatusQuery(input: {
     bookings,
     timezone: input.timezone,
     draft: input.draft,
+  })
+
+  console.info('[whatsapp-conversation] final booking status response', {
+    customerId: input.customerId,
+    conversationId: input.conversationId,
+    responseText,
   })
 
   await prisma.whatsappConversation.update({
