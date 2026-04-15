@@ -60,6 +60,27 @@ function createAgentInput() {
   }
 }
 
+function createConfirmationReadyMemory() {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.state = 'WAITING_CONFIRMATION'
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.selectedProfessionalId = 'pro-rafael'
+  memory.selectedProfessionalName = 'Rafael Costa'
+  memory.requestedDateIso = '2026-04-16'
+  memory.requestedTimeLabel = '17:30'
+  memory.selectedSlot = {
+    key: 'pro-rafael:2026-04-16T20:30:00.000Z',
+    professionalId: 'pro-rafael',
+    professionalName: 'Rafael Costa',
+    dateIso: '2026-04-16',
+    timeLabel: '17:30',
+    startAtIso: '2026-04-16T20:30:00.000Z',
+    endAtIso: '2026-04-16T21:05:00.000Z',
+  }
+  return memory
+}
+
 function getConversationSummaryFromMemory(memory) {
   return {
     selectedServiceName: memory.selectedServiceName,
@@ -539,25 +560,9 @@ test('trata respostas afirmativas amplas como confirmacao real no momento certo'
 })
 
 test('confirmacoes contextuais curtas fecham corretamente em WAITING_CONFIRMATION', () => {
-  const memory = agentTesting.buildInitialMemory(createAgentInput())
-  memory.state = 'WAITING_CONFIRMATION'
-  memory.selectedServiceId = 'svc-classic'
-  memory.selectedServiceName = 'Corte Classic'
-  memory.selectedProfessionalId = 'pro-rafael'
-  memory.selectedProfessionalName = 'Rafael Costa'
-  memory.requestedDateIso = '2026-04-16'
-  memory.requestedTimeLabel = '17:30'
-  memory.selectedSlot = {
-    key: 'pro-rafael:2026-04-16T20:30:00.000Z',
-    professionalId: 'pro-rafael',
-    professionalName: 'Rafael Costa',
-    dateIso: '2026-04-16',
-    timeLabel: '17:30',
-    startAtIso: '2026-04-16T20:30:00.000Z',
-    endAtIso: '2026-04-16T21:05:00.000Z',
-  }
+  ;['isso', 'isso mesmo', 'pode', 'pode sim', 'fechado', 'blz', 'beleza', 'certo', 'aham', 'uhum', 'ok', 'ok sim'].forEach((message) => {
+    const memory = createConfirmationReadyMemory()
 
-  ;['isso', 'pode', 'fechado'].forEach((message) => {
     assert.equal(
       agentTesting.shouldUseDeterministicConfirmationShortcut({
         memory,
@@ -571,32 +576,58 @@ test('confirmacoes contextuais curtas fecham corretamente em WAITING_CONFIRMATIO
 })
 
 test('fora de WAITING_CONFIRMATION uma concordancia curta nao vira confirmacao de agendamento', () => {
-  const memory = agentTesting.buildInitialMemory(createAgentInput())
-  memory.state = 'WAITING_TIME'
-  memory.selectedServiceId = 'svc-classic'
-  memory.selectedServiceName = 'Corte Classic'
-  memory.selectedProfessionalId = 'pro-rafael'
-  memory.selectedProfessionalName = 'Rafael Costa'
-  memory.requestedDateIso = '2026-04-16'
-  memory.requestedTimeLabel = '17:30'
-  memory.selectedSlot = {
-    key: 'pro-rafael:2026-04-16T20:30:00.000Z',
-    professionalId: 'pro-rafael',
-    professionalName: 'Rafael Costa',
-    dateIso: '2026-04-16',
-    timeLabel: '17:30',
-    startAtIso: '2026-04-16T20:30:00.000Z',
-    endAtIso: '2026-04-16T21:05:00.000Z',
-  }
+  ;['isso', 'isso mesmo', 'pode', 'pode sim', 'fechado', 'blz', 'beleza', 'certo', 'aham', 'uhum', 'ok', 'ok sim'].forEach((message) => {
+    const memory = createConfirmationReadyMemory()
+    memory.state = 'WAITING_TIME'
 
-  assert.equal(
-    agentTesting.shouldUseDeterministicConfirmationShortcut({
-      memory,
-      inboundText: 'isso',
-      lastAssistantText: 'Posso confirmar Corte Classic para quinta-feira, 16/04 as 17:30 com Rafael Costa?',
-    }),
-    false
-  )
+    assert.equal(
+      agentTesting.shouldUseDeterministicConfirmationShortcut({
+        memory,
+        inboundText: message,
+        lastAssistantText: 'Posso confirmar Corte Classic para quinta-feira, 16/04 as 17:30 com Rafael Costa?',
+      }),
+      false,
+      message
+    )
+  })
+})
+
+test('caminho de contextual confirmation heuristic aceita as expressoes curtas reais no contexto correto', () => {
+  ;['isso', 'isso mesmo', 'pode', 'pode sim', 'fechado', 'blz', 'beleza', 'certo', 'aham', 'uhum', 'ok', 'ok sim'].forEach((message) => {
+    const result = agentTesting.resolveContextualConfirmationHeuristic({
+      memory: createConfirmationReadyMemory(),
+      inboundText: message,
+    })
+
+    assert.equal(result.accepted, true, message)
+    assert.equal(result.hasRequiredContext, true, message)
+    assert.equal(result.hasCorrectionCue, false, message)
+    assert.equal(result.isAffirmative, true, message)
+  })
+})
+
+test('caminho de llm confirmation classification so arma para concordancias curtas sem correcao explicita', () => {
+  ;['isso', 'pode', 'fechado', 'blz', 'ok'].forEach((message) => {
+    assert.equal(
+      agentTesting.shouldUseContextualConfirmationClassifier({
+        memory: createConfirmationReadyMemory(),
+        inboundText: message,
+      }),
+      true,
+      message
+    )
+  })
+
+  ;['isso 14:30', 'pode ser com o Matheus', 'ok amanha', 'fechado 16h'].forEach((message) => {
+    assert.equal(
+      agentTesting.shouldUseContextualConfirmationClassifier({
+        memory: createConfirmationReadyMemory(),
+        inboundText: message,
+      }),
+      false,
+      message
+    )
+  })
 })
 
 test('horario explicito vence confirmacao generica na mesma frase', async () => {
@@ -685,6 +716,90 @@ test('mudanca de data vence confirmacao curta na mesma frase', async () => {
 
   assert.equal(intent.intent, 'CHANGE_REQUEST')
   assert.equal(intent.correctionTarget, 'DATE')
+})
+
+test('correcoes explicitas vencem a confirmacao curta e nao reaproveitam slot antigo', async () => {
+  const samples = [
+    ['isso 14:30', 'TIME'],
+    ['pode ser com o Matheus', 'PROFESSIONAL'],
+    ['ok amanha', 'DATE'],
+    ['fechado 16h', 'TIME'],
+  ]
+
+  for (const [message, correctionTarget] of samples) {
+    const intent = await interpretWhatsAppMessage({
+      message,
+      barbershopName: 'Linha Nobre',
+      barbershopTimezone: 'America/Sao_Paulo',
+      conversationState: 'WAITING_CONFIRMATION',
+      offeredSlotCount: 0,
+      services: SERVICES.map((service) => ({ name: service.name })),
+      professionals: PROFESSIONALS.map((professional) => ({ name: professional.name })),
+      todayIsoDate: '2026-04-14',
+      currentLocalDateTime: '2026-04-14 10:30',
+      conversationSummary: {
+        selectedServiceName: 'Corte Classic',
+        selectedProfessionalName: 'Rafael Costa',
+        requestedDateIso: '2026-04-16',
+        requestedTimeLabel: '17:30',
+        allowAnyProfessional: false,
+        lastCustomerMessage: '17:30',
+        lastAssistantMessage: 'Posso confirmar Corte Classic para quinta-feira, 16/04 as 17:30 com Rafael Costa?',
+      },
+    })
+
+    assert.equal(intent.intent, 'CHANGE_REQUEST', message)
+    assert.equal(intent.correctionTarget, correctionTarget, message)
+    assert.equal(
+      agentTesting.shouldUseDeterministicConfirmationShortcut({
+        memory: createConfirmationReadyMemory(),
+        inboundText: message,
+        lastAssistantText: 'Posso confirmar Corte Classic para quinta-feira, 16/04 as 17:30 com Rafael Costa?',
+      }),
+      false,
+      message
+    )
+  }
+})
+
+test('confirmacoes curtas nao passam sem slot real ou com barbeiro indefinido', () => {
+  ;['isso', 'pode', 'fechado', 'ok sim'].forEach((message) => {
+    const noSlotMemory = createConfirmationReadyMemory()
+    noSlotMemory.selectedSlot = null
+
+    const noProfessionalMemory = createConfirmationReadyMemory()
+    noProfessionalMemory.selectedProfessionalId = null
+    noProfessionalMemory.selectedProfessionalName = null
+    noProfessionalMemory.allowAnyProfessional = false
+
+    assert.equal(
+      agentTesting.resolveContextualConfirmationHeuristic({
+        memory: noSlotMemory,
+        inboundText: message,
+      }).accepted,
+      false,
+      `noSlot ${message}`
+    )
+
+    assert.equal(
+      agentTesting.resolveContextualConfirmationHeuristic({
+        memory: noProfessionalMemory,
+        inboundText: message,
+      }).accepted,
+      false,
+      `noProfessional ${message}`
+    )
+
+    assert.equal(
+      agentTesting.shouldUseDeterministicConfirmationShortcut({
+        memory: noSlotMemory,
+        inboundText: message,
+        lastAssistantText: 'Posso confirmar Corte Classic para quinta-feira, 16/04 as 17:30 com Rafael Costa?',
+      }),
+      false,
+      `noSlot shortcut ${message}`
+    )
+  })
 })
 
 test('atalho deterministico nao confirma slot antigo quando a resposta traz novo horario', () => {

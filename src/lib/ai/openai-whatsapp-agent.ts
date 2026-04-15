@@ -2860,6 +2860,8 @@ export const __testing = {
   isPureExplicitConfirmation,
   hasExplicitAnyProfessionalConsent,
   hasExplicitFlexibleTimeRequest,
+  resolveContextualConfirmationHeuristic,
+  shouldUseContextualConfirmationClassifier,
   sanitizeReplyTextAgainstProfessionalVocative,
   sanitizePrematureConfirmationReply,
   shouldUseDeterministicConfirmationShortcut,

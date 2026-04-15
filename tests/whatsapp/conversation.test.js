@@ -414,20 +414,24 @@ test('encerramentos naturais como "ok obrigado", "nenhum" e "nao quero" saem do 
 })
 
 test('respostas afirmativas amplas sao aceitas para fechamento deterministico', () => {
-  const affirmativeReplies = ['sim', 's', 'isso', 'isso mesmo', 'ok', 'pode', 'blz', 'beleza', 'aham', 'uhum', 'confirmar', 'quero', 'desejo', 'fechado']
+  const affirmativeReplies = ['sim', 's', 'isso', 'isso mesmo', 'ok', 'ok sim', 'pode', 'pode sim', 'blz', 'beleza', 'certo', 'aham', 'uhum', 'confirmar', 'quero', 'desejo', 'fechado']
 
   affirmativeReplies.forEach((reply) => {
     assert.equal(conversationTesting.isAffirmativeConfirmationMessage(reply), true)
   })
 })
 
-test('novo horario explicito bloqueia a confirmacao do slot antigo', () => {
-  assert.equal(conversationTesting.isAffirmativeConfirmationMessage('pode ser 14:30'), true)
-  assert.equal(conversationTesting.shouldTreatAsStoredSlotConfirmation('pode ser 14:30'), false)
-  assert.equal(conversationTesting.shouldTreatAsStoredSlotConfirmation('pode ser com o Matheus'), false)
-  assert.equal(conversationTesting.shouldTreatAsStoredSlotConfirmation('sim amanha'), false)
-  assert.equal(conversationTesting.shouldTreatAsStoredSlotConfirmation('isso'), true)
-  assert.equal(conversationTesting.shouldTreatAsStoredSlotConfirmation('pode'), true)
+test('caminho de deterministic confirmation accepted aceita as expressoes curtas reais', () => {
+  ;['isso', 'isso mesmo', 'pode', 'pode sim', 'fechado', 'blz', 'beleza', 'certo', 'aham', 'uhum', 'ok', 'ok sim'].forEach((message) => {
+    assert.equal(conversationTesting.shouldTreatAsStoredSlotConfirmation(message), true, message)
+  })
+})
+
+test('caminho de deterministic confirmation blocked barra correcoes explicitas junto da concordancia', () => {
+  ;['isso 14:30', 'pode ser com o Matheus', 'ok amanha', 'fechado 16h'].forEach((message) => {
+    assert.equal(conversationTesting.isAffirmativeConfirmationMessage(message), true, message)
+    assert.equal(conversationTesting.shouldTreatAsStoredSlotConfirmation(message), false, message)
+  })
 })
 
 test('quando o horario exato nao existe a resposta avanca com alternativas proximas', () => {
