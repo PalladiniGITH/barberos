@@ -89,9 +89,45 @@ test('consulta de horarios de amanha responde exatamente os horarios locais salv
     hasSchedulingContext: false,
   })
 
-  assert.match(response, /10:00 com Lucas Ribeiro para Corte Classic/i)
-  assert.match(response, /11:30 com Matheus Lima para Barba Terapia/i)
-  assert.match(response, /16:00 com Rafael Costa para Hidratacao Capilar/i)
-  assert.match(response, /17:00 com Lucas Ribeiro para Pigmentacao Natural/i)
+  assert.match(response, /- 10:00\s+  Corte Classic com Lucas Ribeiro/i)
+  assert.match(response, /- 11:30\s+  Barba Terapia com Matheus Lima/i)
+  assert.match(response, /- 16:00\s+  Hidratacao Capilar com Rafael Costa/i)
+  assert.match(response, /- 17:00\s+  Pigmentacao Natural com Lucas Ribeiro/i)
   assert.doesNotMatch(response, /06:00|12:00|15:00/)
+})
+
+test('consulta de um unico horario usa formato bonito em duas linhas', () => {
+  const response = buildExistingCustomerBookingResponse({
+    bookings: [
+      bookingStatusTesting.serializeExistingCustomerBooking({
+        appointment: buildAppointment('2026-04-15T19:00:00.000Z', {
+          id: 'apt-3',
+          serviceName: 'Hidratacao Capilar',
+          professionalName: 'Rafael Costa',
+        }),
+        timezone: 'America/Sao_Paulo',
+      }),
+    ],
+    requestedDateIso: '2026-04-15',
+    queryScope: 'DAY',
+    timezone: 'America/Sao_Paulo',
+    hasSchedulingContext: false,
+    referenceDateIso: '2026-04-14',
+  })
+
+  assert.match(response, /Amanha voce esta marcado as 16:00/i)
+  assert.match(response, /para Hidratacao Capilar com Rafael Costa/i)
+})
+
+test('consulta sem horario em um sabado usa resposta objetiva com dia da semana', () => {
+  const response = buildExistingCustomerBookingResponse({
+    bookings: [],
+    requestedDateIso: '2026-04-18',
+    queryScope: 'DAY',
+    timezone: 'America/Sao_Paulo',
+    hasSchedulingContext: false,
+    referenceDateIso: '2026-04-14',
+  })
+
+  assert.match(response, /No s[áa]bado voce nao tem nenhum horario confirmado/i)
 })

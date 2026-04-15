@@ -634,6 +634,7 @@ const EXISTING_BOOKING_CONTEXT_PHRASES = [
   'horario confirmado',
   'ja ficou marcado',
   'voce tem um horario',
+  'voce tem estes horarios confirmados',
   'voce nao tem nenhum agendamento',
   'voce nao tem nenhum horario',
   'seus proximos horarios',
@@ -642,6 +643,9 @@ const EXISTING_BOOKING_CONTEXT_PHRASES = [
 
 const EXISTING_BOOKING_FOLLOW_UP_PATTERN =
   /^(que horas|qual horario|com quem|qual servico|o que ficou marcado|o que eu marquei|me lembra|me confirma)\??$/
+
+const EXISTING_BOOKING_DAY_FOLLOW_UP_PATTERN =
+  /^e\s+(hoje|amanha|depois de amanha|domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado|na\s+segunda(?:-feira)?|na\s+terca(?:-feira)?|na\s+quarta(?:-feira)?|na\s+quinta(?:-feira)?|na\s+sexta(?:-feira)?|no\s+sabado|no\s+domingo|semana que vem|proxima semana)\??$/
 
 const ACKNOWLEDGEMENT_PHRASES = [
   'ok',
@@ -766,6 +770,13 @@ export function detectExistingBookingQuestion(input: {
       includesAnyPhrase(lastAssistant, EXISTING_BOOKING_CONTEXT_PHRASES)
       || includesAnyPhrase(lastCustomer, EXISTING_BOOKING_CONTEXT_PHRASES)
     )
+  const dayFollowUpToExistingBookingContext =
+    EXISTING_BOOKING_DAY_FOLLOW_UP_PATTERN.test(normalized)
+    && (
+      includesAnyPhrase(lastAssistant, EXISTING_BOOKING_CONTEXT_PHRASES)
+      || includesAnyPhrase(lastCustomer, EXISTING_BOOKING_CONTEXT_PHRASES)
+      || includesAnyPhrase(lastCustomer, DIRECT_EXISTING_BOOKING_QUERY_PHRASES)
+    )
 
   return (
     asksAboutConfirmedBooking
@@ -773,6 +784,7 @@ export function detectExistingBookingQuestion(input: {
     || fuzzyExistingBookingQuery
     || heuristicExistingBookingFallback
     || followUpToExistingBookingContext
+    || dayFollowUpToExistingBookingContext
   )
 }
 

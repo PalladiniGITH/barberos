@@ -28,6 +28,7 @@ import {
   getAvailableBusinessPeriodsForDate,
   getCurrentDateTimeInTimezone,
   getTodayIsoInTimezone,
+  nextWeekdayIsoDate,
   resolveBusinessTimezone,
 } from '@/lib/timezone'
 import { resolveCustomerPreferredProfessional } from '@/lib/customers/preferred-professional'
@@ -138,11 +139,13 @@ interface RecentConfirmedBookingMemory {
 interface ExistingBookingQuery {
   scope: ExistingCustomerBookingQueryScope
   requestedDateIso: string | null
+  referenceDateIso: string | null
 }
 
 interface PreviousBookingStatusQueryMemory {
   scope: ExistingCustomerBookingQueryScope
   requestedDateIso: string | null
+  referenceDateIso: string | null
 }
 
 interface ContextualProfessionalPreference {
@@ -156,6 +159,21 @@ const CONVERSATION_CONTEXT_TTL_MS = 45 * 60_000
 const RECENT_COMPLETED_BOOKING_CONTEXT_MS = 20 * 60_000
 const RECENT_MESSAGE_CONTEXT_LIMIT = 8
 const SHORT_GREETING_PATTERN = /^(oi+|ola+|ol[aá]|bom dia|boa tarde|boa noite)[!.,\s]*$/
+
+const WEEKDAY_INDEX: Record<string, number> = {
+  domingo: 0,
+  segunda: 1,
+  'segunda-feira': 1,
+  terca: 2,
+  'terca-feira': 2,
+  quarta: 3,
+  'quarta-feira': 3,
+  quinta: 4,
+  'quinta-feira': 4,
+  sexta: 5,
+  'sexta-feira': 5,
+  sabado: 6,
+}
 
 function normalizeText(value: string) {
   return value
@@ -287,7 +305,27 @@ function parsePreviousBookingStatusQuery(raw: Prisma.JsonValue | null) {
   return {
     scope: scope === 'DAY' || scope === 'WEEK' || scope === 'NEXT' ? scope : 'NEXT',
     requestedDateIso: typeof candidate.requestedDateIso === 'string' ? candidate.requestedDateIso : null,
+    referenceDateIso: typeof candidate.referenceDateIso === 'string' ? candidate.referenceDateIso : null,
   } satisfies PreviousBookingStatusQueryMemory
+}
+
+function getWeekStartIso(dateIso: string) {
+  const [year, month, day] = dateIso.split('-').map(Number)
+  const anchor = new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
+  const weekday = anchor.getUTCDay()
+  const offsetToMonday = weekday === 0 ? -6 : 1 - weekday
+  anchor.setUTCDate(anchor.getUTCDate() + offsetToMonday)
+  return formatDateIso(anchor)
+}
+
+function getWeekdayIsoWithinWeek(referenceDateIso: string, weekdayIndex: number) {
+  const weekStartIso = getWeekStartIso(referenceDateIso)
+
+  if (weekdayIndex === 0) {
+    return shiftDateIso(weekStartIso, 6)
+  }
+
+  return shiftDateIso(weekStartIso, weekdayIndex - 1)
 }
 
 function parseRequestedDateFromExistingBookingQuestion(input: {
@@ -297,6 +335,7 @@ function parseRequestedDateFromExistingBookingQuestion(input: {
 }) {
   const normalized = normalizeText(input.message)
   const todayIso = getTodayIsoInTimezone(input.timezone)
+  const referenceDateIso = input.previousQuery?.referenceDateIso ?? todayIso
   const followUpPattern =
     /^(que horas|qual horario|com quem|qual servico|o que ficou marcado|o que eu marquei|me lembra|me confirma)\??$/
 
@@ -312,6 +351,17 @@ function parseRequestedDateFromExistingBookingQuestion(input: {
     return todayIso
   }
 
+  const weekdayName = Object.keys(WEEKDAY_INDEX).find((name) => normalized.includes(name))
+  if (weekdayName) {
+    const weekdayIndex = WEEKDAY_INDEX[weekdayName]
+
+    if (input.previousQuery?.scope === 'WEEK') {
+      return getWeekdayIsoWithinWeek(referenceDateIso, weekdayIndex)
+    }
+
+    return nextWeekdayIsoDate(todayIso, weekdayIndex)
+  }
+
   if (followUpPattern.test(normalized) && input.previousQuery?.requestedDateIso) {
     return input.previousQuery.requestedDateIso
   }
@@ -325,6 +375,17 @@ function parseExistingBookingQuery(input: {
   timezone: string
 }) {
   const normalized = normalizeText(input.message)
+  const todayIso = getTodayIsoInTimezone(input.timezone)
+  const nextWeekReferenceIso = shiftDateIso(getWeekStartIso(todayIso), 7)
+  const requestedDateIso = parseRequestedDateFromExistingBookingQuestion(input)
+
+  if (normalized.includes('semana que vem') || normalized.includes('proxima semana')) {
+    return {
+      scope: 'WEEK',
+      requestedDateIso: null,
+      referenceDateIso: nextWeekReferenceIso,
+    } satisfies ExistingBookingQuery
+  }
 
   if (
     normalized.includes('essa semana')
@@ -335,12 +396,14 @@ function parseExistingBookingQuery(input: {
     return {
       scope: 'WEEK',
       requestedDateIso: null,
+      referenceDateIso: todayIso,
     } satisfies ExistingBookingQuery
   }
 
   return {
-    scope: input.previousQuery?.requestedDateIso ? 'DAY' : 'NEXT',
-    requestedDateIso: parseRequestedDateFromExistingBookingQuestion(input),
+    scope: requestedDateIso ? 'DAY' : 'NEXT',
+    requestedDateIso,
+    referenceDateIso: input.previousQuery?.referenceDateIso ?? todayIso,
   } satisfies ExistingBookingQuery
 }
 
@@ -426,6 +489,7 @@ async function loadExistingCustomerBookings(input: {
   nowDateIso: string
   queryScope: ExistingCustomerBookingQueryScope
   requestedDateIso: string | null
+  referenceDateIso: string | null
 }) {
   return getExistingCustomerBookings({
     barbershopId: input.barbershopId,
@@ -433,7 +497,7 @@ async function loadExistingCustomerBookings(input: {
     timezone: input.timezone,
     requestedDateIso: input.requestedDateIso,
     queryScope: input.queryScope,
-    referenceDateIso: input.nowDateIso,
+    referenceDateIso: input.referenceDateIso ?? input.nowDateIso,
     limit: input.queryScope === 'WEEK' ? 6 : 8,
   })
 }
@@ -462,6 +526,7 @@ async function handleExistingBookingStatusQuery(input: {
     nowDateIso: input.nowDateIso,
     queryScope: existingBookingQuery.scope,
     requestedDateIso: existingBookingQuery.requestedDateIso,
+    referenceDateIso: existingBookingQuery.referenceDateIso,
   })
 
   if (input.effectiveState !== 'IDLE' || hasUsefulConversationProgress(input.draft)) {
@@ -480,6 +545,7 @@ async function handleExistingBookingStatusQuery(input: {
     conversationId: input.conversationId,
     inboundText: input.inboundText,
     requestedDateIso: existingBookingQuery.requestedDateIso,
+    referenceDateIso: existingBookingQuery.referenceDateIso,
     totalUpcomingBookings: bookings.length,
   })
 
@@ -488,6 +554,7 @@ async function handleExistingBookingStatusQuery(input: {
     conversationId: input.conversationId,
     queryScope: existingBookingQuery.scope,
     requestedDateIso: existingBookingQuery.requestedDateIso,
+    referenceDateIso: existingBookingQuery.referenceDateIso,
   })
 
   console.info('[whatsapp-conversation] appointments fetched: X', {
@@ -537,10 +604,10 @@ async function handleExistingBookingStatusQuery(input: {
   const responseText = buildExistingBookingStatusMessage({
     queryScope: existingBookingQuery.scope,
     requestedDateIso: existingBookingQuery.requestedDateIso,
+    referenceDateIso: existingBookingQuery.referenceDateIso,
     bookings,
     timezone: input.timezone,
     draft: input.draft,
-    referenceDateIso: input.nowDateIso,
   })
 
   console.info('[whatsapp-conversation] final booking status response', {
@@ -558,6 +625,7 @@ async function handleExistingBookingStatusQuery(input: {
         intent: 'CHECK_EXISTING_BOOKING',
         queryScope: existingBookingQuery.scope,
         requestedDateIso: existingBookingQuery.requestedDateIso,
+        referenceDateIso: existingBookingQuery.referenceDateIso,
         bookings: bookings.slice(0, 3),
       }),
       lastAssistantText: responseText,

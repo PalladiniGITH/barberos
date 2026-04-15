@@ -166,6 +166,38 @@ test('follow-up curto como "que horas?" consulta o agendamento ja encontrado', (
   assert.equal(requestedDateIso, '2026-04-15')
 })
 
+test('follow-up curto como "e sabado?" continua a consulta anterior', () => {
+  const detected = conversationTesting.isExistingBookingStatusQuestion({
+    message: 'e sabado?',
+    lastCustomerMessage: 'quais horarios eu tenho essa semana?',
+    lastAssistantMessage: 'Essa semana voce tem estes horarios confirmados:\n\n- Sexta-feira - 18:00\n  Hidratacao Capilar com Rafael Costa',
+  })
+
+  const query = conversationTesting.parseExistingBookingQuery({
+    message: 'e sabado?',
+    previousQuery: {
+      scope: 'WEEK',
+      requestedDateIso: null,
+      referenceDateIso: '2026-04-14',
+    },
+    timezone: 'America/Sao_Paulo',
+  })
+
+  assert.equal(detected, true)
+  assert.equal(query.scope, 'DAY')
+  assert.equal(query.requestedDateIso, '2026-04-18')
+})
+
+test('follow-up curto como "e domingo?" nao cai em novo agendamento', () => {
+  const detected = conversationTesting.isExistingBookingStatusQuestion({
+    message: 'e domingo?',
+    lastCustomerMessage: 'quais horarios eu tenho essa semana?',
+    lastAssistantMessage: 'Essa semana voce tem estes horarios confirmados:\n\n- Sexta-feira - 18:00\n  Hidratacao Capilar com Rafael Costa',
+  })
+
+  assert.equal(detected, true)
+})
+
 test('sem barbeiro definido a conversa pergunta preferencia antes de sugerir horarios', () => {
   const reply = conversationTesting.buildProfessionalQuestion(
     ['Lucas Ribeiro', 'Matheus Lima', 'Rafael Costa'],
@@ -316,8 +348,7 @@ test('consulta de amanha com um unico horario responde de forma direta e natural
   })
 
   assert.match(reply, /Amanha voce esta marcado as 16:00/i)
-  assert.match(reply, /Rafael Costa/)
-  assert.match(reply, /Hidratacao Capilar/)
+  assert.match(reply, /para Hidratacao Capilar com Rafael Costa/i)
 })
 
 test('consulta com multiplos horarios amanha lista todos de forma clara', () => {
@@ -350,8 +381,8 @@ test('consulta com multiplos horarios amanha lista todos de forma clara', () => 
   })
 
   assert.match(reply, /Amanha voce tem estes horarios confirmados/i)
-  assert.match(reply, /10:00 com Matheus Lima para Corte Classic/i)
-  assert.match(reply, /16:00 com Rafael Costa para Barba Terapia/i)
+  assert.match(reply, /- 10:00\s+  Corte Classic com Matheus Lima/i)
+  assert.match(reply, /- 16:00\s+  Barba Terapia com Rafael Costa/i)
 })
 
 test('consulta sem agendamento confirmado responde de forma objetiva', () => {
@@ -397,9 +428,22 @@ test('consulta dessa semana responde com os horarios futuros da semana de forma 
   })
 
   assert.match(reply, /Essa semana voce tem estes horarios confirmados/i)
-  assert.match(reply, /sexta/i)
-  assert.match(reply, /18:00 com Rafael Costa para Hidratacao Capilar/i)
-  assert.match(reply, /s[áa]bado/i)
+  assert.match(reply, /- Sexta-feira - 18:00/i)
+  assert.match(reply, /Hidratacao Capilar com Rafael Costa/i)
+  assert.match(reply, /- S[áa]bado - 10:00/i)
+})
+
+test('consulta de sabado sem horario responde de forma objetiva', () => {
+  const reply = conversationTesting.buildExistingBookingStatusMessage({
+    queryScope: 'DAY',
+    requestedDateIso: '2026-04-18',
+    bookings: [],
+    timezone: 'America/Sao_Paulo',
+    draft: conversationTesting.buildEmptyConversationDraft(),
+    referenceDateIso: '2026-04-14',
+  })
+
+  assert.match(reply, /No s[áa]bado voce nao tem nenhum horario confirmado/i)
 })
 
 test('ok apos agendamento concluido vira encerramento leve em vez de novo fluxo', () => {

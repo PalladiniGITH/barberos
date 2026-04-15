@@ -157,6 +157,24 @@ function describeWeekday(dateIso: string, timezone: string) {
   return formatWeekdayFromIsoDate(dateIso, timezone).toLowerCase()
 }
 
+function capitalizeLabel(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+function buildDaySentenceLead(dateIso: string, timezone: string, referenceDateIso?: string | null) {
+  const relativeDay = describeQueryDay(dateIso, timezone, referenceDateIso)
+
+  if (relativeDay === 'hoje' || relativeDay === 'amanha') {
+    return capitalizeLabel(relativeDay)
+  }
+
+  const weekday = describeWeekday(dateIso, timezone)
+  const article = /^(sabado|domingo)/.test(
+    weekday.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  ) ? 'No' : 'Na'
+  return `${article} ${weekday}`
+}
+
 export function buildExistingCustomerBookingResponse(input: {
   bookings: ExistingCustomerBookingItem[]
   requestedDateIso?: string | null
@@ -178,7 +196,7 @@ export function buildExistingCustomerBookingResponse(input: {
     }
 
     if (input.requestedDateIso) {
-      return `${describeQueryDay(input.requestedDateIso, timezone, referenceDateIso)} voce nao tem nenhum horario confirmado.${input.hasSchedulingContext ? ' Se quiser, continuo o novo agendamento por aqui.' : ''}`
+      return `${buildDaySentenceLead(input.requestedDateIso, timezone, referenceDateIso)} voce nao tem nenhum horario confirmado.${input.hasSchedulingContext ? ' Se quiser, continuo o novo agendamento por aqui.' : ''}`
     }
 
     return `No momento voce nao tem nenhum horario confirmado.${input.hasSchedulingContext ? ' Se quiser, continuo o novo agendamento por aqui.' : ''}`
@@ -198,24 +216,24 @@ export function buildExistingCustomerBookingResponse(input: {
       ? `${dayDescription.charAt(0).toUpperCase() + dayDescription.slice(1)} voce esta marcado as ${booking.timeLabel}`
       : `Seu proximo horario e ${dayDescription} as ${booking.timeLabel}`
 
-    return `${leadIn} com ${booking.professionalName} para ${booking.serviceName}.${continuationMessage}`.trim()
+    return `${leadIn}\npara ${booking.serviceName} com ${booking.professionalName}.${continuationMessage}`.trim()
   }
 
   const header = queryScope === 'WEEK'
     ? 'Essa semana voce tem estes horarios confirmados:'
     : input.requestedDateIso
-    ? `${describeQueryDay(input.requestedDateIso, timezone, referenceDateIso).charAt(0).toUpperCase() + describeQueryDay(input.requestedDateIso, timezone, referenceDateIso).slice(1)} voce tem estes horarios confirmados:`
+    ? `${buildDaySentenceLead(input.requestedDateIso, timezone, referenceDateIso)} voce tem estes horarios confirmados:`
     : 'Seus proximos horarios sao:'
   const lines = input.bookings
     .map((booking) => {
-      const datePrefix = queryScope === 'WEEK'
-        ? `${describeWeekday(booking.dateIso, timezone)} as `
+      const heading = queryScope === 'WEEK'
+        ? `${capitalizeLabel(describeWeekday(booking.dateIso, timezone))} - ${booking.timeLabel}`
         : input.requestedDateIso
-          ? ''
-          : `${describeQueryDay(booking.dateIso, timezone, referenceDateIso)} as `
-      return `- ${datePrefix}${booking.timeLabel} com ${booking.professionalName} para ${booking.serviceName}`
+          ? `${booking.timeLabel}`
+          : `${capitalizeLabel(describeQueryDay(booking.dateIso, timezone, referenceDateIso))} - ${booking.timeLabel}`
+      return `- ${heading}\n  ${booking.serviceName} com ${booking.professionalName}`
     })
-    .join('\n')
+    .join('\n\n')
 
   return continuationMessage
     ? `${header}\n\n${lines}\n\n${continuationMessage.trim()}`
