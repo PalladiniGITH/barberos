@@ -92,6 +92,25 @@ function getDateTimePartsInTimezone(referenceDate: Date, timezone: string) {
   }
 }
 
+function parseTimezoneOffsetLabel(value: string) {
+  const normalized = value.trim().toUpperCase()
+
+  if (normalized === 'GMT' || normalized === 'UTC') {
+    return 0
+  }
+
+  const match = /^GMT([+-])(\d{1,2})(?::?(\d{2}))?$/.exec(normalized)
+  if (!match) {
+    return null
+  }
+
+  const sign = match[1] === '-' ? -1 : 1
+  const hours = Number(match[2])
+  const minutes = Number(match[3] ?? '0')
+
+  return sign * (hours * 60 + minutes)
+}
+
 function parseTimeLabel(timeLabel: string) {
   const match = /^(\d{2}):(\d{2})$/.exec(timeLabel.trim())
   if (!match) {
@@ -194,6 +213,29 @@ export function formatDayLabelFromIsoDate(
 
 export function getTimezoneOffsetMinutes(timezone: string, referenceDate = new Date()) {
   const resolvedTimezone = resolveBusinessTimezone(timezone)
+  const offsetFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: resolvedTimezone,
+    timeZoneName: 'shortOffset',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
+  const timezoneNamePart = offsetFormatter
+    .formatToParts(referenceDate)
+    .find((part) => part.type === 'timeZoneName')?.value
+
+  const parsedOffset = timezoneNamePart
+    ? parseTimezoneOffsetLabel(timezoneNamePart)
+    : null
+
+  if (parsedOffset !== null) {
+    return parsedOffset
+  }
+
   const parts = getDateTimePartsInTimezone(referenceDate, resolvedTimezone)
   const asUtc = Date.UTC(
     parts.year,
