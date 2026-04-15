@@ -673,6 +673,7 @@ const ACKNOWLEDGEMENT_PHRASES = [
 
 const CONTEXTUAL_CONFIRMATION_PHRASES = [
   'sim',
+  'ss',
   'isso',
   'isso mesmo',
   'pode',
@@ -795,7 +796,7 @@ function inferIntent(
   exactTime?: string | null
 ) {
   const normalized = normalizeText(message)
-  const confirmationPattern = /\b(sim|isso|isso mesmo|desejo|quero|confirmo|confirmar|confirmado|confirma|fechado|pode ser|pode|pode sim|perfeito|ok|blz|beleza|certo|correto|bora|uhum|aham|isso ai|ta|pode marcar|pode agendar)\b/
+  const confirmationPattern = /\b(sim|ss|isso|isso mesmo|desejo|quero|confirmo|confirmar|confirmado|confirma|fechado|pode ser|pode|pode sim|perfeito|ok|blz|beleza|certo|correto|bora|uhum|aham|isso ai|ta|pode marcar|pode agendar)\b/
 
   if (detectExistingBookingQuestion({
     message,
@@ -839,7 +840,7 @@ function inferIntent(
   }
 
   if (
-    /\b(sim|confirmo|confirmar|fechado|pode ser|perfeito|ok|beleza|confirmado|confirma)\b/.test(normalized)
+    /\b(sim|ss|confirmo|confirmar|fechado|pode ser|perfeito|ok|beleza|confirmado|confirma)\b/.test(normalized)
     && !hasExplicitConfirmationCorrectionCue(message)
   ) {
     return 'CONFIRM' as const
@@ -929,6 +930,14 @@ function inferCorrectionTarget(input: {
   }
 
   if (input.allowAnyProfessional && input.conversationSummary.selectedProfessionalName) {
+    return 'PROFESSIONAL' as const
+  }
+
+  if (
+    input.mentionedName
+    && input.conversationSummary.requestedTimeLabel
+    && !input.conversationSummary.selectedProfessionalName
+  ) {
     return 'PROFESSIONAL' as const
   }
 

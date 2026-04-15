@@ -572,7 +572,7 @@ test('preserva o slot quando o cliente escolhe um horario exato antes da confirm
 })
 
 test('trata respostas afirmativas amplas como confirmacao real no momento certo', () => {
-  const affirmativeReplies = ['sim', 'isso', 'isso mesmo', 'desejo', 'quero', 'pode marcar', 'confirmar', 'fechado', 'ok', 'blz', 'aham', 'uhum']
+  const affirmativeReplies = ['sim', 'ss', 'isso', 'isso mesmo', 'desejo', 'quero', 'pode marcar', 'confirmar', 'fechado', 'ok', 'blz', 'aham', 'uhum']
 
   affirmativeReplies.forEach((reply) => {
     assert.equal(agentTesting.isExplicitConfirmation(reply), true)
@@ -580,7 +580,7 @@ test('trata respostas afirmativas amplas como confirmacao real no momento certo'
 })
 
 test('confirmacoes contextuais curtas fecham corretamente em WAITING_CONFIRMATION', () => {
-  ;['isso', 'isso mesmo', 'pode', 'pode sim', 'fechado', 'blz', 'beleza', 'certo', 'aham', 'uhum', 'ok', 'ok sim'].forEach((message) => {
+  ;['isso', 'isso mesmo', 'pode', 'pode sim', 'fechado', 'blz', 'beleza', 'certo', 'aham', 'uhum', 'ok', 'ok sim', 'ss'].forEach((message) => {
     const memory = createConfirmationReadyMemory()
 
     assert.equal(
@@ -596,7 +596,7 @@ test('confirmacoes contextuais curtas fecham corretamente em WAITING_CONFIRMATIO
 })
 
 test('fora de WAITING_CONFIRMATION uma concordancia curta nao vira confirmacao de agendamento', () => {
-  ;['isso', 'isso mesmo', 'pode', 'pode sim', 'fechado', 'blz', 'beleza', 'certo', 'aham', 'uhum', 'ok', 'ok sim'].forEach((message) => {
+  ;['isso', 'isso mesmo', 'pode', 'pode sim', 'fechado', 'blz', 'beleza', 'certo', 'aham', 'uhum', 'ok', 'ok sim', 'ss'].forEach((message) => {
     const memory = createConfirmationReadyMemory()
     memory.state = 'WAITING_TIME'
 
@@ -613,7 +613,7 @@ test('fora de WAITING_CONFIRMATION uma concordancia curta nao vira confirmacao d
 })
 
 test('caminho de contextual confirmation heuristic aceita as expressoes curtas reais no contexto correto', () => {
-  ;['isso', 'isso mesmo', 'pode', 'pode sim', 'fechado', 'blz', 'beleza', 'certo', 'aham', 'uhum', 'ok', 'ok sim'].forEach((message) => {
+  ;['isso', 'isso mesmo', 'pode', 'pode sim', 'fechado', 'blz', 'beleza', 'certo', 'aham', 'uhum', 'ok', 'ok sim', 'ss'].forEach((message) => {
     const result = agentTesting.resolveContextualConfirmationHeuristic({
       memory: createConfirmationReadyMemory(),
       inboundText: message,
@@ -627,7 +627,7 @@ test('caminho de contextual confirmation heuristic aceita as expressoes curtas r
 })
 
 test('caminho de llm confirmation classification so arma para concordancias curtas sem correcao explicita', () => {
-  ;['isso', 'pode', 'fechado', 'blz', 'ok'].forEach((message) => {
+  ;['isso', 'pode', 'fechado', 'blz', 'ok', 'ss'].forEach((message) => {
     assert.equal(
       agentTesting.shouldUseContextualConfirmationClassifier({
         memory: createConfirmationReadyMemory(),
@@ -638,7 +638,7 @@ test('caminho de llm confirmation classification so arma para concordancias curt
     )
   })
 
-  ;['isso 14:30', 'pode ser com o Matheus', 'ok amanha', 'fechado 16h'].forEach((message) => {
+  ;['isso 14:30', 'pode ser com o Matheus', 'ok amanha', 'fechado 16h', 'ss 14:30', 'ss com o Matheus'].forEach((message) => {
     assert.equal(
       agentTesting.shouldUseContextualConfirmationClassifier({
         memory: createConfirmationReadyMemory(),
@@ -744,6 +744,8 @@ test('correcoes explicitas vencem a confirmacao curta e nao reaproveitam slot an
     ['pode ser com o Matheus', 'PROFESSIONAL'],
     ['ok amanha', 'DATE'],
     ['fechado 16h', 'TIME'],
+    ['ss 14:30', 'TIME'],
+    ['ss com o Matheus', 'PROFESSIONAL'],
   ]
 
   for (const [message, correctionTarget] of samples) {
@@ -783,7 +785,7 @@ test('correcoes explicitas vencem a confirmacao curta e nao reaproveitam slot an
 })
 
 test('confirmacoes curtas nao passam sem slot real ou com barbeiro indefinido', () => {
-  ;['isso', 'pode', 'fechado', 'ok sim'].forEach((message) => {
+  ;['isso', 'pode', 'fechado', 'ok sim', 'ss'].forEach((message) => {
     const noSlotMemory = createConfirmationReadyMemory()
     noSlotMemory.selectedSlot = null
 
@@ -877,6 +879,79 @@ test('interpreta "rafael" isolado como escolha de barbeiro no contexto certo', a
 
   assert.equal(intent.mentionedName, 'Rafael Costa')
   assert.equal(intent.greetingOnly, false)
+})
+
+test('interpreta barbeiro isolado como PROFESSIONAL_CORRECTION quando o horario ja esta escolhido', async () => {
+  const intent = await interpretWhatsAppMessage({
+    message: 'matheus',
+    barbershopName: 'Linha Nobre',
+    barbershopTimezone: 'America/Sao_Paulo',
+    conversationState: 'WAITING_TIME',
+    offeredSlotCount: 0,
+    services: SERVICES.map((service) => ({ name: service.name })),
+    professionals: PROFESSIONALS.map((professional) => ({ name: professional.name })),
+    todayIsoDate: '2026-04-13',
+    currentLocalDateTime: '2026-04-13 10:30',
+    conversationSummary: {
+      selectedServiceName: 'Corte Classic',
+      selectedProfessionalName: null,
+      requestedDateIso: '2026-04-16',
+      requestedTimeLabel: '09:30',
+      allowAnyProfessional: false,
+      lastCustomerMessage: '09:30',
+      lastAssistantMessage: 'Qual horario voce prefere?',
+    },
+  })
+
+  assert.equal(intent.mentionedName, 'Matheus')
+  assert.equal(intent.correctionTarget, 'PROFESSIONAL')
+})
+
+test('troca de barbeiro preserva o horario ja escolhido na memoria do agente', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.state = 'WAITING_TIME'
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.requestedDateIso = '2026-04-16'
+  memory.requestedTimeLabel = '09:30'
+  memory.selectedSlot = {
+    key: 'pro-lucas:2026-04-16T12:30:00.000Z',
+    professionalId: 'pro-lucas',
+    professionalName: 'Lucas',
+    dateIso: '2026-04-16',
+    timeLabel: '09:30',
+    startAtIso: '2026-04-16T12:30:00.000Z',
+    endAtIso: '2026-04-16T13:05:00.000Z',
+  }
+  memory.offeredSlots = [memory.selectedSlot]
+
+  agentTesting.promoteIntentContextToMemory({
+    memory,
+    intent: {
+      intent: 'CHANGE_REQUEST',
+      correctionTarget: 'PROFESSIONAL',
+      serviceName: null,
+      mentionedName: 'Matheus',
+      allowAnyProfessional: false,
+      requestedDateIso: null,
+      timePreference: 'NONE',
+      preferredPeriod: null,
+      exactTime: null,
+      selectedOptionNumber: null,
+      confidence: 0.92,
+      greetingOnly: false,
+      restartConversation: false,
+      reasoning: 'professional correction',
+    },
+    services: SERVICES,
+    professionals: PROFESSIONALS,
+  })
+
+  assert.equal(memory.selectedProfessionalId, 'pro-matheus')
+  assert.equal(memory.selectedProfessionalName, 'Matheus')
+  assert.equal(memory.requestedTimeLabel, '09:30')
+  assert.equal(memory.selectedSlot, null)
+  assert.deepEqual(memory.offeredSlots, [])
 })
 
 test('interpreta consulta de agendamento ja confirmado como CHECK_EXISTING_BOOKING', async () => {

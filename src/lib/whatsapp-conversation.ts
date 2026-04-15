@@ -201,7 +201,7 @@ function shouldResetConversationOnGreeting(input: {
 }
 
 function isAffirmativeConfirmationMessage(message: string) {
-  return /\b(sim|s|isso|isso mesmo|pode|pode sim|pode confirmar|pode marcar|pode agendar|confirmo|confirmar|quero|desejo|fechado|ok|blz|beleza|certo|correto|bora|uhum|aham|isso ai|ta)\b/.test(
+  return /\b(sim|s|ss|isso|isso mesmo|pode|pode sim|pode confirmar|pode marcar|pode agendar|confirmo|confirmar|quero|desejo|fechado|ok|blz|beleza|certo|correto|bora|uhum|aham|isso ai|ta)\b/.test(
     normalizeText(message)
   )
 }
@@ -218,6 +218,26 @@ function hasExplicitConfirmationCorrectionCue(message: string) {
 
 function shouldTreatAsStoredSlotConfirmation(message: string) {
   return isAffirmativeConfirmationMessage(message) && !hasExplicitConfirmationCorrectionCue(message)
+}
+
+function isExactTimeLabel(value: string | null | undefined) {
+  return Boolean(value && /^\d{2}:\d{2}$/.test(value))
+}
+
+function resolveExactTimeForSlotRevalidation(input: {
+  interpretedExactTime: string | null
+  requestedTimeLabel: string | null
+  professionalChanged: boolean
+}) {
+  if (input.interpretedExactTime) {
+    return input.interpretedExactTime
+  }
+
+  if (input.professionalChanged && isExactTimeLabel(input.requestedTimeLabel)) {
+    return input.requestedTimeLabel
+  }
+
+  return null
 }
 
 function buildEmptyConversationDraft(): ConversationDraft {
@@ -1428,7 +1448,6 @@ function applyCorrectionTarget(draft: ConversationDraft, target: string) {
     draft.selectedProfessionalId = null
     draft.selectedProfessionalName = null
     draft.allowAnyProfessional = false
-    draft.requestedTimeLabel = null
     clearDraftAvailability(draft)
     return
   }
@@ -2721,8 +2740,14 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     draft.selectedProfessionalId !== baselineDraft.selectedProfessionalId
     || draft.allowAnyProfessional !== baselineDraft.allowAnyProfessional
   const dateChanged = draft.requestedDateIso !== baselineDraft.requestedDateIso
+  const shouldPreserveRequestedTimeOnProfessionalChange =
+    !hasNewTimePreference
+    && professionalChanged
+    && !serviceChanged
+    && !dateChanged
+    && Boolean(baselineDraft.requestedTimeLabel)
 
-  if (!hasNewTimePreference && (serviceChanged || professionalChanged || dateChanged)) {
+  if (!hasNewTimePreference && (serviceChanged || dateChanged)) {
     draft.requestedTimeLabel = null
     clearDraftAvailability(draft)
   } else {
@@ -2731,6 +2756,17 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       timePreference: interpreted.timePreference,
       preferredPeriod: interpreted.preferredPeriod,
       existingValue: draft.requestedTimeLabel,
+    })
+  }
+
+  if (shouldPreserveRequestedTimeOnProfessionalChange) {
+    console.info('[whatsapp-conversation] professional correction preserved requested time', {
+      customerId: input.customer.id,
+      requestedTimeBefore: baselineDraft.requestedTimeLabel,
+      requestedTimeAfter: draft.requestedTimeLabel,
+      professionalBefore: baselineDraft.selectedProfessionalName,
+      professionalAfter: draft.selectedProfessionalName,
+      correctionTarget: interpreted.correctionTarget,
     })
   }
 
@@ -3028,6 +3064,11 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     exactTime: interpreted.exactTime,
     message: inboundText,
   })
+  const exactTimeForValidation = resolveExactTimeForSlotRevalidation({
+    interpretedExactTime: interpreted.exactTime,
+    requestedTimeLabel: draft.requestedTimeLabel,
+    professionalChanged,
+  })
   const professionalIdForExactSearch = draft.allowAnyProfessional
     ? null
     : draft.selectedProfessionalId ?? contextualProfessionalPreference?.professionalId ?? null
@@ -3035,10 +3076,10 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     ? null
     : draft.selectedProfessionalName ?? contextualProfessionalPreference?.professionalName ?? null
 
-  if (interpreted.exactTime) {
+  if (exactTimeForValidation) {
     console.info('[whatsapp-conversation] exact time requested', {
       customerId: input.customer.id,
-      exactTimeRequested: interpreted.exactTime,
+      exactTimeRequested: exactTimeForValidation,
       requestedDateIso: draft.requestedDateIso,
       selectedProfessionalId: professionalIdForExactSearch,
       selectedProfessionalName: professionalNameForExactSearch,
@@ -3052,7 +3093,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
         customerId: input.customer.id,
         requestedDateIso: draft.requestedDateIso,
         requestedTimeLabel: draft.requestedTimeLabel,
-        exactTimeRequested: interpreted.exactTime,
+        exactTimeRequested: exactTimeForValidation,
         selectedServiceId: draft.selectedServiceId,
         selectedProfessionalId: professionalIdForExactSearch,
       })
@@ -3072,13 +3113,27 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     })
   }
 
-  if (!slotForConfirmation && interpreted.exactTime && professionalIdForExactSearch) {
+  if (
+    !slotForConfirmation
+    && exactTimeForValidation
+    && professionalIdForExactSearch
+  ) {
+    if (!interpreted.exactTime && professionalChanged) {
+      console.info('[whatsapp-conversation] revalidating preserved time with new professional', {
+        customerId: input.customer.id,
+        requestedDateIso: draft.requestedDateIso,
+        preservedExactTime: exactTimeForValidation,
+        selectedProfessionalId: professionalIdForExactSearch,
+        selectedProfessionalName: professionalNameForExactSearch,
+      })
+    }
+
     slotForConfirmation = await findExactAvailableWhatsAppSlot({
       barbershopId: input.barbershop.id,
       serviceId: draft.selectedServiceId,
       professionalId: professionalIdForExactSearch,
       dateIso: draft.requestedDateIso,
-      timeLabel: interpreted.exactTime,
+      timeLabel: exactTimeForValidation,
       timezone,
     })
   }
@@ -3099,7 +3154,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     })
   }
 
-  if (!slotForConfirmation && interpreted.exactTime) {
+  if (!slotForConfirmation && exactTimeForValidation) {
     const exactTimeAvailability = await getAvailableWhatsAppSlots({
       barbershopId: input.barbershop.id,
       serviceId: draft.selectedServiceId,
@@ -3107,13 +3162,13 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       timezone,
       professionalId: professionalIdForExactSearch,
       timePreference: 'EXACT',
-      exactTime: interpreted.exactTime,
+      exactTime: exactTimeForValidation,
       limit: 8,
     })
 
     console.info('[whatsapp-conversation] exact time validation result', {
       customerId: input.customer.id,
-      exactTimeRequested: interpreted.exactTime,
+      exactTimeRequested: exactTimeForValidation,
       selectedProfessionalId: professionalIdForExactSearch,
       selectedProfessionalName: professionalNameForExactSearch,
       freeSlotsReturned: exactTimeAvailability.slots.length,
@@ -3137,8 +3192,8 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
         professionalId: draft.allowAnyProfessional ? null : draft.selectedProfessionalId,
         professionalName: draft.allowAnyProfessional ? null : draft.selectedProfessionalName,
         timePreference: 'EXACT',
-        exactTime: interpreted.exactTime,
-        requestedExactTimeForFallback: interpreted.exactTime,
+        exactTime: exactTimeForValidation,
+        requestedExactTimeForFallback: exactTimeForValidation,
         usedAI,
         responseLeadIn,
         previousAssistantText: conversation.lastAssistantText,
@@ -3147,7 +3202,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   }
 
   if (!slotForConfirmation) {
-    if (!interpreted.exactTime && !hasExplicitFlexibleTimeRequest(inboundText)) {
+    if (!exactTimeForValidation && !hasExplicitFlexibleTimeRequest(inboundText)) {
       const responseText = withLeadIn(
         buildSpecificTimeQuestion({
           requestedDateIso: draft.requestedDateIso,
@@ -3191,13 +3246,13 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       serviceName: draft.selectedServiceName,
       professionalId: draft.allowAnyProfessional ? null : draft.selectedProfessionalId,
       professionalName: draft.allowAnyProfessional ? null : draft.selectedProfessionalName,
-      timePreference: interpreted.exactTime
+      timePreference: exactTimeForValidation
         ? draft.requestedTimeLabel
         : interpreted.timePreference !== 'NONE'
           ? interpreted.timePreference
           : draft.requestedTimeLabel,
-      exactTime: interpreted.exactTime ? null : (draft.requestedTimeLabel?.includes(':') ? draft.requestedTimeLabel : null),
-      requestedExactTimeForFallback: interpreted.exactTime,
+      exactTime: exactTimeForValidation ? null : (draft.requestedTimeLabel?.includes(':') ? draft.requestedTimeLabel : null),
+      requestedExactTimeForFallback: exactTimeForValidation,
       usedAI,
       responseLeadIn,
       previousAssistantText: conversation.lastAssistantText,
@@ -3400,6 +3455,8 @@ export const __testing = {
   isAcknowledgementMessage,
   isExistingBookingStatusQuestion,
   isAffirmativeConfirmationMessage,
+  isExactTimeLabel,
+  resolveExactTimeForSlotRevalidation,
   shouldTreatAsStoredSlotConfirmation,
   isConversationContextReliable,
   parseExistingBookingQuery,

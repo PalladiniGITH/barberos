@@ -263,6 +263,26 @@ test('lista de horarios com o mesmo barbeiro ainda exibe o nome do profissional 
   assert.match(reply, /09:45 com Lucas Ribeiro/i)
 })
 
+test('troca de barbeiro preserva o horario explicito para revalidacao do novo profissional', () => {
+  assert.equal(
+    conversationTesting.resolveExactTimeForSlotRevalidation({
+      interpretedExactTime: null,
+      requestedTimeLabel: '09:30',
+      professionalChanged: true,
+    }),
+    '09:30'
+  )
+
+  assert.equal(
+    conversationTesting.resolveExactTimeForSlotRevalidation({
+      interpretedExactTime: null,
+      requestedTimeLabel: '09:30',
+      professionalChanged: false,
+    }),
+    null
+  )
+})
+
 test('quando o barbeiro preferido nao tem o horario pedido, sugere proximos horarios com ele antes de outro barbeiro', () => {
   const reply = conversationTesting.buildExactTimeFallbackResponse({
     exactTime: '15:00',
@@ -473,7 +493,7 @@ test('encerramentos naturais como "ok obrigado", "nenhum" e "nao quero" saem do 
 })
 
 test('respostas afirmativas amplas sao aceitas para fechamento deterministico', () => {
-  const affirmativeReplies = ['sim', 's', 'isso', 'isso mesmo', 'ok', 'ok sim', 'pode', 'pode sim', 'blz', 'beleza', 'certo', 'aham', 'uhum', 'confirmar', 'quero', 'desejo', 'fechado']
+  const affirmativeReplies = ['sim', 's', 'ss', 'isso', 'isso mesmo', 'ok', 'ok sim', 'pode', 'pode sim', 'blz', 'beleza', 'certo', 'aham', 'uhum', 'confirmar', 'quero', 'desejo', 'fechado']
 
   affirmativeReplies.forEach((reply) => {
     assert.equal(conversationTesting.isAffirmativeConfirmationMessage(reply), true)
@@ -481,13 +501,13 @@ test('respostas afirmativas amplas sao aceitas para fechamento deterministico', 
 })
 
 test('caminho de deterministic confirmation accepted aceita as expressoes curtas reais', () => {
-  ;['isso', 'isso mesmo', 'pode', 'pode sim', 'fechado', 'blz', 'beleza', 'certo', 'aham', 'uhum', 'ok', 'ok sim'].forEach((message) => {
+  ;['isso', 'isso mesmo', 'pode', 'pode sim', 'fechado', 'blz', 'beleza', 'certo', 'aham', 'uhum', 'ok', 'ok sim', 'ss'].forEach((message) => {
     assert.equal(conversationTesting.shouldTreatAsStoredSlotConfirmation(message), true, message)
   })
 })
 
 test('caminho de deterministic confirmation blocked barra correcoes explicitas junto da concordancia', () => {
-  ;['isso 14:30', 'pode ser com o Matheus', 'ok amanha', 'fechado 16h'].forEach((message) => {
+  ;['isso 14:30', 'pode ser com o Matheus', 'ok amanha', 'fechado 16h', 'ss 14:30', 'ss com o Matheus'].forEach((message) => {
     assert.equal(conversationTesting.isAffirmativeConfirmationMessage(message), true, message)
     assert.equal(conversationTesting.shouldTreatAsStoredSlotConfirmation(message), false, message)
   })

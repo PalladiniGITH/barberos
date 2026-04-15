@@ -808,7 +808,7 @@ function enforceNextActionFromMemory(
 }
 
 function isExplicitConfirmation(message: string) {
-  return /\b(sim|isso|isso mesmo|desejo|quero|confirmo|confirmar|confirmado|confirma|fechado|ok|blz|beleza|certo|correto|bora|uhum|aham|isso ai|ta|pode|pode sim|pode confirmar|pode marcar|pode agendar|pode ser)\b/.test(normalizeText(message))
+  return /\b(sim|ss|isso|isso mesmo|desejo|quero|confirmo|confirmar|confirmado|confirma|fechado|ok|blz|beleza|certo|correto|bora|uhum|aham|isso ai|ta|pode|pode sim|pode confirmar|pode marcar|pode agendar|pode ser)\b/.test(normalizeText(message))
 }
 
 function hasExplicitConfirmationCorrectionCue(message: string) {
@@ -831,6 +831,7 @@ function resolveContextualConfirmationHeuristic(input: {
     'pode sim',
     'isso ai',
     'sim',
+    'ss',
     'isso',
     'pode',
     'fechado',
@@ -1081,7 +1082,7 @@ function shouldUseContextualConfirmationClassifier(input: {
     return false
   }
 
-  return normalized.length <= 24 && /^(sim|isso|isso mesmo|pode|pode sim|fechado|ok|blz|beleza|certo|correto|confirmo|confirma|bora|uhum|aham|isso ai|ta)$/.test(normalized)
+  return normalized.length <= 24 && /^(sim|ss|isso|isso mesmo|pode|pode sim|fechado|ok|blz|beleza|certo|correto|confirmo|confirma|bora|uhum|aham|isso ai|ta)$/.test(normalized)
 }
 
 function sanitizeContextualConfirmationPayload(payload: unknown) {
@@ -1423,7 +1424,6 @@ function applyCorrectionTargetToMemory(memory: WorkingMemory, correctionTarget: 
     memory.selectedProfessionalId = null
     memory.selectedProfessionalName = null
     memory.allowAnyProfessional = false
-    memory.requestedTimeLabel = null
     clearPromotedAvailability(memory)
     return
   }
