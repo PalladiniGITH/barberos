@@ -173,7 +173,21 @@ test('sem barbeiro definido a conversa pergunta preferencia antes de sugerir hor
   )
 
   assert.match(reply, /preferencia de barbeiro|qualquer um/i)
-  assert.match(reply, /Lucas Ribeiro/)
+  assert.doesNotMatch(reply, /09:30|09:45/)
+})
+
+test('lista de servicos fica formatada em multiplas linhas com bullets', () => {
+  const reply = conversationTesting.buildServiceQuestion([
+    'Barba Terapia',
+    'Corte + Barba Premium',
+    'Corte Classic',
+  ])
+
+  assert.match(reply, /Temos estes servicos disponiveis/i)
+  assert.match(reply, /(?:^|\n)- Barba Terapia/m)
+  assert.match(reply, /(?:^|\n)- Corte \+ Barba Premium/m)
+  assert.match(reply, /(?:^|\n)- Corte Classic/m)
+  assert.doesNotMatch(reply, /Barba Terapia, Corte \+ Barba Premium, Corte Classic/)
 })
 
 test('com barbeiro recente ou preferencial a conversa usa pergunta mais contextual', () => {

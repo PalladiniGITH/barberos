@@ -1154,8 +1154,16 @@ async function classifyContextualConfirmationWithOpenAI(input: {
 }
 
 function buildServiceQuestionFromNames(serviceNames: string[]) {
-  const preview = serviceNames.slice(0, 6).join(', ')
-  return `Perfeito. Qual servico voce quer fazer? ${preview ? `Hoje temos: ${preview}.` : ''}`.trim()
+  if (serviceNames.length === 0) {
+    return 'Perfeito! Qual servico voce gostaria de agendar?'
+  }
+
+  const preview = serviceNames
+    .slice(0, 6)
+    .map((serviceName) => `- ${serviceName}`)
+    .join('\n')
+
+  return `Perfeito! Temos estes servicos disponiveis:\n\n${preview}\n\nQual voce gostaria de agendar?`
 }
 
 function referencesPreferredProfessional(message: string) {
@@ -1750,7 +1758,7 @@ function buildGuardrailReplyText(input: {
       return `Posso buscar com ${input.memory.selectedProfessionalName} ou, se preferir, vejo outro barbeiro.`
     }
 
-    return 'Tem preferencia de barbeiro ou posso procurar com qualquer um?'
+    return 'Voce tem preferencia de barbeiro ou pode ser qualquer um?'
   }
 
   if (input.nextAction === 'ASK_PERIOD') {
@@ -2855,6 +2863,7 @@ export const __testing = {
   hasUsefulProgressInMemory,
   resolveToolFailureOverride,
   buildGuardrailReplyText,
+  buildServiceQuestionFromNames,
   referencesPreferredProfessional,
   isExplicitConfirmation,
   isPureExplicitConfirmation,

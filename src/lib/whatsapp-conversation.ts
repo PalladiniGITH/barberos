@@ -574,8 +574,16 @@ async function handleExistingBookingStatusQuery(input: {
 }
 
 function buildServiceQuestion(serviceNames: string[]) {
-  const preview = serviceNames.slice(0, 6).join(', ')
-  return `Perfeito. Voce quer corte, barba ou outro servico? ${preview ? `Hoje temos: ${preview}.` : ''}`.trim()
+  if (serviceNames.length === 0) {
+    return 'Perfeito! Qual servico voce gostaria de agendar?'
+  }
+
+  const preview = serviceNames
+    .slice(0, 6)
+    .map((serviceName) => `- ${serviceName}`)
+    .join('\n')
+
+  return `Perfeito! Temos estes servicos disponiveis:\n\n${preview}\n\nQual voce gostaria de agendar?`
 }
 
 function buildProfessionalQuestion(
@@ -586,7 +594,9 @@ function buildProfessionalQuestion(
     return `Quer marcar com ${preferredProfessionalName} de novo ou prefere outro barbeiro?`
   }
 
-  return `Tem preferencia de barbeiro? Posso buscar com ${professionalNames.slice(0, 6).join(', ')}. Se preferir, tambem posso ver com qualquer um.`
+  return professionalNames.length > 0
+    ? 'Voce tem preferencia de barbeiro ou pode ser qualquer um?'
+    : 'Tem algum barbeiro de preferencia?'
 }
 
 function resolveContextualProfessionalPreference(input: {
@@ -3319,6 +3329,7 @@ export const __testing = {
   buildExactTimeFallbackResponse,
   buildExistingBookingStatusMessage,
   buildRecentConfirmedGreeting,
+  buildServiceQuestion,
   buildProfessionalQuestion,
   buildHumanSlotOfferMessage,
   hasUsefulConversationProgress,

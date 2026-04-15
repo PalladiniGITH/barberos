@@ -363,8 +363,28 @@ test('guardrail de servico mostra a lista real quando o servico ainda nao foi de
     nowContext: createAgentInput().nowContext,
   })
 
-  assert.match(reply, /Corte Classic/)
-  assert.match(reply, /Barba/)
+  assert.match(reply, /Temos estes servicos disponiveis/i)
+  assert.match(reply, /(?:^|\n)- Corte Classic/m)
+  assert.match(reply, /(?:^|\n)- Barba/m)
+  assert.doesNotMatch(reply, /Corte Classic, Barba/)
+})
+
+test('guardrail de barbeiro pergunta a preferencia antes de qualquer oferta de horario', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.requestedDateIso = '2026-04-13'
+
+  const reply = agentTesting.buildGuardrailReplyText({
+    nextAction: 'ASK_PROFESSIONAL',
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    nowContext: createAgentInput().nowContext,
+  })
+
+  assert.match(reply, /preferencia de barbeiro|qualquer um/i)
+  assert.doesNotMatch(reply, /13:15|13:30|09:30|09:45/)
 })
 
 test('consentimento para qualquer barbeiro so vale quando o cliente fala isso explicitamente', () => {
