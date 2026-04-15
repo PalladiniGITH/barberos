@@ -357,13 +357,15 @@ function formatIsoTime(hours: number, minutes: number) {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
 }
 
-function parseExplicitTime(message: string) {
-  const exactMatch = message.match(/\b([01]?\d|2[0-3])(?:[:h]|hr|hrs)([0-5]\d)\b/)
+export function extractExplicitTimeFromMessage(message: string) {
+  const normalized = normalizeText(message)
+
+  const exactMatch = normalized.match(/\b([01]?\d|2[0-3])(?:[:h]|hr|hrs)([0-5]\d)\b/)
   if (exactMatch) {
     return formatIsoTime(Number(exactMatch[1]), Number(exactMatch[2]))
   }
 
-  const meridiemMatch = message.match(/\b([1-9]|1[0-2])(?::([0-5]\d))?\s*(?:da|de)\s+(manha|tarde|noite)\b/)
+  const meridiemMatch = normalized.match(/\b([1-9]|1[0-2])(?::([0-5]\d))?\s*(?:da|de)\s+(manha|tarde|noite)\b/)
   if (meridiemMatch) {
     const rawHour = Number(meridiemMatch[1])
     const minutes = Number(meridiemMatch[2] ?? '0')
@@ -381,12 +383,12 @@ function parseExplicitTime(message: string) {
     return formatIsoTime(hours, minutes)
   }
 
-  const hourOnlyMatch = message.match(/\b([01]?\d|2[0-3])\s*(?:h|hr|hrs|hora|horas)\b/)
+  const hourOnlyMatch = normalized.match(/\b([01]?\d|2[0-3])\s*(?:h|hr|hrs|hora|horas)\b/)
   if (hourOnlyMatch) {
     return formatIsoTime(Number(hourOnlyMatch[1]), 0)
   }
 
-  const explicitHourRequest = message.match(/\b(?:as|às)\s*([01]?\d|2[0-3])\b/)
+  const explicitHourRequest = normalized.match(/\b(?:as)\s*([01]?\d|2[0-3])\b/)
   if (explicitHourRequest) {
     return formatIsoTime(Number(explicitHourRequest[1]), 0)
   }
@@ -473,7 +475,7 @@ function inferTimePreference(message: string) {
     return { timePreference: 'MORNING' as const, exactTime: null }
   }
 
-  const exactTime = parseExplicitTime(normalized)
+  const exactTime = extractExplicitTimeFromMessage(normalized)
   if (exactTime) {
     return { timePreference: 'EXACT' as const, exactTime }
   }
@@ -670,7 +672,8 @@ export function detectExistingBookingQuestion(input: {
 function inferIntent(
   message: string,
   conversationState: string,
-  conversationSummary: WhatsAppInterpreterInput['conversationSummary']
+  conversationSummary: WhatsAppInterpreterInput['conversationSummary'],
+  exactTime?: string | null
 ) {
   const normalized = normalizeText(message)
   const confirmationPattern = /\b(sim|desejo|quero|confirmo|confirmar|confirmado|confirma|fechado|pode ser|perfeito|ok|beleza|pode marcar|pode agendar)\b/
@@ -685,6 +688,12 @@ function inferIntent(
 
   if (conversationState !== 'WAITING_CONFIRMATION' && acknowledgementPattern.test(normalized)) {
     return 'ACKNOWLEDGEMENT' as const
+  }
+
+  if (exactTime && confirmationPattern.test(normalized)) {
+    return conversationState === 'WAITING_CONFIRMATION'
+      ? 'CHANGE_REQUEST' as const
+      : 'BOOK_APPOINTMENT' as const
   }
 
   if (
@@ -816,6 +825,38 @@ function inferCorrectionTarget(input: {
   return 'NONE' as const
 }
 
+function prioritizeExplicitTimeOverConfirmation(input: {
+  interpreted: WhatsAppIntent
+  conversationState: string
+  conversationSummary: WhatsAppInterpreterInput['conversationSummary']
+}) {
+  if (!input.interpreted.exactTime) {
+    return input.interpreted
+  }
+
+  if (
+    input.interpreted.intent !== 'CONFIRM'
+    && input.interpreted.intent !== 'ACKNOWLEDGEMENT'
+  ) {
+    return input.interpreted
+  }
+
+  const shouldTreatAsTimeCorrection =
+    input.conversationState === 'WAITING_CONFIRMATION'
+    || input.conversationState === 'WAITING_TIME'
+    || Boolean(input.conversationSummary.requestedTimeLabel)
+
+  return {
+    ...input.interpreted,
+    intent: shouldTreatAsTimeCorrection ? 'CHANGE_REQUEST' : 'BOOK_APPOINTMENT',
+    correctionTarget: input.interpreted.correctionTarget === 'NONE'
+      ? 'TIME'
+      : input.interpreted.correctionTarget,
+    timePreference: 'EXACT',
+    preferredPeriod: null,
+  } satisfies WhatsAppIntent
+}
+
 function buildFallbackIntent(input: WhatsAppInterpreterInput): WhatsAppIntent {
   const timePreference = inferTimePreference(input.message)
   const serviceName = findBestNamedMatch(input.services, input.message)
@@ -836,7 +877,12 @@ function buildFallbackIntent(input: WhatsAppInterpreterInput): WhatsAppIntent {
   })
 
   return {
-    intent: inferIntent(input.message, input.conversationState, input.conversationSummary),
+    intent: inferIntent(
+      input.message,
+      input.conversationState,
+      input.conversationSummary,
+      timePreference.exactTime
+    ),
     serviceName,
     mentionedName,
     preferredPeriod: derivePreferredPeriod(timePreference.timePreference),
@@ -936,7 +982,11 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
   const config = getOpenAIConfig()
 
   if (!config) {
-    return fallback
+    return prioritizeExplicitTimeOverConfirmation({
+      interpreted: fallback,
+      conversationState: input.conversationState,
+      conversationSummary: input.conversationSummary,
+    })
   }
 
   const controller = new AbortController()
@@ -996,11 +1046,15 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
 
     const merged = mergeWithFallback(parsed.data, fallback)
 
-    return {
+    return prioritizeExplicitTimeOverConfirmation({
+      interpreted: {
       ...merged,
       mentionedName: sanitizeMentionedNameCandidate(merged.mentionedName, input.professionals, true),
       preferredPeriod: merged.preferredPeriod ?? derivePreferredPeriod(merged.timePreference),
-    }
+      },
+      conversationState: input.conversationState,
+      conversationSummary: input.conversationSummary,
+    })
   } catch (error) {
     console.warn('[whatsapp-interpreter/openai] fallback request_failed', {
       error: error instanceof Error ? error.message : 'unknown_error',

@@ -463,6 +463,72 @@ test('trata respostas afirmativas amplas como confirmacao real no momento certo'
   })
 })
 
+test('horario explicito vence confirmacao generica na mesma frase', async () => {
+  const samples = [
+    ['pode ser 14:30', '14:30'],
+    ['sim 15h', '15:00'],
+    ['ok 16:00', '16:00'],
+  ]
+
+  for (const [message, expectedTime] of samples) {
+    const intent = await interpretWhatsAppMessage({
+      message,
+      barbershopName: 'Linha Nobre',
+      barbershopTimezone: 'America/Sao_Paulo',
+      conversationState: 'WAITING_CONFIRMATION',
+      offeredSlotCount: 0,
+      services: SERVICES.map((service) => ({ name: service.name })),
+      professionals: PROFESSIONALS.map((professional) => ({ name: professional.name })),
+      todayIsoDate: '2026-04-14',
+      currentLocalDateTime: '2026-04-14 10:30',
+      conversationSummary: {
+        selectedServiceName: 'Corte Classic',
+        selectedProfessionalName: 'Lucas',
+        requestedDateIso: '2026-04-16',
+        requestedTimeLabel: '08:00',
+        allowAnyProfessional: false,
+        lastCustomerMessage: '08:00',
+        lastAssistantMessage: 'Posso confirmar quinta-feira, 16/04 as 08:00 com Lucas Ribeiro?',
+      },
+    })
+
+    assert.equal(intent.exactTime, expectedTime, message)
+    assert.equal(intent.intent, 'CHANGE_REQUEST', message)
+    assert.equal(intent.correctionTarget, 'TIME', message)
+  }
+})
+
+test('atalho deterministico nao confirma slot antigo quando a resposta traz novo horario', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.state = 'WAITING_CONFIRMATION'
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.selectedProfessionalId = 'pro-lucas'
+  memory.selectedProfessionalName = 'Lucas'
+  memory.requestedDateIso = '2026-04-16'
+  memory.requestedTimeLabel = '08:00'
+  memory.selectedSlot = {
+    key: 'pro-lucas:2026-04-16T11:00:00.000Z',
+    professionalId: 'pro-lucas',
+    professionalName: 'Lucas',
+    dateIso: '2026-04-16',
+    timeLabel: '08:00',
+    startAtIso: '2026-04-16T11:00:00.000Z',
+    endAtIso: '2026-04-16T11:35:00.000Z',
+  }
+
+  assert.equal(agentTesting.isExplicitConfirmation('pode ser 14:30'), true)
+  assert.equal(agentTesting.isPureExplicitConfirmation('pode ser 14:30'), false)
+  assert.equal(
+    agentTesting.shouldUseDeterministicConfirmationShortcut({
+      memory,
+      inboundText: 'pode ser 14:30',
+      lastAssistantText: 'Posso confirmar quinta-feira, 16/04 as 08:00 com Lucas Ribeiro?',
+    }),
+    false
+  )
+})
+
 test('interpreta "rafael" isolado como escolha de barbeiro no contexto certo', async () => {
   const intent = await interpretWhatsAppMessage({
     message: 'rafael',

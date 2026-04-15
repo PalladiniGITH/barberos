@@ -343,6 +343,12 @@ test('respostas afirmativas amplas sao aceitas para fechamento deterministico', 
   })
 })
 
+test('novo horario explicito bloqueia a confirmacao do slot antigo', () => {
+  assert.equal(conversationTesting.isAffirmativeConfirmationMessage('pode ser 14:30'), true)
+  assert.equal(conversationTesting.shouldTreatAsStoredSlotConfirmation('pode ser 14:30'), false)
+  assert.equal(conversationTesting.shouldTreatAsStoredSlotConfirmation('pode'), true)
+})
+
 test('quando o horario exato nao existe a resposta avanca com alternativas proximas', () => {
   const slots = [
     {

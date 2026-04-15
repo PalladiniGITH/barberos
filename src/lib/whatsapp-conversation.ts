@@ -4,6 +4,7 @@ import { MessagingProvider, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import {
   detectExistingBookingQuestion,
+  extractExplicitTimeFromMessage,
   interpretWhatsAppMessage,
 } from '@/lib/ai/openai-whatsapp-interpreter'
 import { processWhatsAppConversationWithAgent } from '@/lib/ai/openai-whatsapp-agent'
@@ -184,6 +185,10 @@ function isAffirmativeConfirmationMessage(message: string) {
   return /\b(sim|s|ok|pode|pode confirmar|pode marcar|pode agendar|confirmo|confirmar|quero|desejo|fechado)\b/.test(
     normalizeText(message)
   )
+}
+
+function shouldTreatAsStoredSlotConfirmation(message: string) {
+  return isAffirmativeConfirmationMessage(message) && !extractExplicitTimeFromMessage(message)
 }
 
 function buildEmptyConversationDraft(): ConversationDraft {
@@ -1688,7 +1693,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     effectiveState === 'WAITING_CONFIRMATION'
     && draftForInterpreter.selectedStoredSlot
     && draftForInterpreter.selectedServiceId
-    && isAffirmativeConfirmationMessage(inboundText)
+    && shouldTreatAsStoredSlotConfirmation(inboundText)
   ) {
     console.info('[whatsapp-conversation] affirmative confirmation detected', {
       conversationId: conversation.id,
@@ -2905,7 +2910,12 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     })
   }
 
-  if (!slotForConfirmation && effectiveState === 'WAITING_CONFIRMATION' && draft.selectedStoredSlot) {
+  if (
+    !slotForConfirmation
+    && !interpreted.exactTime
+    && effectiveState === 'WAITING_CONFIRMATION'
+    && draft.selectedStoredSlot
+  ) {
     slotForConfirmation = await findExactAvailableWhatsAppSlot({
       barbershopId: input.barbershop.id,
       serviceId: draft.selectedServiceId,
@@ -3184,6 +3194,7 @@ export const __testing = {
   isAcknowledgementMessage,
   isExistingBookingStatusQuestion,
   isAffirmativeConfirmationMessage,
+  shouldTreatAsStoredSlotConfirmation,
   isConversationContextReliable,
   parseExistingBookingQuery,
   parseRequestedDateFromExistingBookingQuestion,

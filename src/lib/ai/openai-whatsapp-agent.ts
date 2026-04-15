@@ -7,7 +7,10 @@ import {
   findExactAvailableWhatsAppSlot,
   getAvailableWhatsAppSlots,
 } from '@/lib/agendamentos/whatsapp-booking'
-import { interpretWhatsAppMessage } from '@/lib/ai/openai-whatsapp-interpreter'
+import {
+  extractExplicitTimeFromMessage,
+  interpretWhatsAppMessage,
+} from '@/lib/ai/openai-whatsapp-interpreter'
 import {
   formatDayLabelFromIsoDate,
   getAvailableBusinessPeriodsForDate,
@@ -786,6 +789,10 @@ function isExplicitConfirmation(message: string) {
   return /\b(sim|desejo|quero|confirmo|confirmar|confirmado|confirma|fechado|ok|beleza|pode|pode confirmar|pode marcar|pode agendar|pode ser)\b/.test(normalizeText(message))
 }
 
+function isPureExplicitConfirmation(message: string) {
+  return isExplicitConfirmation(message) && !extractExplicitTimeFromMessage(message)
+}
+
 function extractResponseText(payload: ResponsePayload) {
   if (typeof payload.output_text === 'string' && payload.output_text.trim()) {
     return payload.output_text
@@ -983,7 +990,7 @@ function shouldUseDeterministicConfirmationShortcut(input: {
     input.memory.state !== 'WAITING_CONFIRMATION'
     || !input.memory.selectedServiceId
     || !input.memory.selectedSlot
-    || !isExplicitConfirmation(input.inboundText)
+    || !isPureExplicitConfirmation(input.inboundText)
   ) {
     return false
   }
@@ -2016,6 +2023,7 @@ async function executeAgentTool(input: {
   if (toolName === 'confirm_booking') {
     const selectedOptionNumber = typeof args.selectedOptionNumber === 'number' ? args.selectedOptionNumber : null
     const requestedTime = typeof args.requestedTime === 'string' ? args.requestedTime : null
+    const pureExplicitConfirmation = isPureExplicitConfirmation(agentInput.inboundText)
 
     if (selectedOptionNumber && selectedOptionNumber >= 1 && selectedOptionNumber <= memory.offeredSlots.length) {
       memory.selectedSlot = memory.offeredSlots[selectedOptionNumber - 1] ?? null
@@ -2026,7 +2034,7 @@ async function executeAgentTool(input: {
         return {
           status: 'error',
           reason: 'service_not_found',
-          explicitConfirmationDetected: isExplicitConfirmation(agentInput.inboundText),
+          explicitConfirmationDetected: pureExplicitConfirmation,
         }
       }
 
@@ -2058,14 +2066,14 @@ async function executeAgentTool(input: {
             status: 'error',
             reason: 'multiple_professionals_for_exact_time',
             slots: exactAvailability.slots,
-            explicitConfirmationDetected: isExplicitConfirmation(agentInput.inboundText),
+            explicitConfirmationDetected: pureExplicitConfirmation,
           }
         }
       } else if (memory.offeredSlots.length === 0) {
         return {
           status: 'error',
           reason: 'offered_slots_missing',
-          explicitConfirmationDetected: isExplicitConfirmation(agentInput.inboundText),
+          explicitConfirmationDetected: pureExplicitConfirmation,
         }
       }
     }
@@ -2075,15 +2083,15 @@ async function executeAgentTool(input: {
         status: 'error',
         reason: memory.offeredSlots.length === 0 ? 'offered_slots_missing' : 'slot_not_found',
         nearbySlots: memory.offeredSlots.slice(0, 4),
-        explicitConfirmationDetected: isExplicitConfirmation(agentInput.inboundText),
+        explicitConfirmationDetected: pureExplicitConfirmation,
       }
     }
 
     return {
       status: 'ok',
-      readyToConfirm: Boolean(memory.selectedServiceId && memory.selectedSlot && isExplicitConfirmation(agentInput.inboundText)),
+      readyToConfirm: Boolean(memory.selectedServiceId && memory.selectedSlot && pureExplicitConfirmation),
       selectedSlot: memory.selectedSlot,
-      explicitConfirmationDetected: isExplicitConfirmation(agentInput.inboundText),
+      explicitConfirmationDetected: pureExplicitConfirmation,
     }
   }
 
@@ -2181,7 +2189,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
         || (
           memory.state === 'WAITING_PROFESSIONAL'
           && Boolean(input.conversation.lastAssistantText?.includes(input.customer.preferredProfessionalName ?? ''))
-          && isExplicitConfirmation(input.inboundText)
+          && isPureExplicitConfirmation(input.inboundText)
         )
       )
     )
@@ -2446,7 +2454,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
       )
     }
 
-    const explicitConfirmation = isExplicitConfirmation(input.inboundText)
+    const explicitConfirmation = isPureExplicitConfirmation(input.inboundText)
     const shouldCreateAppointment =
       explicitConfirmation
       && memory.state === 'WAITING_CONFIRMATION'
@@ -2555,6 +2563,7 @@ export const __testing = {
   buildGuardrailReplyText,
   referencesPreferredProfessional,
   isExplicitConfirmation,
+  isPureExplicitConfirmation,
   hasExplicitAnyProfessionalConsent,
   sanitizeReplyTextAgainstProfessionalVocative,
   sanitizePrematureConfirmationReply,
