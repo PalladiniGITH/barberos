@@ -981,6 +981,12 @@ function hasExplicitAnyProfessionalConsent(message: string) {
   )
 }
 
+function hasExplicitFlexibleTimeRequest(message: string) {
+  return /\b(qualquer horario|qualquer hora|qualquer horario serve|nao tenho preferencia de horario|sem preferencia de horario|me mostra os horarios|me mostra as opcoes|me passa os horarios|quero ver as opcoes|quais horarios voce tem)\b/.test(
+    normalizeText(message)
+  )
+}
+
 function shouldUseDeterministicConfirmationShortcut(input: {
   memory: WorkingMemory
   inboundText: string
@@ -1589,7 +1595,9 @@ function buildGuardrailReplyText(input: {
     const header = input.memory.selectedProfessionalName
       ? `${input.memory.requestedDateIso ?? 'Nesse dia'} com ${input.memory.selectedProfessionalName} eu tenho estes horarios:`
       : `${input.memory.requestedDateIso ?? 'Nesse dia'} eu tenho estes horarios:`
-    const lines = input.memory.offeredSlots.slice(0, 4).map((slot) => `- ${slot.timeLabel}`)
+    const lines = input.memory.offeredSlots
+      .slice(0, 4)
+      .map((slot) => `- ${slot.timeLabel} com ${slot.professionalName}`)
     return `${header}\n\n${lines.join('\n')}\n\nPode me dizer qual voce prefere?`
   }
 
@@ -1695,6 +1703,22 @@ function resolveToolFailureOverride(input: {
         serviceNames: input.serviceNames,
         nowContext: input.nowContext,
       }) ?? 'Qual dia voce prefere?',
+    }
+  }
+
+  if (reason === 'time_preference_required') {
+    const nextAction = 'ASK_PERIOD' as const
+    return {
+      nextAction,
+      replyText: buildGuardrailReplyText({
+        nextAction,
+        memory: input.memory,
+        customerName: input.customerName,
+        barbershopName: input.barbershopName,
+        preferredProfessionalName: input.preferredProfessionalName ?? null,
+        serviceNames: input.serviceNames,
+        nowContext: input.nowContext,
+      }) ?? 'Qual horario voce gostaria? Se preferir, tambem posso pedir as opcoes.',
     }
   }
 
@@ -1859,10 +1883,21 @@ async function executeAgentTool(input: {
       return { status: 'error', reason: 'date_required' }
     }
 
-    const preferredPeriod = typeof args.preferredPeriod === 'string' && args.preferredPeriod
+    const requestedTimePreference = typeof args.preferredPeriod === 'string' && args.preferredPeriod
       ? args.preferredPeriod
       : memory.requestedTimeLabel
-    const exactTime = typeof args.exactTime === 'string' && args.exactTime ? args.exactTime : null
+    const exactTime = typeof args.exactTime === 'string' && args.exactTime
+      ? args.exactTime
+      : (requestedTimePreference && /^\d{2}:\d{2}$/.test(requestedTimePreference) ? requestedTimePreference : null)
+    const preferredPeriod = exactTime ? 'EXACT' : requestedTimePreference
+
+    const canListOptions = Boolean(exactTime) || hasExplicitFlexibleTimeRequest(agentInput.inboundText)
+    if (!canListOptions) {
+      return {
+        status: 'error',
+        reason: 'time_preference_required',
+      }
+    }
 
     const availability = await getAvailableWhatsAppSlots({
       barbershopId: agentInput.barbershop.id,
@@ -1997,10 +2032,16 @@ async function executeAgentTool(input: {
             slots: exactAvailability.slots,
           }
         }
-      } else if (memory.offeredSlots.length === 0) {
+      } else {
         return {
           status: 'error',
-          reason: 'offered_slots_missing',
+          reason: 'professional_choice_required',
+          preferredProfessional: agentInput.customer.preferredProfessionalId
+            ? {
+                id: agentInput.customer.preferredProfessionalId,
+                name: agentInput.customer.preferredProfessionalName,
+              }
+            : null,
         }
       }
 
@@ -2069,10 +2110,16 @@ async function executeAgentTool(input: {
             explicitConfirmationDetected: pureExplicitConfirmation,
           }
         }
-      } else if (memory.offeredSlots.length === 0) {
+      } else {
         return {
           status: 'error',
-          reason: 'offered_slots_missing',
+          reason: 'professional_choice_required',
+          preferredProfessional: agentInput.customer.preferredProfessionalId
+            ? {
+                id: agentInput.customer.preferredProfessionalId,
+                name: agentInput.customer.preferredProfessionalName,
+              }
+            : null,
           explicitConfirmationDetected: pureExplicitConfirmation,
         }
       }
@@ -2565,6 +2612,7 @@ export const __testing = {
   isExplicitConfirmation,
   isPureExplicitConfirmation,
   hasExplicitAnyProfessionalConsent,
+  hasExplicitFlexibleTimeRequest,
   sanitizeReplyTextAgainstProfessionalVocative,
   sanitizePrematureConfirmationReply,
   shouldUseDeterministicConfirmationShortcut,

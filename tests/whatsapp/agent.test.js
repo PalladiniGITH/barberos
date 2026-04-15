@@ -247,6 +247,42 @@ test('guardrail de horario pergunta primeiro por horario especifico quando a dat
   assert.doesNotMatch(reply, /Voce prefere manha, tarde ou noite/i)
 })
 
+test('guardrail de oferta de horarios sempre mostra o barbeiro junto de cada horario', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.requestedDateIso = '2026-04-13'
+  memory.offeredSlots = [
+    {
+      key: 'pro-matheus:2026-04-13T16:15:00.000Z',
+      professionalId: 'pro-matheus',
+      professionalName: 'Matheus',
+      dateIso: '2026-04-13',
+      timeLabel: '13:15',
+      startAtIso: '2026-04-13T16:15:00.000Z',
+      endAtIso: '2026-04-13T16:50:00.000Z',
+    },
+    {
+      key: 'pro-lucas:2026-04-13T16:30:00.000Z',
+      professionalId: 'pro-lucas',
+      professionalName: 'Lucas',
+      dateIso: '2026-04-13',
+      timeLabel: '13:30',
+      startAtIso: '2026-04-13T16:30:00.000Z',
+      endAtIso: '2026-04-13T17:05:00.000Z',
+    },
+  ]
+
+  const reply = agentTesting.buildGuardrailReplyText({
+    nextAction: 'OFFER_SLOTS',
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    nowContext: createAgentInput().nowContext,
+  })
+
+  assert.match(reply, /13:15 com Matheus/i)
+  assert.match(reply, /13:30 com Lucas/i)
+})
+
 test('backend fecha o fluxo quando ja existe resumo final e o cliente confirma', () => {
   const memory = agentTesting.buildInitialMemory(createAgentInput())
   memory.state = 'WAITING_CONFIRMATION'
@@ -314,6 +350,45 @@ test('consentimento para qualquer barbeiro so vale quando o cliente fala isso ex
   assert.equal(agentTesting.hasExplicitAnyProfessionalConsent('quero 16:00'), false)
   assert.equal(agentTesting.hasExplicitAnyProfessionalConsent('qualquer um'), true)
   assert.equal(agentTesting.hasExplicitAnyProfessionalConsent('pode ser qualquer barbeiro'), true)
+})
+
+test('listar opcoes de horario so e liberado quando o cliente explicita que quer ver opcoes', () => {
+  assert.equal(agentTesting.hasExplicitFlexibleTimeRequest('qualquer horario'), true)
+  assert.equal(agentTesting.hasExplicitFlexibleTimeRequest('me mostra os horarios'), true)
+  assert.equal(agentTesting.hasExplicitFlexibleTimeRequest('amanha'), false)
+  assert.equal(agentTesting.hasExplicitFlexibleTimeRequest('15:00'), false)
+})
+
+test('erro de falta de horario especifico vira pergunta direta de horario antes de listar opcoes', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.selectedProfessionalId = 'pro-matheus'
+  memory.selectedProfessionalName = 'Matheus'
+  memory.requestedDateIso = '2026-04-13'
+
+  const override = agentTesting.resolveToolFailureOverride({
+    toolTrace: [
+      {
+        name: 'search_availability',
+        arguments: {},
+        result: {
+          status: 'error',
+          reason: 'time_preference_required',
+        },
+      },
+    ],
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    preferredProfessionalName: null,
+    serviceNames: SERVICES.map((service) => service.name),
+    nowContext: createAgentInput().nowContext,
+  })
+
+  assert.equal(override.nextAction, 'ASK_PERIOD')
+  assert.match(override.replyText, /Qual horario voce gostaria/i)
+  assert.doesNotMatch(override.replyText, /13:15|13:30/i)
 })
 
 test('sem historico e sem liberacao para qualquer um o backend pergunta barbeiro antes de sugerir horarios', () => {

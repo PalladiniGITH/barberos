@@ -654,6 +654,20 @@ function buildPeriodQuestion(input?: {
   return 'Qual horario voce gostaria? Se preferir, tambem posso procurar por periodo.'
 }
 
+function buildSpecificTimeQuestion(input: {
+  requestedDateIso: string
+  timezone: string
+  professionalName?: string | null
+}) {
+  const dayLabel = formatDayLabel(input.requestedDateIso, input.timezone).toLowerCase()
+
+  if (input.professionalName) {
+    return `Perfeito. Para ${dayLabel} com ${input.professionalName}, qual horario voce prefere? Se quiser, tambem posso te passar as opcoes.`
+  }
+
+  return `Perfeito. Para ${dayLabel}, qual horario voce prefere? Se quiser, tambem posso te passar as opcoes.`
+}
+
 function buildNoAvailabilityMessage(dateIso: string, timezone: string) {
   return `Nao encontrei horario livre em ${formatDayLabel(dateIso, timezone).toLowerCase()} com essa combinacao. Me fala outro dia ou outro periodo que eu procuro de novo.`
 }
@@ -690,11 +704,10 @@ function buildHumanSlotOfferMessage(
   )
 
   const sameDay = uniqueSlots.every((slot) => slot.dateIso === uniqueSlots[0]?.dateIso)
-  const sameProfessional = uniqueSlots.every((slot) => slot.professionalId === uniqueSlots[0]?.professionalId)
   const periodLabel = describeHumanPeriodLabel(timePreference)
 
   let header = `Encontrei estes horarios disponiveis para ${serviceName}:`
-  if (sameDay && sameProfessional) {
+  if (sameDay && uniqueSlots.every((slot) => slot.professionalId === uniqueSlots[0]?.professionalId)) {
     header = periodLabel
       ? `${formatDayLabel(uniqueSlots[0].dateIso, timezone)} ${periodLabel} com ${uniqueSlots[0].professionalName} eu tenho estes horarios livres para ${serviceName}:`
       : `${formatDayLabel(uniqueSlots[0].dateIso, timezone)} com ${uniqueSlots[0].professionalName} eu tenho estes horarios livres para ${serviceName}:`
@@ -705,10 +718,6 @@ function buildHumanSlotOfferMessage(
   }
 
   const lines = uniqueSlots.map((slot) => {
-    if (sameDay && sameProfessional) {
-      return `- ${slot.timeLabel}`
-    }
-
     if (sameDay) {
       return `- ${slot.timeLabel} com ${slot.professionalName}`
     }
@@ -719,6 +728,12 @@ function buildHumanSlotOfferMessage(
   return [header, lines.join('\n'), 'Pode me dizer qual prefere ou pedir outro horario.']
     .filter((line) => line.trim().length > 0)
     .join('\n\n')
+}
+
+function hasExplicitFlexibleTimeRequest(message: string) {
+  const normalized = normalizeText(message)
+
+  return /\b(qualquer horario|qualquer horário|qualquer um serve|sem preferencia de horario|sem preferencia de horário|nao tenho preferencia de horario|não tenho preferência de horário|nao tenho preferencia|não tenho preferência|me mostra os horarios|me mostra os horários|me passa os horarios|me passa os horários|quais horarios|quais horários|pode me passar as opcoes|pode me passar as opções|quero ver as opcoes|quero ver as opções)\b/.test(normalized)
 }
 
 function buildConfirmationMessage(slot: ConversationSlot, serviceName: string, timezone: string) {
@@ -793,10 +808,16 @@ function buildResumeMessage(input: {
     )}`
   }
 
-  return `Oi! Posso continuar por aqui. ${buildPeriodQuestion({
-    requestedDateIso: input.draft.requestedDateIso,
-    nowContext: input.nowContext,
-  })}`
+  return `Oi! Posso continuar por aqui. ${input.draft.requestedDateIso
+    ? buildSpecificTimeQuestion({
+        requestedDateIso: input.draft.requestedDateIso,
+        timezone: input.timezone,
+        professionalName: input.draft.selectedProfessionalName,
+      })
+    : buildPeriodQuestion({
+        requestedDateIso: input.draft.requestedDateIso,
+        nowContext: input.nowContext,
+      })}`
 }
 
 function buildCorrectionLeadIn(target: string) {
@@ -1263,6 +1284,7 @@ function buildExactTimeFallbackResponse(input: {
   dateIso: string
   slots: ConversationSlot[]
   professionalName?: string | null
+  allowAlternativeProfessionalSuggestion?: boolean
   previousAssistantText?: string | null
 }) {
   const nearbySummary = buildCompactNearbySlotSummary(input.slots)
@@ -1275,10 +1297,10 @@ function buildExactTimeFallbackResponse(input: {
 
   const conciseFollowUp = nearbySummary
     ? input.professionalName
-      ? `${unavailableMessage} Tenho ${nearbySummary} com ${input.professionalName}. Quer um deles ou prefere que eu procure outro horario?`
+      ? `${unavailableMessage} Tenho ${nearbySummary}. ${input.allowAlternativeProfessionalSuggestion ? 'Se preferir, eu tambem posso ver esse horario com outro barbeiro.' : 'Quer um deles ou prefere outro horario com ele?'}`
       : `${unavailableMessage} Os horarios mais proximos que tenho sao ${nearbySummary}. Quer um deles ou prefere que eu procure em outro periodo?`
     : input.professionalName
-      ? `${unavailableMessage} Se quiser, eu posso procurar outro horario com ${input.professionalName} ou outro periodo.`
+      ? `${unavailableMessage} Se quiser, eu posso procurar outro horario com ${input.professionalName}${input.allowAlternativeProfessionalSuggestion ? ' ou ver esse horario com outro barbeiro' : ''}.`
       : `${unavailableMessage} Se quiser, eu posso procurar em outro periodo.`
 
   if (shouldAvoidSemanticallyRepeatedResponse({
@@ -2750,9 +2772,10 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     const responseText = professionals.length === 1
       ? withLeadIn(
           `Perfeito. Vou buscar com ${professionals[0].name}. ${draft.requestedDateIso
-            ? buildPeriodQuestion({
+            ? buildSpecificTimeQuestion({
                 requestedDateIso: draft.requestedDateIso,
-                nowContext,
+                timezone,
+                professionalName: professionals[0].name,
               })
             : buildDateQuestion()}`,
           responseLeadIn
@@ -2841,10 +2864,21 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   }
 
   if (!hasResolvedTimePreference(draft.requestedTimeLabel)) {
-    const responseText = withLeadIn(buildPeriodQuestion({
-      requestedDateIso: draft.requestedDateIso,
-      nowContext,
-    }), responseLeadIn)
+    const responseText = withLeadIn(
+      draft.requestedDateIso
+        ? buildSpecificTimeQuestion({
+            requestedDateIso: draft.requestedDateIso,
+            timezone,
+            professionalName: draft.allowAnyProfessional
+              ? null
+              : (draft.selectedProfessionalName ?? contextualProfessionalPreference?.professionalName ?? null),
+          })
+        : buildPeriodQuestion({
+            requestedDateIso: draft.requestedDateIso,
+            nowContext,
+          }),
+      responseLeadIn
+    )
 
     await prisma.whatsappConversation.update({
       where: { id: conversation.id },
@@ -2991,6 +3025,38 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   }
 
   if (!slotForConfirmation) {
+    if (!interpreted.exactTime && !hasExplicitFlexibleTimeRequest(inboundText)) {
+      const responseText = withLeadIn(
+        buildSpecificTimeQuestion({
+          requestedDateIso: draft.requestedDateIso,
+          timezone,
+          professionalName: draft.allowAnyProfessional
+            ? null
+            : (draft.selectedProfessionalName ?? contextualProfessionalPreference?.professionalName ?? null),
+        }),
+        responseLeadIn
+      )
+
+      await prisma.whatsappConversation.update({
+        where: { id: conversation.id },
+        data: {
+          ...baseUpdate,
+          state: 'WAITING_TIME',
+          slotOptions: JSON_NULL,
+          selectedSlot: JSON_NULL,
+          lastAssistantText: responseText,
+        },
+      })
+
+      return {
+        responseText,
+        flow: 'collect_period',
+        conversationId: conversation.id,
+        conversationState: 'WAITING_TIME',
+        usedAI,
+      }
+    }
+
     return offerFreshSlots({
       conversationId: conversation.id,
       customerId: input.customer.id,

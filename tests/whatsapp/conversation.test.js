@@ -186,6 +186,71 @@ test('com barbeiro recente ou preferencial a conversa usa pergunta mais contextu
   assert.match(reply, /de novo|prefere outro/i)
 })
 
+test('lista de horarios com o mesmo barbeiro ainda exibe o nome do profissional em cada linha', () => {
+  const reply = conversationTesting.buildHumanSlotOfferMessage(
+    [
+      {
+        key: 'pro-lucas:2026-04-15T12:30:00.000Z',
+        professionalId: 'pro-lucas',
+        professionalName: 'Lucas Ribeiro',
+        dateIso: '2026-04-15',
+        timeLabel: '09:30',
+        startAtIso: '2026-04-15T12:30:00.000Z',
+        endAtIso: '2026-04-15T13:05:00.000Z',
+      },
+      {
+        key: 'pro-lucas:2026-04-15T12:45:00.000Z',
+        professionalId: 'pro-lucas',
+        professionalName: 'Lucas Ribeiro',
+        dateIso: '2026-04-15',
+        timeLabel: '09:45',
+        startAtIso: '2026-04-15T12:45:00.000Z',
+        endAtIso: '2026-04-15T13:20:00.000Z',
+      },
+    ],
+    'Corte Classic',
+    'America/Sao_Paulo',
+    'MORNING'
+  )
+
+  assert.match(reply, /09:30 com Lucas Ribeiro/i)
+  assert.match(reply, /09:45 com Lucas Ribeiro/i)
+})
+
+test('quando o barbeiro preferido nao tem o horario pedido, sugere proximos horarios com ele antes de outro barbeiro', () => {
+  const reply = conversationTesting.buildExactTimeFallbackResponse({
+    exactTime: '15:00',
+    timezone: 'America/Sao_Paulo',
+    dateIso: '2026-04-15',
+    professionalName: 'Matheus',
+    slots: [
+      {
+        key: 'pro-matheus:2026-04-15T18:30:00.000Z',
+        professionalId: 'pro-matheus',
+        professionalName: 'Matheus',
+        dateIso: '2026-04-15',
+        timeLabel: '15:30',
+        startAtIso: '2026-04-15T18:30:00.000Z',
+        endAtIso: '2026-04-15T19:05:00.000Z',
+      },
+      {
+        key: 'pro-matheus:2026-04-15T19:00:00.000Z',
+        professionalId: 'pro-matheus',
+        professionalName: 'Matheus',
+        dateIso: '2026-04-15',
+        timeLabel: '16:00',
+        startAtIso: '2026-04-15T19:00:00.000Z',
+        endAtIso: '2026-04-15T19:35:00.000Z',
+      },
+    ],
+    allowAlternativeProfessionalSuggestion: false,
+  })
+
+  assert.match(reply, /15:30 e 16:00/i)
+  assert.match(reply, /com Matheus/i)
+  assert.doesNotMatch(reply, /outro barbeiro/i)
+})
+
 test('consulta de agendamento existente responde com o horario encontrado e retoma o fluxo se necessario', () => {
   const draft = conversationTesting.buildEmptyConversationDraft()
   draft.selectedServiceId = 'svc-barba'
