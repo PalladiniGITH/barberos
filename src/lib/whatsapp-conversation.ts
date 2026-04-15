@@ -794,23 +794,23 @@ function buildHumanSlotOfferMessage(
   const sameDay = uniqueSlots.every((slot) => slot.dateIso === uniqueSlots[0]?.dateIso)
   const periodLabel = describeHumanPeriodLabel(timePreference)
 
-  let header = `Encontrei estes horarios disponiveis para ${serviceName}:`
+  let header = `Tenho estas opcoes disponiveis para ${serviceName}:`
   if (sameDay && uniqueSlots.every((slot) => slot.professionalId === uniqueSlots[0]?.professionalId)) {
     header = periodLabel
-      ? `${formatDayLabel(uniqueSlots[0].dateIso, timezone)} ${periodLabel} com ${uniqueSlots[0].professionalName} eu tenho estes horarios livres para ${serviceName}:`
-      : `${formatDayLabel(uniqueSlots[0].dateIso, timezone)} com ${uniqueSlots[0].professionalName} eu tenho estes horarios livres para ${serviceName}:`
+      ? `Para ${formatDayLabel(uniqueSlots[0].dateIso, timezone).toLowerCase()} ${periodLabel} com ${uniqueSlots[0].professionalName}, tenho estas opcoes para ${serviceName}:`
+      : `Para ${formatDayLabel(uniqueSlots[0].dateIso, timezone).toLowerCase()} com ${uniqueSlots[0].professionalName}, tenho estas opcoes para ${serviceName}:`
   } else if (sameDay) {
     header = periodLabel
-      ? `${formatDayLabel(uniqueSlots[0].dateIso, timezone)} ${periodLabel} encontrei estes horarios disponiveis para ${serviceName}:`
-      : `${formatDayLabel(uniqueSlots[0].dateIso, timezone)} encontrei estes horarios disponiveis para ${serviceName}:`
+      ? `Para ${formatDayLabel(uniqueSlots[0].dateIso, timezone).toLowerCase()} ${periodLabel}, encontrei estas opcoes para ${serviceName}:`
+      : `Para ${formatDayLabel(uniqueSlots[0].dateIso, timezone).toLowerCase()}, encontrei estas opcoes para ${serviceName}:`
   }
 
   const lines = uniqueSlots.map((slot) => {
     if (sameDay) {
-      return `- ${slot.timeLabel} com ${slot.professionalName}`
+      return `• ${slot.timeLabel} com ${slot.professionalName}`
     }
 
-    return `- ${formatDayLabel(slot.dateIso, timezone)} as ${slot.timeLabel} com ${slot.professionalName}`
+    return `• ${formatDayLabel(slot.dateIso, timezone)} - ${slot.timeLabel} com ${slot.professionalName}`
   }).filter(Boolean)
 
   return [header, lines.join('\n'), 'Pode me dizer qual prefere ou pedir outro horario.']
@@ -1339,15 +1339,10 @@ function buildCompactNearbySlotSummary(slots: ConversationSlot[]) {
     return null
   }
 
-  if (uniqueLabels.length === 1) {
-    return uniqueLabels[0]
-  }
-
-  if (uniqueLabels.length === 2) {
-    return `${uniqueLabels[0]} e ${uniqueLabels[1]}`
-  }
-
-  return `${uniqueLabels.slice(0, -1).join(', ')} e ${uniqueLabels.at(-1)}`
+  return uniqueLabels
+    .slice(0, 4)
+    .map((label) => `• ${label}`)
+    .join('\n')
 }
 
 function shouldAvoidSemanticallyRepeatedResponse(input: {
@@ -1385,8 +1380,8 @@ function buildExactTimeFallbackResponse(input: {
 
   const conciseFollowUp = nearbySummary
     ? input.professionalName
-      ? `${unavailableMessage} Tenho ${nearbySummary}. ${input.allowAlternativeProfessionalSuggestion ? 'Se preferir, eu tambem posso ver esse horario com outro barbeiro.' : 'Quer um deles ou prefere outro horario com ele?'}`
-      : `${unavailableMessage} Os horarios mais proximos que tenho sao ${nearbySummary}. Quer um deles ou prefere que eu procure em outro periodo?`
+      ? `${unavailableMessage}\n\nTenho estas opcoes com ${input.professionalName}:\n\n${nearbySummary}\n\n${input.allowAlternativeProfessionalSuggestion ? 'Se preferir, eu tambem posso ver esse horario com outro barbeiro.' : 'Quer um deles ou prefere outro horario com ele?'}`
+      : `${unavailableMessage}\n\nTenho estes horarios disponiveis:\n\n${nearbySummary}\n\nQual voce prefere?`
     : input.professionalName
       ? `${unavailableMessage} Se quiser, eu posso procurar outro horario com ${input.professionalName}${input.allowAlternativeProfessionalSuggestion ? ' ou ver esse horario com outro barbeiro' : ''}.`
       : `${unavailableMessage} Se quiser, eu posso procurar em outro periodo.`
@@ -1396,7 +1391,7 @@ function buildExactTimeFallbackResponse(input: {
     nextResponseText: conciseFollowUp,
   })) {
     return nearbySummary
-      ? `Nao tenho ${input.exactTime}. Posso seguir com ${nearbySummary} ou buscar outro periodo.`
+      ? `Nao tenho ${input.exactTime}.\n\nTenho estas opcoes:\n\n${nearbySummary}\n\nQuer que eu siga com uma delas ou busque outro periodo?`
       : `Nao tenho ${input.exactTime}. Posso buscar em outro periodo para voce.`
   }
 

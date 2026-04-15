@@ -1830,7 +1830,7 @@ function buildNearbySlotsMessage(slots: WhatsAppBookingSlot[]) {
     .map((slot) => `${slot.timeLabel} com ${slot.professionalName}`)
 
   return labels.length > 0
-    ? `Os horarios mais proximos que encontrei sao: ${labels.join(', ')}.`
+    ? `Tenho estes horarios disponiveis:\n\n${labels.map((label) => `• ${label}`).join('\n')}\n\nQual voce prefere?`
     : null
 }
 

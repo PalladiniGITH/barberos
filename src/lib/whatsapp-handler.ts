@@ -54,9 +54,10 @@ interface AggregatedInboundMessage {
   reason: 'immediate' | 'aggregated' | 'awaiting_more_messages'
 }
 
-const MESSAGE_AGGREGATION_WINDOW_MS = 2000
-const SENSITIVE_MESSAGE_AGGREGATION_WINDOW_MS = 3000
-const IMMEDIATE_PROCESSING_GUARD_MS = 250
+const MESSAGE_AGGREGATION_WINDOW_MS = 3000
+const FRAGMENTED_MESSAGE_AGGREGATION_WINDOW_MS = 4500
+const SENSITIVE_MESSAGE_AGGREGATION_WINDOW_MS = 5500
+const FAST_COMPLETE_MESSAGE_DEBOUNCE_MS = 1800
 const IMMEDIATE_MESSAGE_PATTERN =
   /^(oi+|ola+|ol[aá]|bom dia|boa tarde|boa noite|quero agendar|quero marcar|agendar|marcar horario)[!.,\s]*$/i
 
@@ -121,17 +122,8 @@ function shouldProcessImmediately(input: {
   message: string
   previousMessages: string[]
 }) {
-  const state = normalizeConversationStateForAggregation(input.state)
-
-  if (state !== 'IDLE') {
-    return false
-  }
-
-  if (input.previousMessages.length > 0) {
-    return false
-  }
-
-  return isClearlyCompleteMessage(input.message)
+  void input
+  return false
 }
 
 function normalizeConversationStateForAggregation(state?: string | null) {
@@ -173,7 +165,7 @@ function resolveAggregationWindowMs(input: {
   previousMessages: string[]
 }) {
   const state = normalizeConversationStateForAggregation(input.state)
-  const hasStrongAggregationSignal =
+  const hasFragmentedSignal =
     isComplementaryShortMessage(input.currentMessage)
     || input.previousMessages.some((message) => isComplementaryShortMessage(message))
   const usesConservativeState =
@@ -182,16 +174,20 @@ function resolveAggregationWindowMs(input: {
     || state === 'WAITING_DATE'
     || state === 'WAITING_TIME'
     || state === 'WAITING_CONFIRMATION'
-  const shouldUseSensitiveWindow =
-    hasStrongAggregationSignal
-    && (
-      usesConservativeState
-      || state === 'IDLE'
-    )
 
-  return shouldUseSensitiveWindow
-    ? SENSITIVE_MESSAGE_AGGREGATION_WINDOW_MS
-    : MESSAGE_AGGREGATION_WINDOW_MS
+  if (usesConservativeState) {
+    return SENSITIVE_MESSAGE_AGGREGATION_WINDOW_MS
+  }
+
+  if (input.previousMessages.length === 0 && isClearlyCompleteMessage(input.currentMessage)) {
+    return FAST_COMPLETE_MESSAGE_DEBOUNCE_MS
+  }
+
+  if (hasFragmentedSignal) {
+    return FRAGMENTED_MESSAGE_AGGREGATION_WINDOW_MS
+  }
+
+  return MESSAGE_AGGREGATION_WINDOW_MS
 }
 
 function parseMessageBuffer(raw: Prisma.JsonValue | null) {
@@ -216,6 +212,16 @@ function hasPendingBufferedMessages(input: {
     input.bufferedMessages.length > 0
     && input.lastMessageTimestamp
     && input.referenceTime - input.lastMessageTimestamp.getTime() <= input.activeWindowMs
+  )
+}
+
+function shouldFinalizeDebouncedTurn(input: {
+  waitStartedAt: Date
+  lastMessageTimestamp: Date | null
+}) {
+  return Boolean(
+    input.lastMessageTimestamp
+    && input.lastMessageTimestamp.getTime() === input.waitStartedAt.getTime()
   )
 }
 
@@ -536,8 +542,6 @@ async function aggregateInboundMessages(input: {
   })
     ? previousMessages
     : []
-  const clearlyCompleteMessage = isClearlyCompleteMessage(normalizedMessage)
-
   console.info('[whatsapp-agent] aggregation window used', {
     conversationId: conversation.id,
     state: aggregationState,
@@ -546,78 +550,7 @@ async function aggregateInboundMessages(input: {
     bufferedMessages: previousBuffer,
   })
 
-  if (aggregationState === 'IDLE' && clearlyCompleteMessage && previousBuffer.length > 0) {
-    console.info('[whatsapp-agent] blocked immediate processing due to pending buffer', {
-      conversationId: conversation.id,
-      state: aggregationState,
-      message: normalizedMessage,
-      bufferedMessages: previousBuffer,
-    })
-  }
-
-  if (shouldProcessImmediately({
-    state: aggregationState,
-    message: normalizedMessage,
-    previousMessages: previousBuffer,
-  })) {
-    await wait(IMMEDIATE_PROCESSING_GUARD_MS)
-
-    const refreshedConversation = await prisma.whatsappConversation.findUnique({
-      where: { id: conversation.id },
-      select: {
-        id: true,
-        messageBuffer: true,
-        lastMessageTimestamp: true,
-      },
-    })
-    const refreshedMessages = parseMessageBuffer(refreshedConversation?.messageBuffer ?? null)
-    activeWindowMs = resolveAggregationWindowMs({
-      state: aggregationState,
-      currentMessage: normalizedMessage,
-      previousMessages: refreshedMessages,
-    })
-    const refreshedPendingBuffer = hasPendingBufferedMessages({
-      bufferedMessages: refreshedMessages,
-      lastMessageTimestamp: refreshedConversation?.lastMessageTimestamp ?? null,
-      activeWindowMs,
-      referenceTime: Date.now(),
-    })
-
-    if (!refreshedPendingBuffer) {
-      await prisma.whatsappConversation.update({
-        where: { id: conversation.id },
-        data: {
-          phone: input.phone ?? null,
-          messageBuffer: Prisma.JsonNull,
-          lastMessageTimestamp: null,
-        },
-      })
-
-      console.info('[whatsapp-agent] immediate processing allowed', {
-        conversationId: conversation.id,
-        state: aggregationState,
-        message: normalizedMessage,
-        reason: 'clearly_complete_message',
-      })
-
-      console.info('[whatsapp-agent] message aggregation', {
-        state: aggregationState,
-        windowMs: activeWindowMs,
-        rawMessages: [normalizedMessage],
-        concatenatedMessage: normalizedMessage,
-      })
-
-      return {
-        shouldProcess: true,
-        conversationId: conversation.id,
-        rawMessages: [normalizedMessage],
-        concatenatedMessage: normalizedMessage,
-        reason: 'immediate',
-      }
-    }
-
-    previousBuffer = refreshedMessages
-
+  if (previousBuffer.length > 0 && aggregationState === 'IDLE') {
     console.info('[whatsapp-agent] blocked immediate processing due to pending buffer', {
       conversationId: conversation.id,
       state: aggregationState,
@@ -673,11 +606,18 @@ async function aggregateInboundMessages(input: {
     },
   })
 
-  if (
-    !latestConversation
-    || !latestConversation.lastMessageTimestamp
-    || latestConversation.lastMessageTimestamp.getTime() !== now.getTime()
-  ) {
+  if (!latestConversation || !shouldFinalizeDebouncedTurn({
+    waitStartedAt: now,
+    lastMessageTimestamp: latestConversation.lastMessageTimestamp,
+  })) {
+    console.info('[whatsapp-agent] debounce timer restarted', {
+      conversationId: conversation.id,
+      state: aggregationState,
+      previousWaitStartedAt: now.toISOString(),
+      latestBufferedAt: latestConversation?.lastMessageTimestamp?.toISOString() ?? null,
+      bufferedMessages: parseMessageBuffer(latestConversation?.messageBuffer ?? null),
+    })
+
     return {
       shouldProcess: false,
       conversationId: conversation.id,
@@ -1020,6 +960,7 @@ export const __testing = {
   isStronglyAggregatedMessage,
   buildConcatenatedMessage,
   hasPendingBufferedMessages,
+  shouldFinalizeDebouncedTurn,
   resolveAggregationWindowMs,
   shouldProcessImmediately,
 }

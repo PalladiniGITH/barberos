@@ -38,7 +38,7 @@ test('agregacao sensivel consolida horario e barbeiro em um unico turno util', a
 
   assert.equal(handlerTesting.isComplementaryShortMessage('16:45'), true)
   assert.equal(handlerTesting.isComplementaryShortMessage('com o rafael'), true)
-  assert.equal(aggregationWindowMs, 3000)
+  assert.equal(aggregationWindowMs, 5500)
   assert.equal(concatenatedMessage, '16:45 com o rafael')
   assert.equal(intent.exactTime, '16:45')
   assert.equal(intent.mentionedName, 'Rafael')
@@ -95,10 +95,18 @@ test('fragmentos de servico, dia e periodo tambem sao consolidados antes da resp
   assert.equal(handlerTesting.isStronglyAggregatedMessage('de manhã'), true)
 })
 
-test('mensagem completa sozinha pode processar imediatamente, mas nao se ja existir buffer', () => {
+test('mensagem completa sozinha usa debounce curto, mas nunca responde de forma imediata', () => {
   const fullMessage = 'Quero marcar um horário amanhã de manhã para barba'
 
   assert.equal(handlerTesting.isClearlyCompleteMessage(fullMessage), true)
+  assert.equal(
+    handlerTesting.resolveAggregationWindowMs({
+      state: 'IDLE',
+      currentMessage: fullMessage,
+      previousMessages: [],
+    }),
+    1800
+  )
 
   assert.equal(
     handlerTesting.shouldProcessImmediately({
@@ -106,7 +114,7 @@ test('mensagem completa sozinha pode processar imediatamente, mas nao se ja exis
       message: fullMessage,
       previousMessages: [],
     }),
-    true
+    false
   )
 
   assert.equal(
@@ -138,9 +146,29 @@ test('estados sensiveis usam janela de agregacao mais conservadora para mensagen
     previousMessages: [],
   })
 
-  assert.equal(windowForIdleGreeting, 3000)
-  assert.equal(windowForGreeting, 3000)
-  assert.equal(windowForConfirmation, 3000)
+  assert.equal(windowForIdleGreeting, 4500)
+  assert.equal(windowForGreeting, 5500)
+  assert.equal(windowForConfirmation, 5500)
+})
+
+test('debounce reinicia quando chega nova mensagem antes do timer acabar', () => {
+  const waitStartedAt = new Date('2026-04-15T15:00:00.000Z')
+
+  assert.equal(
+    handlerTesting.shouldFinalizeDebouncedTurn({
+      waitStartedAt,
+      lastMessageTimestamp: new Date('2026-04-15T15:00:02.000Z'),
+    }),
+    false
+  )
+
+  assert.equal(
+    handlerTesting.shouldFinalizeDebouncedTurn({
+      waitStartedAt,
+      lastMessageTimestamp: new Date('2026-04-15T15:00:00.000Z'),
+    }),
+    true
+  )
 })
 
 test('mensagem de horarios nao repete linhas nem cria espacos em branco extras', () => {
@@ -238,6 +266,8 @@ test('quando ha varios barbeiros no mesmo horario a mensagem mostra o nome de ca
 
   assert.match(message, /09:00 com Lucas Ribeiro/)
   assert.match(message, /09:00 com Matheus Lima/)
+  assert.match(message, /• 09:00 com Lucas Ribeiro/)
+  assert.match(message, /• 09:00 com Matheus Lima/)
 })
 
 test('oi seguido de intencao completa em IDLE continua em um unico turno agregado', () => {
@@ -265,5 +295,21 @@ test('oi seguido de intencao completa em IDLE continua em um unico turno agregad
   assert.equal(
     handlerTesting.buildConcatenatedMessage(['Oi', fullMessage]),
     'Oi Queria marcar horario pra hoje'
+  )
+})
+
+test('barba, amanha e com o matheus continuam em um unico bloco agregado', () => {
+  assert.equal(
+    handlerTesting.buildConcatenatedMessage(['barba', 'amanha', 'com o matheus']),
+    'barba amanha com o matheus'
+  )
+
+  assert.equal(
+    handlerTesting.resolveAggregationWindowMs({
+      state: 'WAITING_SERVICE',
+      currentMessage: 'com o matheus',
+      previousMessages: ['barba', 'amanha'],
+    }),
+    5500
   )
 })

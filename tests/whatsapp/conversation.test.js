@@ -292,8 +292,9 @@ test('quando o barbeiro preferido nao tem o horario pedido, sugere proximos hora
     allowAlternativeProfessionalSuggestion: false,
   })
 
-  assert.match(reply, /15:30 e 16:00/i)
-  assert.match(reply, /com Matheus/i)
+  assert.match(reply, /Tenho estas opcoes com Matheus/i)
+  assert.match(reply, /• 15:30/i)
+  assert.match(reply, /• 16:00/i)
   assert.doesNotMatch(reply, /outro barbeiro/i)
 })
 
