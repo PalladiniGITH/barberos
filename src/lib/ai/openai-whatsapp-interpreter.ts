@@ -124,6 +124,28 @@ const INTENT_JSON_SCHEMA = {
   ],
 } as const
 
+const CONTEXTUAL_CONFIRMATION_JSON_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    intent: {
+      type: 'string',
+      enum: ['CONFIRM', 'REJECT', 'TIME_CORRECTION', 'DATE_CORRECTION', 'PROFESSIONAL_CORRECTION', 'UNKNOWN'],
+    },
+    confidence: { type: 'number', minimum: 0, maximum: 1 },
+    shouldClose: { type: 'boolean' },
+    shouldConfirm: { type: 'boolean' },
+  },
+  required: ['intent', 'confidence', 'shouldClose', 'shouldConfirm'],
+} as const
+
+type ContextualConfirmationClassification = {
+  intent: 'CONFIRM' | 'REJECT' | 'TIME_CORRECTION' | 'DATE_CORRECTION' | 'PROFESSIONAL_CORRECTION' | 'UNKNOWN'
+  confidence: number
+  shouldClose: boolean
+  shouldConfirm: boolean
+}
+
 interface OpenAIConfig {
   apiKey: string
   model: string
@@ -645,8 +667,46 @@ const ACKNOWLEDGEMENT_PHRASES = [
   'deixa assim',
 ]
 
+const CONTEXTUAL_CONFIRMATION_PHRASES = [
+  'sim',
+  'isso',
+  'isso mesmo',
+  'pode',
+  'pode sim',
+  'fechado',
+  'ok',
+  'blz',
+  'beleza',
+  'certo',
+  'correto',
+  'confirmo',
+  'confirma',
+  'bora',
+  'uhum',
+  'aham',
+  'isso ai',
+  'isso aí',
+  'ta',
+  'tá',
+]
+
 function includesAnyPhrase(normalized: string, phrases: string[]) {
   return phrases.some((phrase) => normalized.includes(phrase))
+}
+
+function hasExplicitConfirmationCorrectionCue(message: string) {
+  const normalized = normalizeText(message)
+
+  return Boolean(
+    extractExplicitTimeFromMessage(message)
+    || /\b(hoje|amanha|depois de amanha|segunda|terca|quarta|quinta|sexta|sabado|domingo|\d{1,2}[\/-]\d{1,2})\b/.test(normalized)
+    || /\bcom(?:\s+o|\s+a)?\s+[a-zà-ÿ]{3,}\b/.test(normalized)
+  )
+}
+
+function detectContextualConfirmationMessage(message: string) {
+  const normalized = normalizeText(message)
+  return includesAnyPhrase(normalized, CONTEXTUAL_CONFIRMATION_PHRASES)
 }
 
 export function detectAcknowledgementMessage(message: string) {
@@ -723,7 +783,7 @@ function inferIntent(
   exactTime?: string | null
 ) {
   const normalized = normalizeText(message)
-  const confirmationPattern = /\b(sim|desejo|quero|confirmo|confirmar|confirmado|confirma|fechado|pode ser|perfeito|ok|beleza|pode marcar|pode agendar)\b/
+  const confirmationPattern = /\b(sim|isso|isso mesmo|desejo|quero|confirmo|confirmar|confirmado|confirma|fechado|pode ser|pode|pode sim|perfeito|ok|blz|beleza|certo|correto|bora|uhum|aham|isso ai|ta|pode marcar|pode agendar)\b/
 
   if (detectExistingBookingQuestion({
     message,
@@ -745,11 +805,31 @@ function inferIntent(
   if (
     conversationState === 'WAITING_CONFIRMATION'
     && confirmationPattern.test(normalized)
+    && hasExplicitConfirmationCorrectionCue(message)
+  ) {
+    return 'CHANGE_REQUEST' as const
+  }
+
+  if (
+    conversationState === 'WAITING_CONFIRMATION'
+    && detectContextualConfirmationMessage(message)
+    && !hasExplicitConfirmationCorrectionCue(message)
   ) {
     return 'CONFIRM' as const
   }
 
-  if (/\b(sim|confirmo|confirmar|fechado|pode ser|perfeito|ok|beleza|confirmado|confirma)\b/.test(normalized)) {
+  if (
+    conversationState === 'WAITING_CONFIRMATION'
+    && confirmationPattern.test(normalized)
+    && !hasExplicitConfirmationCorrectionCue(message)
+  ) {
+    return 'CONFIRM' as const
+  }
+
+  if (
+    /\b(sim|confirmo|confirmar|fechado|pode ser|perfeito|ok|beleza|confirmado|confirma)\b/.test(normalized)
+    && !hasExplicitConfirmationCorrectionCue(message)
+  ) {
     return 'CONFIRM' as const
   }
 
@@ -1023,6 +1103,175 @@ function sanitizeOpenAiIntentPayload(payload: unknown) {
   }
 }
 
+function shouldUseContextualConfirmationClassifier(input: WhatsAppInterpreterInput) {
+  return (
+    input.conversationState === 'WAITING_CONFIRMATION'
+    && Boolean(input.conversationSummary.selectedServiceName)
+    && Boolean(input.conversationSummary.requestedDateIso)
+    && Boolean(input.conversationSummary.requestedTimeLabel)
+    && (
+      Boolean(input.conversationSummary.selectedProfessionalName)
+      || Boolean(input.conversationSummary.allowAnyProfessional)
+    )
+    && detectContextualConfirmationMessage(input.message)
+    && !hasExplicitConfirmationCorrectionCue(input.message)
+    && normalizeText(input.message).length <= 24
+  )
+}
+
+function buildContextualConfirmationPrompt(input: WhatsAppInterpreterInput) {
+  return [
+    'Voce classifica uma resposta curta de WhatsApp dentro de um contexto de confirmacao de agendamento.',
+    'Nao invente dados e nao crie logica de negocio.',
+    'Responda apenas se a mensagem indica CONFIRM, REJECT, TIME_CORRECTION, DATE_CORRECTION, PROFESSIONAL_CORRECTION ou UNKNOWN.',
+    `Estado atual: ${input.conversationState}.`,
+    `Resumo do agendamento: servico=${input.conversationSummary.selectedServiceName ?? 'none'}; barbeiro=${input.conversationSummary.selectedProfessionalName ?? (input.conversationSummary.allowAnyProfessional ? 'qualquer' : 'none')}; data=${input.conversationSummary.requestedDateIso ?? 'none'}; horario=${input.conversationSummary.requestedTimeLabel ?? 'none'}.`,
+    `Ultima pergunta do sistema: ${input.conversationSummary.lastAssistantMessage ?? 'none'}.`,
+    `Mensagem do cliente: """${input.message}"""`,
+    'Regras:',
+    '- Se a mensagem trouxer um novo horario explicito, retorne TIME_CORRECTION.',
+    '- Se trouxer nova data ou dia, retorne DATE_CORRECTION.',
+    '- Se trouxer novo barbeiro, retorne PROFESSIONAL_CORRECTION.',
+    '- Se for uma concordancia curta contextual com o resumo acima, retorne CONFIRM.',
+    '- Se indicar recusa ou cancelamento, retorne REJECT.',
+    '- Se nao der para afirmar com seguranca, retorne UNKNOWN.',
+  ].join('\n')
+}
+
+function sanitizeContextualConfirmationPayload(payload: unknown) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return payload
+  }
+
+  const candidate = payload as Record<string, unknown>
+
+  return {
+    intent: typeof candidate.intent === 'string' ? candidate.intent.trim() : candidate.intent,
+    confidence: typeof candidate.confidence === 'number' ? candidate.confidence : 0,
+    shouldClose: Boolean(candidate.shouldClose),
+    shouldConfirm: Boolean(candidate.shouldConfirm),
+  }
+}
+
+async function classifyContextualConfirmationWithOpenAI(input: {
+  config: OpenAIConfig
+  interpreterInput: WhatsAppInterpreterInput
+  signal: AbortSignal
+}) {
+  const response = await fetch(OPENAI_RESPONSES_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${input.config.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: input.config.model,
+      max_output_tokens: 120,
+      input: [
+        {
+          role: 'user',
+          content: buildContextualConfirmationPrompt(input.interpreterInput),
+        },
+      ],
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'barberos_contextual_confirmation',
+          strict: true,
+          schema: CONTEXTUAL_CONFIRMATION_JSON_SCHEMA,
+        },
+      },
+    }),
+    cache: 'no-store',
+    signal: input.signal,
+  })
+
+  if (!response.ok) {
+    console.warn('[whatsapp-interpreter/openai] contextual classifier bad_status', { status: response.status })
+    return null
+  }
+
+  const payload = await response.json()
+  const outputText = extractResponseText(payload)
+  if (!outputText) {
+    return null
+  }
+
+  const parsed = sanitizeContextualConfirmationPayload(JSON.parse(outputText)) as ContextualConfirmationClassification | null
+  if (
+    !parsed
+    || typeof parsed.intent !== 'string'
+    || typeof parsed.confidence !== 'number'
+    || typeof parsed.shouldClose !== 'boolean'
+    || typeof parsed.shouldConfirm !== 'boolean'
+  ) {
+    return null
+  }
+
+  return parsed
+}
+
+function applyContextualConfirmationClassification(input: {
+  classification: ContextualConfirmationClassification
+  fallback: WhatsAppIntent
+}) {
+  if (input.classification.intent === 'UNKNOWN') {
+    return null
+  }
+
+  if (input.classification.intent === 'CONFIRM') {
+    return {
+      ...input.fallback,
+      intent: 'CONFIRM',
+      correctionTarget: 'NONE',
+      confidence: Math.max(input.fallback.confidence, input.classification.confidence),
+      source: 'openai',
+    } satisfies WhatsAppIntent
+  }
+
+  if (input.classification.intent === 'REJECT') {
+    return {
+      ...input.fallback,
+      intent: 'DECLINE',
+      correctionTarget: 'NONE',
+      confidence: Math.max(input.fallback.confidence, input.classification.confidence),
+      source: 'openai',
+    } satisfies WhatsAppIntent
+  }
+
+  if (input.classification.intent === 'TIME_CORRECTION') {
+    return {
+      ...input.fallback,
+      intent: 'CHANGE_REQUEST',
+      correctionTarget: 'TIME',
+      confidence: Math.max(input.fallback.confidence, input.classification.confidence),
+      source: 'openai',
+    } satisfies WhatsAppIntent
+  }
+
+  if (input.classification.intent === 'DATE_CORRECTION') {
+    return {
+      ...input.fallback,
+      intent: 'CHANGE_REQUEST',
+      correctionTarget: 'DATE',
+      confidence: Math.max(input.fallback.confidence, input.classification.confidence),
+      source: 'openai',
+    } satisfies WhatsAppIntent
+  }
+
+  if (input.classification.intent === 'PROFESSIONAL_CORRECTION') {
+    return {
+      ...input.fallback,
+      intent: 'CHANGE_REQUEST',
+      correctionTarget: 'PROFESSIONAL',
+      confidence: Math.max(input.fallback.confidence, input.classification.confidence),
+      source: 'openai',
+    } satisfies WhatsAppIntent
+  }
+
+  return null
+}
+
 export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput): Promise<WhatsAppIntent> {
   const fallback = buildFallbackIntent(input)
   const config = getOpenAIConfig()
@@ -1039,6 +1288,35 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs)
 
   try {
+    if (shouldUseContextualConfirmationClassifier(input)) {
+      const classification = await classifyContextualConfirmationWithOpenAI({
+        config,
+        interpreterInput: input,
+        signal: controller.signal,
+      })
+
+      console.info('[whatsapp-agent] llm confirmation classification', {
+        message: input.message,
+        conversationState: input.conversationState,
+        classification,
+      })
+
+      if (classification) {
+        const classifiedIntent = applyContextualConfirmationClassification({
+          classification,
+          fallback,
+        })
+
+        if (classifiedIntent) {
+          return prioritizeExplicitTimeOverConfirmation({
+            interpreted: classifiedIntent,
+            conversationState: input.conversationState,
+            conversationSummary: input.conversationSummary,
+          })
+        }
+      }
+    }
+
     const response = await fetch(OPENAI_RESPONSES_URL, {
       method: 'POST',
       headers: {

@@ -531,11 +531,72 @@ test('preserva o slot quando o cliente escolhe um horario exato antes da confirm
 })
 
 test('trata respostas afirmativas amplas como confirmacao real no momento certo', () => {
-  const affirmativeReplies = ['sim', 'desejo', 'quero', 'pode marcar', 'confirmar', 'fechado', 'ok']
+  const affirmativeReplies = ['sim', 'isso', 'isso mesmo', 'desejo', 'quero', 'pode marcar', 'confirmar', 'fechado', 'ok', 'blz', 'aham', 'uhum']
 
   affirmativeReplies.forEach((reply) => {
-  assert.equal(agentTesting.isExplicitConfirmation(reply), true)
+    assert.equal(agentTesting.isExplicitConfirmation(reply), true)
   })
+})
+
+test('confirmacoes contextuais curtas fecham corretamente em WAITING_CONFIRMATION', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.state = 'WAITING_CONFIRMATION'
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.selectedProfessionalId = 'pro-rafael'
+  memory.selectedProfessionalName = 'Rafael Costa'
+  memory.requestedDateIso = '2026-04-16'
+  memory.requestedTimeLabel = '17:30'
+  memory.selectedSlot = {
+    key: 'pro-rafael:2026-04-16T20:30:00.000Z',
+    professionalId: 'pro-rafael',
+    professionalName: 'Rafael Costa',
+    dateIso: '2026-04-16',
+    timeLabel: '17:30',
+    startAtIso: '2026-04-16T20:30:00.000Z',
+    endAtIso: '2026-04-16T21:05:00.000Z',
+  }
+
+  ;['isso', 'pode', 'fechado'].forEach((message) => {
+    assert.equal(
+      agentTesting.shouldUseDeterministicConfirmationShortcut({
+        memory,
+        inboundText: message,
+        lastAssistantText: 'Posso confirmar Corte Classic para quinta-feira, 16/04 as 17:30 com Rafael Costa?',
+      }),
+      true,
+      message
+    )
+  })
+})
+
+test('fora de WAITING_CONFIRMATION uma concordancia curta nao vira confirmacao de agendamento', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.state = 'WAITING_TIME'
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.selectedProfessionalId = 'pro-rafael'
+  memory.selectedProfessionalName = 'Rafael Costa'
+  memory.requestedDateIso = '2026-04-16'
+  memory.requestedTimeLabel = '17:30'
+  memory.selectedSlot = {
+    key: 'pro-rafael:2026-04-16T20:30:00.000Z',
+    professionalId: 'pro-rafael',
+    professionalName: 'Rafael Costa',
+    dateIso: '2026-04-16',
+    timeLabel: '17:30',
+    startAtIso: '2026-04-16T20:30:00.000Z',
+    endAtIso: '2026-04-16T21:05:00.000Z',
+  }
+
+  assert.equal(
+    agentTesting.shouldUseDeterministicConfirmationShortcut({
+      memory,
+      inboundText: 'isso',
+      lastAssistantText: 'Posso confirmar Corte Classic para quinta-feira, 16/04 as 17:30 com Rafael Costa?',
+    }),
+    false
+  )
 })
 
 test('horario explicito vence confirmacao generica na mesma frase', async () => {
@@ -571,6 +632,59 @@ test('horario explicito vence confirmacao generica na mesma frase', async () => 
     assert.equal(intent.intent, 'CHANGE_REQUEST', message)
     assert.equal(intent.correctionTarget, 'TIME', message)
   }
+})
+
+test('mudanca de barbeiro vence confirmacao curta na mesma frase', async () => {
+  const intent = await interpretWhatsAppMessage({
+    message: 'pode ser com o Matheus',
+    barbershopName: 'Linha Nobre',
+    barbershopTimezone: 'America/Sao_Paulo',
+    conversationState: 'WAITING_CONFIRMATION',
+    offeredSlotCount: 0,
+    services: SERVICES.map((service) => ({ name: service.name })),
+    professionals: PROFESSIONALS.map((professional) => ({ name: professional.name })),
+    todayIsoDate: '2026-04-14',
+    currentLocalDateTime: '2026-04-14 10:30',
+    conversationSummary: {
+      selectedServiceName: 'Corte Classic',
+      selectedProfessionalName: 'Lucas',
+      requestedDateIso: '2026-04-16',
+      requestedTimeLabel: '08:00',
+      allowAnyProfessional: false,
+      lastCustomerMessage: '08:00',
+      lastAssistantMessage: 'Posso confirmar quinta-feira, 16/04 as 08:00 com Lucas Ribeiro?',
+    },
+  })
+
+  assert.equal(intent.intent, 'CHANGE_REQUEST')
+  assert.equal(intent.correctionTarget, 'PROFESSIONAL')
+  assert.equal(intent.mentionedName, 'Matheus')
+})
+
+test('mudanca de data vence confirmacao curta na mesma frase', async () => {
+  const intent = await interpretWhatsAppMessage({
+    message: 'sim amanha',
+    barbershopName: 'Linha Nobre',
+    barbershopTimezone: 'America/Sao_Paulo',
+    conversationState: 'WAITING_CONFIRMATION',
+    offeredSlotCount: 0,
+    services: SERVICES.map((service) => ({ name: service.name })),
+    professionals: PROFESSIONALS.map((professional) => ({ name: professional.name })),
+    todayIsoDate: '2026-04-14',
+    currentLocalDateTime: '2026-04-14 10:30',
+    conversationSummary: {
+      selectedServiceName: 'Corte Classic',
+      selectedProfessionalName: 'Lucas',
+      requestedDateIso: '2026-04-16',
+      requestedTimeLabel: '08:00',
+      allowAnyProfessional: false,
+      lastCustomerMessage: '08:00',
+      lastAssistantMessage: 'Posso confirmar quinta-feira, 16/04 as 08:00 com Lucas Ribeiro?',
+    },
+  })
+
+  assert.equal(intent.intent, 'CHANGE_REQUEST')
+  assert.equal(intent.correctionTarget, 'DATE')
 })
 
 test('atalho deterministico nao confirma slot antigo quando a resposta traz novo horario', () => {

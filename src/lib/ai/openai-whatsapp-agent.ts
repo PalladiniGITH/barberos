@@ -254,6 +254,28 @@ const AGENT_OUTPUT_SCHEMA = {
   ],
 } as const
 
+const CONTEXTUAL_CONFIRMATION_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    intent: {
+      type: 'string',
+      enum: ['CONFIRM', 'REJECT', 'TIME_CORRECTION', 'DATE_CORRECTION', 'PROFESSIONAL_CORRECTION', 'UNKNOWN'],
+    },
+    confidence: { type: 'number', minimum: 0, maximum: 1 },
+    shouldClose: { type: 'boolean' },
+    shouldConfirm: { type: 'boolean' },
+  },
+  required: ['intent', 'confidence', 'shouldClose', 'shouldConfirm'],
+} as const
+
+type ContextualConfirmationClassification = {
+  intent: 'CONFIRM' | 'REJECT' | 'TIME_CORRECTION' | 'DATE_CORRECTION' | 'PROFESSIONAL_CORRECTION' | 'UNKNOWN'
+  confidence: number
+  shouldClose: boolean
+  shouldConfirm: boolean
+}
+
 const TOOL_DEFINITIONS = [
   {
     type: 'function',
@@ -786,11 +808,67 @@ function enforceNextActionFromMemory(
 }
 
 function isExplicitConfirmation(message: string) {
-  return /\b(sim|desejo|quero|confirmo|confirmar|confirmado|confirma|fechado|ok|beleza|pode|pode confirmar|pode marcar|pode agendar|pode ser)\b/.test(normalizeText(message))
+  return /\b(sim|isso|isso mesmo|desejo|quero|confirmo|confirmar|confirmado|confirma|fechado|ok|blz|beleza|certo|correto|bora|uhum|aham|isso ai|ta|pode|pode sim|pode confirmar|pode marcar|pode agendar|pode ser)\b/.test(normalizeText(message))
+}
+
+function hasExplicitConfirmationCorrectionCue(message: string) {
+  const normalized = normalizeText(message)
+
+  return Boolean(
+    extractExplicitTimeFromMessage(message)
+    || /\b(hoje|amanha|depois de amanha|segunda|terca|quarta|quinta|sexta|sabado|domingo|\d{1,2}[\/-]\d{1,2})\b/.test(normalized)
+    || /\bcom(?:\s+o|\s+a)?\s+[a-zà-ÿ]{3,}\b/.test(normalized)
+  )
+}
+
+function resolveContextualConfirmationHeuristic(input: {
+  memory: WorkingMemory
+  inboundText: string
+}) {
+  const normalized = normalizeText(input.inboundText)
+  const matchedToken = [
+    'isso mesmo',
+    'pode sim',
+    'isso ai',
+    'sim',
+    'isso',
+    'pode',
+    'fechado',
+    'ok',
+    'blz',
+    'beleza',
+    'certo',
+    'correto',
+    'confirmo',
+    'confirma',
+    'bora',
+    'uhum',
+    'aham',
+    'ta',
+  ].find((token) => normalized.includes(token))
+
+  const hasRequiredContext =
+    input.memory.state === 'WAITING_CONFIRMATION'
+    && Boolean(input.memory.selectedSlot)
+    && Boolean(input.memory.selectedServiceId)
+    && (Boolean(input.memory.selectedProfessionalId) || input.memory.allowAnyProfessional)
+
+  const hasCorrectionCue = hasExplicitConfirmationCorrectionCue(input.inboundText)
+  const isAffirmative = isExplicitConfirmation(input.inboundText)
+
+  const accepted = hasRequiredContext && isAffirmative && !hasCorrectionCue
+
+  return {
+    accepted,
+    matchedToken: matchedToken ?? null,
+    hasRequiredContext,
+    hasCorrectionCue,
+    isAffirmative,
+  }
 }
 
 function isPureExplicitConfirmation(message: string) {
-  return isExplicitConfirmation(message) && !extractExplicitTimeFromMessage(message)
+  return isExplicitConfirmation(message) && !hasExplicitConfirmationCorrectionCue(message)
 }
 
 function extractResponseText(payload: ResponsePayload) {
@@ -963,6 +1041,116 @@ function buildRuntimeSummary(memory: WorkingMemory) {
     : 'nao selecionado'
 
   return `Estado=${memory.state}; servico=${service}; barbeiro=${barber}; data=${date}; horario_ou_periodo=${time}; slot=${slot}.`
+}
+
+function buildContextualConfirmationClassifierPrompt(input: {
+  inboundText: string
+  lastAssistantText?: string | null
+  memory: WorkingMemory
+}) {
+  return [
+    'Voce classifica respostas curtas de WhatsApp dentro de um contexto de confirmacao de agendamento.',
+    'Nao cria regras de negocio e nao inventa dados.',
+    'Decida apenas entre CONFIRM, REJECT, TIME_CORRECTION, DATE_CORRECTION, PROFESSIONAL_CORRECTION ou UNKNOWN.',
+    `Estado atual: ${input.memory.state}.`,
+    `Resumo do agendamento: ${buildRuntimeSummary(input.memory)}`,
+    `Ultima pergunta do sistema: ${input.lastAssistantText ?? 'none'}.`,
+    `Mensagem atual do cliente: """${input.inboundText}"""`,
+    'Regras:',
+    '- Se a mensagem trouxer novo horario explicito, retorne TIME_CORRECTION.',
+    '- Se trouxer nova data ou dia, retorne DATE_CORRECTION.',
+    '- Se trouxer novo barbeiro, retorne PROFESSIONAL_CORRECTION.',
+    '- Se for uma concordancia curta e contextual com o resumo atual, retorne CONFIRM.',
+    '- Se indicar recusa, retorne REJECT.',
+    '- Se ainda estiver ambiguo, retorne UNKNOWN.',
+  ].join('\n')
+}
+
+function shouldUseContextualConfirmationClassifier(input: {
+  memory: WorkingMemory
+  inboundText: string
+}) {
+  const normalized = normalizeText(input.inboundText)
+  if (
+    input.memory.state !== 'WAITING_CONFIRMATION'
+    || !input.memory.selectedSlot
+    || !input.memory.selectedServiceId
+    || (!input.memory.selectedProfessionalId && !input.memory.allowAnyProfessional)
+    || hasExplicitConfirmationCorrectionCue(input.inboundText)
+  ) {
+    return false
+  }
+
+  return normalized.length <= 24 && /^(sim|isso|isso mesmo|pode|pode sim|fechado|ok|blz|beleza|certo|correto|confirmo|confirma|bora|uhum|aham|isso ai|ta)$/.test(normalized)
+}
+
+function sanitizeContextualConfirmationPayload(payload: unknown) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return payload
+  }
+
+  const candidate = payload as Record<string, unknown>
+
+  return {
+    intent: typeof candidate.intent === 'string' ? candidate.intent.trim() : candidate.intent,
+    confidence: typeof candidate.confidence === 'number' ? candidate.confidence : 0,
+    shouldClose: Boolean(candidate.shouldClose),
+    shouldConfirm: Boolean(candidate.shouldConfirm),
+  }
+}
+
+async function classifyContextualConfirmationWithOpenAI(input: {
+  config: OpenAIConfig
+  memory: WorkingMemory
+  inboundText: string
+  lastAssistantText?: string | null
+  signal: AbortSignal
+}) {
+  const response = await callResponsesApi(
+    input.config,
+    {
+      model: input.config.model,
+      max_output_tokens: 120,
+      input: [
+        {
+          role: 'user',
+          content: buildContextualConfirmationClassifierPrompt({
+            inboundText: input.inboundText,
+            lastAssistantText: input.lastAssistantText,
+            memory: input.memory,
+          }),
+        },
+      ],
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'barberos_contextual_confirmation',
+          strict: true,
+          schema: CONTEXTUAL_CONFIRMATION_SCHEMA,
+        },
+      },
+    },
+    input.signal,
+    'contextual_confirmation'
+  )
+
+  const outputText = extractResponseText(response)
+  if (!outputText) {
+    return null
+  }
+
+  const parsed = sanitizeContextualConfirmationPayload(JSON.parse(outputText)) as ContextualConfirmationClassification | null
+  if (
+    !parsed
+    || typeof parsed.intent !== 'string'
+    || typeof parsed.confidence !== 'number'
+    || typeof parsed.shouldClose !== 'boolean'
+    || typeof parsed.shouldConfirm !== 'boolean'
+  ) {
+    return null
+  }
+
+  return parsed
 }
 
 function buildServiceQuestionFromNames(serviceNames: string[]) {
@@ -2253,11 +2441,70 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     })
   }
 
-  if (shouldUseDeterministicConfirmationShortcut({
+  const contextualConfirmationHeuristic = resolveContextualConfirmationHeuristic({
     memory,
     inboundText: input.inboundText,
-    lastAssistantText: input.conversation.lastAssistantText,
+  })
+
+  console.info('[whatsapp-agent] contextual confirmation heuristic', {
+    customerId: input.customer.id,
+    conversationId: input.conversation.id,
+    inboundText: input.inboundText,
+    matchedToken: contextualConfirmationHeuristic.matchedToken,
+    accepted: contextualConfirmationHeuristic.accepted,
+    hasRequiredContext: contextualConfirmationHeuristic.hasRequiredContext,
+    hasCorrectionCue: contextualConfirmationHeuristic.hasCorrectionCue,
+    isAffirmative: contextualConfirmationHeuristic.isAffirmative,
+  })
+
+  let llmContextualConfirmation: ContextualConfirmationClassification | null = null
+
+  if (shouldUseContextualConfirmationClassifier({
+    memory,
+    inboundText: input.inboundText,
   })) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), Math.min(config.timeoutMs, 8000))
+
+    try {
+      llmContextualConfirmation = await classifyContextualConfirmationWithOpenAI({
+        config,
+        memory,
+        inboundText: input.inboundText,
+        lastAssistantText: input.conversation.lastAssistantText,
+        signal: controller.signal,
+      })
+    } catch (error) {
+      console.warn('[whatsapp-agent] llm confirmation classification failed', {
+        error: error instanceof Error ? error.message : 'unknown_error',
+      })
+    } finally {
+      clearTimeout(timeout)
+    }
+
+    console.info('[whatsapp-agent] llm confirmation classification', {
+      customerId: input.customer.id,
+      conversationId: input.conversation.id,
+      inboundText: input.inboundText,
+      classification: llmContextualConfirmation,
+    })
+  }
+
+  const canUseDeterministicConfirmation =
+    shouldUseDeterministicConfirmationShortcut({
+      memory,
+      inboundText: input.inboundText,
+      lastAssistantText: input.conversation.lastAssistantText,
+    })
+    || Boolean(
+      contextualConfirmationHeuristic.accepted
+      && llmContextualConfirmation
+      && llmContextualConfirmation.intent === 'CONFIRM'
+      && llmContextualConfirmation.shouldConfirm
+      && llmContextualConfirmation.confidence >= 0.7
+    )
+
+  if (canUseDeterministicConfirmation) {
     const responseText =
       'Perfeito. Vou concluir esse agendamento no sistema agora para voce.'
 

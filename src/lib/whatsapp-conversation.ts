@@ -183,13 +183,23 @@ function shouldResetConversationOnGreeting(input: {
 }
 
 function isAffirmativeConfirmationMessage(message: string) {
-  return /\b(sim|s|ok|pode|pode confirmar|pode marcar|pode agendar|confirmo|confirmar|quero|desejo|fechado)\b/.test(
+  return /\b(sim|s|isso|isso mesmo|pode|pode sim|pode confirmar|pode marcar|pode agendar|confirmo|confirmar|quero|desejo|fechado|ok|blz|beleza|certo|correto|bora|uhum|aham|isso ai|ta)\b/.test(
     normalizeText(message)
   )
 }
 
+function hasExplicitConfirmationCorrectionCue(message: string) {
+  const normalized = normalizeText(message)
+
+  return Boolean(
+    extractExplicitTimeFromMessage(message)
+    || /\b(hoje|amanha|depois de amanha|segunda|terca|quarta|quinta|sexta|sabado|domingo|\d{1,2}[\/-]\d{1,2})\b/.test(normalized)
+    || /\bcom(?:\s+o|\s+a)?\s+[a-zà-ÿ]{3,}\b/.test(normalized)
+  )
+}
+
 function shouldTreatAsStoredSlotConfirmation(message: string) {
-  return isAffirmativeConfirmationMessage(message) && !extractExplicitTimeFromMessage(message)
+  return isAffirmativeConfirmationMessage(message) && !hasExplicitConfirmationCorrectionCue(message)
 }
 
 function buildEmptyConversationDraft(): ConversationDraft {
@@ -1728,26 +1738,65 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     })
   }
 
+  const canUseDeterministicStoredSlotConfirmation =
+    effectiveState === 'WAITING_CONFIRMATION'
+    && Boolean(draftForInterpreter.selectedStoredSlot)
+    && Boolean(draftForInterpreter.selectedServiceId)
+    && (
+      Boolean(draftForInterpreter.selectedProfessionalId)
+      || draftForInterpreter.allowAnyProfessional
+    )
+
   if (
     effectiveState === 'WAITING_CONFIRMATION'
     && draftForInterpreter.selectedStoredSlot
     && draftForInterpreter.selectedServiceId
-    && shouldTreatAsStoredSlotConfirmation(inboundText)
+    && !shouldTreatAsStoredSlotConfirmation(inboundText)
+    && isAffirmativeConfirmationMessage(inboundText)
   ) {
-    console.info('[whatsapp-conversation] affirmative confirmation detected', {
+    console.info('[whatsapp-conversation] deterministic confirmation blocked', {
       conversationId: conversation.id,
       customerId: input.customer.id,
       inboundText,
       selectedServiceId: draftForInterpreter.selectedServiceId,
+      selectedProfessionalId: draftForInterpreter.selectedProfessionalId,
+      allowAnyProfessional: draftForInterpreter.allowAnyProfessional,
       selectedSlot: draftForInterpreter.selectedStoredSlot,
+      blockedReason: 'explicit_correction_detected',
+    })
+  }
+
+  if (
+    canUseDeterministicStoredSlotConfirmation
+    && shouldTreatAsStoredSlotConfirmation(inboundText)
+  ) {
+    const deterministicServiceId = draftForInterpreter.selectedServiceId!
+    const deterministicSelectedSlot = draftForInterpreter.selectedStoredSlot!
+
+    console.info('[whatsapp-conversation] deterministic confirmation accepted', {
+      conversationId: conversation.id,
+      customerId: input.customer.id,
+      inboundText,
+      selectedServiceId: deterministicServiceId,
+      selectedProfessionalId: draftForInterpreter.selectedProfessionalId,
+      allowAnyProfessional: draftForInterpreter.allowAnyProfessional,
+      selectedSlot: deterministicSelectedSlot,
+    })
+
+    console.info('[whatsapp-conversation] affirmative confirmation detected', {
+      conversationId: conversation.id,
+      customerId: input.customer.id,
+      inboundText,
+      selectedServiceId: deterministicServiceId,
+      selectedSlot: deterministicSelectedSlot,
     })
 
     const confirmedSlot = await findExactAvailableWhatsAppSlot({
       barbershopId: input.barbershop.id,
-      serviceId: draftForInterpreter.selectedServiceId,
-      professionalId: draftForInterpreter.selectedStoredSlot.professionalId,
-      dateIso: draftForInterpreter.selectedStoredSlot.dateIso,
-      timeLabel: draftForInterpreter.selectedStoredSlot.timeLabel,
+      serviceId: deterministicServiceId,
+      professionalId: deterministicSelectedSlot.professionalId,
+      dateIso: deterministicSelectedSlot.dateIso,
+      timeLabel: deterministicSelectedSlot.timeLabel,
       timezone,
     })
 
@@ -1759,7 +1808,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
         where: { id: conversation.id },
         data: {
           state: 'WAITING_TIME',
-          selectedServiceId: draftForInterpreter.selectedServiceId,
+          selectedServiceId: deterministicServiceId,
           selectedServiceName: draftForInterpreter.selectedServiceName,
           selectedProfessionalId: draftForInterpreter.selectedProfessionalId,
           selectedProfessionalName: draftForInterpreter.selectedProfessionalName,
@@ -1771,7 +1820,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
           slotOptions: JSON_NULL,
           selectedSlot: JSON_NULL,
           bookingDraft: buildJsonValue({
-            selectedServiceId: draftForInterpreter.selectedServiceId,
+            selectedServiceId: deterministicServiceId,
             selectedServiceName: draftForInterpreter.selectedServiceName,
             selectedProfessionalId: draftForInterpreter.selectedProfessionalId,
             selectedProfessionalName: draftForInterpreter.selectedProfessionalName,
@@ -1802,7 +1851,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       const appointment = await createAppointmentFromWhatsApp({
         barbershopId: input.barbershop.id,
         customerId: input.customer.id,
-        serviceId: draftForInterpreter.selectedServiceId,
+        serviceId: deterministicServiceId,
         professionalId: confirmedSlot.professionalId,
         startAtIso: confirmedSlot.startAtIso,
         dateIso: confirmedSlot.dateIso,
@@ -1877,7 +1926,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
         where: { id: conversation.id },
         data: {
           state: 'WAITING_CONFIRMATION',
-          selectedServiceId: draftForInterpreter.selectedServiceId,
+          selectedServiceId: deterministicServiceId,
           selectedServiceName: draftForInterpreter.selectedServiceName,
           selectedProfessionalId: confirmedSlot.professionalId,
           selectedProfessionalName: confirmedSlot.professionalName,
@@ -1887,7 +1936,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
           slotOptions: JSON_NULL,
           selectedSlot: buildJsonValue(confirmedSlot),
           bookingDraft: buildJsonValue({
-            selectedServiceId: draftForInterpreter.selectedServiceId,
+            selectedServiceId: deterministicServiceId,
             selectedServiceName: draftForInterpreter.selectedServiceName,
             selectedProfessionalId: confirmedSlot.professionalId,
             selectedProfessionalName: confirmedSlot.professionalName,
