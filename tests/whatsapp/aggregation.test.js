@@ -431,3 +431,23 @@ test('debounce nao finaliza no meio do bloco quando chega uma nova mensagem frag
     true
   )
 })
+
+test('turno WAITING_ recente preserva contexto mesmo sem buffer imediato', () => {
+  assert.equal(
+    handlerTesting.hasOngoingTurnContext({
+      state: 'WAITING_TIME',
+      updatedAt: new Date('2026-04-16T13:00:00.000Z'),
+      referenceTime: new Date('2026-04-16T13:00:20.000Z').getTime(),
+    }),
+    true
+  )
+
+  assert.equal(
+    handlerTesting.hasOngoingTurnContext({
+      state: 'WAITING_TIME',
+      updatedAt: new Date('2026-04-16T13:00:00.000Z'),
+      referenceTime: new Date('2026-04-16T13:00:40.000Z').getTime(),
+    }),
+    false
+  )
+})

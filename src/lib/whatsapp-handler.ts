@@ -60,6 +60,7 @@ const SENSITIVE_MESSAGE_AGGREGATION_WINDOW_MS = 6000
 const FORMING_BOOKING_TURN_IDLE_WINDOW_MS = 6200
 const FORMING_BOOKING_TURN_SENSITIVE_WINDOW_MS = 6800
 const FAST_COMPLETE_MESSAGE_DEBOUNCE_MS = 1800
+const ONGOING_TURN_CONTEXT_WINDOW_MS = 30_000
 const IMMEDIATE_MESSAGE_PATTERN =
   /^(oi+|ola+|ol[aá]|bom dia|boa tarde|boa noite|quero agendar|quero marcar|agendar|marcar horario)[!.,\s]*$/i
 
@@ -319,6 +320,20 @@ function hasPendingBufferedMessages(input: {
     input.bufferedMessages.length > 0
     && input.lastMessageTimestamp
     && input.referenceTime - input.lastMessageTimestamp.getTime() <= input.activeWindowMs
+  )
+}
+
+function hasOngoingTurnContext(input: {
+  state: string
+  updatedAt: Date | null
+  referenceTime: number
+}) {
+  const normalizedState = normalizeConversationStateForAggregation(input.state)
+
+  return Boolean(
+    normalizedState !== 'IDLE'
+    && input.updatedAt
+    && input.referenceTime - input.updatedAt.getTime() <= ONGOING_TURN_CONTEXT_WINDOW_MS
   )
 }
 
@@ -617,6 +632,7 @@ async function getOrCreateWhatsappConversation(input: {
       state: true,
       messageBuffer: true,
       lastMessageTimestamp: true,
+      updatedAt: true,
     },
   })
 }
@@ -635,6 +651,12 @@ async function aggregateInboundMessages(input: {
   })
   const aggregationState = normalizeConversationStateForAggregation(conversation.state)
   const previousMessages = parseMessageBuffer(conversation.messageBuffer)
+  const now = new Date()
+  const ongoingTurnContext = hasOngoingTurnContext({
+    state: aggregationState,
+    updatedAt: conversation.updatedAt,
+    referenceTime: now.getTime(),
+  })
   const fragmentedBookingTurn = detectFragmentedBookingTurn({
     state: aggregationState,
     currentMessage: normalizedMessage,
@@ -645,7 +667,6 @@ async function aggregateInboundMessages(input: {
     currentMessage: normalizedMessage,
     previousMessages,
   })
-  const now = new Date()
   let previousBuffer = hasPendingBufferedMessages({
     bufferedMessages: previousMessages,
     lastMessageTimestamp: conversation.lastMessageTimestamp,
@@ -654,6 +675,32 @@ async function aggregateInboundMessages(input: {
   })
     ? previousMessages
     : []
+  const currentFragment = classifySchedulingFragment(normalizedMessage)
+
+  if (
+    ongoingTurnContext
+    && previousBuffer.length === 0
+    && currentFragment.short
+    && (
+      currentFragment.greeting
+      || currentFragment.intent
+      || currentFragment.date
+      || currentFragment.service
+      || currentFragment.professional
+      || currentFragment.time
+    )
+  ) {
+    activeWindowMs = Math.max(activeWindowMs, FORMING_BOOKING_TURN_SENSITIVE_WINDOW_MS)
+
+    console.info('[handler] ongoing turn preserved context', {
+      conversationId: conversation.id,
+      state: aggregationState,
+      updatedAt: conversation.updatedAt.toISOString(),
+      message: normalizedMessage,
+      windowMs: activeWindowMs,
+    })
+  }
+
   console.info('[whatsapp-agent] aggregation window used', {
     conversationId: conversation.id,
     state: aggregationState,
@@ -1130,6 +1177,7 @@ export const __testing = {
   detectFragmentedBookingTurn,
   buildConcatenatedMessage,
   hasPendingBufferedMessages,
+  hasOngoingTurnContext,
   shouldFinalizeDebouncedTurn,
   resolveAggregationWindowMs,
   shouldProcessImmediately,

@@ -414,6 +414,13 @@ export async function getAvailableWhatsAppSlots(input: {
   }
 
   const dedupedSlots = dedupeWhatsAppSlots(openSlotsAfterPeriodFilter)
+  console.info('[availability] slots after period filter', {
+    barbershopId: input.barbershopId,
+    serviceId: input.serviceId,
+    dateIso: input.dateIso,
+    period: normalizedPeriod,
+    count: dedupedSlots.length,
+  })
   const slots = dedupedSlots
     .sort((left, right) => new Date(left.startAtIso).getTime() - new Date(right.startAtIso).getTime())
     .slice(0, input.limit ?? 4)

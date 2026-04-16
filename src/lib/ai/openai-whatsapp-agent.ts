@@ -1189,6 +1189,22 @@ function hasBroadPeriodSchedulingFilter(value?: string | null) {
   return Boolean(value && ['MORNING', 'AFTERNOON', 'LATE_AFTERNOON', 'EVENING'].includes(value))
 }
 
+function shouldAllowAvailabilitySearch(input: {
+  exactTime?: string | null
+  preferredPeriod?: string | null
+  inboundText: string
+}) {
+  return Boolean(
+    input.exactTime
+    || hasBroadPeriodSchedulingFilter(input.preferredPeriod)
+    || hasExplicitFlexibleTimeRequest(input.inboundText)
+  )
+}
+
+function shouldBlockConfirmationWithoutSlot(memory: WorkingMemory) {
+  return !memory.selectedSlot && memory.offeredSlots.length === 0
+}
+
 function shouldUseDeterministicConfirmationShortcut(input: {
   memory: WorkingMemory
   inboundText: string
@@ -2109,10 +2125,11 @@ async function executeAgentTool(input: {
       })
     }
 
-    const canListOptions =
-      Boolean(exactTime)
-      || hasPeriodFilter
-      || hasExplicitFlexibleTimeRequest(agentInput.inboundText)
+    const canListOptions = shouldAllowAvailabilitySearch({
+      exactTime,
+      preferredPeriod,
+      inboundText: agentInput.inboundText,
+    })
     if (!canListOptions) {
       return {
         status: 'error',
@@ -2321,6 +2338,22 @@ async function executeAgentTool(input: {
     const selectedOptionNumber = typeof args.selectedOptionNumber === 'number' ? args.selectedOptionNumber : null
     const requestedTime = typeof args.requestedTime === 'string' ? args.requestedTime : null
     const pureExplicitConfirmation = isPureExplicitConfirmation(agentInput.inboundText)
+
+    if (shouldBlockConfirmationWithoutSlot(memory)) {
+      console.info('[agent] confirmation blocked missing slot', {
+        customerId: agentInput.customer.id,
+        conversationId: agentInput.conversation.id,
+        inboundText: agentInput.inboundText,
+        offeredSlots: memory.offeredSlots.length,
+        selectedSlot: memory.selectedSlot,
+      })
+
+      return {
+        status: 'error',
+        reason: 'offered_slots_missing',
+        explicitConfirmationDetected: pureExplicitConfirmation,
+      }
+    }
 
     if (selectedOptionNumber && selectedOptionNumber >= 1 && selectedOptionNumber <= memory.offeredSlots.length) {
       memory.selectedSlot = memory.offeredSlots[selectedOptionNumber - 1] ?? null
@@ -2968,6 +3001,8 @@ export const __testing = {
   isPureExplicitConfirmation,
   hasExplicitAnyProfessionalConsent,
   hasExplicitFlexibleTimeRequest,
+  shouldAllowAvailabilitySearch,
+  shouldBlockConfirmationWithoutSlot,
   resolveContextualConfirmationHeuristic,
   shouldUseContextualConfirmationClassifier,
   sanitizeReplyTextAgainstProfessionalVocative,

@@ -491,6 +491,51 @@ test('erro transitório de disponibilidade vira fallback neutro de infraestrutur
   assert.match(override.replyText, /Vou tentar novamente/i)
 })
 
+test('preferredPeriod EVENING libera a busca de disponibilidade sem exigir horario exato', () => {
+  assert.equal(
+    agentTesting.shouldAllowAvailabilitySearch({
+      exactTime: null,
+      preferredPeriod: 'EVENING',
+      inboundText: 'de noite',
+    }),
+    true
+  )
+
+  assert.equal(
+    agentTesting.shouldAllowAvailabilitySearch({
+      exactTime: null,
+      preferredPeriod: null,
+      inboundText: 'quero marcar',
+    }),
+    false
+  )
+})
+
+test('confirm_booking é bloqueado quando não existe slot selecionado nem offeredSlots', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.state = 'WAITING_CONFIRMATION'
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.requestedDateIso = '2026-04-13'
+  memory.requestedTimeLabel = 'EVENING'
+
+  assert.equal(agentTesting.shouldBlockConfirmationWithoutSlot(memory), true)
+
+  memory.offeredSlots = [
+    {
+      key: 'pro-matheus:2026-04-13T21:00:00.000Z',
+      professionalId: 'pro-matheus',
+      professionalName: 'Matheus',
+      dateIso: '2026-04-13',
+      timeLabel: '18:00',
+      startAtIso: '2026-04-13T21:00:00.000Z',
+      endAtIso: '2026-04-13T21:35:00.000Z',
+    },
+  ]
+
+  assert.equal(agentTesting.shouldBlockConfirmationWithoutSlot(memory), false)
+})
+
 test('sem historico e sem liberacao para qualquer um o backend pergunta barbeiro antes de sugerir horarios', () => {
   const memory = agentTesting.buildInitialMemory(createAgentInput())
   memory.selectedServiceId = 'svc-classic'
