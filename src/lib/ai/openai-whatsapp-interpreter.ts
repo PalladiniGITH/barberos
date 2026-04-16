@@ -553,8 +553,43 @@ const EVENING_PERIOD_PATTERNS = [
   /\bfim\s+da\s+tarde\s*\/\s*noite\b/,
 ]
 
-function inferBroadPeriodHint(message: string) {
+export function detectShortPeriodPhrase(input: {
+  message: string
+  conversationState?: string | null
+}) {
+  const normalized = normalizeText(input.message)
+  const contextAllowsLaterAsEvening =
+    input.conversationState === 'WAITING_TIME'
+    || input.conversationState === 'WAITING_CONFIRMATION'
+
+  if (
+    /^(?:isso\s+)?de\s+noite$/.test(normalized)
+    || /^(?:isso\s+)?a\s+noite$/.test(normalized)
+    || /^(?:isso\s+)?no\s+periodo\s+da\s+noite$/.test(normalized)
+    || /^(?:isso\s+)?periodo\s+da\s+noite$/.test(normalized)
+    || /^(?:isso\s+)?mais\s+tarde(?:\s+(?:de|a)\s+noite)?$/.test(normalized)
+    || /^(?:isso\s+)?no\s+fim\s+da\s+tarde\s*\/\s*noite$/.test(normalized)
+  ) {
+    if (normalized === 'mais tarde' && !contextAllowsLaterAsEvening) {
+      return null
+    }
+
+    return 'EVENING' as const
+  }
+
+  return null
+}
+
+function inferBroadPeriodHint(message: string, conversationState?: string) {
   const normalized = normalizeText(message)
+  const shortPeriodPhrase = detectShortPeriodPhrase({
+    message,
+    conversationState,
+  })
+
+  if (shortPeriodPhrase) {
+    return shortPeriodPhrase
+  }
 
   if (normalized.includes('fim da tarde')) {
     return 'LATE_AFTERNOON' as const
@@ -579,7 +614,7 @@ function inferBroadPeriodHint(message: string) {
   return 'NONE' as const
 }
 
-function inferTimePreference(message: string) {
+function inferTimePreference(message: string, conversationState?: string) {
   const normalized = normalizeText(message)
 
   const afterHourMatch = normalized.match(/depois\s+das?\s+([01]?\d|2[0-3])/)
@@ -606,7 +641,7 @@ function inferTimePreference(message: string) {
     return { timePreference: 'EXACT' as const, exactTime }
   }
 
-  const broadPeriodHint = inferBroadPeriodHint(message)
+  const broadPeriodHint = inferBroadPeriodHint(message, conversationState)
   if (broadPeriodHint !== 'NONE') {
     return { timePreference: broadPeriodHint, exactTime: null }
   }
@@ -1098,7 +1133,7 @@ function prioritizeExplicitTimeOverConfirmation(input: {
 }
 
 function buildFallbackIntent(input: WhatsAppInterpreterInput): WhatsAppIntent {
-  const timePreference = inferTimePreference(input.message)
+  const timePreference = inferTimePreference(input.message, input.conversationState)
   const serviceName = findBestNamedMatch(input.services, input.message)
   const mentionedName = extractMentionedName(input.message, input.professionals)
   const allowAnyProfessional = /\b(qualquer um|qualquer barbeiro|tanto faz|sem preferencia)\b/.test(
@@ -1115,12 +1150,25 @@ function buildFallbackIntent(input: WhatsAppInterpreterInput): WhatsAppIntent {
     allowAnyProfessional,
     conversationSummary: input.conversationSummary,
   })
+  const shortPeriodPhrase = detectShortPeriodPhrase({
+    message: input.message,
+    conversationState: input.conversationState,
+  })
 
   if (requestedDateIso && detectRelativeDateExpression(input.message)) {
     console.info('[whatsapp-agent] relative date interpreted', {
       message: input.message,
       requestedDateIso,
       todayIsoDate: input.todayIsoDate,
+      timezone: input.barbershopTimezone,
+    })
+  }
+
+  if (shortPeriodPhrase) {
+    console.info('[whatsapp-agent] short period phrase interpreted', {
+      message: input.message,
+      preferredPeriod: shortPeriodPhrase,
+      conversationState: input.conversationState,
       timezone: input.barbershopTimezone,
     })
   }

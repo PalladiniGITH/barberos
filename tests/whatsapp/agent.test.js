@@ -246,6 +246,8 @@ test('frases naturais de noite promovem EVENING de forma deterministica', async 
     'de noite',
     'a noite',
     'à noite',
+    'mais tarde',
+    'mais tarde de noite',
     'no periodo da noite',
     'no período da noite',
     'mais tarde a noite',
@@ -564,14 +566,19 @@ test('erro transitório de disponibilidade vira fallback neutro de infraestrutur
 })
 
 test('preferredPeriod EVENING libera a busca de disponibilidade sem exigir horario exato', () => {
-  assert.equal(
-    agentTesting.shouldAllowAvailabilitySearch({
-      exactTime: null,
-      preferredPeriod: 'EVENING',
-      inboundText: 'de noite',
-    }),
-    true
-  )
+  const shortPeriodMessages = ['de noite', 'a noite', 'à noite', 'mais tarde']
+
+  shortPeriodMessages.forEach((message) => {
+    assert.equal(
+      agentTesting.shouldAllowAvailabilitySearch({
+        exactTime: null,
+        preferredPeriod: 'EVENING',
+        inboundText: message,
+      }),
+      true,
+      message
+    )
+  })
 
   assert.equal(
     agentTesting.shouldAllowAvailabilitySearch({

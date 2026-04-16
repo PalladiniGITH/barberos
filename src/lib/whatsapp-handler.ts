@@ -68,7 +68,7 @@ const COMPLEMENTARY_SHORT_MESSAGE_PATTERN =
   /^(?:\d{1,2}(?::\d{2})?\s*(?:h|hr|hrs|hora|horas)?|com\s+.+|qualquer um|qualquer barbeiro|com o mesmo|com meu barbeiro|com o de sempre|sim|ok|beleza|fechado|pode ser)$/i
 
 const STRONGLY_AGGREGATED_MESSAGE_PATTERN =
-  /^(?:!+|\?+|oi+|ola+|ol[aÃ¡]|bom dia|boa tarde|boa noite|hoje|amanha|amanhÃ£|de manha|manha|manhÃ£|a tarde|tarde|a noite|noite|fim da tarde|depois de amanha|depois de amanhÃ£|depois das \d{1,2}(?::\d{2})?|\d{1,2}(?::\d{2})?\s*(?:h|hr|hrs|hora|horas)?|as \d{1,2}(?::\d{2})?|Ã s \d{1,2}(?::\d{2})?|com\s+.+|qualquer um|qualquer barbeiro|sem preferencia|sem preferÃªncia|com o mesmo|com meu barbeiro|com o de sempre|sim|ok|beleza|fechado|pode ser|barba|corte|barba terapia)$/i
+  /^(?:!+|\?+|oi+|ola+|ol[aÃ¡]|bom dia|boa tarde|boa noite|hoje|amanha|amanhÃ£|de manha|manha|manhÃ£|a tarde|tarde|a noite|de noite|noite|mais tarde(?: de noite)?|periodo da noite|no periodo da noite|fim da tarde|depois de amanha|depois de amanhÃ£|depois das \d{1,2}(?::\d{2})?|\d{1,2}(?::\d{2})?\s*(?:h|hr|hrs|hora|horas)?|as \d{1,2}(?::\d{2})?|Ã s \d{1,2}(?::\d{2})?|com\s+.+|qualquer um|qualquer barbeiro|sem preferencia|sem preferÃªncia|com o mesmo|com meu barbeiro|com o de sempre|sim|ok|beleza|fechado|pode ser|barba|corte|barba terapia)$/i
 
 const COMPLETE_MESSAGE_INTENT_PATTERN =
   /\b(?:quero|preciso|gostaria|pode|quero marcar|quero agendar|marcar|agendar)\b/i
@@ -92,7 +92,7 @@ const SCHEDULING_PROFESSIONAL_FRAGMENT_PATTERN =
   /^(?:com\s+.+|com o mesmo|com meu barbeiro|com o de sempre)$/i
 
 const SCHEDULING_TIME_FRAGMENT_PATTERN =
-  /^(?:\d{1,2}(?::\d{2})?\s*(?:h|hr|hrs|hora|horas)?|as\s+\d{1,2}(?::\d{2})?|de manha|manha|manhÃƒÂ£|a tarde|tarde|a noite|noite|fim da tarde)$/i
+  /^(?:\d{1,2}(?::\d{2})?\s*(?:h|hr|hrs|hora|horas)?|as\s+\d{1,2}(?::\d{2})?|de manha|manha|manhÃƒÂ£|a tarde|tarde|a noite|de noite|noite|mais tarde(?: de noite)?|periodo da noite|no periodo da noite|fim da tarde)$/i
 
 function normalizePhoneDigits(value?: string | null) {
   if (!value) {

@@ -3,6 +3,7 @@ import 'server-only'
 import { MessagingProvider, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import {
+  detectShortPeriodPhrase,
   detectRelativeDateExpression,
   detectAcknowledgementMessage,
   detectExistingBookingQuestion,
@@ -2890,6 +2891,21 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     })
   }
 
+  const shortPeriodPhrase = detectShortPeriodPhrase({
+    message: inboundText,
+    conversationState: effectiveState,
+  })
+
+  if (shortPeriodPhrase && hasBroadPeriodSchedulingFilter(draft.requestedTimeLabel)) {
+    console.info('[whatsapp-conversation] preferredPeriod promoted from short phrase', {
+      customerId: input.customer.id,
+      conversationId: conversation.id,
+      inboundText,
+      preferredPeriod: shortPeriodPhrase,
+      requestedTimeLabel: draft.requestedTimeLabel,
+    })
+  }
+
   if (hasBroadPeriodSchedulingFilter(draft.requestedTimeLabel) && (
     interpreted.preferredPeriod
     || (interpreted.timePreference && interpreted.timePreference !== 'NONE' && interpreted.timePreference !== 'EXACT')
@@ -3203,6 +3219,17 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       conversationId: conversation.id,
       inboundText,
       requestedDateIso: draft.requestedDateIso,
+      timezone,
+    })
+  }
+
+  if (shortPeriodPhrase && hasBroadPeriodSchedulingFilter(draft.requestedTimeLabel)) {
+    console.info('[availability] period filter applied from short phrase', {
+      customerId: input.customer.id,
+      conversationId: conversation.id,
+      inboundText,
+      requestedDateIso: draft.requestedDateIso,
+      preferredPeriod: draft.requestedTimeLabel,
       timezone,
     })
   }

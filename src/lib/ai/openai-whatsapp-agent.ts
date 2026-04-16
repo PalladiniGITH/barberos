@@ -9,6 +9,7 @@ import {
 } from '@/lib/agendamentos/whatsapp-booking'
 import { AvailabilityInfrastructureError } from '@/lib/agendamentos/availability'
 import {
+  detectShortPeriodPhrase,
   extractExplicitTimeFromMessage,
   interpretWhatsAppMessage,
 } from '@/lib/ai/openai-whatsapp-interpreter'
@@ -2131,6 +2132,22 @@ async function executeAgentTool(input: {
         inboundText: agentInput.inboundText,
         preferredPeriod,
       })
+
+      const shortPeriodPhrase = detectShortPeriodPhrase({
+        message: agentInput.inboundText,
+        conversationState: memory.state,
+      })
+
+      if (shortPeriodPhrase) {
+        console.info('[availability] period filter applied from short phrase', {
+          customerId: agentInput.customer.id,
+          conversationId: agentInput.conversation.id,
+          inboundText: agentInput.inboundText,
+          preferredPeriod,
+          requestedDateIso: dateIso,
+          timezone: agentInput.barbershop.timezone,
+        })
+      }
     }
 
     const canListOptions = shouldAllowAvailabilitySearch({
