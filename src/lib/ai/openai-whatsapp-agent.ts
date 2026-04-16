@@ -732,6 +732,14 @@ function enforceNextActionFromMemory(
   }
 
   if (memory.requestedDateIso && requestedAction === 'ASK_DATE') {
+    if (validation.missingFields.includes('service')) {
+      return 'ASK_SERVICE'
+    }
+
+    if (validation.missingFields.includes('professional')) {
+      return 'ASK_PROFESSIONAL'
+    }
+
     if (validation.missingFields.includes('period')) {
       return 'ASK_PERIOD'
     }

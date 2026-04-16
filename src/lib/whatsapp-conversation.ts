@@ -3,6 +3,7 @@ import 'server-only'
 import { MessagingProvider, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import {
+  detectRelativeDateExpression,
   detectAcknowledgementMessage,
   detectExistingBookingQuestion,
   extractExplicitTimeFromMessage,
@@ -2880,6 +2881,15 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     professionalAfter: draft.selectedProfessionalName,
   })
 
+  if (draft.requestedDateIso && detectRelativeDateExpression(inboundText)) {
+    console.info('[whatsapp-conversation] requestedDate promoted from relative date', {
+      customerId: input.customer.id,
+      conversationId: conversation.id,
+      inboundText,
+      requestedDateIso: draft.requestedDateIso,
+    })
+  }
+
   if (hasBroadPeriodSchedulingFilter(draft.requestedTimeLabel) && (
     interpreted.preferredPeriod
     || (interpreted.timePreference && interpreted.timePreference !== 'NONE' && interpreted.timePreference !== 'EXACT')
@@ -3186,6 +3196,16 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   const professionalNameForExactSearch = draft.allowAnyProfessional
     ? null
     : draft.selectedProfessionalName ?? contextualProfessionalPreference?.professionalName ?? null
+
+  if (draft.requestedDateIso && detectRelativeDateExpression(inboundText)) {
+    console.info('[availability] using requestedDateIso from relative date', {
+      customerId: input.customer.id,
+      conversationId: conversation.id,
+      inboundText,
+      requestedDateIso: draft.requestedDateIso,
+      timezone,
+    })
+  }
 
   if (exactTimeForValidation) {
     console.info('[whatsapp-conversation] exact time requested', {

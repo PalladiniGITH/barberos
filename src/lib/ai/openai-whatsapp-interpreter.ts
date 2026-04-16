@@ -1,7 +1,13 @@
 import 'server-only'
 
 import { z } from 'zod'
-import { nextWeekdayIsoDate, shiftIsoDate } from '@/lib/timezone'
+import {
+  nextWeekdayIsoDate,
+  resolveWeekdayIsoDateInWeek,
+  shiftIsoDate,
+  shiftIsoDateByMonths,
+  shiftIsoDateByWeeks,
+} from '@/lib/timezone'
 
 const DEFAULT_OPENAI_MODEL = 'gpt-4.1-mini'
 const DEFAULT_TIMEOUT_MS = 15000
@@ -48,6 +54,11 @@ const WEEKDAY_INDEX: Record<string, number> = {
   sabado: 6,
   sábado: 6,
 }
+
+const NORMALIZED_WEEKDAY_INDEX = Object.entries(WEEKDAY_INDEX).reduce<Record<string, number>>((accumulator, [label, index]) => {
+  accumulator[normalizeText(label)] = index
+  return accumulator
+}, {})
 
 const IntentSchema = z.object({
   intent: z.enum(['BOOK_APPOINTMENT', 'CHECK_EXISTING_BOOKING', 'ACKNOWLEDGEMENT', 'CONFIRM', 'DECLINE', 'CHANGE_REQUEST', 'UNKNOWN']),
@@ -439,6 +450,30 @@ function extractMentionedName(message: string, professionals: Array<{ name: stri
   return sanitizeMentionedNameCandidate(rawName, professionals, Boolean(directMatch))
 }
 
+function findNormalizedWeekdayIndex(message: string) {
+  const normalized = normalizeText(message)
+  const matches = Object.entries(NORMALIZED_WEEKDAY_INDEX)
+    .filter(([label]) => normalized.includes(label))
+    .sort((left, right) => right[0].length - left[0].length)
+
+  return matches.length > 0 ? matches[0][1] : null
+}
+
+export function detectRelativeDateExpression(message: string) {
+  const normalized = normalizeText(message)
+
+  return Boolean(
+    normalized.includes('hoje')
+    || normalized.includes('amanha')
+    || normalized.includes('depois de amanha')
+    || /\bdaqui\s+(?:\d+|um|uma)\s+(?:dia|dias|semana|semanas|mes|meses)\b/.test(normalized)
+    || /\b(?:na|no)\s+outr[ao]\s+(?:domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado)\b/.test(normalized)
+    || /\b(?:domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado)\s+da\s+(?:semana\s+que\s+vem|proxima\s+semana|outra\s+semana)\b/.test(normalized)
+    || /\bproxim[ao]\s+(?:domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado)\b/.test(normalized)
+    || /\b(?:domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado)\s+que\s+vem\b/.test(normalized)
+  )
+}
+
 function parseRelativeDate(message: string, todayIsoDate: string) {
   const normalized = normalizeText(message)
 
@@ -454,6 +489,25 @@ function parseRelativeDate(message: string, todayIsoDate: string) {
     return todayIsoDate
   }
 
+  const daysFromNowMatch = normalized.match(/\bdaqui\s+(\d+)\s+dias?\b/)
+  if (daysFromNowMatch) {
+    return shiftIsoDate(todayIsoDate, Number(daysFromNowMatch[1]))
+  }
+
+  const weeksFromNowMatch = normalized.match(/\bdaqui\s+(\d+)\s+semanas?\b/)
+  if (weeksFromNowMatch) {
+    return shiftIsoDateByWeeks(todayIsoDate, Number(weeksFromNowMatch[1]))
+  }
+
+  if (/\bdaqui\s+(?:1|um|uma)\s+mes\b/.test(normalized)) {
+    return shiftIsoDateByMonths(todayIsoDate, 1)
+  }
+
+  const monthsFromNowMatch = normalized.match(/\bdaqui\s+(\d+)\s+mes(?:es)?\b/)
+  if (monthsFromNowMatch) {
+    return shiftIsoDateByMonths(todayIsoDate, Number(monthsFromNowMatch[1]))
+  }
+
   const explicitDate = normalized.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/)
   if (explicitDate) {
     const day = Number(explicitDate[1])
@@ -467,9 +521,23 @@ function parseRelativeDate(message: string, todayIsoDate: string) {
     }
   }
 
-  const weekdayName = Object.keys(WEEKDAY_INDEX).find((name) => normalized.includes(name))
-  if (weekdayName) {
-    return nextWeekdayIsoDate(todayIsoDate, WEEKDAY_INDEX[weekdayName])
+  const weekdayIndex = findNormalizedWeekdayIndex(normalized)
+  if (weekdayIndex !== null) {
+    if (
+      /\boutr[ao]\s+(domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado)\b/.test(normalized)
+      || /\b(domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado)\s+da\s+semana\s+que\s+vem\b/.test(normalized)
+      || /\b(domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado)\s+da\s+proxima\s+semana\b/.test(normalized)
+      || /\b(domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado)\s+da\s+outra\s+semana\b/.test(normalized)
+    ) {
+      const weekOffset = normalized.includes('outra semana') ? 2 : 1
+      return resolveWeekdayIsoDateInWeek({
+        referenceDateIso: todayIsoDate,
+        weekdayIndex,
+        weekOffset,
+      })
+    }
+
+    return nextWeekdayIsoDate(todayIsoDate, weekdayIndex)
   }
 
   return null
@@ -1047,6 +1115,15 @@ function buildFallbackIntent(input: WhatsAppInterpreterInput): WhatsAppIntent {
     allowAnyProfessional,
     conversationSummary: input.conversationSummary,
   })
+
+  if (requestedDateIso && detectRelativeDateExpression(input.message)) {
+    console.info('[whatsapp-agent] relative date interpreted', {
+      message: input.message,
+      requestedDateIso,
+      todayIsoDate: input.todayIsoDate,
+      timezone: input.barbershopTimezone,
+    })
+  }
 
   return {
     intent: inferIntent(

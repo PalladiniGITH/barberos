@@ -155,6 +155,53 @@ export function shiftIsoDate(dateIso: string, days: number) {
   })
 }
 
+function getDaysInUtcMonth(year: number, monthIndex: number) {
+  return new Date(Date.UTC(year, monthIndex + 1, 0, 12, 0, 0)).getUTCDate()
+}
+
+export function shiftIsoDateByWeeks(dateIso: string, weeks: number) {
+  return shiftIsoDate(dateIso, weeks * 7)
+}
+
+export function shiftIsoDateByMonths(dateIso: string, months: number) {
+  const [year, month, day] = dateIso.split('-').map(Number)
+  const anchor = new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
+  const targetMonthIndex = anchor.getUTCMonth() + months
+  const targetYear = anchor.getUTCFullYear() + Math.floor(targetMonthIndex / 12)
+  const normalizedMonthIndex = ((targetMonthIndex % 12) + 12) % 12
+  const clampedDay = Math.min(day, getDaysInUtcMonth(targetYear, normalizedMonthIndex))
+
+  return formatIsoDateParts({
+    year: targetYear,
+    month: normalizedMonthIndex + 1,
+    day: clampedDay,
+  })
+}
+
+export function getStartOfWeekIsoDate(dateIso: string) {
+  const [year, month, day] = dateIso.split('-').map(Number)
+  const anchor = new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
+  const weekday = anchor.getUTCDay()
+  const offsetToMonday = weekday === 0 ? -6 : 1 - weekday
+  anchor.setUTCDate(anchor.getUTCDate() + offsetToMonday)
+
+  return formatIsoDateParts({
+    year: anchor.getUTCFullYear(),
+    month: anchor.getUTCMonth() + 1,
+    day: anchor.getUTCDate(),
+  })
+}
+
+export function resolveWeekdayIsoDateInWeek(input: {
+  referenceDateIso: string
+  weekdayIndex: number
+  weekOffset?: number
+}) {
+  const weekStartIso = shiftIsoDateByWeeks(getStartOfWeekIsoDate(input.referenceDateIso), input.weekOffset ?? 0)
+  const dayOffset = input.weekdayIndex === 0 ? 6 : input.weekdayIndex - 1
+  return shiftIsoDate(weekStartIso, dayOffset)
+}
+
 export function nextWeekdayIsoDate(baseIsoDate: string, weekdayIndex: number) {
   const [year, month, day] = baseIsoDate.split('-').map(Number)
   const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0))

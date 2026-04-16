@@ -166,6 +166,78 @@ test('requestedDate promovido nao volta para null quando o cliente informa o ser
   assert.equal(memory.selectedServiceId, 'svc-classic')
 })
 
+test('datas relativas reais geram requestedDateIso correto no timezone da barbearia', async () => {
+  const cases = [
+    ['daqui 15 dias', '2026-04-28'],
+    ['daqui 2 semanas', '2026-04-27'],
+    ['daqui 1 mes', '2026-05-13'],
+    ['na outra sexta', '2026-04-24'],
+    ['quinta da semana que vem', '2026-04-23'],
+    ['proxima quinta', '2026-04-16'],
+    ['domingo da outra semana', '2026-05-03'],
+  ]
+
+  for (const [message, expectedDateIso] of cases) {
+    const memory = agentTesting.buildInitialMemory(createAgentInput())
+    memory.state = 'WAITING_DATE'
+
+    const interpreted = await interpretMessage(message, memory)
+    agentTesting.promoteIntentContextToMemory({
+      memory,
+      intent: interpreted,
+      services: SERVICES,
+      professionals: PROFESSIONALS,
+    })
+
+    assert.equal(interpreted.requestedDateIso, expectedDateIso, message)
+    assert.equal(memory.requestedDateIso, expectedDateIso, message)
+  }
+})
+
+test('data relativa promovida continua no contexto e nao volta a ASK_DATE no turno seguinte', async () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+
+  const dateIntent = await interpretMessage('quinta da semana que vem', memory)
+  agentTesting.promoteIntentContextToMemory({
+    memory,
+    intent: dateIntent,
+    services: SERVICES,
+    professionals: PROFESSIONALS,
+  })
+
+  const serviceIntent = await interpretMessage('Corte classic', memory)
+  agentTesting.promoteIntentContextToMemory({
+    memory,
+    intent: serviceIntent,
+    services: SERVICES,
+    professionals: PROFESSIONALS,
+  })
+
+  const periodIntent = await interpretMessage('periodo da noite', memory)
+  agentTesting.promoteIntentContextToMemory({
+    memory,
+    intent: periodIntent,
+    services: SERVICES,
+    professionals: PROFESSIONALS,
+  })
+
+  const corrected = agentTesting.enforceNextActionFromMemory(
+    'ASK_DATE',
+    memory,
+    false,
+    createAgentInput().nowContext
+  )
+
+  assert.equal(memory.requestedDateIso, '2026-04-23')
+  assert.equal(memory.requestedTimeLabel, 'EVENING')
+  assert.notEqual(corrected, 'ASK_DATE')
+  assert.equal(agentTesting.shouldAllowAvailabilitySearch({
+    exactTime: null,
+    preferredPeriod: memory.requestedTimeLabel,
+    inboundText: 'periodo da noite',
+  }), true)
+})
+
 test('frases naturais de noite promovem EVENING de forma deterministica', async () => {
   const messages = [
     'periodo da noite',
