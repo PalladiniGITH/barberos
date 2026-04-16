@@ -3,6 +3,7 @@ import 'server-only'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import {
+  AvailabilityInfrastructureError,
   SCHEDULE_END_HOUR,
   SCHEDULE_SLOT_STEP_MINUTES,
   SCHEDULE_START_HOUR,
@@ -14,8 +15,10 @@ import {
   getMinimumLeadTimeMinutes,
   getOperationalBufferMinutes,
   hasBufferedConflict,
+  isTransientAvailabilityDbError,
   listBlockingAppointmentsForDay,
   matchesTimePreference,
+  runAvailabilityDbQueryWithRetry,
 } from '@/lib/agendamentos/availability'
 import {
   formatDateTimeInTimezone,
@@ -74,6 +77,7 @@ export interface WhatsAppAvailabilityDiagnostics {
     | 'no_slots_available'
     | 'no_slots_in_requested_period'
     | 'exact_time_unavailable'
+    | 'infrastructure_error'
 }
 
 interface SchedulingServiceOption {
@@ -166,29 +170,35 @@ function logAvailabilityLookup(input: {
 
 export async function loadBarbershopSchedulingOptions(barbershopId: string) {
   const [services, professionals] = await Promise.all([
-    prisma.service.findMany({
-      where: {
-        barbershopId,
-        active: true,
-      },
-      orderBy: { name: 'asc' },
-      select: {
-        id: true,
-        name: true,
-        duration: true,
-        price: true,
-      },
+    runAvailabilityDbQueryWithRetry({
+      label: 'load_scheduling_services',
+      operation: () => prisma.service.findMany({
+        where: {
+          barbershopId,
+          active: true,
+        },
+        orderBy: { name: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          duration: true,
+          price: true,
+        },
+      }),
     }),
-    prisma.professional.findMany({
-      where: {
-        barbershopId,
-        active: true,
-      },
-      orderBy: { name: 'asc' },
-      select: {
-        id: true,
-        name: true,
-      },
+    runAvailabilityDbQueryWithRetry({
+      label: 'load_scheduling_professionals',
+      operation: () => prisma.professional.findMany({
+        where: {
+          barbershopId,
+          active: true,
+        },
+        orderBy: { name: 'asc' },
+        select: {
+          id: true,
+          name: true,
+        },
+      }),
     }),
   ])
 
@@ -218,18 +228,21 @@ export async function getAvailableWhatsAppSlots(input: {
   const minimumLeadTimeMinutes = getMinimumLeadTimeMinutes()
   const normalizedPeriod = normalizeTimePreference(input.timePreference)
 
-  const service = await prisma.service.findFirst({
-    where: {
-      id: input.serviceId,
-      barbershopId: input.barbershopId,
-      active: true,
-    },
-    select: {
-      id: true,
-      name: true,
-      duration: true,
-      price: true,
-    },
+  const service = await runAvailabilityDbQueryWithRetry({
+    label: 'availability_service_lookup',
+    operation: () => prisma.service.findFirst({
+      where: {
+        id: input.serviceId,
+        barbershopId: input.barbershopId,
+        active: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        duration: true,
+        price: true,
+      },
+    }),
   })
 
   if (!service) {
@@ -257,17 +270,20 @@ export async function getAvailableWhatsAppSlots(input: {
     }
   }
 
-  const professionals = await prisma.professional.findMany({
-    where: {
-      barbershopId: input.barbershopId,
-      active: true,
-      id: input.professionalId ? input.professionalId : undefined,
-    },
-    orderBy: { name: 'asc' },
-    select: {
-      id: true,
-      name: true,
-    },
+  const professionals = await runAvailabilityDbQueryWithRetry({
+    label: 'availability_professionals_lookup',
+    operation: () => prisma.professional.findMany({
+      where: {
+        barbershopId: input.barbershopId,
+        active: true,
+        id: input.professionalId ? input.professionalId : undefined,
+      },
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+      },
+    }),
   })
 
   if (professionals.length === 0) {
@@ -312,6 +328,15 @@ export async function getAvailableWhatsAppSlots(input: {
   const firstEligibleSlotTime = isToday
     ? formatTimeLabel(firstEligibleStartAt, resolvedTimezone)
     : formatTimeLabel(dayOpen, resolvedTimezone)
+  if (normalizedPeriod !== 'NONE' && normalizedPeriod !== 'EXACT') {
+    console.info('[availability] period filter applied', {
+      barbershopId: input.barbershopId,
+      serviceId: input.serviceId,
+      dateIso: input.dateIso,
+      period: normalizedPeriod,
+      timezone: resolvedTimezone,
+    })
+  }
   const blockingAppointments = await listBlockingAppointmentsForDay({
     barbershopId: input.barbershopId,
     dateIso: input.dateIso,
@@ -456,22 +481,30 @@ export async function findExactAvailableWhatsAppSlot(input: {
   timeLabel: string
   timezone?: string | null
 }) {
-  const availability = await getAvailableWhatsAppSlots({
-    barbershopId: input.barbershopId,
-    serviceId: input.serviceId,
-    professionalId: input.professionalId,
-    dateIso: input.dateIso,
-    timezone: input.timezone,
-    timePreference: 'EXACT',
-    exactTime: input.timeLabel,
-    limit: 8,
-  })
+  try {
+    const availability = await getAvailableWhatsAppSlots({
+      barbershopId: input.barbershopId,
+      serviceId: input.serviceId,
+      professionalId: input.professionalId,
+      dateIso: input.dateIso,
+      timezone: input.timezone,
+      timePreference: 'EXACT',
+      exactTime: input.timeLabel,
+      limit: 8,
+    })
 
-  return availability.slots.find((slot) => (
-    slot.professionalId === input.professionalId
-    && slot.dateIso === input.dateIso
-    && slot.timeLabel === input.timeLabel
-  )) ?? null
+    return availability.slots.find((slot) => (
+      slot.professionalId === input.professionalId
+      && slot.dateIso === input.dateIso
+      && slot.timeLabel === input.timeLabel
+    )) ?? null
+  } catch (error) {
+    if (isTransientAvailabilityDbError(error)) {
+      throw new AvailabilityInfrastructureError('find_exact_available_whatsapp_slot', error)
+    }
+
+    throw error
+  }
 }
 
 export async function createAppointmentFromWhatsApp(input: {

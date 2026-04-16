@@ -663,6 +663,16 @@ async function aggregateInboundMessages(input: {
     fragmentedBookingTurn: fragmentedBookingTurn.active,
   })
 
+  if (fragmentedBookingTurn.active) {
+    console.info('[whatsapp-agent] fragmented turn state', {
+      conversationId: conversation.id,
+      state: aggregationState,
+      rawMessages: [...previousBuffer, normalizedMessage],
+      fragments: fragmentedBookingTurn.summary,
+      windowMs: activeWindowMs,
+    })
+  }
+
   if (previousBuffer.length > 0 && aggregationState === 'IDLE') {
     console.info(
       fragmentedBookingTurn.active
@@ -705,6 +715,13 @@ async function aggregateInboundMessages(input: {
   })
 
   if (previousBuffer.length > 0) {
+    console.info('[whatsapp-agent] buffer carried across sequential messages', {
+      conversationId: conversation.id,
+      state: aggregationState,
+      bufferedMessages: previousBuffer,
+      incomingMessage: normalizedMessage,
+    })
+
     console.info('[whatsapp-agent] merged into existing pending buffer', {
       conversationId: conversation.id,
       state: aggregationState,
@@ -782,6 +799,14 @@ async function aggregateInboundMessages(input: {
   })
 
   console.info('[whatsapp-agent] message aggregation', {
+    state: aggregationState,
+    windowMs: activeWindowMs,
+    rawMessages,
+    concatenatedMessage,
+  })
+
+  console.info('[whatsapp-agent] final merged turn emitted', {
+    conversationId: conversation.id,
     state: aggregationState,
     windowMs: activeWindowMs,
     rawMessages,

@@ -166,6 +166,34 @@ test('requestedDate promovido nao volta para null quando o cliente informa o ser
   assert.equal(memory.selectedServiceId, 'svc-classic')
 })
 
+test('frases naturais de noite promovem EVENING de forma deterministica', async () => {
+  const messages = [
+    'periodo da noite',
+    'período da noite',
+    'isso de noite',
+    'de noite',
+    'a noite',
+    'à noite',
+    'no periodo da noite',
+    'no período da noite',
+    'mais tarde a noite',
+    'mais tarde à noite',
+  ]
+
+  for (const message of messages) {
+    const memory = agentTesting.buildInitialMemory(createAgentInput())
+    memory.state = 'WAITING_TIME'
+    memory.selectedServiceId = 'svc-classic'
+    memory.selectedServiceName = 'Corte Classic'
+    memory.requestedDateIso = '2026-04-17'
+
+    const interpreted = await interpretMessage(message, memory)
+
+    assert.equal(interpreted.preferredPeriod, 'EVENING', message)
+    assert.equal(interpreted.timePreference, 'EVENING', message)
+  }
+})
+
 test('backend corrige nextAction quando a IA tenta perguntar algo ja preenchido', () => {
   const memory = agentTesting.buildInitialMemory(createAgentInput())
 
@@ -430,6 +458,37 @@ test('erro de falta de horario especifico vira pergunta direta de horario antes 
   assert.equal(override.nextAction, 'ASK_PERIOD')
   assert.match(override.replyText, /Qual horario voce gostaria/i)
   assert.doesNotMatch(override.replyText, /13:15|13:30/i)
+})
+
+test('erro transitório de disponibilidade vira fallback neutro de infraestrutura no agente', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.requestedDateIso = '2026-04-13'
+  memory.requestedTimeLabel = 'EVENING'
+
+  const override = agentTesting.resolveToolFailureOverride({
+    toolTrace: [
+      {
+        name: 'search_availability',
+        arguments: {},
+        result: {
+          status: 'error',
+          reason: 'availability_infrastructure_error',
+        },
+      },
+    ],
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    preferredProfessionalName: null,
+    serviceNames: SERVICES.map((service) => service.name),
+    nowContext: createAgentInput().nowContext,
+  })
+
+  assert.equal(override.nextAction, 'ASK_CLARIFICATION')
+  assert.match(override.replyText, /instabilidade/i)
+  assert.match(override.replyText, /Vou tentar novamente/i)
 })
 
 test('sem historico e sem liberacao para qualquer um o backend pergunta barbeiro antes de sugerir horarios', () => {

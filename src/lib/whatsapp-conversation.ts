@@ -16,6 +16,7 @@ import {
   loadBarbershopSchedulingOptions,
   type WhatsAppBookingSlot,
 } from '@/lib/agendamentos/whatsapp-booking'
+import { AvailabilityInfrastructureError } from '@/lib/agendamentos/availability'
 import {
   buildExistingCustomerBookingResponse,
   getExistingCustomerBookings,
@@ -945,6 +946,45 @@ function withLeadIn(message: string, leadIn?: string | null) {
   return `${leadIn}\n\n${message}`
 }
 
+async function emitAvailabilityInfrastructureFallback(input: {
+  conversationId: string
+  baseUpdate: ConversationBaseUpdate
+  fallbackState: ConversationState
+  fallbackFlow: ConversationServiceResult['flow']
+  usedAI: boolean
+  error: unknown
+  source: string
+}) {
+  const responseText =
+    'Tive uma instabilidade aqui para consultar os horarios. Vou tentar novamente.'
+
+  console.warn('[availability] fallback emitted to customer', {
+    conversationId: input.conversationId,
+    source: input.source,
+    state: input.fallbackState,
+    error: input.error instanceof Error ? input.error.message : 'unknown_error',
+  })
+
+  await prisma.whatsappConversation.update({
+    where: { id: input.conversationId },
+    data: {
+      ...input.baseUpdate,
+      state: input.fallbackState,
+      slotOptions: JSON_NULL,
+      selectedSlot: JSON_NULL,
+      lastAssistantText: responseText,
+    },
+  })
+
+  return {
+    responseText,
+    flow: input.fallbackFlow,
+    conversationId: input.conversationId,
+    conversationState: input.fallbackState,
+    usedAI: input.usedAI,
+  } satisfies ConversationServiceResult
+}
+
 function buildJsonValue(value: unknown) {
   return value as Prisma.InputJsonValue
 }
@@ -1018,6 +1058,14 @@ function hasResolvedTimePreference(value: string | null) {
   }
 
   return ['MORNING', 'AFTERNOON', 'LATE_AFTERNOON', 'EVENING'].includes(value) || value.includes(':')
+}
+
+function hasBroadPeriodSchedulingFilter(value: string | null) {
+  if (!value) {
+    return false
+  }
+
+  return ['MORNING', 'AFTERNOON', 'LATE_AFTERNOON', 'EVENING'].includes(value)
 }
 
 function isBookingEntryPoint(state: ConversationState, intent: string) {
@@ -1606,16 +1654,33 @@ async function offerFreshSlots(input: {
   responseLeadIn?: string | null
   previousAssistantText?: string | null
 }): Promise<ConversationServiceResult> {
-  const availability = await getAvailableWhatsAppSlots({
-    barbershopId: input.barbershopId,
-    serviceId: input.serviceId,
-    dateIso: input.requestedDateIso,
-    timezone: input.timezone,
-    professionalId: input.professionalId,
-    timePreference: input.timePreference,
-    exactTime: input.exactTime,
-    limit: 4,
-  })
+  let availability
+  try {
+    availability = await getAvailableWhatsAppSlots({
+      barbershopId: input.barbershopId,
+      serviceId: input.serviceId,
+      dateIso: input.requestedDateIso,
+      timezone: input.timezone,
+      professionalId: input.professionalId,
+      timePreference: input.timePreference,
+      exactTime: input.exactTime,
+      limit: 4,
+    })
+  } catch (error) {
+    if (error instanceof AvailabilityInfrastructureError) {
+      return emitAvailabilityInfrastructureFallback({
+        conversationId: input.conversationId,
+        baseUpdate: input.baseUpdate,
+        fallbackState: input.conversationStep === 'WAITING_CONFIRMATION' ? 'WAITING_CONFIRMATION' : 'WAITING_TIME',
+        fallbackFlow: input.conversationStep === 'WAITING_CONFIRMATION' ? 'await_confirmation' : 'collect_period',
+        usedAI: input.usedAI,
+        error,
+        source: 'offer_fresh_slots',
+      })
+    }
+
+    throw error
+  }
 
   console.info('[whatsapp-conversation] availability lookup', {
     customerId: input.customerId,
@@ -1883,14 +1948,47 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       selectedSlot: deterministicSelectedSlot,
     })
 
-    const confirmedSlot = await findExactAvailableWhatsAppSlot({
-      barbershopId: input.barbershop.id,
-      serviceId: deterministicServiceId,
-      professionalId: deterministicSelectedSlot.professionalId,
-      dateIso: deterministicSelectedSlot.dateIso,
-      timeLabel: deterministicSelectedSlot.timeLabel,
-      timezone,
-    })
+    let confirmedSlot: ConversationSlot | null = null
+    try {
+      confirmedSlot = await findExactAvailableWhatsAppSlot({
+        barbershopId: input.barbershop.id,
+        serviceId: deterministicServiceId,
+        professionalId: deterministicSelectedSlot.professionalId,
+        dateIso: deterministicSelectedSlot.dateIso,
+        timeLabel: deterministicSelectedSlot.timeLabel,
+        timezone,
+      })
+    } catch (error) {
+      if (error instanceof AvailabilityInfrastructureError) {
+        return emitAvailabilityInfrastructureFallback({
+          conversationId: conversation.id,
+          baseUpdate: {
+            lastInboundText: inboundText,
+            lastIntent: buildJsonValue({
+              source: 'backend_confirmation_guard',
+              intent: 'CONFIRM',
+              confirmationFailed: 'availability_infrastructure_error',
+            }),
+            selectedServiceId: deterministicServiceId,
+            selectedServiceName: draftForInterpreter.selectedServiceName,
+            selectedProfessionalId: draftForInterpreter.selectedProfessionalId,
+            selectedProfessionalName: draftForInterpreter.selectedProfessionalName,
+            allowAnyProfessional: draftForInterpreter.allowAnyProfessional,
+            requestedDate: draftForInterpreter.requestedDateIso
+              ? buildDateAnchorUtc(draftForInterpreter.requestedDateIso)
+              : null,
+            requestedTimeLabel: draftForInterpreter.requestedTimeLabel,
+          },
+          fallbackState: 'WAITING_CONFIRMATION',
+          fallbackFlow: 'await_confirmation',
+          usedAI: false,
+          error,
+          source: 'deterministic_confirmation_guard',
+        })
+      }
+
+      throw error
+    }
 
     if (!confirmedSlot) {
       const responseText =
@@ -2782,6 +2880,19 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     professionalAfter: draft.selectedProfessionalName,
   })
 
+  if (hasBroadPeriodSchedulingFilter(draft.requestedTimeLabel) && (
+    interpreted.preferredPeriod
+    || (interpreted.timePreference && interpreted.timePreference !== 'NONE' && interpreted.timePreference !== 'EXACT')
+  )) {
+    console.info('[whatsapp-agent] preferred period interpreted', {
+      customerId: input.customer.id,
+      inboundText,
+      preferredPeriod: interpreted.preferredPeriod,
+      timePreference: interpreted.timePreference,
+      requestedTimeLabel: draft.requestedTimeLabel,
+    })
+  }
+
   if (serviceChanged || professionalChanged || dateChanged || interpreted.correctionTarget !== 'NONE') {
     clearDraftAvailability(draft)
     console.info('[whatsapp-conversation] cleared stale availability context', {
@@ -3103,14 +3214,30 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   let slotForConfirmation: ConversationSlot | null = null
 
   if (selectedOfferedSlot) {
-    slotForConfirmation = await findExactAvailableWhatsAppSlot({
-      barbershopId: input.barbershop.id,
-      serviceId: draft.selectedServiceId,
-      professionalId: selectedOfferedSlot.professionalId,
-      dateIso: selectedOfferedSlot.dateIso,
-      timeLabel: selectedOfferedSlot.timeLabel,
-      timezone,
-    })
+    try {
+      slotForConfirmation = await findExactAvailableWhatsAppSlot({
+        barbershopId: input.barbershop.id,
+        serviceId: draft.selectedServiceId,
+        professionalId: selectedOfferedSlot.professionalId,
+        dateIso: selectedOfferedSlot.dateIso,
+        timeLabel: selectedOfferedSlot.timeLabel,
+        timezone,
+      })
+    } catch (error) {
+      if (error instanceof AvailabilityInfrastructureError) {
+        return emitAvailabilityInfrastructureFallback({
+          conversationId: conversation.id,
+          baseUpdate,
+          fallbackState: 'WAITING_TIME',
+          fallbackFlow: 'collect_period',
+          usedAI,
+          error,
+          source: 'selected_offered_slot_confirmation',
+        })
+      }
+
+      throw error
+    }
   }
 
   if (
@@ -3128,14 +3255,30 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       })
     }
 
-    slotForConfirmation = await findExactAvailableWhatsAppSlot({
-      barbershopId: input.barbershop.id,
-      serviceId: draft.selectedServiceId,
-      professionalId: professionalIdForExactSearch,
-      dateIso: draft.requestedDateIso,
-      timeLabel: exactTimeForValidation,
-      timezone,
-    })
+    try {
+      slotForConfirmation = await findExactAvailableWhatsAppSlot({
+        barbershopId: input.barbershop.id,
+        serviceId: draft.selectedServiceId,
+        professionalId: professionalIdForExactSearch,
+        dateIso: draft.requestedDateIso,
+        timeLabel: exactTimeForValidation,
+        timezone,
+      })
+    } catch (error) {
+      if (error instanceof AvailabilityInfrastructureError) {
+        return emitAvailabilityInfrastructureFallback({
+          conversationId: conversation.id,
+          baseUpdate,
+          fallbackState: 'WAITING_TIME',
+          fallbackFlow: 'collect_period',
+          usedAI,
+          error,
+          source: 'preserved_exact_time_revalidation',
+        })
+      }
+
+      throw error
+    }
   }
 
   if (
@@ -3144,27 +3287,60 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     && effectiveState === 'WAITING_CONFIRMATION'
     && draft.selectedStoredSlot
   ) {
-    slotForConfirmation = await findExactAvailableWhatsAppSlot({
-      barbershopId: input.barbershop.id,
-      serviceId: draft.selectedServiceId,
-      professionalId: draft.selectedStoredSlot.professionalId,
-      dateIso: draft.selectedStoredSlot.dateIso,
-      timeLabel: draft.selectedStoredSlot.timeLabel,
-      timezone,
-    })
+    try {
+      slotForConfirmation = await findExactAvailableWhatsAppSlot({
+        barbershopId: input.barbershop.id,
+        serviceId: draft.selectedServiceId,
+        professionalId: draft.selectedStoredSlot.professionalId,
+        dateIso: draft.selectedStoredSlot.dateIso,
+        timeLabel: draft.selectedStoredSlot.timeLabel,
+        timezone,
+      })
+    } catch (error) {
+      if (error instanceof AvailabilityInfrastructureError) {
+        return emitAvailabilityInfrastructureFallback({
+          conversationId: conversation.id,
+          baseUpdate,
+          fallbackState: 'WAITING_CONFIRMATION',
+          fallbackFlow: 'await_confirmation',
+          usedAI,
+          error,
+          source: 'stored_slot_revalidation',
+        })
+      }
+
+      throw error
+    }
   }
 
   if (!slotForConfirmation && exactTimeForValidation) {
-    const exactTimeAvailability = await getAvailableWhatsAppSlots({
-      barbershopId: input.barbershop.id,
-      serviceId: draft.selectedServiceId,
-      dateIso: draft.requestedDateIso,
-      timezone,
-      professionalId: professionalIdForExactSearch,
-      timePreference: 'EXACT',
-      exactTime: exactTimeForValidation,
-      limit: 8,
-    })
+    let exactTimeAvailability
+    try {
+      exactTimeAvailability = await getAvailableWhatsAppSlots({
+        barbershopId: input.barbershop.id,
+        serviceId: draft.selectedServiceId,
+        dateIso: draft.requestedDateIso,
+        timezone,
+        professionalId: professionalIdForExactSearch,
+        timePreference: 'EXACT',
+        exactTime: exactTimeForValidation,
+        limit: 8,
+      })
+    } catch (error) {
+      if (error instanceof AvailabilityInfrastructureError) {
+        return emitAvailabilityInfrastructureFallback({
+          conversationId: conversation.id,
+          baseUpdate,
+          fallbackState: 'WAITING_TIME',
+          fallbackFlow: 'collect_period',
+          usedAI,
+          error,
+          source: 'exact_time_validation',
+        })
+      }
+
+      throw error
+    }
 
     console.info('[whatsapp-conversation] exact time validation result', {
       customerId: input.customer.id,
@@ -3201,8 +3377,22 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     }
   }
 
+  const hasPeriodSchedulingFilter = hasBroadPeriodSchedulingFilter(draft.requestedTimeLabel)
+
   if (!slotForConfirmation) {
-    if (!exactTimeForValidation && !hasExplicitFlexibleTimeRequest(inboundText)) {
+    if (hasPeriodSchedulingFilter) {
+      console.info('[whatsapp-conversation] period accepted as scheduling filter', {
+        customerId: input.customer.id,
+        conversationId: conversation.id,
+        inboundText,
+        requestedDateIso: draft.requestedDateIso,
+        requestedTimeLabel: draft.requestedTimeLabel,
+        selectedProfessionalId: draft.selectedProfessionalId,
+        selectedProfessionalName: draft.selectedProfessionalName,
+      })
+    }
+
+    if (!exactTimeForValidation && !hasPeriodSchedulingFilter && !hasExplicitFlexibleTimeRequest(inboundText)) {
       const responseText = withLeadIn(
         buildSpecificTimeQuestion({
           requestedDateIso: draft.requestedDateIso,

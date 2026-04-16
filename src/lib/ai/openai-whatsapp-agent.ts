@@ -7,6 +7,7 @@ import {
   findExactAvailableWhatsAppSlot,
   getAvailableWhatsAppSlots,
 } from '@/lib/agendamentos/whatsapp-booking'
+import { AvailabilityInfrastructureError } from '@/lib/agendamentos/availability'
 import {
   extractExplicitTimeFromMessage,
   interpretWhatsAppMessage,
@@ -1184,6 +1185,10 @@ function hasExplicitFlexibleTimeRequest(message: string) {
   )
 }
 
+function hasBroadPeriodSchedulingFilter(value?: string | null) {
+  return Boolean(value && ['MORNING', 'AFTERNOON', 'LATE_AFTERNOON', 'EVENING'].includes(value))
+}
+
 function shouldUseDeterministicConfirmationShortcut(input: {
   memory: WorkingMemory
   inboundText: string
@@ -1918,6 +1923,13 @@ function resolveToolFailureOverride(input: {
     }
   }
 
+  if (reason === 'availability_infrastructure_error') {
+    return {
+      nextAction: 'ASK_CLARIFICATION' as const,
+      replyText: 'Tive uma instabilidade aqui para consultar os horarios. Vou tentar novamente.',
+    }
+  }
+
   if (reason === 'multiple_professionals_for_exact_time') {
     const slots = Array.isArray(latestAvailabilityError.result.slots)
       ? latestAvailabilityError.result.slots as WhatsAppBookingSlot[]
@@ -2086,8 +2098,21 @@ async function executeAgentTool(input: {
       ? args.exactTime
       : (requestedTimePreference && /^\d{2}:\d{2}$/.test(requestedTimePreference) ? requestedTimePreference : null)
     const preferredPeriod = exactTime ? 'EXACT' : requestedTimePreference
+    const hasPeriodFilter = hasBroadPeriodSchedulingFilter(preferredPeriod)
 
-    const canListOptions = Boolean(exactTime) || hasExplicitFlexibleTimeRequest(agentInput.inboundText)
+    if (hasPeriodFilter) {
+      console.info('[whatsapp-agent] preferred period interpreted', {
+        customerId: agentInput.customer.id,
+        conversationId: agentInput.conversation.id,
+        inboundText: agentInput.inboundText,
+        preferredPeriod,
+      })
+    }
+
+    const canListOptions =
+      Boolean(exactTime)
+      || hasPeriodFilter
+      || hasExplicitFlexibleTimeRequest(agentInput.inboundText)
     if (!canListOptions) {
       return {
         status: 'error',
@@ -2095,16 +2120,28 @@ async function executeAgentTool(input: {
       }
     }
 
-    const availability = await getAvailableWhatsAppSlots({
-      barbershopId: agentInput.barbershop.id,
-      serviceId: service.id,
-      dateIso,
-      timezone: agentInput.barbershop.timezone,
-      professionalId: allowAnyProfessional ? null : professionalId,
-      timePreference: preferredPeriod,
-      exactTime,
-      limit: 4,
-    })
+    let availability
+    try {
+      availability = await getAvailableWhatsAppSlots({
+        barbershopId: agentInput.barbershop.id,
+        serviceId: service.id,
+        dateIso,
+        timezone: agentInput.barbershop.timezone,
+        professionalId: allowAnyProfessional ? null : professionalId,
+        timePreference: preferredPeriod,
+        exactTime,
+        limit: 4,
+      })
+    } catch (error) {
+      if (error instanceof AvailabilityInfrastructureError) {
+        return {
+          status: 'error',
+          reason: 'availability_infrastructure_error',
+        }
+      }
+
+      throw error
+    }
 
     memory.selectedServiceId = service.id
     memory.selectedServiceName = service.name
@@ -2199,25 +2236,48 @@ async function executeAgentTool(input: {
       }
 
       if (memory.selectedProfessionalId) {
-        memory.selectedSlot = await findExactAvailableWhatsAppSlot({
-          barbershopId: agentInput.barbershop.id,
-          serviceId: memory.selectedServiceId,
-          professionalId: memory.selectedProfessionalId,
-          dateIso: memory.requestedDateIso,
-          timeLabel: args.requestedTime,
-          timezone: agentInput.barbershop.timezone,
-        })
+        try {
+          memory.selectedSlot = await findExactAvailableWhatsAppSlot({
+            barbershopId: agentInput.barbershop.id,
+            serviceId: memory.selectedServiceId,
+            professionalId: memory.selectedProfessionalId,
+            dateIso: memory.requestedDateIso,
+            timeLabel: args.requestedTime,
+            timezone: agentInput.barbershop.timezone,
+          })
+        } catch (error) {
+          if (error instanceof AvailabilityInfrastructureError) {
+            return {
+              status: 'error',
+              reason: 'availability_infrastructure_error',
+            }
+          }
+
+          throw error
+        }
       } else if (memory.allowAnyProfessional) {
-        const exactAvailability = await getAvailableWhatsAppSlots({
-          barbershopId: agentInput.barbershop.id,
-          serviceId: memory.selectedServiceId,
-          dateIso: memory.requestedDateIso,
-          timezone: agentInput.barbershop.timezone,
-          professionalId: null,
-          timePreference: 'EXACT',
-          exactTime: args.requestedTime,
-          limit: 4,
-        })
+        let exactAvailability
+        try {
+          exactAvailability = await getAvailableWhatsAppSlots({
+            barbershopId: agentInput.barbershop.id,
+            serviceId: memory.selectedServiceId,
+            dateIso: memory.requestedDateIso,
+            timezone: agentInput.barbershop.timezone,
+            professionalId: null,
+            timePreference: 'EXACT',
+            exactTime: args.requestedTime,
+            limit: 4,
+          })
+        } catch (error) {
+          if (error instanceof AvailabilityInfrastructureError) {
+            return {
+              status: 'error',
+              reason: 'availability_infrastructure_error',
+            }
+          }
+
+          throw error
+        }
 
         if (exactAvailability.slots.length === 1) {
           memory.selectedSlot = exactAvailability.slots[0]
@@ -2276,25 +2336,50 @@ async function executeAgentTool(input: {
       }
 
       if (memory.selectedProfessionalId) {
-        memory.selectedSlot = await findExactAvailableWhatsAppSlot({
-          barbershopId: agentInput.barbershop.id,
-          serviceId: memory.selectedServiceId,
-          professionalId: memory.selectedProfessionalId,
-          dateIso: memory.requestedDateIso,
-          timeLabel: requestedTime,
-          timezone: agentInput.barbershop.timezone,
-        })
+        try {
+          memory.selectedSlot = await findExactAvailableWhatsAppSlot({
+            barbershopId: agentInput.barbershop.id,
+            serviceId: memory.selectedServiceId,
+            professionalId: memory.selectedProfessionalId,
+            dateIso: memory.requestedDateIso,
+            timeLabel: requestedTime,
+            timezone: agentInput.barbershop.timezone,
+          })
+        } catch (error) {
+          if (error instanceof AvailabilityInfrastructureError) {
+            return {
+              status: 'error',
+              reason: 'availability_infrastructure_error',
+              explicitConfirmationDetected: pureExplicitConfirmation,
+            }
+          }
+
+          throw error
+        }
       } else if (memory.allowAnyProfessional) {
-        const exactAvailability = await getAvailableWhatsAppSlots({
-          barbershopId: agentInput.barbershop.id,
-          serviceId: memory.selectedServiceId,
-          dateIso: memory.requestedDateIso,
-          timezone: agentInput.barbershop.timezone,
-          professionalId: null,
-          timePreference: 'EXACT',
-          exactTime: requestedTime,
-          limit: 4,
-        })
+        let exactAvailability
+        try {
+          exactAvailability = await getAvailableWhatsAppSlots({
+            barbershopId: agentInput.barbershop.id,
+            serviceId: memory.selectedServiceId,
+            dateIso: memory.requestedDateIso,
+            timezone: agentInput.barbershop.timezone,
+            professionalId: null,
+            timePreference: 'EXACT',
+            exactTime: requestedTime,
+            limit: 4,
+          })
+        } catch (error) {
+          if (error instanceof AvailabilityInfrastructureError) {
+            return {
+              status: 'error',
+              reason: 'availability_infrastructure_error',
+              explicitConfirmationDetected: pureExplicitConfirmation,
+            }
+          }
+
+          throw error
+        }
 
         if (exactAvailability.slots.length === 1) {
           memory.selectedSlot = exactAvailability.slots[0]
@@ -2420,6 +2505,20 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     requestedTimeBeforeTurn: schedulingBeforeTurn.requestedTimeLabel,
     requestedTimeAfterPromotion: memory.requestedTimeLabel,
   })
+
+  if (hasBroadPeriodSchedulingFilter(memory.requestedTimeLabel) && (
+    fallbackIntent.preferredPeriod
+    || (fallbackIntent.timePreference && fallbackIntent.timePreference !== 'NONE' && fallbackIntent.timePreference !== 'EXACT')
+  )) {
+    console.info('[whatsapp-agent] preferred period interpreted', {
+      customerId: input.customer.id,
+      conversationId: input.conversation.id,
+      inboundText: input.inboundText,
+      preferredPeriod: fallbackIntent.preferredPeriod,
+      timePreference: fallbackIntent.timePreference,
+      requestedTimeLabel: memory.requestedTimeLabel,
+    })
+  }
 
   const shouldUsePreferredProfessional =
     Boolean(

@@ -475,6 +475,42 @@ function parseRelativeDate(message: string, todayIsoDate: string) {
   return null
 }
 
+const EVENING_PERIOD_PATTERNS = [
+  /\b(?:a|de)\s+noite\b/,
+  /\bno\s+periodo\s+da\s+noite\b/,
+  /\bperiodo\s+da\s+noite\b/,
+  /\bmais\s+tarde\s+a\s+noite\b/,
+  /\bmais\s+tarde\s+na\s+noite\b/,
+  /\bfinal\s+da\s+tarde\s*\/\s*noite\b/,
+  /\bfim\s+da\s+tarde\s*\/\s*noite\b/,
+]
+
+function inferBroadPeriodHint(message: string) {
+  const normalized = normalizeText(message)
+
+  if (normalized.includes('fim da tarde')) {
+    return 'LATE_AFTERNOON' as const
+  }
+
+  if (EVENING_PERIOD_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    return 'EVENING' as const
+  }
+
+  if (normalized.includes('manha')) {
+    return 'MORNING' as const
+  }
+
+  if (normalized.includes('tarde')) {
+    return 'AFTERNOON' as const
+  }
+
+  if (normalized.includes('noite')) {
+    return 'EVENING' as const
+  }
+
+  return 'NONE' as const
+}
+
 function inferTimePreference(message: string) {
   const normalized = normalizeText(message)
 
@@ -502,20 +538,9 @@ function inferTimePreference(message: string) {
     return { timePreference: 'EXACT' as const, exactTime }
   }
 
-  if (normalized.includes('fim da tarde')) {
-    return { timePreference: 'LATE_AFTERNOON' as const, exactTime: null }
-  }
-
-  if (normalized.includes('manha')) {
-    return { timePreference: 'MORNING' as const, exactTime: null }
-  }
-
-  if (normalized.includes('tarde')) {
-    return { timePreference: 'AFTERNOON' as const, exactTime: null }
-  }
-
-  if (normalized.includes('noite')) {
-    return { timePreference: 'EVENING' as const, exactTime: null }
+  const broadPeriodHint = inferBroadPeriodHint(message)
+  if (broadPeriodHint !== 'NONE') {
+    return { timePreference: broadPeriodHint, exactTime: null }
   }
 
   return { timePreference: 'NONE' as const, exactTime: null }

@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import {
   buildBusinessDateTime,
@@ -15,6 +16,8 @@ export const SCHEDULE_SLOT_STEP_MINUTES = 15
 export const ACTIVE_APPOINTMENT_STATUS_VALUES = ['PENDING', 'CONFIRMED'] as const
 export const DEFAULT_OPERATIONAL_BUFFER_MINUTES = 5
 export const DEFAULT_MIN_LEAD_TIME_MINUTES = 20
+const AVAILABILITY_DB_RETRY_DELAY_MS = 150
+const TRANSIENT_PRISMA_ERROR_CODES = new Set(['P1001', 'P1002', 'P1008', 'P1017', 'P2024'])
 
 export type AvailabilityTimePreference =
   | 'NONE'
@@ -30,6 +33,105 @@ export interface BlockingAppointment {
   professionalId: string
   startAt: Date
   endAt: Date
+}
+
+export class AvailabilityInfrastructureError extends Error {
+  label: string
+
+  constructor(label: string, cause?: unknown) {
+    super(`availability_infrastructure_error:${label}`)
+    this.name = 'AvailabilityInfrastructureError'
+    this.label = label
+    if (cause instanceof Error && cause.stack) {
+      this.stack = cause.stack
+    }
+  }
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function extractAvailabilityErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error)
+}
+
+export function isTransientAvailabilityDbError(error: unknown) {
+  if (error instanceof AvailabilityInfrastructureError) {
+    return true
+  }
+
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError
+    || error instanceof Prisma.PrismaClientInitializationError
+    || error instanceof Prisma.PrismaClientRustPanicError
+    || error instanceof Prisma.PrismaClientUnknownRequestError
+  ) {
+    const code = 'code' in error && typeof error.code === 'string' ? error.code : null
+    if (code && TRANSIENT_PRISMA_ERROR_CODES.has(code)) {
+      return true
+    }
+  }
+
+  const message = extractAvailabilityErrorMessage(error).toLowerCase()
+  return /(?:connection|closed the connection|server has closed|can't reach database|timeout|timed out|econnreset|econnrefused|pool)/i.test(
+    message
+  )
+}
+
+export async function runAvailabilityDbQueryWithRetry<T>(input: {
+  label: string
+  operation: () => Promise<T>
+}) {
+  let attempt = 1
+
+  while (attempt <= 2) {
+    console.info('[availability] db query started', {
+      label: input.label,
+      attempt,
+    })
+
+    try {
+      const result = await input.operation()
+
+      if (attempt > 1) {
+        console.info('[availability] db query success after retry', {
+          label: input.label,
+          attempt,
+        })
+      }
+
+      return result
+    } catch (error) {
+      const transient = isTransientAvailabilityDbError(error)
+
+      console.warn('[availability] db query failed', {
+        label: input.label,
+        attempt,
+        transient,
+        error: extractAvailabilityErrorMessage(error),
+      })
+
+      if (!transient || attempt >= 2) {
+        if (transient) {
+          throw new AvailabilityInfrastructureError(input.label, error)
+        }
+
+        throw error
+      }
+
+      console.info('[availability] db query retry', {
+        label: input.label,
+        attempt,
+        retryInMs: AVAILABILITY_DB_RETRY_DELAY_MS,
+      })
+
+      await wait(AVAILABILITY_DB_RETRY_DELAY_MS)
+      attempt += 1
+    }
+  }
+
+  throw new AvailabilityInfrastructureError(input.label)
 }
 
 export function buildLocalDate(baseDateIso: string, hours = 0, minutes = 0, timezone?: string | null) {
@@ -190,27 +292,33 @@ export async function listBlockingAppointmentsForDay(input: {
   const dayOpen = buildLocalDate(input.dateIso, SCHEDULE_START_HOUR, 0, resolvedTimezone)
   const dayClose = buildLocalDate(input.dateIso, SCHEDULE_END_HOUR, 0, resolvedTimezone)
 
-  return prisma.appointment.findMany({
-    where: {
-      barbershopId: input.barbershopId,
-      professionalId: input.professionalIds?.length
-        ? { in: input.professionalIds }
-        : undefined,
-      status: { in: [...ACTIVE_APPOINTMENT_STATUS_VALUES] },
-      startAt: { lt: dayClose },
-      endAt: { gt: dayOpen },
-    },
-    orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
-    select: {
-      id: true,
-      professionalId: true,
-      startAt: true,
-      endAt: true,
-    },
+  return runAvailabilityDbQueryWithRetry({
+    label: 'blocking_appointments_for_day',
+    operation: () => prisma.appointment.findMany({
+      where: {
+        barbershopId: input.barbershopId,
+        professionalId: input.professionalIds?.length
+          ? { in: input.professionalIds }
+          : undefined,
+        status: { in: [...ACTIVE_APPOINTMENT_STATUS_VALUES] },
+        startAt: { lt: dayClose },
+        endAt: { gt: dayOpen },
+      },
+      orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        professionalId: true,
+        startAt: true,
+        endAt: true,
+      },
+    }),
   })
 }
 
 export const __testing = {
   getMinimumLeadTimeMinutes,
   getEarliestCustomerSlotStart,
+  isTransientAvailabilityDbError,
+  matchesTimePreference,
+  runAvailabilityDbQueryWithRetry,
 }
