@@ -146,7 +146,7 @@ export function ScheduleBlockModal({
                   {isEdit ? 'Editar bloqueio' : 'Bloquear agenda'}
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  Use isso para pausa, ausência, encaixe proibido ou reserva operacional.
+                  Use isso para pausa, ausencia, encaixe proibido ou reserva operacional.
                 </p>
               </div>
 
@@ -211,7 +211,7 @@ export function ScheduleBlockModal({
                   Resumo do bloqueio
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  {selectedProfessional?.name ?? 'Selecione o barbeiro'} com o intervalo informado ficará indisponível na agenda e a IA também deixa de sugerir esse espaço.
+                  {selectedProfessional?.name ?? 'Selecione o barbeiro'} com o intervalo informado ficara indisponivel na agenda e a IA tambem deixa de sugerir esse espaco.
                 </p>
               </div>
 

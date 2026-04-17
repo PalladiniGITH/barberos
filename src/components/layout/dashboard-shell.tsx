@@ -87,7 +87,7 @@ function DashboardShellFrame({
         <main
           aria-busy={pending}
           className={cn(
-            'min-h-0 flex-1 overflow-y-auto overscroll-y-contain transition-[opacity,transform] duration-200',
+            'flex-1 transition-[opacity,transform] duration-200',
             focusMode
               ? 'bg-[radial-gradient(circle_at_top,rgba(91,33,182,0.08),transparent_26%),linear-gradient(180deg,rgba(248,247,251,0.88),rgba(243,241,248,0.96))] px-4 pb-8 pt-4 sm:px-6'
               : 'bg-[radial-gradient(circle_at_top,rgba(91,33,182,0.07),transparent_30%),linear-gradient(180deg,rgba(247,246,250,0.84),rgba(241,239,246,0.96))] px-4 pb-12 pt-6 sm:px-7 lg:px-8',

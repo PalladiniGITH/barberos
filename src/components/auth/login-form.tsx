@@ -79,7 +79,7 @@ export function LoginForm() {
           <button
             type="button"
             onClick={() => setShowPassword((current) => !current)}
-            className="absolute right-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-transparent text-muted-foreground transition-colors hover:border-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.05)] hover:text-foreground"
+            className="absolute right-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-transparent text-muted-foreground transition-colors hover:border-[rgba(91,33,182,0.08)] hover:bg-[rgba(91,33,182,0.05)] hover:text-foreground"
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
@@ -88,7 +88,7 @@ export function LoginForm() {
       </div>
 
       {error && (
-        <div className="rounded-[1.2rem] border border-[rgba(251,113,133,0.18)] bg-[rgba(251,113,133,0.1)] px-4 py-3 text-sm text-rose-200">
+        <div className="rounded-[1.2rem] border border-[rgba(244,63,94,0.14)] bg-[rgba(244,63,94,0.06)] px-4 py-3 text-sm text-rose-700">
           {error}
         </div>
       )}
@@ -96,21 +96,21 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={isSubmitting}
-        className="flex w-full items-center justify-center gap-2 rounded-[1.2rem] bg-[linear-gradient(135deg,rgba(15,23,42,0.98),rgba(30,41,59,0.94))] px-4 py-3 text-sm font-semibold text-slate-50 shadow-[0_18px_34px_-20px_rgba(15,23,42,0.65)] transition-all hover:-translate-y-0.5 hover:shadow-[0_24px_42px_-22px_rgba(15,23,42,0.7)] disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
+        className="action-button-primary flex h-12 w-full items-center justify-center gap-2 rounded-[1.15rem] disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         {isSubmitting ? 'Entrando...' : 'Entrar no painel'}
       </button>
 
-      <div className="rounded-[1.4rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(30,41,59,0.78),rgba(15,23,42,0.72))] p-4 shadow-[0_18px_38px_-28px_rgba(2,6,23,0.78)]">
+      <div className="rounded-[1.45rem] border border-[rgba(58,47,86,0.08)] bg-[linear-gradient(180deg,rgba(244,241,249,0.96),rgba(250,249,252,0.98))] p-4 shadow-[0_18px_34px_-30px_rgba(22,16,39,0.12)]">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="page-kicker">Acesso demo</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            <p className="mt-2 text-sm leading-7 text-muted-foreground">
               Use qualquer conta abaixo com a senha padrao para navegar pelo produto.
             </p>
           </div>
-          <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(52,211,153,0.18)] bg-[rgba(52,211,153,0.1)] px-3 py-1 text-xs font-semibold text-emerald-200">
+          <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(16,185,129,0.14)] bg-[rgba(16,185,129,0.08)] px-3 py-1 text-xs font-semibold text-emerald-700">
             <CheckCircle2 className="h-3.5 w-3.5" />
             Pronto para demo
           </span>
@@ -120,13 +120,13 @@ export function LoginForm() {
           {demoAccounts.map((account) => (
             <div
               key={account.email}
-              className="flex items-center justify-between gap-3 rounded-[1.2rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-4 py-3 shadow-[0_16px_28px_-24px_rgba(2,6,23,0.82)]"
+              className="flex items-center justify-between gap-3 rounded-[1.15rem] border border-[rgba(58,47,86,0.08)] bg-white px-4 py-3 shadow-[0_12px_24px_-20px_rgba(22,16,39,0.12)]"
             >
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-foreground">{account.label}</p>
                 <p className="truncate font-mono text-xs text-muted-foreground">{account.email}</p>
               </div>
-              <span className="rounded-full border border-slate-900/10 bg-[linear-gradient(135deg,rgba(15,23,42,0.98),rgba(30,41,59,0.92))] px-3 py-1.5 text-xs font-semibold text-slate-100">
+              <span className="rounded-full border border-[rgba(91,33,182,0.1)] bg-[rgba(91,33,182,0.06)] px-3 py-1.5 text-xs font-semibold text-primary">
                 demo123456
               </span>
             </div>
