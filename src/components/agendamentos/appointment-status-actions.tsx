@@ -44,13 +44,13 @@ function getActions(status: AppointmentFormValue['status']): StatusAction[] {
         icon: CheckCircle2,
         label: 'Confirmar',
         status: 'CONFIRMED',
-        className: 'hover:border-[rgba(16,185,129,0.18)] hover:bg-[rgba(16,185,129,0.08)] hover:text-emerald-700',
+        className: 'hover:border-emerald-400/40 hover:bg-emerald-400/12 hover:text-emerald-100',
       },
       {
         icon: Ban,
         label: 'Cancelar',
         status: 'CANCELLED',
-        className: 'hover:border-[rgba(244,63,94,0.18)] hover:bg-[rgba(244,63,94,0.08)] hover:text-rose-700',
+        className: 'hover:border-rose-400/40 hover:bg-rose-400/12 hover:text-rose-100',
       },
     ]
   }
@@ -61,19 +61,19 @@ function getActions(status: AppointmentFormValue['status']): StatusAction[] {
         icon: CheckCheck,
         label: 'Concluir',
         status: 'COMPLETED',
-        className: 'hover:border-[rgba(16,185,129,0.18)] hover:bg-[rgba(16,185,129,0.08)] hover:text-emerald-700',
+        className: 'hover:border-emerald-400/40 hover:bg-emerald-400/12 hover:text-emerald-100',
       },
       {
         icon: UserX,
         label: 'No-show',
         status: 'NO_SHOW',
-        className: 'hover:border-[rgba(245,158,11,0.18)] hover:bg-[rgba(245,158,11,0.08)] hover:text-amber-700',
+        className: 'hover:border-amber-400/40 hover:bg-amber-400/12 hover:text-amber-100',
       },
       {
         icon: Ban,
         label: 'Cancelar',
         status: 'CANCELLED',
-        className: 'hover:border-[rgba(244,63,94,0.18)] hover:bg-[rgba(244,63,94,0.08)] hover:text-rose-700',
+        className: 'hover:border-rose-400/40 hover:bg-rose-400/12 hover:text-rose-100',
       },
     ]
   }
@@ -132,7 +132,7 @@ export function AppointmentStatusActions({
             title={action.label}
             disabled={isPending}
             onClick={() => handleStatusChange(action.status)}
-            className={`inline-flex h-7 w-7 items-center justify-center rounded-[0.8rem] border border-[rgba(58,47,86,0.08)] bg-[rgba(255,255,255,0.78)] text-muted-foreground shadow-[0_12px_20px_-18px_rgba(22,16,39,0.14)] transition-colors ${action.className}`}
+            className={`inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-slate-400 transition-colors ${action.className}`}
           >
             {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <action.icon className="h-3.5 w-3.5" />}
           </button>
@@ -146,7 +146,7 @@ export function AppointmentStatusActions({
       <Popover.Trigger asChild>
         <button
           type="button"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-[0.9rem] border border-[rgba(58,47,86,0.08)] bg-[rgba(255,255,255,0.8)] text-muted-foreground shadow-[0_14px_24px_-20px_rgba(22,16,39,0.14)] transition-colors hover:bg-[rgba(91,33,182,0.05)] hover:text-primary"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.05)] text-slate-300 transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-white"
           title="Abrir detalhes"
         >
           <MoreHorizontal className="h-4 w-4" />
@@ -158,48 +158,48 @@ export function AppointmentStatusActions({
           side="top"
           align="end"
           sideOffset={10}
-          className="z-50 w-[280px] rounded-[1.3rem] border border-[rgba(58,47,86,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(247,245,251,0.97))] p-4 text-foreground shadow-[0_30px_70px_-36px_rgba(22,16,39,0.22)] backdrop-blur-xl"
+          className="z-50 w-[280px] rounded-[1.3rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(30,41,59,0.98),rgba(15,23,42,0.96))] p-4 text-slate-100 shadow-[0_32px_80px_-42px_rgba(2,6,23,0.92)] backdrop-blur-xl"
         >
           <div className="space-y-4">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
                 {appointment.time}
               </p>
-              <p className="mt-2 text-base font-semibold text-foreground">{appointment.customerName}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{meta.service?.name ?? 'Servico'}</p>
+              <p className="mt-2 text-base font-semibold text-white">{appointment.customerName}</p>
+              <p className="mt-1 text-sm text-slate-300">{meta.service?.name ?? 'Servico'}</p>
             </div>
 
-            <div className="grid gap-2 rounded-[1rem] border border-[rgba(58,47,86,0.08)] bg-[rgba(248,246,252,0.92)] p-3 text-xs text-muted-foreground">
+            <div className="grid gap-2 rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-3 text-xs text-slate-300">
               <div className="flex items-center justify-between gap-3">
-                <span>Barbeiro</span>
-                <span className="font-medium text-foreground">{meta.professional?.name ?? 'Nao informado'}</span>
+                <span className="text-slate-400">Barbeiro</span>
+                <span className="font-medium text-slate-100">{meta.professional?.name ?? 'Nao informado'}</span>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span>Valor</span>
-                <span className="font-medium text-foreground">
+                <span className="text-slate-400">Valor</span>
+                <span className="font-medium text-slate-100">
                   {formatCurrency(meta.service?.price ?? 0)}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span>Duracao</span>
-                <span className="font-medium text-foreground">
+                <span className="text-slate-400">Duracao</span>
+                <span className="font-medium text-slate-100">
                   {meta.service?.duration ?? 0} min
                 </span>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span>Contato</span>
-                <span className="truncate font-medium text-foreground">
+                <span className="text-slate-400">Contato</span>
+                <span className="truncate font-medium text-slate-100">
                   {appointment.customerPhone ?? appointment.customerEmail ?? 'Sem contato'}
                 </span>
               </div>
             </div>
 
             {appointment.notes && (
-              <div className="rounded-[1rem] border border-[rgba(58,47,86,0.08)] bg-[rgba(255,255,255,0.72)] p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                   Observacao
                 </p>
-                <p className="mt-2 text-sm leading-6 text-foreground">{appointment.notes}</p>
+                <p className="mt-2 text-sm leading-6 text-slate-200">{appointment.notes}</p>
               </div>
             )}
 
@@ -220,19 +220,19 @@ export function AppointmentStatusActions({
                   type="button"
                   disabled={isPending}
                   onClick={() => handleStatusChange(action.status)}
-                  className={`flex items-center justify-between rounded-xl border border-[rgba(58,47,86,0.08)] bg-[rgba(255,255,255,0.78)] px-3 py-2.5 text-sm font-medium text-foreground transition-colors ${action.className}`}
+                  className={`flex items-center justify-between rounded-xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2.5 text-sm font-medium text-slate-100 transition-colors ${action.className}`}
                 >
                   <span className="inline-flex items-center gap-2">
                     {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <action.icon className="h-3.5 w-3.5" />}
                     {action.label}
                   </span>
-                  <Clock3 className="h-3.5 w-3.5 text-muted-foreground" />
+                  <Clock3 className="h-3.5 w-3.5 text-slate-500" />
                 </button>
               ))}
             </div>
           </div>
 
-          <Popover.Arrow className="fill-white" />
+          <Popover.Arrow className="fill-[rgba(30,41,59,0.98)]" />
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

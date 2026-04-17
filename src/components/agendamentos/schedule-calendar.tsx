@@ -437,7 +437,7 @@ function ScheduleAppointmentCard({
             }
           }}
           className={cn(
-            'group absolute overflow-hidden rounded-[1.15rem] border text-left shadow-[0_22px_42px_-30px_rgba(22,16,39,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_30px_50px_-28px_rgba(22,16,39,0.22)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(91,33,182,0.32)]',
+            'group absolute overflow-hidden rounded-[1.05rem] border text-left shadow-[0_20px_38px_-28px_rgba(22,16,39,0.16)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_28px_46px_-28px_rgba(22,16,39,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(91,33,182,0.32)]',
             statusMeta.shell
           )}
           style={{
@@ -448,9 +448,9 @@ function ScheduleAppointmentCard({
           }}
         >
           <span className={cn('absolute inset-y-0 left-0 w-[3px] bg-gradient-to-b', statusMeta.accent)} />
-          <div className="flex h-full min-w-0 flex-col justify-between px-3.5 py-3.5">
+          <div className="flex h-full min-w-0 flex-col justify-between px-3 py-3">
             <div className="flex items-start justify-between gap-2">
-              <span className="inline-flex rounded-full border border-[rgba(58,47,86,0.08)] bg-white/96 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-foreground shadow-[0_8px_14px_-12px_rgba(22,16,39,0.16)]">
+              <span className="inline-flex rounded-full border border-[rgba(58,47,86,0.08)] bg-white/95 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-foreground">
                 {item.startTimeLabel}
               </span>
               <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
@@ -463,7 +463,7 @@ function ScheduleAppointmentCard({
               <p
                 title={item.itemType === 'BLOCK' ? item.notes ?? 'Bloqueio operacional' : item.customerName}
                 className={cn(
-                  'overflow-hidden font-semibold tracking-[-0.01em] text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]',
+                  'overflow-hidden font-semibold text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]',
                   compact ? 'text-[13px] leading-5' : 'text-sm leading-5'
                 )}
               >
@@ -472,7 +472,7 @@ function ScheduleAppointmentCard({
               <p
                 title={item.itemType === 'BLOCK' ? `Bloqueio com ${item.professionalName}` : item.serviceName}
                 className={cn(
-                  'mt-1 overflow-hidden text-[rgba(80,73,101,0.92)] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]',
+                  'mt-1 overflow-hidden text-muted-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]',
                   compact ? 'text-[11px] leading-4' : 'text-xs leading-5'
                 )}
               >

@@ -580,7 +580,7 @@ test('erro de falta de horario especifico vira pergunta direta de horario antes 
   })
 
   assert.equal(override.nextAction, 'ASK_PERIOD')
-  assert.match(override.replyText, /Qual horario voce gostaria|Que horas voce gostaria|Me diz o horario/i)
+  assert.match(override.replyText, /Qual horario voce gostaria/i)
   assert.doesNotMatch(override.replyText, /13:15|13:30/i)
 })
 

@@ -26,12 +26,12 @@ test('localDateTimeToUtc preserva o horario local escolhido ao converter para UT
 
 test('17/04 usa sempre a mesma projecao local para dia da semana', () => {
   assert.equal(
-    formatWeekdayFromIsoDate('1970-01-02', 'America/Sao_Paulo'),
+    formatWeekdayFromIsoDate('2026-04-17', 'America/Sao_Paulo'),
     'sexta-feira'
   )
   assert.equal(
-    formatDayLabelFromIsoDate('1970-01-02', 'America/Sao_Paulo'),
-    'sexta-feira, 02/01'
+    formatDayLabelFromIsoDate('2026-04-17', 'America/Sao_Paulo'),
+    'sexta-feira, 17/04'
   )
 })
 
