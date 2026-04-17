@@ -1,18 +1,27 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import * as Popover from '@radix-ui/react-popover'
 import {
   CalendarClock,
   Clock3,
+  GripVertical,
+  Move,
   Phone,
   Scissors,
   Sparkles,
   UserRound,
   X,
 } from 'lucide-react'
+import { toast } from 'sonner'
+import {
+  moveAppointmentSlot,
+  moveScheduleBlock,
+} from '@/actions/agendamentos'
+import { AppointmentModal } from '@/components/agendamentos/appointment-modal'
 import { AppointmentStatusActions } from '@/components/agendamentos/appointment-status-actions'
+import { ScheduleBlockModal, type ScheduleBlockValue } from '@/components/agendamentos/schedule-block-modal'
 import type {
   ScheduleAppointmentItem,
   ScheduleToolbarCustomer,
@@ -20,6 +29,14 @@ import type {
   ScheduleToolbarService,
   ScheduleView,
 } from '@/lib/agendamentos'
+import {
+  buildSelectionFromPoint,
+  floorMinutesToStep,
+  intervalsOverlap,
+  minutesToTimeLabel,
+  normalizeSelectionRange,
+  timeLabelToMinutes,
+} from '@/lib/schedule-grid'
 import {
   APPOINTMENT_BILLING_MODEL_LABELS,
   APPOINTMENT_SOURCE_LABELS,
@@ -38,6 +55,8 @@ interface ScheduleCalendarColumn {
   key: string
   title: string
   helper: string
+  professionalId: string | null
+  dateIso: string
   appointments: PositionedAppointment[]
 }
 
@@ -54,38 +73,84 @@ interface ScheduleCalendarProps {
   recentCustomers: ScheduleToolbarCustomer[]
 }
 
-const EVENT_GAP = 8
+interface CommittedSelection {
+  columnKey: string
+  professionalId: string | null
+  dateIso: string
+  startMinutes: number
+  endMinutes: number
+  durationMinutes: number
+}
 
-function getAppointmentStatusMeta(status: ScheduleAppointmentItem['status']) {
+interface PointerSelectionState {
+  columnKey: string
+  professionalId: string | null
+  dateIso: string
+  pointerStartY: number
+  anchorMinutes: number
+  currentMinutes: number
+}
+
+interface DragPreview {
+  itemId: string
+  columnKey: string
+  professionalId: string | null
+  dateIso: string
+  startMinutes: number
+  endMinutes: number
+  durationMinutes: number
+  valid: boolean
+}
+
+interface DragState {
+  item: PositionedAppointment
+  sourceColumnKey: string
+  sourceProfessionalId: string | null
+  pointerStartY: number
+  originalStartMinutes: number
+}
+
+const EVENT_GAP = 8
+const MINIMUM_SELECTION_DURATION = 30
+
+function getAppointmentStatusMeta(item: PositionedAppointment) {
+  if (item.itemType === 'BLOCK') {
+    return {
+      accent: 'from-violet-700/90 via-violet-500/75 to-transparent',
+      badge: 'border-[rgba(91,33,182,0.14)] bg-[rgba(91,33,182,0.09)] text-primary',
+      shell: 'border-[rgba(91,33,182,0.16)] bg-[linear-gradient(180deg,rgba(91,33,182,0.14),rgba(255,255,255,0.98))]',
+    } as const
+  }
+
   const styles = {
     PENDING: {
-      accent: 'from-amber-300/80 via-amber-400/70 to-transparent',
-      badge: 'border-[rgba(251,191,36,0.2)] bg-[rgba(251,191,36,0.12)] text-amber-100',
-      shell: 'border-[rgba(251,191,36,0.1)] bg-[linear-gradient(180deg,rgba(251,191,36,0.1),rgba(15,23,42,0.92))]',
+      accent: 'from-amber-500/90 via-amber-300/70 to-transparent',
+      badge: 'border-[rgba(245,158,11,0.12)] bg-[rgba(245,158,11,0.08)] text-amber-700',
+      shell: 'border-[rgba(245,158,11,0.14)] bg-[linear-gradient(180deg,rgba(245,158,11,0.12),rgba(255,255,255,0.98))]',
     },
     CONFIRMED: {
-      accent: 'from-emerald-300/80 via-emerald-400/70 to-transparent',
-      badge: 'border-[rgba(52,211,153,0.18)] bg-[rgba(52,211,153,0.12)] text-emerald-100',
-      shell: 'border-[rgba(52,211,153,0.1)] bg-[linear-gradient(180deg,rgba(16,185,129,0.1),rgba(15,23,42,0.92))]',
+      accent: 'from-emerald-500/90 via-emerald-400/70 to-transparent',
+      badge: 'border-[rgba(16,185,129,0.12)] bg-[rgba(16,185,129,0.08)] text-emerald-700',
+      shell: 'border-[rgba(16,185,129,0.14)] bg-[linear-gradient(180deg,rgba(16,185,129,0.11),rgba(255,255,255,0.98))]',
     },
     CANCELLED: {
-      accent: 'from-rose-300/80 via-rose-400/70 to-transparent',
-      badge: 'border-[rgba(251,113,133,0.18)] bg-[rgba(251,113,133,0.12)] text-rose-100',
-      shell: 'border-[rgba(251,113,133,0.1)] bg-[linear-gradient(180deg,rgba(251,113,133,0.09),rgba(15,23,42,0.92))]',
+      accent: 'from-rose-500/90 via-rose-400/70 to-transparent',
+      badge: 'border-[rgba(244,63,94,0.12)] bg-[rgba(244,63,94,0.08)] text-rose-700',
+      shell: 'border-[rgba(244,63,94,0.14)] bg-[linear-gradient(180deg,rgba(244,63,94,0.1),rgba(255,255,255,0.98))]',
     },
     COMPLETED: {
-      accent: 'from-sky-300/80 via-sky-400/70 to-transparent',
-      badge: 'border-[rgba(56,189,248,0.18)] bg-[rgba(56,189,248,0.12)] text-sky-100',
-      shell: 'border-[rgba(56,189,248,0.1)] bg-[linear-gradient(180deg,rgba(56,189,248,0.1),rgba(15,23,42,0.92))]',
+      accent: 'from-sky-500/90 via-sky-400/70 to-transparent',
+      badge: 'border-[rgba(14,165,233,0.12)] bg-[rgba(14,165,233,0.08)] text-sky-700',
+      shell: 'border-[rgba(14,165,233,0.14)] bg-[linear-gradient(180deg,rgba(14,165,233,0.1),rgba(255,255,255,0.98))]',
     },
     NO_SHOW: {
-      accent: 'from-fuchsia-300/80 via-pink-400/70 to-transparent',
-      badge: 'border-[rgba(244,114,182,0.18)] bg-[rgba(244,114,182,0.12)] text-pink-100',
-      shell: 'border-[rgba(244,114,182,0.1)] bg-[linear-gradient(180deg,rgba(244,114,182,0.1),rgba(15,23,42,0.92))]',
+      accent: 'from-pink-500/90 via-fuchsia-400/70 to-transparent',
+      badge: 'border-[rgba(236,72,153,0.12)] bg-[rgba(236,72,153,0.08)] text-pink-700',
+      shell: 'border-[rgba(236,72,153,0.14)] bg-[linear-gradient(180deg,rgba(236,72,153,0.1),rgba(255,255,255,0.98))]',
     },
   } as const
 
-  return styles[status] ?? styles.PENDING
+  return styles[item.status] ?? styles.PENDING
 }
 
 function getEventWidth(laneCount: number) {
@@ -105,84 +170,77 @@ function getEventLeft(laneIndex: number, laneCount: number) {
   return `calc(${EVENT_GAP}px + ${laneIndex} * (${width} + ${EVENT_GAP}px))`
 }
 
-function getAppointmentTop(startMinutesOfDay: number, pxPerMinute: number) {
-  return (startMinutesOfDay - (8 * 60)) * pxPerMinute
+function getAppointmentTop(startMinutesOfDay: number, dayStartMinutes: number, pxPerMinute: number) {
+  return (startMinutesOfDay - dayStartMinutes) * pxPerMinute
 }
 
-function DetailPill({
-  children,
-  tone = 'neutral',
-}: {
-  children: ReactNode
-  tone?: 'neutral' | 'positive' | 'warning'
-}) {
-  const toneClass = {
-    neutral: 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.05)] text-slate-200',
-    positive: 'border-[rgba(52,211,153,0.18)] bg-[rgba(16,185,129,0.12)] text-emerald-100',
-    warning: 'border-[rgba(251,191,36,0.18)] bg-[rgba(251,191,36,0.12)] text-amber-100',
-  }[tone]
-
-  return (
-    <span className={cn('inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold', toneClass)}>
-      {children}
-    </span>
-  )
+function buildAppointmentFormValue(appointment: PositionedAppointment) {
+  return {
+    id: appointment.id,
+    customerId: appointment.customerId,
+    customerName: appointment.customerName,
+    customerPhone: appointment.customerPhone,
+    customerEmail: appointment.customerEmail,
+    customerType: appointment.customerType,
+    subscriptionPrice: appointment.customerSubscriptionPrice,
+    professionalId: appointment.professionalId,
+    serviceId: appointment.serviceId,
+    date: appointment.localDateIso,
+    time: appointment.startTimeLabel,
+    status: appointment.status,
+    source: appointment.source,
+    billingModel: appointment.billingModel,
+    notes: appointment.notes,
+  }
 }
 
-function AppointmentPreview({
-  appointment,
-}: {
-  appointment: PositionedAppointment
-}) {
-  const statusMeta = getAppointmentStatusMeta(appointment.status)
+function buildScheduleBlockValue(item: PositionedAppointment): ScheduleBlockValue {
+  return {
+    id: item.id,
+    date: item.localDateIso,
+    startTime: item.startTimeLabel,
+    endTime: item.endTimeLabel,
+    professionalId: item.professionalId,
+    notes: item.blockReason ?? item.notes,
+  }
+}
+
+function itemBlocksScheduling(item: PositionedAppointment) {
+  return item.itemType === 'BLOCK' || item.status === 'PENDING' || item.status === 'CONFIRMED'
+}
+
+function ScheduleItemPreview({ item }: { item: PositionedAppointment }) {
+  const statusMeta = getAppointmentStatusMeta(item)
 
   return (
     <div className="space-y-4">
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
-          {appointment.localDateLabel} / {appointment.startTimeLabel} - {appointment.endTimeLabel}
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+          {item.localDateLabel} - {item.startTimeLabel} - {item.endTimeLabel}
         </p>
-        <p className="mt-2 text-base font-semibold text-white">{appointment.customerName}</p>
-        <p className="mt-1 text-sm text-slate-300">{appointment.serviceName}</p>
+        <p className="mt-2 text-base font-semibold text-foreground">
+          {item.itemType === 'BLOCK' ? item.notes ?? 'Bloqueio operacional' : item.customerName}
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {item.itemType === 'BLOCK' ? `Bloqueio com ${item.professionalName}` : item.serviceName}
+        </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
         <span className={cn('inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold', statusMeta.badge)}>
-          {APPOINTMENT_STATUS_LABELS[appointment.status]}
+          {item.itemType === 'BLOCK' ? 'Bloqueado' : APPOINTMENT_STATUS_LABELS[item.status]}
         </span>
-        <DetailPill>{CUSTOMER_TYPE_LABELS[appointment.customerType]}</DetailPill>
-        <DetailPill>{APPOINTMENT_BILLING_MODEL_LABELS[appointment.billingModel]}</DetailPill>
+        {item.itemType === 'APPOINTMENT' && (
+          <>
+            <span className="inline-flex items-center rounded-full border border-[rgba(84,35,145,0.08)] bg-[rgba(124,58,237,0.04)] px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
+              {CUSTOMER_TYPE_LABELS[item.customerType]}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[rgba(84,35,145,0.08)] bg-[rgba(124,58,237,0.04)] px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
+              {APPOINTMENT_BILLING_MODEL_LABELS[item.billingModel]}
+            </span>
+          </>
+        )}
       </div>
-
-      <div className="grid gap-2 rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-3 text-xs text-slate-300">
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-slate-400">Barbeiro</span>
-          <span className="font-medium text-slate-100">{appointment.professionalName}</span>
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-slate-400">Duracao</span>
-          <span className="font-medium text-slate-100">{appointment.durationMinutes} min</span>
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-slate-400">Valor</span>
-          <span className="font-medium text-slate-100">{formatCurrency(appointment.priceSnapshot)}</span>
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-slate-400">Contato</span>
-          <span className="truncate font-medium text-slate-100">
-            {appointment.customerPhone ?? appointment.customerEmail ?? 'Sem contato'}
-          </span>
-        </div>
-      </div>
-
-      {appointment.notes && (
-        <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Observacao</p>
-          <p className="mt-2 text-sm leading-6 text-slate-200">{appointment.notes}</p>
-        </div>
-      )}
-
-      <p className="text-xs leading-5 text-slate-400">Passe o olho aqui para contexto rapido. No clique, abrimos a visao completa do agendamento.</p>
     </div>
   )
 }
@@ -202,22 +260,22 @@ function AppointmentDetailsDialog({
   open: boolean
   onOpenChange: (value: boolean) => void
 }) {
-  const statusMeta = getAppointmentStatusMeta(appointment.status)
+  const statusMeta = getAppointmentStatusMeta(appointment)
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-[rgba(2,6,23,0.72)] backdrop-blur-sm" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,760px)] -translate-x-1/2 -translate-y-1/2 rounded-[1.5rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(17,24,39,0.96))] shadow-[0_48px_120px_-60px_rgba(2,6,23,0.95)] outline-none">
-          <div className="flex items-start justify-between gap-4 border-b border-[rgba(255,255,255,0.06)] px-6 py-5">
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-[rgba(17,24,39,0.42)] backdrop-blur-md" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,760px)] -translate-x-1/2 -translate-y-1/2 rounded-[1.6rem] border border-[rgba(58,47,86,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(246,244,250,0.98))] shadow-[0_56px_120px_-58px_rgba(22,16,39,0.28)] outline-none">
+          <div className="flex items-start justify-between gap-4 border-b border-[rgba(58,47,86,0.08)] px-6 py-5">
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
-                {appointment.localDateLabel} / {appointment.startTimeLabel} - {appointment.endTimeLabel}
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                {appointment.localDateLabel} - {appointment.startTimeLabel} - {appointment.endTimeLabel}
               </p>
-              <Dialog.Title className="mt-2 truncate text-2xl font-semibold text-white">
+              <Dialog.Title className="mt-2 truncate text-2xl font-semibold text-foreground">
                 {appointment.customerName}
               </Dialog.Title>
-              <Dialog.Description className="mt-2 text-sm leading-6 text-slate-300">
+              <Dialog.Description className="mt-2 text-sm leading-6 text-muted-foreground">
                 {appointment.serviceName} com {appointment.professionalName}
               </Dialog.Description>
             </div>
@@ -225,7 +283,7 @@ function AppointmentDetailsDialog({
             <Dialog.Close asChild>
               <button
                 type="button"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-slate-300 transition-colors hover:bg-[rgba(255,255,255,0.06)] hover:text-white"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-[1rem] border border-[rgba(58,47,86,0.08)] bg-white text-muted-foreground transition-colors hover:bg-[rgba(91,33,182,0.04)] hover:text-primary"
                 aria-label="Fechar"
               >
                 <X className="h-4 w-4" />
@@ -238,64 +296,68 @@ function AppointmentDetailsDialog({
               <span className={cn('inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold', statusMeta.badge)}>
                 {APPOINTMENT_STATUS_LABELS[appointment.status]}
               </span>
-              <DetailPill>{CUSTOMER_TYPE_LABELS[appointment.customerType]}</DetailPill>
-              <DetailPill tone={appointment.billingModel === 'AVULSO' ? 'neutral' : 'positive'}>
+              <span className="inline-flex items-center rounded-full border border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
+                {CUSTOMER_TYPE_LABELS[appointment.customerType]}
+              </span>
+              <span className="inline-flex items-center rounded-full border border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
                 {APPOINTMENT_BILLING_MODEL_LABELS[appointment.billingModel]}
-              </DetailPill>
-              <DetailPill>{APPOINTMENT_SOURCE_LABELS[appointment.source]}</DetailPill>
+              </span>
+              <span className="inline-flex items-center rounded-full border border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
+                {APPOINTMENT_SOURCE_LABELS[appointment.source]}
+              </span>
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="surface-soft p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Resumo do atendimento</p>
-                <div className="mt-4 space-y-3 text-sm text-slate-200">
+                <div className="mt-4 space-y-3 text-sm">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="inline-flex items-center gap-2 text-slate-400">
+                    <span className="inline-flex items-center gap-2 text-muted-foreground">
                       <UserRound className="h-4 w-4" />
                       Cliente
                     </span>
-                    <span className="font-medium text-right">{appointment.customerName}</span>
+                    <span className="font-medium text-foreground text-right">{appointment.customerName}</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="inline-flex items-center gap-2 text-slate-400">
+                    <span className="inline-flex items-center gap-2 text-muted-foreground">
                       <Scissors className="h-4 w-4" />
                       Servico
                     </span>
-                    <span className="font-medium text-right">{appointment.serviceName}</span>
+                    <span className="font-medium text-foreground text-right">{appointment.serviceName}</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="inline-flex items-center gap-2 text-slate-400">
+                    <span className="inline-flex items-center gap-2 text-muted-foreground">
                       <CalendarClock className="h-4 w-4" />
                       Barbeiro
                     </span>
-                    <span className="font-medium text-right">{appointment.professionalName}</span>
+                    <span className="font-medium text-foreground text-right">{appointment.professionalName}</span>
                   </div>
                 </div>
               </div>
 
               <div className="surface-soft p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Valor e operacao</p>
-                <div className="mt-4 space-y-3 text-sm text-slate-200">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Valor e contato</p>
+                <div className="mt-4 space-y-3 text-sm">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="inline-flex items-center gap-2 text-slate-400">
+                    <span className="inline-flex items-center gap-2 text-muted-foreground">
                       <Clock3 className="h-4 w-4" />
                       Duracao
                     </span>
-                    <span className="font-medium">{appointment.durationMinutes} min</span>
+                    <span className="font-medium text-foreground">{appointment.durationMinutes} min</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="inline-flex items-center gap-2 text-slate-400">
+                    <span className="inline-flex items-center gap-2 text-muted-foreground">
                       <Sparkles className="h-4 w-4" />
                       Valor do slot
                     </span>
-                    <span className="font-medium">{formatCurrency(appointment.priceSnapshot)}</span>
+                    <span className="font-medium text-foreground">{formatCurrency(appointment.priceSnapshot)}</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="inline-flex items-center gap-2 text-slate-400">
+                    <span className="inline-flex items-center gap-2 text-muted-foreground">
                       <Phone className="h-4 w-4" />
                       Contato
                     </span>
-                    <span className="max-w-[220px] truncate font-medium text-right">
+                    <span className="max-w-[220px] truncate font-medium text-right text-foreground">
                       {appointment.customerPhone ?? appointment.customerEmail ?? 'Sem contato'}
                     </span>
                   </div>
@@ -306,34 +368,18 @@ function AppointmentDetailsDialog({
             {appointment.notes && (
               <div className="surface-soft p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Observacoes</p>
-                <p className="mt-3 text-sm leading-6 text-slate-200">{appointment.notes}</p>
+                <p className="mt-3 text-sm leading-6 text-foreground">{appointment.notes}</p>
               </div>
             )}
 
-            <div className="rounded-[1.1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+            <div className="rounded-[1.1rem] border border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-white">Acoes do agendamento</p>
-                  <p className="mt-1 text-sm text-slate-400">Edite o horario ou atualize o status sem sair da agenda.</p>
+                  <p className="text-sm font-semibold text-foreground">Acoes do agendamento</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Edite, confirme, conclua ou ajuste sem sair da agenda.</p>
                 </div>
                 <AppointmentStatusActions
-                  appointment={{
-                    id: appointment.id,
-                    customerId: appointment.customerId,
-                    customerName: appointment.customerName,
-                    customerPhone: appointment.customerPhone,
-                    customerEmail: appointment.customerEmail,
-                    customerType: appointment.customerType,
-                    subscriptionPrice: appointment.customerSubscriptionPrice,
-                    professionalId: appointment.professionalId,
-                    serviceId: appointment.serviceId,
-                    date: appointment.localDateIso,
-                    time: appointment.startTimeLabel,
-                    status: appointment.status,
-                    source: appointment.source,
-                    billingModel: appointment.billingModel,
-                    notes: appointment.notes,
-                  }}
+                  appointment={buildAppointmentFormValue(appointment)}
                   professionals={professionals}
                   services={services}
                   recentCustomers={recentCustomers}
@@ -348,127 +394,124 @@ function AppointmentDetailsDialog({
 }
 
 function ScheduleAppointmentCard({
-  appointment,
+  item,
   view,
   selectedProfessionalId,
   schedulePxPerMinute,
-  professionals,
-  services,
-  recentCustomers,
+  dayStartMinutes,
+  onPointerDown,
+  onOpenAppointment,
+  onOpenBlock,
 }: {
-  appointment: PositionedAppointment
+  item: PositionedAppointment
   view: ScheduleView
   selectedProfessionalId: string | null
   schedulePxPerMinute: number
-  professionals: ScheduleToolbarProfessional[]
-  services: ScheduleToolbarService[]
-  recentCustomers: ScheduleToolbarCustomer[]
+  dayStartMinutes: number
+  onPointerDown: (event: React.PointerEvent<HTMLButtonElement>, item: PositionedAppointment) => void
+  onOpenAppointment: (item: PositionedAppointment) => void
+  onOpenBlock: (item: PositionedAppointment) => void
 }) {
   const [previewOpen, setPreviewOpen] = useState(false)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const top = getAppointmentTop(appointment.startMinutesOfDay, schedulePxPerMinute)
-  const height = Math.max(
-    appointment.durationMinutes * schedulePxPerMinute,
-    view === 'barber' ? 84 : 92
-  )
-  const width = getEventWidth(appointment.laneCount)
-  const left = getEventLeft(appointment.laneIndex, appointment.laneCount)
-  const compact = appointment.laneCount > 1 || height < 96
-  const statusMeta = getAppointmentStatusMeta(appointment.status)
+  const top = getAppointmentTop(item.startMinutesOfDay, dayStartMinutes, schedulePxPerMinute)
+  const height = Math.max(item.durationMinutes * schedulePxPerMinute, item.itemType === 'BLOCK' ? 56 : view === 'barber' ? 84 : 92)
+  const width = getEventWidth(item.laneCount)
+  const left = getEventLeft(item.laneIndex, item.laneCount)
+  const compact = item.laneCount > 1 || height < 96
+  const statusMeta = getAppointmentStatusMeta(item)
 
   return (
-    <>
-      <Popover.Root open={previewOpen} onOpenChange={setPreviewOpen}>
-        <Popover.Trigger asChild>
-          <button
-            type="button"
-            onMouseEnter={() => setPreviewOpen(true)}
-            onMouseLeave={() => setPreviewOpen(false)}
-            onClick={() => {
-              setPreviewOpen(false)
-              setDialogOpen(true)
-            }}
-            className={cn(
-              'group absolute overflow-hidden rounded-[1rem] border text-left shadow-[0_22px_46px_-28px_rgba(2,6,23,0.88)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[rgba(255,255,255,0.14)] hover:shadow-[0_30px_58px_-30px_rgba(2,6,23,0.92)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/50',
-              statusMeta.shell
-            )}
-            style={{
-              top: `${top}px`,
-              left,
-              width,
-              height: `${height}px`,
-            }}
-          >
-            <span className={cn('absolute inset-y-0 left-0 w-[3px] bg-gradient-to-b', statusMeta.accent)} />
-            <div className="flex h-full min-w-0 flex-col justify-between px-3 py-3">
-              <div className="flex items-start justify-between gap-2">
-                <span className="inline-flex rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(15,23,42,0.52)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-200">
-                  {appointment.startTimeLabel}
-                </span>
-                <span className={cn('h-2.5 w-2.5 flex-shrink-0 rounded-full border border-white/10', compact ? 'mt-1' : 'mt-0.5', statusMeta.badge)} />
-              </div>
-
-              <div className="min-w-0">
-                <p
-                  title={appointment.customerName}
-                  className={cn(
-                    'overflow-hidden font-semibold text-white [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]',
-                    compact ? 'text-[13px] leading-5' : 'text-sm leading-5'
-                  )}
-                >
-                  {appointment.customerName}
-                </p>
-                <p
-                  title={appointment.serviceName}
-                  className={cn(
-                    'mt-1 overflow-hidden text-slate-300 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]',
-                    compact ? 'text-[11px] leading-4' : 'text-xs leading-5'
-                  )}
-                >
-                  {appointment.serviceName}
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400">
-                <span className="truncate">
-                  {view === 'barber'
-                    ? `${appointment.durationMinutes} min`
-                    : selectedProfessionalId
-                      ? `${appointment.durationMinutes} min`
-                      : appointment.professionalName}
-                </span>
-                <span className="truncate text-slate-500 group-hover:text-slate-300">
-                  Abrir
-                </span>
-              </div>
+    <Popover.Root open={previewOpen} onOpenChange={setPreviewOpen}>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          onPointerDown={(event) => onPointerDown(event, item)}
+          onMouseEnter={() => setPreviewOpen(true)}
+          onMouseLeave={() => setPreviewOpen(false)}
+          onClick={() => {
+            setPreviewOpen(false)
+            if (item.itemType === 'BLOCK') {
+              onOpenBlock(item)
+            } else {
+              onOpenAppointment(item)
+            }
+          }}
+          className={cn(
+            'group absolute overflow-hidden rounded-[1.05rem] border text-left shadow-[0_20px_38px_-28px_rgba(22,16,39,0.16)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_28px_46px_-28px_rgba(22,16,39,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(91,33,182,0.32)]',
+            statusMeta.shell
+          )}
+          style={{
+            top: `${top}px`,
+            left,
+            width,
+            height: `${height}px`,
+          }}
+        >
+          <span className={cn('absolute inset-y-0 left-0 w-[3px] bg-gradient-to-b', statusMeta.accent)} />
+          <div className="flex h-full min-w-0 flex-col justify-between px-3 py-3">
+            <div className="flex items-start justify-between gap-2">
+              <span className="inline-flex rounded-full border border-[rgba(58,47,86,0.08)] bg-white/95 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-foreground">
+                {item.startTimeLabel}
+              </span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+                <GripVertical className="h-3 w-3" />
+                mover
+              </span>
             </div>
-          </button>
-        </Popover.Trigger>
 
-        <Popover.Portal>
-          <Popover.Content
-            side={view === 'barber' ? 'right' : 'top'}
-            align="start"
-            sideOffset={12}
-            onMouseEnter={() => setPreviewOpen(true)}
-            onMouseLeave={() => setPreviewOpen(false)}
-            className="z-50 w-[320px] rounded-[1.3rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(30,41,59,0.98),rgba(15,23,42,0.97))] p-4 text-slate-100 shadow-[0_36px_90px_-44px_rgba(2,6,23,0.96)] backdrop-blur-xl"
-          >
-            <AppointmentPreview appointment={appointment} />
-            <Popover.Arrow className="fill-[rgba(30,41,59,0.98)]" />
-          </Popover.Content>
-        </Popover.Portal>
-      </Popover.Root>
+            <div className="min-w-0">
+              <p
+                title={item.itemType === 'BLOCK' ? item.notes ?? 'Bloqueio operacional' : item.customerName}
+                className={cn(
+                  'overflow-hidden font-semibold text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]',
+                  compact ? 'text-[13px] leading-5' : 'text-sm leading-5'
+                )}
+              >
+                {item.itemType === 'BLOCK' ? item.notes ?? 'Bloqueio operacional' : item.customerName}
+              </p>
+              <p
+                title={item.itemType === 'BLOCK' ? `Bloqueio com ${item.professionalName}` : item.serviceName}
+                className={cn(
+                  'mt-1 overflow-hidden text-muted-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]',
+                  compact ? 'text-[11px] leading-4' : 'text-xs leading-5'
+                )}
+              >
+                {item.itemType === 'BLOCK' ? `Bloqueio com ${item.professionalName}` : item.serviceName}
+              </p>
+            </div>
 
-      <AppointmentDetailsDialog
-        appointment={appointment}
-        professionals={professionals}
-        services={services}
-        recentCustomers={recentCustomers}
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-      />
-    </>
+            <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+              <span className="truncate">
+                {item.itemType === 'BLOCK'
+                  ? 'Intervalo indisponivel'
+                  : view === 'barber'
+                    ? `${item.durationMinutes} min`
+                    : selectedProfessionalId
+                      ? `${item.durationMinutes} min`
+                      : item.professionalName}
+              </span>
+              <span className="truncate group-hover:text-primary">
+                {item.itemType === 'BLOCK' ? 'Bloqueio' : item.source === 'WHATSAPP' ? 'WhatsApp' : 'Manual'}
+              </span>
+            </div>
+          </div>
+        </button>
+      </Popover.Trigger>
+
+      <Popover.Portal>
+        <Popover.Content
+          side={view === 'barber' ? 'right' : 'top'}
+          align="start"
+          sideOffset={12}
+          onMouseEnter={() => setPreviewOpen(true)}
+          onMouseLeave={() => setPreviewOpen(false)}
+          className="z-50 w-[320px] rounded-[1.3rem] border border-[rgba(84,35,145,0.08)] bg-white p-4 text-foreground shadow-[0_36px_90px_-44px_rgba(124,58,237,0.24)]"
+        >
+          <ScheduleItemPreview item={item} />
+          <Popover.Arrow className="fill-white" />
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   )
 }
 
@@ -484,90 +527,534 @@ export function ScheduleCalendar({
   services,
   recentCustomers,
 }: ScheduleCalendarProps) {
-  const calendarMinWidth = 86 + (columns.length * minColumnWidth)
+  const columnRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const [pointerSelection, setPointerSelection] = useState<PointerSelectionState | null>(null)
+  const [committedSelection, setCommittedSelection] = useState<CommittedSelection | null>(null)
+  const [dragState, setDragState] = useState<DragState | null>(null)
+  const [dragPreview, setDragPreview] = useState<DragPreview | null>(null)
+  const [savingMoveId, setSavingMoveId] = useState<string | null>(null)
+  const [appointmentModalState, setAppointmentModalState] = useState<{
+    open: boolean
+    defaultDate: string
+    defaultTime: string
+    defaultProfessionalId: string | null
+  }>({
+    open: false,
+    defaultDate: columns[0]?.dateIso ?? '',
+    defaultTime: '09:00',
+    defaultProfessionalId: columns[0]?.professionalId ?? selectedProfessionalId,
+  })
+  const [activeAppointment, setActiveAppointment] = useState<PositionedAppointment | null>(null)
+  const [activeBlock, setActiveBlock] = useState<PositionedAppointment | null>(null)
+
+  const calendarMinWidth = 88 + (columns.length * minColumnWidth)
+  const dayStartMinutes = useMemo(() => timeLabelToMinutes(hours[0] ?? '08:00'), [hours])
+  const dayEndMinutes = useMemo(() => {
+    const lastHour = hours[hours.length - 1] ?? '20:00'
+    return timeLabelToMinutes(lastHour) + 60
+  }, [hours])
+
+  function getColumnByKey(columnKey: string) {
+    return columns.find((column) => column.key === columnKey) ?? null
+  }
+
+  function resolveMinutesFromPointer(columnKey: string, clientY: number) {
+    const element = columnRefs.current[columnKey]
+
+    if (!element) {
+      return dayStartMinutes
+    }
+
+    const rect = element.getBoundingClientRect()
+    const rawMinutes = dayStartMinutes + ((clientY - rect.top) / schedulePxPerMinute)
+    return Math.max(dayStartMinutes, Math.min(dayEndMinutes, rawMinutes))
+  }
+
+  function findColumnFromPointer(clientX: number) {
+    return columns.find((column) => {
+      const rect = columnRefs.current[column.key]?.getBoundingClientRect()
+      return rect ? clientX >= rect.left && clientX <= rect.right : false
+    }) ?? null
+  }
+
+  function hasConflict(input: {
+    column: ScheduleCalendarColumn
+    professionalId: string | null
+    startMinutes: number
+    endMinutes: number
+    ignoreId?: string
+  }) {
+    return input.column.appointments.some((entry) => {
+      if (entry.id === input.ignoreId || !itemBlocksScheduling(entry)) {
+        return false
+      }
+
+      if (!input.column.professionalId && input.professionalId && entry.professionalId !== input.professionalId) {
+        return false
+      }
+
+      return intervalsOverlap({
+        startMinutes: input.startMinutes,
+        endMinutes: input.endMinutes,
+        compareStartMinutes: entry.startMinutesOfDay,
+        compareEndMinutes: entry.startMinutesOfDay + entry.durationMinutes,
+      })
+    })
+  }
+
+  useEffect(() => {
+    if (!pointerSelection && !dragState) {
+      return
+    }
+
+    function handlePointerMove(event: PointerEvent) {
+      if (pointerSelection) {
+        setCommittedSelection(null)
+        setPointerSelection((current) => current ? { ...current, currentMinutes: resolveMinutesFromPointer(current.columnKey, event.clientY) } : null)
+      }
+
+      if (dragState) {
+        const candidateColumn = findColumnFromPointer(event.clientX) ?? getColumnByKey(dragState.sourceColumnKey)
+        if (!candidateColumn) {
+          return
+        }
+
+        const deltaMinutes = (event.clientY - dragState.pointerStartY) / schedulePxPerMinute
+        const nextStart = floorMinutesToStep(dragState.originalStartMinutes + deltaMinutes)
+        const startMinutes = Math.max(dayStartMinutes, Math.min(dayEndMinutes - dragState.item.durationMinutes, nextStart))
+        const endMinutes = Math.min(dayEndMinutes, startMinutes + dragState.item.durationMinutes)
+        const professionalId = candidateColumn.professionalId ?? dragState.item.professionalId
+        const valid = !hasConflict({
+          column: candidateColumn,
+          professionalId,
+          startMinutes,
+          endMinutes,
+          ignoreId: dragState.item.id,
+        })
+
+        setDragPreview({
+          itemId: dragState.item.id,
+          columnKey: candidateColumn.key,
+          professionalId,
+          dateIso: candidateColumn.dateIso,
+          startMinutes,
+          endMinutes,
+          durationMinutes: dragState.item.durationMinutes,
+          valid,
+        })
+      }
+    }
+
+    async function handlePointerUp() {
+      if (pointerSelection) {
+        const normalized = normalizeSelectionRange({
+          anchorMinutes: pointerSelection.anchorMinutes,
+          currentMinutes: pointerSelection.currentMinutes,
+          dayStartMinutes,
+          dayEndMinutes,
+          minimumDuration: MINIMUM_SELECTION_DURATION,
+        })
+        const pointerDistance = Math.abs(pointerSelection.currentMinutes - pointerSelection.anchorMinutes) * schedulePxPerMinute
+
+        if (pointerDistance < 8) {
+          const quickSelection = buildSelectionFromPoint({
+            minutes: pointerSelection.anchorMinutes,
+            dayStartMinutes,
+            dayEndMinutes,
+            defaultDuration: MINIMUM_SELECTION_DURATION,
+          })
+          setAppointmentModalState({
+            open: true,
+            defaultDate: pointerSelection.dateIso,
+            defaultTime: minutesToTimeLabel(quickSelection.startMinutes),
+            defaultProfessionalId: pointerSelection.professionalId,
+          })
+        } else {
+          setCommittedSelection({
+            columnKey: pointerSelection.columnKey,
+            professionalId: pointerSelection.professionalId,
+            dateIso: pointerSelection.dateIso,
+            ...normalized,
+          })
+        }
+
+        setPointerSelection(null)
+      }
+
+      if (dragState) {
+        if (dragPreview && dragPreview.valid) {
+          const professionalId = dragPreview.professionalId ?? dragState.item.professionalId
+          const date = dragPreview.dateIso
+
+          setSavingMoveId(dragState.item.id)
+          const result = dragState.item.itemType === 'BLOCK'
+            ? await moveScheduleBlock(dragState.item.id, {
+                professionalId,
+                date,
+                startTime: minutesToTimeLabel(dragPreview.startMinutes),
+                endTime: minutesToTimeLabel(dragPreview.endMinutes),
+                notes: dragState.item.notes ?? dragState.item.blockReason ?? '',
+              })
+            : await moveAppointmentSlot(dragState.item.id, {
+                professionalId,
+                date,
+                time: minutesToTimeLabel(dragPreview.startMinutes),
+              })
+
+          setSavingMoveId(null)
+
+          if (result.success) {
+            toast.success(dragState.item.itemType === 'BLOCK' ? 'Bloqueio remarcado.' : 'Agendamento remarcado.')
+          } else {
+            toast.error(result.error ?? 'Nao foi possivel mover esse bloco.')
+          }
+        }
+
+        setDragState(null)
+        setDragPreview(null)
+      }
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+    }
+  }, [
+    columns,
+    dayEndMinutes,
+    dayStartMinutes,
+    dragPreview,
+    dragState,
+    pointerSelection,
+    schedulePxPerMinute,
+  ])
 
   return (
-    <div className="overflow-x-auto">
-      <div className="px-4 py-4 sm:px-6" style={{ minWidth: `${calendarMinWidth}px` }}>
-        <div
-          className="grid gap-3"
-          style={{ gridTemplateColumns: `86px repeat(${Math.max(columns.length, 1)}, minmax(${minColumnWidth}px, 1fr))` }}
-        >
-          <div className="sticky left-0 z-20 rounded-[1rem] bg-[rgba(10,15,28,0.9)] px-2 py-3 backdrop-blur-sm">
-            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-slate-500">Horario</p>
-          </div>
-
-          {columns.map((column) => (
-            <div
-              key={`${column.key}-header`}
-              className="rounded-[1rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.035)] px-4 py-3"
-            >
-              <p className="text-sm font-semibold text-white">{column.title}</p>
-              <p className="mt-1 text-xs text-slate-400">{column.helper}</p>
+    <>
+      <div className="overflow-x-auto">
+        <div className="px-4 py-5 sm:px-6" style={{ minWidth: `${calendarMinWidth}px` }}>
+          <div
+            className="grid gap-3"
+            style={{ gridTemplateColumns: `88px repeat(${Math.max(columns.length, 1)}, minmax(${minColumnWidth}px, 1fr))` }}
+          >
+            <div className="sticky left-0 z-20 rounded-[1.15rem] border border-[rgba(58,47,86,0.08)] bg-[linear-gradient(180deg,rgba(245,243,250,0.98),rgba(251,250,253,0.98))] px-3 py-3 shadow-[0_12px_28px_-24px_rgba(22,16,39,0.16)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Horario</p>
             </div>
-          ))}
-        </div>
 
-        <div
-          className="mt-3 grid gap-3"
-          style={{ gridTemplateColumns: `86px repeat(${Math.max(columns.length, 1)}, minmax(${minColumnWidth}px, 1fr))` }}
-        >
-          <div className="sticky left-0 z-10 rounded-[1rem] bg-[rgba(10,15,28,0.94)] px-2">
-            {hours.map((hour) => (
+            {columns.map((column) => (
               <div
-                key={hour}
-                className="relative border-t border-[rgba(255,255,255,0.05)] first:border-t-0"
-                style={{ height: `${60 * schedulePxPerMinute}px` }}
+                key={`${column.key}-header`}
+                className="rounded-[1.15rem] border border-[rgba(58,47,86,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,246,251,0.96))] px-4 py-3.5 shadow-[0_18px_36px_-30px_rgba(22,16,39,0.14)]"
               >
-                <span className="absolute -top-2 left-0 rounded-[0.75rem] bg-[rgba(15,23,42,0.98)] px-2 py-0.5 text-xs font-medium text-slate-400">
-                  {hour}
-                </span>
+                <p className="text-sm font-semibold tracking-tight text-foreground">{column.title}</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">{column.helper}</p>
               </div>
             ))}
           </div>
 
-          {columns.map((column) => (
-            <div key={column.key} className="min-w-0">
-              <div
-                className="relative overflow-hidden rounded-[1.1rem] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(15,23,42,0.78),rgba(15,23,42,0.62))]"
-                style={{ height: `${calendarHeight}px` }}
-              >
-                {hours.map((hour, index) => (
-                  <div
-                    key={`${column.key}-${hour}`}
-                    className={cn(
-                      'absolute inset-x-0 border-t first:border-t-0',
-                      index % 2 === 0 ? 'border-[rgba(255,255,255,0.055)]' : 'border-[rgba(255,255,255,0.035)]'
-                    )}
-                    style={{ top: `${index * 60 * schedulePxPerMinute}px` }}
-                  />
-                ))}
-
-                {column.appointments.map((appointment) => (
-                  <ScheduleAppointmentCard
-                    key={appointment.id}
-                    appointment={appointment}
-                    view={view}
-                    selectedProfessionalId={selectedProfessionalId}
-                    schedulePxPerMinute={schedulePxPerMinute}
-                    professionals={professionals}
-                    services={services}
-                    recentCustomers={recentCustomers}
-                  />
-                ))}
-
-                {column.appointments.length === 0 && (
-                  <div className="absolute inset-x-5 top-6 rounded-[1rem] border border-dashed border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.025)] px-4 py-3 text-xs text-slate-500">
-                    {selectedProfessionalId
-                      ? 'Nenhum horario neste recorte.'
-                      : 'Grade livre neste bloco.'}
-                  </div>
-                )}
-              </div>
+          <div
+            className="mt-3 grid gap-3"
+            style={{ gridTemplateColumns: `88px repeat(${Math.max(columns.length, 1)}, minmax(${minColumnWidth}px, 1fr))` }}
+          >
+            <div className="sticky left-0 z-10 rounded-[1.15rem] border border-[rgba(58,47,86,0.08)] bg-[linear-gradient(180deg,rgba(245,243,250,0.96),rgba(250,249,252,0.98))] px-2 shadow-[0_10px_24px_-22px_rgba(22,16,39,0.12)]">
+              {hours.map((hour, index) => (
+                <div
+                  key={hour}
+                  className="relative border-t border-[rgba(58,47,86,0.06)] first:border-t-0"
+                  style={{ height: `${60 * schedulePxPerMinute}px` }}
+                >
+                  <span className={cn(
+                    'absolute -top-2 left-0 rounded-[0.85rem] bg-white px-2.5 py-1 text-xs font-semibold text-foreground shadow-[0_10px_20px_-16px_rgba(22,16,39,0.18)]',
+                    index === 0 ? 'top-0' : ''
+                  )}>
+                    {hour}
+                  </span>
+                </div>
+              ))}
             </div>
-          ))}
+            {columns.map((column) => {
+              const liveSelection = pointerSelection?.columnKey === column.key
+                ? normalizeSelectionRange({
+                    anchorMinutes: pointerSelection.anchorMinutes,
+                    currentMinutes: pointerSelection.currentMinutes,
+                    dayStartMinutes,
+                    dayEndMinutes,
+                    minimumDuration: MINIMUM_SELECTION_DURATION,
+                  })
+                : null
+              const committedForColumn = committedSelection?.columnKey === column.key ? committedSelection : null
+              const dragPreviewForColumn = dragPreview?.columnKey === column.key ? dragPreview : null
+
+              return (
+                <div key={column.key} className="min-w-0">
+                  <div
+                    ref={(element) => {
+                      columnRefs.current[column.key] = element
+                    }}
+                    onPointerDown={(event) => {
+                      const target = event.target as HTMLElement
+                      if (target.closest('[data-schedule-item]')) {
+                        return
+                      }
+
+                      setActiveAppointment(null)
+                      setActiveBlock(null)
+                      const minutes = resolveMinutesFromPointer(column.key, event.clientY)
+                      setPointerSelection({
+                        columnKey: column.key,
+                        professionalId: column.professionalId,
+                        dateIso: column.dateIso,
+                        pointerStartY: event.clientY,
+                        anchorMinutes: minutes,
+                        currentMinutes: minutes,
+                      })
+                    }}
+                    className="relative overflow-hidden rounded-[1.3rem] border border-[rgba(58,47,86,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(246,244,250,0.94))] shadow-[0_22px_42px_-34px_rgba(22,16,39,0.14)]"
+                    style={{ height: `${calendarHeight}px` }}
+                  >
+                    {hours.map((hour, index) => (
+                      <div key={`${column.key}-${hour}`}>
+                        <div
+                          className="absolute inset-x-0 border-t border-[rgba(58,47,86,0.08)]"
+                          style={{ top: `${index * 60 * schedulePxPerMinute}px` }}
+                        />
+                        {index < hours.length - 1 && (
+                          <div
+                            className="absolute inset-x-0 border-t border-dashed border-[rgba(58,47,86,0.05)]"
+                            style={{ top: `${index * 60 * schedulePxPerMinute + 30 * schedulePxPerMinute}px` }}
+                          />
+                        )}
+                      </div>
+                    ))}
+
+                    {column.appointments.map((item) => (
+                      <div key={item.id} data-schedule-item>
+                        <ScheduleAppointmentCard
+                          item={item}
+                          view={view}
+                          selectedProfessionalId={selectedProfessionalId}
+                          schedulePxPerMinute={schedulePxPerMinute}
+                          dayStartMinutes={dayStartMinutes}
+                          onPointerDown={(event, currentItem) => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                            setCommittedSelection(null)
+                            setPointerSelection(null)
+                            setDragState({
+                              item: currentItem,
+                              sourceColumnKey: column.key,
+                              sourceProfessionalId: column.professionalId,
+                              pointerStartY: event.clientY,
+                              originalStartMinutes: currentItem.startMinutesOfDay,
+                            })
+                            setDragPreview({
+                              itemId: currentItem.id,
+                              columnKey: column.key,
+                              professionalId: column.professionalId ?? currentItem.professionalId,
+                              dateIso: column.dateIso,
+                              startMinutes: currentItem.startMinutesOfDay,
+                              endMinutes: currentItem.startMinutesOfDay + currentItem.durationMinutes,
+                              durationMinutes: currentItem.durationMinutes,
+                              valid: true,
+                            })
+                          }}
+                          onOpenAppointment={setActiveAppointment}
+                          onOpenBlock={setActiveBlock}
+                        />
+                      </div>
+                    ))}
+
+                    {liveSelection && (
+                      <div
+                        className="absolute inset-x-3 rounded-[1rem] border border-dashed border-[rgba(91,33,182,0.22)] bg-[rgba(91,33,182,0.1)]"
+                        style={{
+                          top: `${getAppointmentTop(liveSelection.startMinutes, dayStartMinutes, schedulePxPerMinute)}px`,
+                          height: `${Math.max(liveSelection.durationMinutes * schedulePxPerMinute, 40)}px`,
+                        }}
+                      />
+                    )}
+
+                    {committedForColumn && (
+                      <div
+                        className="absolute inset-x-3 rounded-[1rem] border border-[rgba(91,33,182,0.18)] bg-[rgba(91,33,182,0.08)] shadow-[0_16px_30px_-24px_rgba(22,16,39,0.16)]"
+                        style={{
+                          top: `${getAppointmentTop(committedForColumn.startMinutes, dayStartMinutes, schedulePxPerMinute)}px`,
+                          height: `${Math.max(committedForColumn.durationMinutes * schedulePxPerMinute, 58)}px`,
+                        }}
+                      >
+                        <div className="flex h-full flex-col justify-between gap-3 p-3">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                              {minutesToTimeLabel(committedForColumn.startMinutes)} - {minutesToTimeLabel(committedForColumn.endMinutes)}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Escolha se esse intervalo vira agendamento ou bloqueio operacional.
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAppointmentModalState({
+                                  open: true,
+                                  defaultDate: committedForColumn.dateIso,
+                                  defaultTime: minutesToTimeLabel(committedForColumn.startMinutes),
+                                  defaultProfessionalId: committedForColumn.professionalId,
+                                })
+                                setCommittedSelection(null)
+                              }}
+                              className="action-button-primary px-3 py-2 text-xs"
+                            >
+                              Criar agendamento
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveBlock({
+                                  id: 'draft-block',
+                                  itemType: 'BLOCK',
+                                  customerId: '',
+                                  customerName: 'Bloqueio Operacional',
+                                  customerPhone: null,
+                                  customerEmail: null,
+                                  customerType: 'WALK_IN',
+                                  customerSubscriptionPrice: null,
+                                  professionalId: committedForColumn.professionalId ?? '',
+                                  professionalName: '',
+                                  serviceId: '',
+                                  serviceName: 'Bloqueio Operacional',
+                                  status: 'CONFIRMED',
+                                  source: 'MANUAL',
+                                  billingModel: 'AVULSO',
+                                  startAt: '',
+                                  endAt: '',
+                                  localDateIso: committedForColumn.dateIso,
+                                  localDateLabel: committedForColumn.dateIso,
+                                  startTimeLabel: minutesToTimeLabel(committedForColumn.startMinutes),
+                                  endTimeLabel: minutesToTimeLabel(committedForColumn.endMinutes),
+                                  startDateTimeLabel: '',
+                                  endDateTimeLabel: '',
+                                  startMinutesOfDay: committedForColumn.startMinutes,
+                                  durationMinutes: committedForColumn.durationMinutes,
+                                  priceSnapshot: 0,
+                                  notes: 'Bloqueio operacional',
+                                  sourceReference: null,
+                                  blockReason: 'Bloqueio operacional',
+                                  laneIndex: 0,
+                                  laneCount: 1,
+                                })
+                              }}
+                              className="action-button px-3 py-2 text-xs"
+                            >
+                              Bloquear agenda
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCommittedSelection(null)}
+                              className="action-button px-3 py-2 text-xs"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {dragPreviewForColumn && dragState && dragPreviewForColumn.itemId === dragState.item.id && (
+                      <div
+                        className={cn(
+                          'pointer-events-none absolute inset-x-3 rounded-[1rem] border border-dashed px-3 py-2 shadow-[0_16px_30px_-24px_rgba(22,16,39,0.16)]',
+                          dragPreviewForColumn.valid
+                            ? 'border-[rgba(91,33,182,0.22)] bg-[rgba(91,33,182,0.09)]'
+                            : 'border-[rgba(244,63,94,0.22)] bg-[rgba(244,63,94,0.1)]'
+                        )}
+                        style={{
+                          top: `${getAppointmentTop(dragPreviewForColumn.startMinutes, dayStartMinutes, schedulePxPerMinute)}px`,
+                          height: `${Math.max(dragPreviewForColumn.durationMinutes * schedulePxPerMinute, 56)}px`,
+                        }}
+                      >
+                        <div className="flex h-full items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground">
+                              {minutesToTimeLabel(dragPreviewForColumn.startMinutes)} - {minutesToTimeLabel(dragPreviewForColumn.endMinutes)}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {dragPreviewForColumn.valid ? 'Solte para salvar a remarcacao.' : 'Conflito com slot ja ocupado.'}
+                            </p>
+                          </div>
+                          {savingMoveId === dragState.item.id && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                              <Move className="h-3 w-3 animate-pulse" />
+                              salvando
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {column.appointments.length === 0 && !committedForColumn && (
+                      <div className="absolute inset-x-5 top-6 rounded-[1.05rem] border border-dashed border-[rgba(58,47,86,0.12)] bg-[rgba(91,33,182,0.04)] px-4 py-3 text-xs leading-6 text-muted-foreground">
+                        Clique para criar. Arraste para reservar um intervalo maior.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
-    </div>
+
+      <AppointmentModal
+        hideTrigger
+        open={appointmentModalState.open}
+        onOpenChange={(value) => setAppointmentModalState((current) => ({ ...current, open: value }))}
+        defaultDate={appointmentModalState.defaultDate}
+        defaultTime={appointmentModalState.defaultTime}
+        defaultProfessionalId={appointmentModalState.defaultProfessionalId}
+        professionals={professionals}
+        services={services}
+        recentCustomers={recentCustomers}
+      />
+
+      {activeAppointment && (
+        <AppointmentDetailsDialog
+          appointment={activeAppointment}
+          professionals={professionals}
+          services={services}
+          recentCustomers={recentCustomers}
+          open={Boolean(activeAppointment)}
+          onOpenChange={(value) => {
+            if (!value) {
+              setActiveAppointment(null)
+            }
+          }}
+        />
+      )}
+
+      {activeBlock && (
+        <ScheduleBlockModal
+          hideTrigger
+          open={Boolean(activeBlock)}
+          onOpenChange={(value) => {
+            if (!value) {
+              setActiveBlock(null)
+              setCommittedSelection(null)
+            }
+          }}
+          professionals={professionals}
+          defaultDate={activeBlock.localDateIso}
+          defaultStartTime={activeBlock.startTimeLabel}
+          defaultEndTime={activeBlock.endTimeLabel}
+          defaultProfessionalId={activeBlock.professionalId}
+          block={activeBlock.id === 'draft-block' ? undefined : buildScheduleBlockValue(activeBlock)}
+        />
+      )}
+    </>
   )
 }
+

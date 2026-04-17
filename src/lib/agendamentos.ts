@@ -23,6 +23,7 @@ import {
   getMinutesOfDayInTimezone,
   resolveBusinessTimezone,
 } from '@/lib/timezone'
+import { isOperationalBlockSourceReference } from '@/lib/agendamentos/operational-blocks'
 import { calcGoalProgress, capitalize } from '@/lib/utils'
 
 export { SCHEDULE_END_HOUR, SCHEDULE_START_HOUR } from '@/lib/agendamentos/availability'
@@ -64,6 +65,7 @@ export interface ScheduleToolbarCustomer {
 
 export interface ScheduleAppointmentItem {
   id: string
+  itemType: 'APPOINTMENT' | 'BLOCK'
   customerId: string
   customerName: string
   customerPhone: string | null
@@ -89,6 +91,8 @@ export interface ScheduleAppointmentItem {
   durationMinutes: number
   priceSnapshot: number
   notes: string | null
+  sourceReference: string | null
+  blockReason: string | null
 }
 
 export interface ScheduleMonthRevenueMap {
@@ -133,6 +137,7 @@ export interface SchedulePageData {
     completedCount: number
     cancelledCount: number
     scheduledValue: number
+    blockedCount: number
   }
   panel: ScheduleBarberPanel
   laneMap: Record<string, number>
@@ -157,7 +162,7 @@ function normalizeDate(value?: string) {
 }
 
 function resolveScheduleView(value?: string): ScheduleView {
-  return value === 'barber' || value === 'week' ? 'barber' : 'day'
+  return value === 'day' ? 'day' : 'barber'
 }
 
 function buildDayEntries(baseDate: Date, view: ScheduleView) {
@@ -212,9 +217,11 @@ function serializeScheduleAppointment(input: {
   const localDateIso = formatIsoDateInTimezone(appointment.startAt, timezone)
   const startTimeLabel = formatTimeInTimezone(appointment.startAt, timezone)
   const endTimeLabel = formatTimeInTimezone(appointment.endAt, timezone)
+  const isOperationalBlock = isOperationalBlockSourceReference(appointment.sourceReference)
 
   return {
     id: appointment.id,
+    itemType: isOperationalBlock ? 'BLOCK' : 'APPOINTMENT',
     customerId: appointment.customerId,
     customerName: appointment.customer.name,
     customerPhone: appointment.customer.phone,
@@ -242,6 +249,8 @@ function serializeScheduleAppointment(input: {
     durationMinutes: appointment.durationMinutes,
     priceSnapshot: Number(appointment.priceSnapshot),
     notes: appointment.notes,
+    sourceReference: appointment.sourceReference,
+    blockReason: isOperationalBlock ? appointment.notes : null,
   } satisfies ScheduleAppointmentItem
 }
 
@@ -395,8 +404,9 @@ const getCachedSchedulePageData = cache(
       : 0
 
     const activeDayAppointments = selectedDayAppointments.filter((appointment) =>
-      ACTIVE_APPOINTMENT_STATUSES.has(appointment.status)
+      appointment.itemType === 'APPOINTMENT' && ACTIVE_APPOINTMENT_STATUSES.has(appointment.status)
     )
+    const blockedDayAppointments = selectedDayAppointments.filter((appointment) => appointment.itemType === 'BLOCK')
 
     const upcomingToday = activeDayAppointments.slice(0, 5)
 
@@ -449,11 +459,12 @@ const getCachedSchedulePageData = cache(
       hours: buildHours(),
       summary: {
         scheduledCount: activeDayAppointments.length,
-        confirmedCount: selectedDayAppointments.filter((appointment) => appointment.status === 'CONFIRMED').length,
-        pendingCount: selectedDayAppointments.filter((appointment) => appointment.status === 'PENDING').length,
-        completedCount: selectedDayAppointments.filter((appointment) => appointment.status === 'COMPLETED').length,
-        cancelledCount: selectedDayAppointments.filter((appointment) => appointment.status === 'CANCELLED').length,
+        confirmedCount: selectedDayAppointments.filter((appointment) => appointment.itemType === 'APPOINTMENT' && appointment.status === 'CONFIRMED').length,
+        pendingCount: selectedDayAppointments.filter((appointment) => appointment.itemType === 'APPOINTMENT' && appointment.status === 'PENDING').length,
+        completedCount: selectedDayAppointments.filter((appointment) => appointment.itemType === 'APPOINTMENT' && appointment.status === 'COMPLETED').length,
+        cancelledCount: selectedDayAppointments.filter((appointment) => appointment.itemType === 'APPOINTMENT' && appointment.status === 'CANCELLED').length,
         scheduledValue: activeDayAppointments.reduce((sum, appointment) => sum + appointment.priceSnapshot, 0),
+        blockedCount: blockedDayAppointments.length,
       },
       panel: {
         mode: selectedProfessional ? 'professional' : 'team',
@@ -464,7 +475,7 @@ const getCachedSchedulePageData = cache(
         periodRevenue: panelRevenue,
         periodGoal: panelGoal,
         periodGoalProgress,
-        completedCount: selectedDayAppointments.filter((appointment) => appointment.status === 'COMPLETED').length,
+        completedCount: selectedDayAppointments.filter((appointment) => appointment.itemType === 'APPOINTMENT' && appointment.status === 'COMPLETED').length,
         scheduledValueToday: activeDayAppointments.reduce((sum, appointment) => sum + appointment.priceSnapshot, 0),
         upcomingToday,
       },

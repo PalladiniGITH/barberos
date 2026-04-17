@@ -14,15 +14,11 @@ interface ProfessionalRankingProps {
 }
 
 function positionIcon(position: number) {
-  if (position === 1) return <Crown className="h-4 w-4 text-amber-400" />
-  if (position === 2) return <Medal className="h-4 w-4 text-slate-400" />
+  if (position === 1) return <Crown className="h-4 w-4 text-amber-500" />
+  if (position === 2) return <Medal className="h-4 w-4 text-slate-500" />
   if (position === 3) return <Medal className="h-4 w-4 text-amber-700" />
 
-  return (
-    <span className="w-4 text-center font-mono text-xs text-muted-foreground">
-      {position}
-    </span>
-  )
+  return <span className="w-4 text-center font-mono text-xs text-muted-foreground">{position}</span>
 }
 
 export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
@@ -30,104 +26,88 @@ export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
   const maxRevenue = Math.max(...data.map((entry) => entry.revenue), 0)
 
   return (
-    <section className="dashboard-panel overflow-hidden p-0">
-      <div className="dashboard-spotlight px-6 py-6">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="spotlight-kicker">Forca comercial do time</p>
-            <h3 className="mt-2 text-2xl font-semibold text-white">Ranking dos profissionais</h3>
-            <p className="spotlight-copy max-w-xl">
-              Quem esta puxando o faturamento deste periodo e como cada nome pesa no resultado do mes.
-            </p>
-          </div>
-          {data[0] && (
-            <span className="spotlight-chip">
-              Lider: {data[0].name}
-            </span>
-          )}
+    <section className="dashboard-panel p-6">
+      <div className="flex flex-col gap-4 border-b border-[rgba(58,47,86,0.08)] pb-5 xl:flex-row xl:items-start xl:justify-between">
+        <div>
+          <p className="page-kicker">Performance comercial</p>
+          <h3 className="mt-2 text-[1.55rem] font-semibold tracking-tight text-foreground">Ranking dos profissionais</h3>
+          <p className="mt-2 max-w-xl text-sm leading-7 text-muted-foreground">
+            Uma leitura mais executiva do time, com peso de receita, proximidade da meta e relevancia na operacao.
+          </p>
         </div>
+        {data[0] && <span className="surface-chip">Lider do periodo: {data[0].name}</span>}
       </div>
 
-      <div className="p-6">
-        <div className="space-y-3">
-          {data.map((entry) => {
-            const hasGoal = entry.goal > 0
-            const goalProgress = hasGoal ? (entry.revenue / entry.goal) * 100 : 0
-            const barProgress = hasGoal
-              ? Math.min(100, goalProgress)
-              : maxRevenue > 0
-                ? (entry.revenue / maxRevenue) * 100
-                : 0
-            const shareOfTeam = totalRevenue > 0 ? (entry.revenue / totalRevenue) * 100 : 0
+      <div className="mt-5 space-y-3">
+        {data.map((entry) => {
+          const hasGoal = entry.goal > 0
+          const goalProgress = hasGoal ? (entry.revenue / entry.goal) * 100 : 0
+          const barProgress = hasGoal ? Math.min(100, goalProgress) : maxRevenue > 0 ? (entry.revenue / maxRevenue) * 100 : 0
+          const shareOfTeam = totalRevenue > 0 ? (entry.revenue / totalRevenue) * 100 : 0
 
-            return (
-              <div
-                key={entry.id}
-                className="rounded-[1.45rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(30,41,59,0.76),rgba(15,23,42,0.68))] p-4 shadow-[0_20px_44px_-34px_rgba(2,6,23,0.82)]"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[1rem] bg-[linear-gradient(135deg,rgba(15,23,42,0.98),rgba(30,41,59,0.92))] text-slate-100 shadow-[0_16px_30px_-20px_rgba(15,23,42,0.55)]">
-                    {positionIcon(entry.position)}
+          return (
+            <article
+              key={entry.id}
+              className="rounded-[1.35rem] border border-[rgba(58,47,86,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,247,251,0.96))] p-5 shadow-[0_20px_40px_-30px_rgba(22,16,39,0.12)]"
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[1rem] border border-[rgba(91,33,182,0.08)] bg-[rgba(91,33,182,0.08)] text-primary">
+                  {positionIcon(entry.position)}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-semibold text-foreground">{entry.name}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {hasGoal
+                          ? `Meta individual: ${formatCurrency(entry.goal)}`
+                          : `${formatPercent(shareOfTeam, 0)} do faturamento da equipe`}
+                      </p>
+                    </div>
+
+                    <div className="rounded-[1rem] border border-[rgba(58,47,86,0.08)] bg-white px-3.5 py-2.5 text-right shadow-[0_14px_26px_-22px_rgba(22,16,39,0.12)]">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Receita</p>
+                      <p className="mt-1 text-base font-semibold tabular-nums text-foreground">
+                        {formatCurrency(entry.revenue)}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-foreground">
-                          {entry.name}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {hasGoal
-                            ? `Meta individual: ${formatCurrency(entry.goal)}`
-                            : `${formatPercent(shareOfTeam, 0)} do faturamento da equipe`}
-                        </p>
-                      </div>
-
-                      <div className="text-right">
-                        <p className="text-sm font-semibold tabular-nums text-foreground">
-                          {formatCurrency(entry.revenue)}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {hasGoal ? formatPercent(goalProgress, 0) : 'Sem meta'}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-[rgba(255,255,255,0.06)]">
-                      <div
-                        className={cn(
-                          'h-full rounded-full transition-all duration-700',
-                          hasGoal
-                            ? goalProgress >= 100
-                              ? 'bg-emerald-500'
-                              : goalProgress >= 80
-                                ? 'bg-primary'
-                                : 'bg-amber-500'
-                            : 'bg-sky-500'
-                        )}
-                        style={{ width: `${barProgress}%` }}
-                      />
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-                      <span className="inline-flex items-center gap-1">
-                        <TrendingUp className="h-3.5 w-3.5" />
-                        {hasGoal ? 'Progresso da meta' : 'Forca relativa no ranking'}
-                      </span>
-                      <span>
-                        {hasGoal
+                  <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-[rgba(91,33,182,0.08)]">
+                    <div
+                      className={cn(
+                        'h-full rounded-full transition-all duration-700',
+                        hasGoal
                           ? goalProgress >= 100
-                            ? 'Meta batida'
-                            : `${formatPercent(Math.max(0, 100 - goalProgress), 0)} para bater`
-                          : `${formatPercent(barProgress, 0)} do lider`}
-                      </span>
-                    </div>
+                            ? 'bg-emerald-500'
+                            : goalProgress >= 80
+                              ? 'bg-primary'
+                              : 'bg-amber-500'
+                          : 'bg-violet-500'
+                      )}
+                      style={{ width: `${barProgress}%` }}
+                    />
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                      <TrendingUp className="h-3.5 w-3.5" />
+                      {hasGoal ? 'Progresso da meta' : 'Participacao na equipe'}
+                    </span>
+                    <span className="rounded-full bg-[rgba(91,33,182,0.06)] px-2.5 py-1 font-medium text-foreground">
+                      {hasGoal
+                        ? goalProgress >= 100
+                          ? 'Meta batida'
+                          : `${formatPercent(Math.max(0, 100 - goalProgress), 0)} para bater`
+                        : `${formatPercent(barProgress, 0)} do lider`}
+                    </span>
                   </div>
                 </div>
               </div>
-            )
-          })}
-        </div>
+            </article>
+          )
+        })}
       </div>
     </section>
   )

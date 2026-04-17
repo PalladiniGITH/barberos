@@ -10,6 +10,12 @@ import {
   resolveBusinessTimezone,
 } from '@/lib/timezone'
 import { syncCustomerPreferredProfessional } from '@/lib/customers/preferred-professional'
+import {
+  buildOperationalBlockSourceReference,
+  isOperationalBlockSourceReference,
+  OPERATIONAL_BLOCK_CUSTOMER_NAME,
+  OPERATIONAL_BLOCK_SERVICE_NAME,
+} from '@/lib/agendamentos/operational-blocks'
 
 type ActionResult = { success: true } | { success: false; error: string }
 
@@ -39,6 +45,18 @@ const AppointmentSchema = z.object({
 })
 
 const AppointmentStatusSchema = z.enum(['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW'])
+const SlotMoveSchema = z.object({
+  professionalId: z.string().cuid('Profissional invalido'),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data invalida'),
+  time: z.string().regex(/^\d{2}:\d{2}$/, 'Horario invalido'),
+})
+const ScheduleBlockSchema = z.object({
+  professionalId: z.string().cuid('Profissional invalido'),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data invalida'),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Horario inicial invalido'),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Horario final invalido'),
+  notes: z.string().max(400).optional().nullable(),
+})
 
 function normalizeOptionalText(value?: string | null) {
   const normalized = value?.trim()
@@ -201,6 +219,8 @@ async function ensureAppointmentSlotAvailable(input: {
     select: {
       startAt: true,
       endAt: true,
+      sourceReference: true,
+      notes: true,
       customer: { select: { name: true } },
     },
   })
@@ -208,10 +228,13 @@ async function ensureAppointmentSlotAvailable(input: {
   if (conflictingAppointment) {
     const startLabel = formatTimeInTimezone(conflictingAppointment.startAt, input.timezone)
     const endLabel = formatTimeInTimezone(conflictingAppointment.endAt, input.timezone)
+    const isOperationalBlock = isOperationalBlockSourceReference(conflictingAppointment.sourceReference)
 
     return {
       success: false as const,
-      error: `Esse barbeiro ja tem um atendimento com ${conflictingAppointment.customer.name} entre ${startLabel} e ${endLabel}.`,
+      error: isOperationalBlock
+        ? `Esse intervalo esta bloqueado entre ${startLabel} e ${endLabel}${conflictingAppointment.notes ? ` (${conflictingAppointment.notes})` : ''}.`
+        : `Esse barbeiro ja tem um atendimento com ${conflictingAppointment.customer.name} entre ${startLabel} e ${endLabel}.`,
     }
   }
 
@@ -220,6 +243,63 @@ async function ensureAppointmentSlotAvailable(input: {
 
 function revalidateSchedulePaths() {
   revalidatePath('/agendamentos')
+}
+
+async function ensureOperationalBlockEntities(barbershopId: string) {
+  const existingService = await prisma.service.findFirst({
+    where: {
+      barbershopId,
+      name: OPERATIONAL_BLOCK_SERVICE_NAME,
+    },
+    select: { id: true },
+  })
+
+  const service = existingService
+    ? await prisma.service.update({
+        where: { id: existingService.id },
+        data: { active: false },
+        select: { id: true },
+      })
+    : await prisma.service.create({
+        data: {
+          barbershopId,
+          name: OPERATIONAL_BLOCK_SERVICE_NAME,
+          description: 'Marcador interno para bloqueio operacional da agenda.',
+          price: 0,
+          duration: 15,
+          active: false,
+        },
+        select: { id: true },
+      })
+
+  const existingCustomer = await prisma.customer.findFirst({
+    where: {
+      barbershopId,
+      name: OPERATIONAL_BLOCK_CUSTOMER_NAME,
+    },
+    select: { id: true },
+  })
+
+  const customer = existingCustomer
+    ? await prisma.customer.update({
+        where: { id: existingCustomer.id },
+        data: { active: false },
+        select: { id: true },
+      })
+    : await prisma.customer.create({
+        data: {
+          barbershopId,
+          name: OPERATIONAL_BLOCK_CUSTOMER_NAME,
+          active: false,
+          type: 'WALK_IN',
+        },
+        select: { id: true },
+      })
+
+  return {
+    serviceId: service.id,
+    customerId: customer.id,
+  }
 }
 
 export async function createAppointment(rawData: unknown): Promise<ActionResult> {
@@ -464,5 +544,217 @@ export async function updateAppointmentStatus(id: string, rawStatus: unknown): P
   } catch (error) {
     console.error('updateAppointmentStatus error', error)
     return { success: false, error: 'Nao foi possivel atualizar o status.' }
+  }
+}
+
+export async function moveAppointmentSlot(id: string, rawData: unknown): Promise<ActionResult> {
+  const session = await requireSession()
+  const { barbershopId } = session.user
+
+  const parsed = SlotMoveSchema.safeParse(rawData)
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.errors[0]?.message ?? 'Dados invalidos' }
+  }
+
+  const existingAppointment = await prisma.appointment.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      barbershopId: true,
+      durationMinutes: true,
+      sourceReference: true,
+    },
+  })
+
+  if (!existingAppointment || existingAppointment.barbershopId !== barbershopId) {
+    return { success: false, error: 'Agendamento nao encontrado.' }
+  }
+
+  if (isOperationalBlockSourceReference(existingAppointment.sourceReference)) {
+    return { success: false, error: 'Use o fluxo de bloqueio para mover esse bloco.' }
+  }
+
+  try {
+    const data = parsed.data
+    const timezone = await getBarbershopTimezone(barbershopId)
+    const startAt = buildStartAt(data.date, data.time, timezone)
+    const endAt = new Date(startAt.getTime() + existingAppointment.durationMinutes * 60_000)
+
+    await assertOwnership(barbershopId, 'professional', data.professionalId)
+
+    const availability = await ensureAppointmentSlotAvailable({
+      appointmentId: id,
+      barbershopId,
+      professionalId: data.professionalId,
+      startAt,
+      endAt,
+      timezone,
+    })
+
+    if (!availability.success) {
+      return availability
+    }
+
+    await prisma.appointment.update({
+      where: { id },
+      data: {
+        professionalId: data.professionalId,
+        startAt,
+        endAt,
+      },
+    })
+
+    revalidateSchedulePaths()
+    return { success: true }
+  } catch (error) {
+    console.error('moveAppointmentSlot error', error)
+    return { success: false, error: 'Nao foi possivel mover o agendamento.' }
+  }
+}
+
+export async function createScheduleBlock(rawData: unknown): Promise<ActionResult> {
+  const session = await requireSession()
+  const { barbershopId } = session.user
+
+  const parsed = ScheduleBlockSchema.safeParse(rawData)
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.errors[0]?.message ?? 'Dados invalidos' }
+  }
+
+  try {
+    const data = parsed.data
+    const timezone = await getBarbershopTimezone(barbershopId)
+    const startAt = buildStartAt(data.date, data.startTime, timezone)
+    const endAt = buildStartAt(data.date, data.endTime, timezone)
+
+    if (endAt <= startAt) {
+      return { success: false, error: 'O fim do bloqueio precisa ser depois do inicio.' }
+    }
+
+    await assertOwnership(barbershopId, 'professional', data.professionalId)
+
+    const availability = await ensureAppointmentSlotAvailable({
+      barbershopId,
+      professionalId: data.professionalId,
+      startAt,
+      endAt,
+      timezone,
+    })
+
+    if (!availability.success) {
+      return availability
+    }
+
+    const blockEntities = await ensureOperationalBlockEntities(barbershopId)
+
+    await prisma.appointment.create({
+      data: {
+        barbershopId,
+        customerId: blockEntities.customerId,
+        professionalId: data.professionalId,
+        serviceId: blockEntities.serviceId,
+        status: 'CONFIRMED',
+        source: 'MANUAL',
+        billingModel: 'AVULSO',
+        sourceReference: buildOperationalBlockSourceReference(),
+        startAt,
+        endAt,
+        durationMinutes: Math.round((endAt.getTime() - startAt.getTime()) / 60_000),
+        priceSnapshot: 0,
+        notes: normalizeOptionalText(data.notes) ?? 'Bloqueio operacional',
+        confirmedAt: new Date(),
+      },
+    })
+
+    revalidateSchedulePaths()
+    return { success: true }
+  } catch (error) {
+    console.error('createScheduleBlock error', error)
+    return { success: false, error: 'Nao foi possivel bloquear esse intervalo.' }
+  }
+}
+
+export async function moveScheduleBlock(id: string, rawData: unknown): Promise<ActionResult> {
+  const session = await requireSession()
+  const { barbershopId } = session.user
+
+  const parsed = ScheduleBlockSchema.safeParse(rawData)
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.errors[0]?.message ?? 'Dados invalidos' }
+  }
+
+  const existingBlock = await prisma.appointment.findUnique({
+    where: { id },
+    select: { id: true, barbershopId: true, sourceReference: true, notes: true },
+  })
+
+  if (!existingBlock || existingBlock.barbershopId !== barbershopId || !isOperationalBlockSourceReference(existingBlock.sourceReference)) {
+    return { success: false, error: 'Bloqueio nao encontrado.' }
+  }
+
+  try {
+    const data = parsed.data
+    const timezone = await getBarbershopTimezone(barbershopId)
+    const startAt = buildStartAt(data.date, data.startTime, timezone)
+    const endAt = buildStartAt(data.date, data.endTime, timezone)
+
+    if (endAt <= startAt) {
+      return { success: false, error: 'O fim do bloqueio precisa ser depois do inicio.' }
+    }
+
+    await assertOwnership(barbershopId, 'professional', data.professionalId)
+
+    const availability = await ensureAppointmentSlotAvailable({
+      appointmentId: id,
+      barbershopId,
+      professionalId: data.professionalId,
+      startAt,
+      endAt,
+      timezone,
+    })
+
+    if (!availability.success) {
+      return availability
+    }
+
+    await prisma.appointment.update({
+      where: { id },
+      data: {
+        professionalId: data.professionalId,
+        startAt,
+        endAt,
+        durationMinutes: Math.round((endAt.getTime() - startAt.getTime()) / 60_000),
+        notes: normalizeOptionalText(data.notes) ?? existingBlock.notes,
+      },
+    })
+
+    revalidateSchedulePaths()
+    return { success: true }
+  } catch (error) {
+    console.error('moveScheduleBlock error', error)
+    return { success: false, error: 'Nao foi possivel mover o bloqueio.' }
+  }
+}
+
+export async function removeScheduleBlock(id: string): Promise<ActionResult> {
+  const session = await requireSession()
+  const { barbershopId } = session.user
+
+  const existingBlock = await prisma.appointment.findUnique({
+    where: { id },
+    select: { id: true, barbershopId: true, sourceReference: true },
+  })
+
+  if (!existingBlock || existingBlock.barbershopId !== barbershopId || !isOperationalBlockSourceReference(existingBlock.sourceReference)) {
+    return { success: false, error: 'Bloqueio nao encontrado.' }
+  }
+
+  try {
+    await prisma.appointment.delete({ where: { id } })
+    revalidateSchedulePaths()
+    return { success: true }
+  } catch (error) {
+    console.error('removeScheduleBlock error', error)
+    return { success: false, error: 'Nao foi possivel remover o bloqueio.' }
   }
 }

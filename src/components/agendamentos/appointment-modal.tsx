@@ -74,13 +74,17 @@ interface AppointmentModalProps {
   services: ScheduleToolbarService[]
   recentCustomers: ScheduleToolbarCustomer[]
   defaultDate: string
+  defaultTime?: string
   defaultProfessionalId?: string | null
   appointment?: AppointmentFormValue
   triggerMode?: 'primary' | 'secondary' | 'icon'
+  open?: boolean
+  onOpenChange?: (value: boolean) => void
+  hideTrigger?: boolean
 }
 
 const fieldClassName =
-  'w-full min-w-0 rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 outline-none transition-colors focus:border-[rgba(52,211,153,0.24)] focus:bg-[rgba(255,255,255,0.05)] focus:ring-2 focus:ring-emerald-400/20'
+  'w-full min-w-0 rounded-[1rem] border border-[rgba(84,35,145,0.08)] bg-white px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-[rgba(124,58,237,0.2)] focus:bg-[rgba(124,58,237,0.02)] focus:ring-4 focus:ring-[rgba(124,58,237,0.1)]'
 
 function Field({
   label,
@@ -93,9 +97,9 @@ function Field({
 }) {
   return (
     <label className="block min-w-0">
-      <span className="mb-1.5 block text-sm font-medium text-slate-100">{label}</span>
+      <span className="mb-1.5 block text-sm font-medium text-foreground">{label}</span>
       {children}
-      {error && <p className="mt-1.5 text-xs text-rose-300">{error}</p>}
+      {error && <p className="mt-1.5 text-xs text-rose-600">{error}</p>}
     </label>
   )
 }
@@ -105,11 +109,17 @@ export function AppointmentModal({
   services,
   recentCustomers,
   defaultDate,
+  defaultTime = '09:00',
   defaultProfessionalId = null,
   appointment,
   triggerMode = 'primary',
+  open: controlledOpen,
+  onOpenChange,
+  hideTrigger = false,
 }: AppointmentModalProps) {
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = controlledOpen ?? internalOpen
+  const setOpen = onOpenChange ?? setInternalOpen
   const router = useRouter()
   const isEdit = Boolean(appointment)
 
@@ -123,12 +133,12 @@ export function AppointmentModal({
     professionalId: appointment?.professionalId ?? defaultProfessionalId ?? '',
     serviceId: appointment?.serviceId ?? '',
     date: appointment?.date ?? defaultDate,
-    time: appointment?.time ?? '09:00',
+    time: appointment?.time ?? defaultTime,
     status: appointment?.status ?? 'CONFIRMED',
     source: appointment?.source ?? 'MANUAL',
     billingModel: appointment?.billingModel ?? 'AVULSO',
     notes: appointment?.notes ?? '',
-  }), [appointment, defaultDate, defaultProfessionalId])
+  }), [appointment, defaultDate, defaultProfessionalId, defaultTime])
 
   const {
     register,
@@ -143,8 +153,10 @@ export function AppointmentModal({
   })
 
   useEffect(() => {
-    reset(defaultValues)
-  }, [defaultValues, reset, open])
+    if (open) {
+      reset(defaultValues)
+    }
+  }, [defaultValues, open, reset])
 
   const selectedServiceId = watch('serviceId')
   const selectedProfessionalId = watch('professionalId')
@@ -217,44 +229,43 @@ export function AppointmentModal({
   }
 
   const triggerClass = {
-    primary: 'premium-dark-button',
-    secondary: 'inline-flex items-center gap-2 rounded-[0.9rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm font-semibold text-slate-100 transition-colors hover:bg-[rgba(255,255,255,0.06)]',
-    icon: 'inline-flex h-8 w-8 items-center justify-center rounded-[0.8rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-slate-300 transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-white',
+    primary: 'action-button-primary',
+    secondary: 'action-button',
+    icon: 'inline-flex h-9 w-9 items-center justify-center rounded-[0.9rem] border border-[rgba(84,35,145,0.08)] bg-white text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.04)] hover:text-primary',
   }[triggerMode]
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={triggerClass}>
-        {triggerMode === 'icon' ? <Pencil className="h-4 w-4" /> : (
-          <>
-            {isEdit ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-            {isEdit ? 'Editar' : 'Novo agendamento'}
-          </>
-        )}
-      </button>
+      {!hideTrigger && (
+        <button type="button" onClick={() => setOpen(true)} className={triggerClass}>
+          {triggerMode === 'icon' ? <Pencil className="h-4 w-4" /> : (
+            <>
+              {isEdit ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              {isEdit ? 'Editar' : 'Novo agendamento'}
+            </>
+          )}
+        </button>
+      )}
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-3 pt-4 sm:items-center sm:p-4">
-          <div
-            className="absolute inset-0 bg-[rgba(2,6,23,0.74)] backdrop-blur-sm"
-            onClick={() => setOpen(false)}
-          />
+          <div className="absolute inset-0 bg-[rgba(17,24,39,0.36)] backdrop-blur-sm" onClick={() => setOpen(false)} />
 
-          <div className="relative z-10 grid h-[min(900px,calc(100vh-1rem))] w-full max-w-5xl min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[1.15rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(30,41,59,0.97),rgba(15,23,42,0.96))] shadow-[0_40px_120px_-60px_rgba(2,6,23,0.96)]">
-            <div className="flex items-start justify-between gap-4 border-b border-[rgba(255,255,255,0.06)] px-5 py-4 sm:px-6">
+          <div className="relative z-10 grid h-[min(920px,calc(100vh-1rem))] w-full max-w-5xl min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[1.5rem] border border-[rgba(84,35,145,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(249,246,253,0.97))] shadow-[0_42px_120px_-60px_rgba(124,58,237,0.28)]">
+            <div className="flex items-start justify-between gap-4 border-b border-[rgba(84,35,145,0.08)] px-5 py-4 sm:px-6">
               <div className="min-w-0">
-                <h2 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
+                <h2 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
                   {isEdit ? 'Editar horario' : 'Novo horario'}
                 </h2>
-                <p className="mt-1 text-sm leading-6 text-slate-400">
-                  Ajuste cliente, horario, barbeiro, servico e status sem quebrar o fluxo da agenda.
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  Preencha cliente, barbeiro, servico e horario com o minimo de atrito para a recepcao.
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] text-slate-400 transition-colors hover:bg-[rgba(255,255,255,0.06)] hover:text-white"
+                className="flex h-9 w-9 items-center justify-center rounded-[0.9rem] text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.04)] hover:text-primary"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -268,8 +279,8 @@ export function AppointmentModal({
                 <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
                   <section className="space-y-3">
                     <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-emerald-300" />
-                      <p className="text-sm font-semibold text-white">Clientes recentes</p>
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <p className="text-sm font-semibold text-foreground">Clientes recentes</p>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
@@ -292,9 +303,9 @@ export function AppointmentModal({
                               customer.type === 'SUBSCRIPTION' ? 'SUBSCRIPTION_INCLUDED' : 'AVULSO'
                             )
                           }}
-                          className="inline-flex max-w-full items-center gap-2 rounded-[0.8rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1.5 text-xs font-medium text-slate-200 transition-colors hover:bg-[rgba(255,255,255,0.08)]"
+                          className="inline-flex max-w-full items-center gap-2 rounded-full border border-[rgba(84,35,145,0.08)] bg-white px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-[rgba(124,58,237,0.04)]"
                         >
-                          <UserRound className="h-3 w-3 flex-shrink-0" />
+                          <UserRound className="h-3 w-3 flex-shrink-0 text-primary" />
                           <span className="truncate">{customer.name}</span>
                         </button>
                       ))}
@@ -304,32 +315,19 @@ export function AppointmentModal({
                   <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-12">
                     <div className="lg:col-span-2 xl:col-span-6">
                       <Field label="Cliente *" error={errors.customerName?.message}>
-                        <input
-                          {...customerNameField}
-                          placeholder="Ex: Carlos Mendes"
-                          className={fieldClassName}
-                        />
+                        <input {...customerNameField} placeholder="Ex: Carlos Mendes" className={fieldClassName} />
                       </Field>
                     </div>
 
                     <div className="xl:col-span-3">
                       <Field label="Telefone">
-                        <input
-                          {...customerPhoneField}
-                          placeholder="(11) 99999-0000"
-                          className={fieldClassName}
-                        />
+                        <input {...customerPhoneField} placeholder="(11) 99999-0000" className={fieldClassName} />
                       </Field>
                     </div>
 
                     <div className="xl:col-span-3">
                       <Field label="Email" error={errors.customerEmail?.message}>
-                        <input
-                          {...customerEmailField}
-                          type="email"
-                          placeholder="cliente@email.com"
-                          className={fieldClassName}
-                        />
+                        <input {...customerEmailField} type="email" placeholder="cliente@email.com" className={fieldClassName} />
                       </Field>
                     </div>
                   </section>
@@ -375,22 +373,13 @@ export function AppointmentModal({
                   <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-12">
                     <div className="xl:col-span-3">
                       <Field label="Data *">
-                        <input
-                          {...register('date')}
-                          type="date"
-                          className={fieldClassName}
-                        />
+                        <input {...register('date')} type="date" className={fieldClassName} />
                       </Field>
                     </div>
 
                     <div className="xl:col-span-3">
                       <Field label="Horario *">
-                        <input
-                          {...register('time')}
-                          type="time"
-                          step="900"
-                          className={fieldClassName}
-                        />
+                        <input {...register('time')} type="time" step="900" className={fieldClassName} />
                       </Field>
                     </div>
 
@@ -447,111 +436,89 @@ export function AppointmentModal({
                   </section>
                 </div>
 
-                <div className="mt-5 flex flex-col gap-3 border-t border-[rgba(255,255,255,0.06)] pt-5 sm:flex-row">
+                <div className="mt-5 flex flex-col gap-3 border-t border-[rgba(84,35,145,0.08)] pt-5 sm:flex-row">
                   <button
                     type="button"
                     onClick={() => setOpen(false)}
-                    className="inline-flex h-11 flex-1 items-center justify-center rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] px-4 text-sm font-medium text-slate-200 transition-colors hover:bg-[rgba(255,255,255,0.04)]"
+                    className="action-button h-11 flex-1"
                   >
                     Cancelar
                   </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-[0.95rem] bg-emerald-400 px-4 text-sm font-semibold text-slate-950 transition-colors hover:bg-emerald-300 disabled:opacity-50"
-                  >
+                  <button type="submit" disabled={isSubmitting} className="action-button-primary h-11 flex-1 disabled:opacity-50">
                     {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
                     {isSubmitting ? 'Salvando...' : isEdit ? 'Salvar ajustes' : 'Salvar agendamento'}
                   </button>
                 </div>
               </form>
 
-              <aside className="min-h-0 min-w-0 overflow-y-auto border-t border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-5 xl:border-l xl:border-t-0 xl:px-6">
+              <aside className="min-h-0 min-w-0 overflow-y-auto border-t border-[rgba(84,35,145,0.08)] bg-[rgba(124,58,237,0.04)] px-5 py-5 xl:border-l xl:border-t-0 xl:px-6">
                 <div className="space-y-4">
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-slate-500">
-                      Resumo do horario
-                    </p>
-                    <h3 className="mt-2 text-lg font-semibold text-white">
-                      {selectedCustomerName || 'Novo atendimento'}
-                    </h3>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Resumo do horario</p>
+                    <h3 className="mt-2 text-lg font-semibold text-foreground">{selectedCustomerName || 'Novo atendimento'}</h3>
                   </div>
 
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
-                    <div className="rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
-                        <CalendarClock className="h-4 w-4 text-emerald-300" />
+                    <div className="panel-soft p-4">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <CalendarClock className="h-4 w-4 text-primary" />
                         Agenda
                       </div>
-                      <p className="mt-3 text-sm text-slate-300">
-                        {selectedDate || 'Selecione a data'}
-                      </p>
-                      <p className="mt-1 text-base font-semibold text-white">
-                        {selectedTime || '--:--'}
-                      </p>
+                      <p className="mt-3 text-sm text-muted-foreground">{selectedDate || 'Selecione a data'}</p>
+                      <p className="mt-1 text-base font-semibold text-foreground">{selectedTime || '--:--'}</p>
                     </div>
 
-                    <div className="rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
-                        <Scissors className="h-4 w-4 text-sky-300" />
+                    <div className="panel-soft p-4">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <Scissors className="h-4 w-4 text-primary" />
                         Servico
                       </div>
-                      <p className="mt-3 text-sm text-slate-300">
-                        {selectedService?.name ?? 'Selecione um servico'}
-                      </p>
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                      <p className="mt-3 text-sm text-muted-foreground">{selectedService?.name ?? 'Selecione um servico'}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <span>{selectedService ? formatCurrency(selectedService.price) : 'Sem valor'}</span>
                         <span>{selectedService ? `${selectedService.duration} min` : 'Sem duracao'}</span>
                       </div>
                     </div>
 
-                    <div className="rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
-                        <UserRound className="h-4 w-4 text-slate-300" />
+                    <div className="panel-soft p-4">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <UserRound className="h-4 w-4 text-primary" />
                         Atendimento
                       </div>
-                      <p className="mt-3 text-sm text-slate-300">
-                        {selectedProfessional?.name ?? 'Selecione o barbeiro'}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-400">
-                        Status: {APPOINTMENT_STATUS_LABELS[selectedStatus]}
-                      </p>
+                      <p className="mt-3 text-sm text-muted-foreground">{selectedProfessional?.name ?? 'Selecione o barbeiro'}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Status: {APPOINTMENT_STATUS_LABELS[selectedStatus]}</p>
                     </div>
 
-                    <div className="rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
-                        <Phone className="h-4 w-4 text-slate-300" />
+                    <div className="panel-soft p-4">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <Phone className="h-4 w-4 text-primary" />
                         Cliente
                       </div>
-                      <p className="mt-3 text-sm text-slate-300">
-                        {watch('customerPhone') || 'Sem telefone informado'}
-                      </p>
-                      <p className="mt-1 truncate text-xs text-slate-400">
-                        {watch('customerEmail') || 'Sem email informado'}
-                      </p>
+                      <p className="mt-3 text-sm text-muted-foreground">{watch('customerPhone') || 'Sem telefone informado'}</p>
+                      <p className="mt-1 truncate text-xs text-muted-foreground">{watch('customerEmail') || 'Sem email informado'}</p>
                       <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
-                        <span className="inline-flex items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-2.5 py-1 text-slate-200">
+                        <span className="inline-flex items-center rounded-full border border-[rgba(84,35,145,0.08)] bg-white px-2.5 py-1 text-foreground">
                           {CUSTOMER_TYPE_LABELS[selectedCustomerType]}
                         </span>
-                        <span className="inline-flex items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-2.5 py-1 text-slate-300">
+                        <span className="inline-flex items-center rounded-full border border-[rgba(84,35,145,0.08)] bg-white px-2.5 py-1 text-muted-foreground">
                           {APPOINTMENT_BILLING_MODEL_LABELS[selectedBillingModel]}
                         </span>
                       </div>
                     </div>
 
-                    <div className="rounded-[0.95rem] border border-[rgba(52,211,153,0.14)] bg-[rgba(16,185,129,0.08)] p-4">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-emerald-100">
+                    <div className="rounded-[1rem] border border-[rgba(124,58,237,0.12)] bg-[linear-gradient(135deg,rgba(124,58,237,0.08),rgba(124,58,237,0.03))] p-4">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-primary">
                         <Clock3 className="h-4 w-4" />
                         Valor e duracao
                       </div>
-                      <p className="mt-3 text-xl font-semibold text-white">
+                      <p className="mt-3 text-xl font-semibold text-foreground">
                         {selectedService ? formatCurrency(selectedService.price) : 'Selecione um servico'}
                       </p>
-                      <p className="mt-1 text-sm text-emerald-100/80">
+                      <p className="mt-1 text-sm text-muted-foreground">
                         {selectedService ? `${selectedService.duration} minutos reservados na agenda.` : 'A duracao vem direto do catalogo.'}
                       </p>
                       {selectedCustomerType === 'SUBSCRIPTION' && (
-                        <p className="mt-3 text-xs text-emerald-100/80">
+                        <p className="mt-3 text-xs text-muted-foreground">
                           Mensalidade atual: {selectedSubscriptionPrice ? formatCurrency(selectedSubscriptionPrice) : 'Defina a mensalidade do plano.'}
                         </p>
                       )}

@@ -101,13 +101,11 @@ function buildDashboardData(report: BusinessIntelligenceReport) {
   }
 }
 
-function getTrendConfig(change: number | null, positiveIsGood = true, surface: 'light' | 'dark' = 'light') {
+function getTrendConfig(change: number | null, positiveIsGood = true) {
   if (change === null) {
     return {
       Icon: Clock3,
-      className: surface === 'dark'
-        ? 'border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.06)] text-slate-100'
-        : 'border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-muted-foreground',
+      className: 'border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] text-muted-foreground',
       label: 'Sem base anterior',
     }
   }
@@ -115,9 +113,7 @@ function getTrendConfig(change: number | null, positiveIsGood = true, surface: '
   if (Math.abs(change) < 0.05) {
     return {
       Icon: Clock3,
-      className: surface === 'dark'
-        ? 'border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.06)] text-slate-100'
-        : 'border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-muted-foreground',
+      className: 'border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] text-muted-foreground',
       label: 'Estavel',
     }
   }
@@ -126,13 +122,9 @@ function getTrendConfig(change: number | null, positiveIsGood = true, surface: '
 
   return {
     Icon: change > 0 ? ArrowUpRight : ArrowDownRight,
-    className: surface === 'dark'
-      ? improving
-        ? 'border border-[rgba(52,211,153,0.16)] bg-[rgba(52,211,153,0.12)] text-emerald-50'
-        : 'border border-[rgba(251,113,133,0.16)] bg-[rgba(251,113,133,0.12)] text-rose-50'
-      : improving
-        ? 'border border-[rgba(52,211,153,0.2)] bg-[rgba(52,211,153,0.1)] text-emerald-200'
-        : 'border border-[rgba(251,113,133,0.2)] bg-[rgba(251,113,133,0.1)] text-rose-200',
+    className: improving
+      ? 'border-[rgba(16,185,129,0.12)] bg-[rgba(16,185,129,0.08)] text-emerald-700'
+      : 'border-[rgba(244,63,94,0.12)] bg-[rgba(244,63,94,0.08)] text-rose-700',
     label: `${change > 0 ? '+' : ''}${change.toFixed(1)}%`,
   }
 }
@@ -140,87 +132,75 @@ function getTrendConfig(change: number | null, positiveIsGood = true, surface: '
 function TrendBadge({
   change,
   positiveIsGood = true,
-  surface = 'light',
 }: {
   change: number | null
   positiveIsGood?: boolean
-  surface?: 'light' | 'dark'
 }) {
-  const config = getTrendConfig(change, positiveIsGood, surface)
+  const config = getTrendConfig(change, positiveIsGood)
 
   return (
-    <span className={cn('inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold', config.className)}>
+    <span className={cn('inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold', config.className)}>
       <config.Icon className="h-3.5 w-3.5" />
       {config.label}
     </span>
   )
 }
 
-function KpiCard({
+function ExecutiveCard({
   title,
   value,
   helper,
   trend,
   positiveIsGood = true,
-  tone = 'neutral',
 }: {
   title: string
   value: string
   helper: string
   trend?: number | null
   positiveIsGood?: boolean
-  tone?: 'neutral' | 'positive' | 'warning'
 }) {
-  const toneClass = {
-    neutral: 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.05)]',
-    positive: 'border-[rgba(52,211,153,0.16)] bg-[rgba(52,211,153,0.08)]',
-    warning: 'border-[rgba(251,191,36,0.16)] bg-[rgba(251,191,36,0.08)]',
-  }[tone]
-
   return (
-    <div className={cn('rounded-[1.45rem] border p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-sm', toneClass)}>
+    <article className="executive-metric">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-300">{title}</p>
-          <p className="mt-3 text-[1.8rem] font-semibold tracking-tight text-white">{value}</p>
+          <p className="executive-label">{title}</p>
+          <p className="executive-value">{value}</p>
         </div>
-        {trend !== undefined && <TrendBadge change={trend} positiveIsGood={positiveIsGood} surface="dark" />}
+        {trend !== undefined && <TrendBadge change={trend} positiveIsGood={positiveIsGood} />}
       </div>
-      <p className="mt-2 text-sm leading-6 text-slate-300">{helper}</p>
-    </div>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">{helper}</p>
+    </article>
   )
 }
 
 function AlertBanner({ alert }: { alert: DashboardAlert }) {
   const toneClass = {
-    critical: 'border-[rgba(251,113,133,0.2)] bg-[rgba(251,113,133,0.08)]',
-    warning: 'border-[rgba(251,191,36,0.2)] bg-[rgba(251,191,36,0.08)]',
-    positive: 'border-[rgba(52,211,153,0.2)] bg-[rgba(52,211,153,0.08)]',
+    critical: 'border-[rgba(244,63,94,0.14)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,245,247,0.98))]',
+    warning: 'border-[rgba(245,158,11,0.14)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,250,242,0.98))]',
+    positive: 'border-[rgba(16,185,129,0.14)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,252,248,0.98))]',
   }[alert.tone]
 
   const iconClass = {
-    critical: 'bg-[rgba(251,113,133,0.14)] text-rose-200',
-    warning: 'bg-[rgba(251,191,36,0.14)] text-amber-200',
-    positive: 'bg-[rgba(52,211,153,0.14)] text-emerald-200',
+    critical: 'bg-[rgba(244,63,94,0.08)] text-rose-600',
+    warning: 'bg-[rgba(245,158,11,0.08)] text-amber-600',
+    positive: 'bg-[rgba(16,185,129,0.08)] text-emerald-600',
   }[alert.tone]
 
   return (
-    <section className={cn('dashboard-panel border p-5', toneClass)}>
+    <section className={cn('dashboard-panel p-5', toneClass)}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-start gap-3">
           <span className={cn('mt-0.5 flex h-11 w-11 items-center justify-center rounded-2xl', iconClass)}>
             <alert.icon className="h-5 w-5" />
           </span>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-              Principal alerta do mes
-            </p>
+            <p className="page-kicker">Principal alerta do mes</p>
             <h2 className="mt-2 text-lg font-semibold text-foreground">{alert.title}</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">{alert.body}</p>
+            <p className="mt-1 max-w-3xl text-sm leading-7 text-muted-foreground">{alert.body}</p>
           </div>
         </div>
 
-        <Link href={alert.href} className="premium-dark-button self-start">
+        <Link href={alert.href} className="action-button-primary self-start">
           {alert.actionLabel}
           <ArrowUpRight className="h-4 w-4" />
         </Link>
@@ -231,10 +211,10 @@ function AlertBanner({ alert }: { alert: DashboardAlert }) {
 
 function ComparisonRow({ metric }: { metric: ComparisonMetric }) {
   return (
-    <div className="rounded-[1.35rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(30,41,59,0.78),rgba(15,23,42,0.7))] px-4 py-3 shadow-[0_20px_44px_-34px_rgba(2,6,23,0.82)]">
+    <div className="rounded-[1.2rem] border border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] px-4 py-3.5">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-foreground">{metric.label}</p>
+          <p className="text-sm font-semibold text-foreground">{metric.label}</p>
           <p className="mt-1 text-xs text-muted-foreground">Antes: {formatCurrency(metric.previous)}</p>
         </div>
         <div className="text-right">
@@ -271,7 +251,7 @@ function buildAlerts(input: {
   if (input.totalRevenue === 0) {
     alerts.push({
       actionLabel: 'Lancar receitas',
-      body: 'Sem receitas registradas, o painel perde a leitura real da operacao e do lucro.',
+      body: 'Sem receitas registradas, o painel perde leitura real de faturamento, margem e tracao.',
       href: '/financeiro/receitas',
       icon: AlertTriangle,
       title: 'Nenhuma receita lancada neste periodo',
@@ -282,10 +262,10 @@ function buildAlerts(input: {
   if (input.overdueExpenseCount > 0) {
     alerts.push({
       actionLabel: 'Revisar despesas',
-      body: `${formatCurrency(input.overdueExpenseAmount)} ainda esta pendente. Regularizar isso protege caixa e evita distorcao no lucro.`,
+      body: `${formatCurrency(input.overdueExpenseAmount)} ainda esta pendente. Corrigir isso protege o caixa e evita distorcao na margem.`,
       href: '/financeiro/despesas',
       icon: Clock3,
-      title: `${input.overdueExpenseCount} despesa${input.overdueExpenseCount > 1 ? 's' : ''} em aberto no periodo`,
+      title: `${input.overdueExpenseCount} despesa${input.overdueExpenseCount > 1 ? 's' : ''} em aberto`,
       tone: 'critical',
     })
   }
@@ -293,16 +273,16 @@ function buildAlerts(input: {
   if (input.goalValue <= 0) {
     alerts.push({
       actionLabel: 'Definir meta mensal',
-      body: 'Sem meta, a equipe enxerga faturamento, mas nao enxerga direcao nem ritmo esperado.',
+      body: 'Sem meta, o time ve faturamento, mas nao enxerga direcao nem ritmo esperado.',
       href: '/equipe/metas',
       icon: Target,
-      title: 'Defina a meta do mes para dar contexto aos numeros',
+      title: 'A casa ainda nao tem meta formal para o mes',
       tone: 'warning',
     })
   } else if (input.isCurrentPeriod && input.goalAttainment + 8 < input.expectedProgress && input.remainingToGoal > 0) {
     alerts.push({
-      actionLabel: 'Acompanhar metas da equipe',
-      body: `Faltam ${formatCurrency(input.remainingToGoal)} para bater a meta. Para recuperar o mes, o ritmo precisa subir para ${formatCurrency(input.requiredDailyRevenue)} por dia.`,
+      actionLabel: 'Acompanhar metas',
+      body: `Faltam ${formatCurrency(input.remainingToGoal)} para bater a meta. O ritmo precisa subir para ${formatCurrency(input.requiredDailyRevenue)} por dia.`,
       href: '/equipe/metas',
       icon: Target,
       title: 'A meta esta abaixo do ritmo ideal',
@@ -316,7 +296,7 @@ function buildAlerts(input: {
       body: `As despesas consumiram ${formatPercent(input.expenseLimitUsage, 0)} do teto mensal.`,
       href: '/financeiro/despesas',
       icon: TrendingDown,
-      title: 'O limite de despesas ja foi ultrapassado',
+      title: 'O limite de despesas foi ultrapassado',
       tone: 'critical',
     })
   }
@@ -334,11 +314,11 @@ function buildAlerts(input: {
 
   if (input.revenueChange !== null && input.revenueChange >= 10) {
     alerts.push({
-      actionLabel: 'Aproveitar o ritmo atual',
-      body: `O faturamento acelerou frente a ${input.comparisonMonthLabel}. Hora boa para puxar servicos premium.`,
+      actionLabel: 'Aproveitar o momento',
+      body: `O faturamento acelerou frente a ${input.comparisonMonthLabel}. Esse e um bom momento para puxar servicos premium.`,
       href: '/precificacao/resultado',
       icon: TrendingUp,
-      title: 'O mes esta com tracao acima do anterior',
+      title: 'O mes ganhou tracao acima do anterior',
       tone: 'positive',
     })
   }
@@ -348,7 +328,7 @@ function buildAlerts(input: {
 
     if (topProgress >= 90) {
       alerts.push({
-        actionLabel: 'Ver metas da equipe',
+        actionLabel: 'Ver desempenho da equipe',
         body: `${input.topProfessional.name} ja esta em ${formatPercent(topProgress, 0)} da meta individual.`,
         href: '/equipe/desempenho',
         icon: Crown,
@@ -361,7 +341,7 @@ function buildAlerts(input: {
   if (alerts.length === 0) {
     alerts.push({
       actionLabel: 'Manter o ritmo',
-      body: 'Receita, despesas e meta estao equilibradas. A sensacao e de controle, nao de correria.',
+      body: 'Receita, despesas e meta estao equilibradas. O painel mostra controle, nao correria.',
       href: '/equipe/desempenho',
       icon: Sparkles,
       title: 'A operacao esta sob controle',
@@ -413,10 +393,10 @@ export default async function DashboardPage({ searchParams }: Props) {
   ]
 
   return (
-    <div className="page-section mx-auto flex max-w-7xl flex-col gap-6">
+    <div className="page-section flex flex-col gap-6">
       <PageHeader
-        title="Painel do negocio"
-        description="A leitura mais rapida do mes: faturamento, lucro, meta, despesas, ticket e a principal prioridade de acao."
+        title="Painel executivo"
+        description="Uma leitura mais clara, mais forte e mais acionavel do negocio, com menos ruido e mais hierarquia."
         action={(
           <Suspense>
             <PeriodSelector month={month} year={year} pathname="/dashboard" />
@@ -424,59 +404,135 @@ export default async function DashboardPage({ searchParams }: Props) {
         )}
       />
 
-      <section className="dashboard-panel dashboard-spotlight overflow-hidden p-6 sm:p-7">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_360px]">
-          <div className="max-w-3xl">
-            <p className="spotlight-kicker">
-              Visao executiva do mes
-            </p>
-            <h2 className="spotlight-title">
-              {formatCurrency(data.totalRevenue)}
-            </h2>
+      <section className="dashboard-spotlight overflow-hidden p-6 sm:p-7">
+        <div className="dashboard-hero-grid">
+          <div>
+            <p className="spotlight-kicker">Radar operacional</p>
+            <h2 className="spotlight-title">{formatCurrency(data.totalRevenue)}</h2>
             <p className="spotlight-copy max-w-2xl">
-              Faturamento acumulado em {data.monthLabel}.
+              Faturamento acumulado em {data.monthLabel}, organizado para dar contexto rapido sobre margem, meta, ticket medio e pressao do periodo.
             </p>
 
             <div className="mt-5 flex flex-wrap gap-2">
-              <TrendBadge change={data.revenueChange} surface="dark" />
+              <TrendBadge change={data.revenueChange} />
               <span className="spotlight-chip">
                 {data.partialComparison ? 'Mesmo intervalo do mes anterior' : data.comparisonMonthLabel}
               </span>
+              <span className="spotlight-chip">{data.totalAppointments} atendimentos no periodo</span>
+            </div>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <div className="hero-stat-card">
+                <p className="executive-label">Margem atual</p>
+                <p className="mt-3 text-2xl font-semibold tracking-tight text-foreground">
+                  {formatPercent(data.profitMargin, 0)}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">Lucro estimado sobre a receita lancada.</p>
+              </div>
+              <div className="hero-stat-card">
+                <p className="executive-label">Ticket medio</p>
+                <p className="mt-3 text-2xl font-semibold tracking-tight text-foreground">
+                  {formatCurrency(data.ticketAverage)}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">Quanto cada atendimento esta deixando no caixa.</p>
+              </div>
+              <div className="hero-stat-card">
+                <p className="executive-label">Despesas do mes</p>
+                <p className="mt-3 text-2xl font-semibold tracking-tight text-foreground">
+                  {formatCurrency(data.totalExpense)}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">Leitura direta do peso de custo no periodo.</p>
+              </div>
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-            <KpiCard
-              title="Lucro estimado"
-              value={formatCurrency(data.profit)}
-              helper={data.profit >= 0 ? `${formatPercent(data.profitMargin, 0)} de margem sobre o faturamento` : 'O lucro estimado ficou negativo neste periodo.'}
-              trend={data.profitChange}
-              tone={data.profit >= 0 ? 'positive' : 'warning'}
-            />
-            <KpiCard
-              title="Meta mensal"
-              value={data.goalValue > 0 ? formatPercent(data.goalAttainment, 0) : 'Sem meta'}
-              helper={data.goalValue > 0 ? `${formatPercent(data.goalAttainment, 0)} de ${formatCurrency(data.goalValue)}` : 'Defina uma meta para dar contexto ao faturamento do mes.'}
-              tone={data.goalValue > 0 && data.goalAttainment >= data.expectedProgress ? 'positive' : 'warning'}
-            />
-            <KpiCard
-              title="Despesas do mes"
-              value={formatCurrency(data.totalExpense)}
-              helper={data.expenseLimit > 0 ? `${formatPercent(data.expenseLimitUsage, 0)} do teto mensal de despesas` : 'Acompanhe o custo para proteger o caixa.'}
-              trend={data.expenseChange}
-              positiveIsGood={false}
-            />
-            <KpiCard
-              title="Ticket medio"
-              value={formatCurrency(data.ticketAverage)}
-              helper={data.totalAppointments > 0 ? `${data.totalAppointments} atendimentos registrados no periodo` : 'Cadastre receitas para ler o ticket real.'}
-              trend={data.ticketChange}
-            />
-          </div>
+          <aside className="premium-rail p-5">
+            <p className="page-kicker">Pulso do mes</p>
+            <div className="mt-3 space-y-4">
+              <div className="rounded-[1.25rem] border border-[rgba(58,47,86,0.08)] bg-white p-4 shadow-[0_14px_28px_-24px_rgba(20,15,35,0.12)]">
+                <p className="executive-label">Meta principal</p>
+                <p className="mt-3 text-[1.8rem] font-semibold tracking-tight text-foreground">
+                  {data.goalValue > 0 ? formatPercent(data.goalAttainment, 0) : 'Sem meta'}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  {data.goalValue > 0
+                    ? `${formatCurrency(data.totalRevenue)} de ${formatCurrency(data.goalValue)}`
+                    : 'Defina uma meta para dar direcao ao faturamento do mes.'}
+                </p>
+              </div>
+
+              <div className="rounded-[1.25rem] border border-[rgba(58,47,86,0.08)] bg-white p-4 shadow-[0_14px_28px_-24px_rgba(20,15,35,0.12)]">
+                <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Percentual atingido</span>
+                  <span>{formatPercent(data.goalAttainment, 0)}</span>
+                </div>
+                <div className="h-3 overflow-hidden rounded-full bg-[rgba(91,33,182,0.08)]">
+                  <div
+                    className={cn(
+                      'h-full rounded-full transition-all duration-700',
+                      data.goalAttainment >= 100 ? 'bg-emerald-500' : data.goalAttainment >= data.expectedProgress ? 'bg-primary' : 'bg-amber-500'
+                    )}
+                    style={{ width: `${goalBarProgress}%` }}
+                  />
+                </div>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                  {data.goalAttainment >= 100
+                    ? 'A meta principal ja foi batida.'
+                    : data.remainingDays > 0
+                      ? `${formatCurrency(data.requiredDailyRevenue)} por dia para fechar o objetivo.`
+                      : 'Use esse gap para calibrar o proximo periodo.'}
+                </p>
+              </div>
+
+              <div className="rounded-[1.25rem] border border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] p-4">
+                <p className="executive-label">Leitura rapida</p>
+                <div className="mt-3 space-y-3 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Falta para meta</span>
+                    <strong>{formatCurrency(Math.max(0, data.remainingToGoal))}</strong>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Teto de despesas</span>
+                    <strong>{data.expenseLimit > 0 ? formatPercent(data.expenseLimitUsage, 0) : 'Nao definido'}</strong>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Comparacao</span>
+                    <strong>{data.comparisonMonthLabel}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </aside>
         </div>
       </section>
 
-      <DashboardInsightsPreview report={intelligenceReport} />
+      <section className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
+        <ExecutiveCard
+          title="Receita confirmada"
+          value={formatCurrency(data.totalRevenue)}
+          helper="Faturamento registrado no periodo com base real."
+          trend={data.revenueChange}
+        />
+        <ExecutiveCard
+          title="Lucro estimado"
+          value={formatCurrency(data.profit)}
+          helper={data.profit >= 0 ? `${formatPercent(data.profitMargin, 0)} de margem sobre a receita.` : 'O lucro estimado ficou negativo neste periodo.'}
+          trend={data.profitChange}
+        />
+        <ExecutiveCard
+          title="Despesas"
+          value={formatCurrency(data.totalExpense)}
+          helper={data.expenseLimit > 0 ? `${formatPercent(data.expenseLimitUsage, 0)} do teto mensal.` : 'Sem teto formal de despesa definido.'}
+          trend={data.expenseChange}
+          positiveIsGood={false}
+        />
+        <ExecutiveCard
+          title="Ticket medio"
+          value={formatCurrency(data.ticketAverage)}
+          helper={`${data.totalAppointments} atendimentos registrados no periodo.`}
+          trend={data.ticketChange}
+        />
+      </section>
 
       {primaryAlert && <AlertBanner alert={primaryAlert} />}
 
@@ -484,94 +540,44 @@ export default async function DashboardPage({ searchParams }: Props) {
         <RevenueChart data={data.chartData} />
 
         <aside className="space-y-5">
-          <section className="dashboard-panel p-6">
+          <section className="premium-rail p-6">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-foreground">Meta do mes</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  O suficiente para entender se o mes esta no ritmo certo sem poluir o topo.
-                </p>
+                <p className="page-kicker">Execucao da meta</p>
+                <h3 className="mt-2 text-[1.4rem] font-semibold tracking-tight text-foreground">Meta do mes</h3>
               </div>
-              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                {data.monthLabel}
-              </span>
+              <span className="surface-chip">{data.monthLabel}</span>
             </div>
 
             {data.goalValue > 0 ? (
-              <>
-                <div className="mt-5 flex items-end justify-between gap-3">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Realizado ate agora</p>
-                    <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">
-                      {formatCurrency(data.totalRevenue)}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Meta principal</p>
-                    <p className="mt-2 text-xl font-semibold text-foreground">
-                      {formatCurrency(data.goalValue)}
-                    </p>
-                  </div>
+              <div className="mt-5 space-y-4">
+                <div className="rounded-[1.25rem] border border-[rgba(58,47,86,0.08)] bg-white p-4">
+                  <p className="executive-label">Realizado ate agora</p>
+                  <p className="mt-3 text-[2rem] font-semibold tracking-tight text-foreground">
+                    {formatCurrency(data.totalRevenue)}
+                  </p>
+                  <p className="mt-2 text-sm text-muted-foreground">Meta principal: {formatCurrency(data.goalValue)}</p>
                 </div>
 
-                <div className="mt-5">
-                  <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Percentual atingido</span>
-                    <span>{formatPercent(data.goalAttainment, 0)}</span>
-                  </div>
-                  <div className="h-3 overflow-hidden rounded-full bg-secondary">
-                    <div
-                      className={cn(
-                        'h-full rounded-full transition-all duration-700',
-                        data.goalAttainment >= 100 ? 'bg-emerald-500' : data.goalAttainment >= data.expectedProgress ? 'bg-primary' : 'bg-amber-500'
-                      )}
-                      style={{ width: `${goalBarProgress}%` }}
-                    />
-                  </div>
-                  <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Minimo saudavel: {formatCurrency(data.minGoalValue)}</span>
-                    <span>Ritmo ideal: {formatPercent(data.expectedProgress, 0)}</span>
-                  </div>
+                <div className="panel-soft">
+                  <p className="executive-label">Meta minima saudavel</p>
+                  <p className="mt-3 text-xl font-semibold text-foreground">{formatCurrency(data.minGoalValue)}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">Base minima para o mes nao ficar aquem do esperado.</p>
                 </div>
 
-                <div className="mt-5 grid gap-3">
-                  <div className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      {data.goalAttainment >= 100 ? 'Acima da meta' : 'Falta para bater'}
-                    </p>
-                    <p className="mt-2 text-xl font-semibold text-foreground">
-                      {formatCurrency(data.goalAttainment >= 100 ? data.totalRevenue - data.goalValue : data.remainingToGoal)}
-                    </p>
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                      {data.goalAttainment >= 100 ? 'O mes ja superou o objetivo principal.' : data.remainingDays > 0 ? `${formatCurrency(data.requiredDailyRevenue)} por dia para fechar o objetivo.` : 'Use esse gap para calibrar o proximo periodo.'}
-                    </p>
-                  </div>
-
-                  {data.expenseLimit > 0 && (
-                    <div className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                        Teto de despesas
-                      </p>
-                      <p className="mt-2 text-xl font-semibold text-foreground">
-                        {formatCurrency(data.expenseLimit)}
-                      </p>
-                      <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                        {formatPercent(data.expenseLimitUsage, 0)} do teto consumido neste mes.
-                      </p>
-                    </div>
-                  )}
+                <div className="panel-soft">
+                  <p className="executive-label">Ritmo necessario</p>
+                  <p className="mt-3 text-xl font-semibold text-foreground">{formatCurrency(data.requiredDailyRevenue)}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">Por dia para fechar o objetivo no tempo restante.</p>
                 </div>
-              </>
+              </div>
             ) : (
-              <div className="mt-5 rounded-2xl border border-dashed border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] p-5">
-                <p className="text-sm font-medium text-foreground">Meta ainda nao configurada</p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Defina a meta e o mes deixa de ser so faturamento solto para virar direcao comercial clara.
+              <div className="mt-5 rounded-[1.2rem] border border-dashed border-[rgba(58,47,86,0.12)] bg-[rgba(91,33,182,0.04)] p-5">
+                <p className="text-sm font-semibold text-foreground">Meta ainda nao configurada</p>
+                <p className="mt-2 text-sm leading-7 text-muted-foreground">
+                  Defina a meta e o painel deixa de ser so historico para virar direcao comercial.
                 </p>
-                <Link
-                  href="/equipe/metas"
-                  className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary"
-                >
+                <Link href="/equipe/metas" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary">
                   Configurar meta
                   <ArrowUpRight className="h-4 w-4" />
                 </Link>
@@ -580,17 +586,18 @@ export default async function DashboardPage({ searchParams }: Props) {
           </section>
 
           <section className="dashboard-panel p-6">
-            <h3 className="text-lg font-semibold text-foreground">Movimentos rapidos</h3>
+            <p className="page-kicker">Acoes rapidas</p>
+            <h3 className="mt-2 text-[1.3rem] font-semibold tracking-tight text-foreground">Proximos atalhos</h3>
             <div className="mt-4 space-y-3">
-              <Link href="/financeiro" className="flex items-center justify-between rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-[rgba(255,255,255,0.06)]">
+              <Link href="/financeiro" className="action-button flex justify-between">
                 Abrir visao financeira
                 <ArrowUpRight className="h-4 w-4 text-primary" />
               </Link>
-              <Link href="/equipe/desempenho" className="flex items-center justify-between rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-[rgba(255,255,255,0.06)]">
-                Ver desempenho do time
+              <Link href="/equipe/desempenho" className="action-button flex justify-between">
+                Ver desempenho da equipe
                 <ArrowUpRight className="h-4 w-4 text-primary" />
               </Link>
-              <Link href="/precificacao/resultado" className="flex items-center justify-between rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-[rgba(255,255,255,0.06)]">
+              <Link href="/precificacao/resultado" className="action-button flex justify-between">
                 Revisar resultado da margem
                 <ArrowUpRight className="h-4 w-4 text-primary" />
               </Link>
@@ -599,15 +606,17 @@ export default async function DashboardPage({ searchParams }: Props) {
         </aside>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,1fr)]">
+      <DashboardInsightsPreview report={intelligenceReport} />
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,1fr)]">
         {data.ranking.length > 0 ? (
           <ProfessionalRanking data={data.ranking.slice(0, 5)} />
         ) : (
           <section className="dashboard-panel flex min-h-[280px] flex-col justify-center p-6">
-            <div className="rounded-2xl border border-dashed border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] p-5 text-center">
-              <p className="text-sm font-medium text-foreground">Ranking ainda indisponivel</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Assim que as receitas forem lancadas por profissional, a equipe aparece aqui com clareza.
+            <div className="rounded-[1.25rem] border border-dashed border-[rgba(58,47,86,0.12)] bg-[rgba(91,33,182,0.04)] p-5 text-center">
+              <p className="text-sm font-semibold text-foreground">Ranking ainda indisponivel</p>
+              <p className="mt-2 text-sm leading-7 text-muted-foreground">
+                Assim que as receitas forem lancadas por profissional, o time aparece aqui com hierarquia e comparacao real.
               </p>
               <Link href="/financeiro/receitas" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary">
                 Lancar receitas
@@ -621,11 +630,9 @@ export default async function DashboardPage({ searchParams }: Props) {
           <summary className="disclosure-summary">
             <div>
               <p className="page-kicker">Leitura complementar</p>
-              <h3 className="mt-2 text-lg font-semibold text-foreground">Comparativos e sinais secundarios</h3>
+              <h3 className="mt-2 text-[1.35rem] font-semibold tracking-tight text-foreground">Comparativos e sinais secundarios</h3>
             </div>
-            <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-xs font-semibold text-slate-300">
-              Abrir detalhes
-            </span>
+            <span className="surface-chip">Abrir detalhes</span>
           </summary>
 
           <div className="disclosure-body">
@@ -638,9 +645,9 @@ export default async function DashboardPage({ searchParams }: Props) {
             {secondaryAlerts.length > 0 && (
               <div className="mt-5 space-y-3">
                 {secondaryAlerts.map((alert) => (
-                  <Link key={alert.title} href={alert.href} className="block rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4 transition-colors hover:bg-[rgba(255,255,255,0.05)]">
+                  <Link key={alert.title} href={alert.href} className="block rounded-[1.2rem] border border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] p-4 transition-colors hover:bg-[rgba(91,33,182,0.06)]">
                     <p className="text-sm font-semibold text-foreground">{alert.title}</p>
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">{alert.body}</p>
+                    <p className="mt-1 text-sm leading-7 text-muted-foreground">{alert.body}</p>
                   </Link>
                 ))}
               </div>

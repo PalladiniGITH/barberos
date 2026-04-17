@@ -14,6 +14,7 @@ import {
   PanelsTopLeft,
 } from 'lucide-react'
 import { AppointmentModal } from '@/components/agendamentos/appointment-modal'
+import { ScheduleBlockModal } from '@/components/agendamentos/schedule-block-modal'
 import { useNavigationFeedback } from '@/components/layout/navigation-feedback'
 import type {
   ScheduleToolbarCustomer,
@@ -66,13 +67,11 @@ export function ScheduleToolbar({
   const label = useMemo(() => {
     const current = new Date(`${date}T09:00:00`)
     return capitalize(format(current, "EEEE, dd 'de' MMMM", { locale: ptBR }))
-  }, [date, view])
+  }, [date])
 
   const goToDate = (direction: 'previous' | 'next' | 'today') => {
     const current = new Date(`${date}T09:00:00`)
-    const target = direction === 'today'
-      ? new Date()
-      : addDays(current, direction === 'next' ? 1 : -1)
+    const target = direction === 'today' ? new Date() : addDays(current, direction === 'next' ? 1 : -1)
 
     const href = buildUrl({
       date: format(target, 'yyyy-MM-dd'),
@@ -85,13 +84,13 @@ export function ScheduleToolbar({
   }
 
   return (
-    <div className="flex w-full flex-col gap-3 xl:min-w-[540px] xl:items-end">
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center xl:justify-end">
-        <div className="flex min-w-0 items-center gap-1 rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(30,41,59,0.78),rgba(15,23,42,0.7))] p-1 shadow-[0_18px_34px_-24px_rgba(2,6,23,0.72)]">
+    <div className="flex w-full flex-col gap-3 xl:min-w-[720px]">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-end">
+        <div className="flex min-w-0 items-center gap-1 rounded-[1.15rem] border border-[rgba(58,47,86,0.08)] bg-[rgba(255,255,255,0.82)] p-1.5 shadow-[0_20px_40px_-32px_rgba(22,16,39,0.16)]">
           <button
             type="button"
             onClick={() => goToDate('previous')}
-            className="rounded-[0.75rem] p-2 text-slate-400 transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-white"
+            className="rounded-[0.95rem] p-2.5 text-muted-foreground transition-colors hover:bg-[rgba(91,33,182,0.05)] hover:text-primary"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -99,66 +98,79 @@ export function ScheduleToolbar({
           <button
             type="button"
             onClick={() => goToDate('today')}
-            className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-[0.8rem] border border-[rgba(52,211,153,0.14)] bg-[linear-gradient(135deg,rgba(17,24,39,0.96),rgba(15,23,42,0.9))] px-3 py-2 text-slate-100 shadow-[0_16px_30px_-20px_rgba(2,6,23,0.72)]"
+            className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-[1rem] border border-[rgba(91,33,182,0.08)] bg-[rgba(91,33,182,0.05)] px-4 py-2.5 text-foreground"
           >
-            <CalendarDays className="h-3.5 w-3.5 text-slate-300" />
-            <span className="truncate text-center text-sm font-medium text-slate-50">{label}</span>
+            <CalendarDays className="h-3.5 w-3.5 text-primary" />
+            <span className="truncate text-center text-sm font-semibold">{label}</span>
           </button>
 
           <button
             type="button"
             onClick={() => goToDate('next')}
-            className="rounded-[0.75rem] p-2 text-slate-400 transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-white"
+            className="rounded-[0.95rem] p-2.5 text-muted-foreground transition-colors hover:bg-[rgba(91,33,182,0.05)] hover:text-primary"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
 
-        {professionalLocked ? (
-          <div className="inline-flex min-w-0 items-center gap-2 rounded-[0.95rem] border border-[rgba(52,211,153,0.16)] bg-[rgba(16,185,129,0.08)] px-3 py-2 text-sm text-emerald-100">
-            <BadgeCheck className="h-4 w-4 flex-shrink-0" />
-            <span className="truncate">{professionalLockedLabel ?? 'Minha agenda'}</span>
-          </div>
-        ) : (
-          <div className="flex min-w-0 items-center gap-2 rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2">
-            <ListFilter className="h-4 w-4 text-slate-400" />
-            <select
-              value={selectedProfessionalId ?? ''}
-              onChange={(event) => {
-                const href = buildUrl({
-                  date,
-                  view,
-                  professionalId: event.target.value || null,
-                })
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center xl:justify-end">
+          {professionalLocked ? (
+            <div className="inline-flex min-w-0 items-center gap-2 rounded-[1.05rem] border border-[rgba(91,33,182,0.08)] bg-[rgba(91,33,182,0.05)] px-3.5 py-2.5 text-sm font-medium text-primary">
+              <BadgeCheck className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">{professionalLockedLabel ?? 'Minha agenda'}</span>
+            </div>
+          ) : (
+            <div className="flex min-w-0 items-center gap-2 rounded-[1.05rem] border border-[rgba(58,47,86,0.08)] bg-[rgba(255,255,255,0.82)] px-3.5 py-2.5 shadow-[0_16px_32px_-30px_rgba(22,16,39,0.14)]">
+              <ListFilter className="h-4 w-4 text-muted-foreground" />
+              <select
+                value={selectedProfessionalId ?? ''}
+                onChange={(event) => {
+                  const href = buildUrl({
+                    date,
+                    view,
+                    professionalId: event.target.value || null,
+                  })
 
-                startNavigation(href)
-                router.push(href)
-              }}
-              className="min-w-0 bg-transparent text-sm text-slate-100 outline-none"
-            >
-              <option value="">Toda a equipe</option>
-              {professionals.map((professional) => (
-                <option key={professional.id} value={professional.id}>
-                  {professional.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+                  startNavigation(href)
+                  router.push(href)
+                }}
+                className="min-w-0 bg-transparent text-sm font-semibold text-foreground outline-none"
+              >
+                <option value="">Toda a equipe</option>
+                {professionals.map((professional) => (
+                  <option key={professional.id} value={professional.id}>
+                    {professional.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
-        <AppointmentModal
-          defaultDate={date}
-          defaultProfessionalId={selectedProfessionalId}
-          professionals={professionals}
-          services={services}
-          recentCustomers={recentCustomers}
-        />
+          <div className="flex flex-wrap items-center gap-2">
+            <ScheduleBlockModal
+              defaultDate={date}
+              defaultStartTime="09:00"
+              defaultEndTime="09:30"
+              defaultProfessionalId={selectedProfessionalId}
+              professionals={professionals}
+            />
+
+            <AppointmentModal
+              defaultDate={date}
+              defaultTime="09:00"
+              defaultProfessionalId={selectedProfessionalId}
+              professionals={professionals}
+              services={services}
+              recentCustomers={recentCustomers}
+            />
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 xl:justify-end">
         {[
-          { value: 'day' as const, label: 'Dia', icon: LayoutGrid },
-          { value: 'barber' as const, label: 'Barbeiros', icon: PanelsTopLeft },
+          { value: 'barber' as const, label: 'Grade por barbeiro', icon: PanelsTopLeft },
+          { value: 'day' as const, label: 'Linha do dia', icon: LayoutGrid },
         ].map((item) => (
           <button
             key={item.value}
@@ -169,10 +181,10 @@ export function ScheduleToolbar({
               router.push(href)
             }}
             className={cn(
-              'inline-flex items-center gap-2 rounded-[0.8rem] border px-3 py-1.5 text-sm font-medium transition-colors',
+              'inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors',
               view === item.value
-                ? 'border-[rgba(52,211,153,0.18)] bg-[rgba(16,185,129,0.14)] text-emerald-100'
-                : 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-slate-300 hover:bg-[rgba(255,255,255,0.06)]'
+                ? 'border-[rgba(91,33,182,0.12)] bg-[rgba(91,33,182,0.08)] text-primary'
+                : 'border-[rgba(58,47,86,0.08)] bg-[rgba(255,255,255,0.82)] text-muted-foreground hover:bg-[rgba(91,33,182,0.04)] hover:text-foreground'
             )}
           >
             <item.icon className="h-4 w-4" />
