@@ -293,7 +293,7 @@ const TOOL_DEFINITIONS = [
   {
     type: 'function',
     name: 'list_services',
-    description: 'Lista os servicos ativos da barbearia para ajudar a identificar o servico pedido pelo cliente.',
+    description: 'Lista os servicos ativos da barbearia para ajudar a identificar o servico pedido pelo cliente. So use preco quando o cliente pedir valor explicitamente.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -319,7 +319,7 @@ const TOOL_DEFINITIONS = [
   {
     type: 'function',
     name: 'search_availability',
-    description: 'Consulta disponibilidade real no backend usando servico, barbeiro, data e periodo.',
+    description: 'Consulta disponibilidade real no backend usando servico, barbeiro, data e horario exato. Periodo so entra como filtro auxiliar quando o cliente pedir dessa forma.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -341,7 +341,7 @@ const TOOL_DEFINITIONS = [
   {
     type: 'function',
     name: 'create_booking_draft',
-    description: 'Atualiza ou prepara um draft de agendamento com servico, barbeiro, data, periodo ou horario escolhido.',
+    description: 'Atualiza ou prepara um draft de agendamento com servico, data, barbeiro, horario escolhido ou periodo quando o cliente trouxer esse filtro.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -600,12 +600,12 @@ function deriveConversationStateFromMemory(
     return 'WAITING_SERVICE'
   }
 
-  if (validation.missingFields.includes('professional')) {
-    return 'WAITING_PROFESSIONAL'
-  }
-
   if (validation.shouldAskDateInsteadOfPeriod || validation.missingFields.includes('date')) {
     return 'WAITING_DATE'
+  }
+
+  if (validation.missingFields.includes('professional')) {
+    return 'WAITING_PROFESSIONAL'
   }
 
   return 'WAITING_TIME'
@@ -656,12 +656,12 @@ function validateMissingFields(input: {
     missingFields.push('service')
   }
 
-  if (!input.memory.selectedProfessionalId && !input.memory.allowAnyProfessional) {
-    missingFields.push('professional')
-  }
-
   if (!input.memory.requestedDateIso) {
     missingFields.push('date')
+  }
+
+  if (!input.memory.selectedProfessionalId && !input.memory.allowAnyProfessional) {
+    missingFields.push('professional')
   }
 
   if (!input.memory.requestedTimeLabel) {
@@ -714,12 +714,12 @@ function enforceNextActionFromMemory(
         return 'ASK_SERVICE'
       }
 
-      if (validation.missingFields.includes('professional')) {
-        return 'ASK_PROFESSIONAL'
-      }
-
       if (validation.shouldAskDateInsteadOfPeriod || validation.missingFields.includes('date')) {
         return 'ASK_DATE'
+      }
+
+      if (validation.missingFields.includes('professional')) {
+        return 'ASK_PROFESSIONAL'
       }
 
       if (validation.missingFields.includes('period')) {
@@ -754,16 +754,16 @@ function enforceNextActionFromMemory(
     return 'ASK_SERVICE'
   }
 
-  if (validation.missingFields.includes('professional')) {
-    return 'ASK_PROFESSIONAL'
-  }
-
   if (validation.shouldAskDateInsteadOfPeriod) {
     return 'ASK_DATE'
   }
 
   if (validation.missingFields.includes('date')) {
     return 'ASK_DATE'
+  }
+
+  if (validation.missingFields.includes('professional')) {
+    return 'ASK_PROFESSIONAL'
   }
 
   if (validation.missingFields.includes('period')) {
@@ -1175,6 +1175,12 @@ function buildServiceQuestionFromNames(serviceNames: string[]) {
     .join('\n')
 
   return `Perfeito! Temos estes servicos disponiveis:\n\n${preview}\n\nQual voce gostaria de agendar?`
+}
+
+function hasExplicitPriceQuestion(message: string) {
+  return /\b(quanto custa|qual o preco|qual o valor|valor\b|preco\b|preço\b|quanto sai)\b/.test(
+    normalizeText(message)
+  )
 }
 
 function referencesPreferredProfessional(message: string) {
@@ -1658,8 +1664,10 @@ function buildToolPhasePrompt(input: {
     'Use as ferramentas para validar servico, barbeiro, disponibilidade e rascunho antes de responder.',
     'Quando faltar contexto, prefira perguntar em vez de assumir.',
     'Nunca pergunte novamente por um campo que o backend ja tem preenchido.',
-    'Se o servico ainda nao estiver definido, use list_services para trazer a lista real completa da barbearia.',
-    'Pergunte o horario especifico antes de perguntar periodo. Use manha/tarde/noite so como fallback quando o cliente nao tiver horario especifico.',
+    'Se o servico ainda nao estiver definido, use list_services para trazer a lista real completa da barbearia sem preco, a menos que o cliente pergunte valor explicitamente.',
+    'Depois de identificar o servico, pergunte a data antes de falar de barbeiro e horario.',
+    'Depois de identificar servico e data, pergunte a preferencia de barbeiro ou se pode ser qualquer um antes de buscar horarios.',
+    'Pergunte o horario especifico como etapa principal. Use manha/tarde/noite so como fallback quando o cliente trouxer isso espontaneamente.',
     'Nao busque horarios nem confirme slot antes de existir barbeiro definido, barbeiro preferencial valido ou allowAnyProfessional explicito.',
     'Se o cliente responder apenas com um nome de barbeiro, trate isso como escolha de profissional.',
     'Nao use o nome do barbeiro escolhido como vocativo do cliente na resposta.',
@@ -1694,9 +1702,10 @@ function buildFinalPrompt(input: {
     `Ferramentas chamadas nesta rodada: ${input.toolTrace.map((trace) => `${trace.name}:${JSON.stringify(trace.result)}`).join(' | ') || 'nenhuma'}.`,
     `Ultimas mensagens: ${input.recentMessages.map((message) => `${message.direction}:${message.text}`).join(' | ') || 'nenhuma'}.`,
     'Escolha nextAction coerente com o estado do backend.',
-    'Se faltar servico, responda mostrando a lista real de servicos disponiveis.',
-    'Pergunte o horario especifico antes de sugerir periodo sempre que o cliente ainda nao tiver dado um horario claro.',
-    'Se faltar definicao de barbeiro, pergunte preferencia antes de confirmar horario.',
+    'Se faltar servico, responda mostrando a lista real de servicos disponiveis sem preco, a menos que o cliente tenha pedido valor explicitamente.',
+    'Depois de servico e data, pergunte preferencia de barbeiro antes de falar de horarios.',
+    'Pergunte o horario especifico como etapa principal e nao use periodo como pergunta padrao.',
+    'Se faltar definicao de barbeiro, pergunte preferencia antes de buscar ou confirmar horario.',
     'Se o cliente respondeu afirmativamente depois de um "Posso confirmar?", finalize o agendamento; nao repita a pre-confirmacao.',
     'Se o cliente responder apenas com um nome de barbeiro, trate isso como escolha de profissional e nao como vocativo.',
   ].join('\n')
@@ -1716,12 +1725,12 @@ function buildFallbackStructuredOutput(input: {
     ? `Oi, ${firstName}! Posso te ajudar a marcar um horario na ${input.barbershopName} 🙂`
     : (!input.memory.selectedServiceId
       ? 'Perfeito. Qual servico voce quer fazer?'
-      : (!input.memory.selectedProfessionalId && !input.memory.allowAnyProfessional
-        ? 'Tem preferencia de barbeiro?'
-        : (!input.memory.requestedDateIso
-          ? 'Qual dia voce prefere?'
+      : (!input.memory.requestedDateIso
+        ? 'Qual dia voce prefere?'
+        : (!input.memory.selectedProfessionalId && !input.memory.allowAnyProfessional
+          ? 'Voce tem algum barbeiro de preferencia ou pode ser qualquer um?'
           : (!input.memory.requestedTimeLabel
-            ? 'Qual horario voce gostaria? Se preferir, tambem posso procurar por periodo.'
+            ? 'Perfeito. Que horas voce gostaria?'
             : 'Me confirma rapidinho como voce quer seguir por aqui.'))))
 
   const nextAction: WhatsAppAgentNextAction =
@@ -1788,7 +1797,7 @@ function buildGuardrailReplyText(input: {
       return `Posso buscar com ${input.memory.selectedProfessionalName} ou, se preferir, vejo outro barbeiro.`
     }
 
-    return 'Voce tem preferencia de barbeiro ou pode ser qualquer um?'
+    return 'Voce tem algum barbeiro de preferencia ou pode ser qualquer um?'
   }
 
   if (input.nextAction === 'ASK_PERIOD') {
@@ -1796,17 +1805,7 @@ function buildGuardrailReplyText(input: {
       return 'Hoje ja passou do horario de atendimento. Quer que eu veja para amanha ou outro dia?'
     }
 
-    if (validation?.availablePeriods.length === 1) {
-      return validation.availablePeriods[0] === 'EVENING'
-        ? 'Perfeito. Para esse dia eu consigo te atender na noite. Qual horario voce gostaria?'
-        : validation.availablePeriods[0] === 'AFTERNOON'
-          ? 'Perfeito. Para esse dia eu consigo te atender na tarde. Qual horario voce gostaria?'
-          : 'Perfeito. Para esse dia eu consigo te atender na manha. Qual horario voce gostaria?'
-    }
-
-    if (validation?.availablePeriods.length) {
-      return 'Qual horario voce gostaria? Se preferir, tambem posso procurar por periodo.'
-    }
+    return 'Perfeito. Que horas voce gostaria? Me diz o horario que voce quer e eu verifico pra voce.'
   }
 
   if (input.nextAction === 'ASK_DATE') {
@@ -1912,7 +1911,7 @@ function resolveToolFailureOverride(input: {
         preferredProfessionalName: input.preferredProfessionalName ?? null,
         serviceNames: input.serviceNames,
         nowContext: input.nowContext,
-      }) ?? 'Tem preferencia de barbeiro ou posso procurar com qualquer um?',
+      }) ?? 'Voce tem algum barbeiro de preferencia ou pode ser qualquer um?',
     }
   }
 
@@ -1944,7 +1943,7 @@ function resolveToolFailureOverride(input: {
         preferredProfessionalName: input.preferredProfessionalName ?? null,
         serviceNames: input.serviceNames,
         nowContext: input.nowContext,
-      }) ?? 'Qual horario voce gostaria? Se preferir, tambem posso pedir as opcoes.',
+      }) ?? 'Perfeito. Que horas voce gostaria?',
     }
   }
 
@@ -2021,6 +2020,7 @@ async function executeAgentTool(input: {
       ? agentInput.services.filter((service) => normalizeText(service.name).includes(normalizeText(query)))
       : agentInput.services
     const services = filteredServices.length > 0 ? filteredServices : agentInput.services
+    const includePrice = hasExplicitPriceQuestion(agentInput.inboundText)
 
     return {
       status: 'ok',
@@ -2029,7 +2029,7 @@ async function executeAgentTool(input: {
         id: service.id,
         name: service.name,
         duration: service.duration,
-        price: service.price,
+        price: includePrice ? service.price : null,
       })),
     }
   }
@@ -3022,6 +3022,7 @@ export const __testing = {
   buildGuardrailReplyText,
   buildServiceQuestionFromNames,
   referencesPreferredProfessional,
+  hasExplicitPriceQuestion,
   isExplicitConfirmation,
   isPureExplicitConfirmation,
   hasExplicitAnyProfessionalConsent,

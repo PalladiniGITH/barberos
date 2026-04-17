@@ -220,6 +220,7 @@ test('lista de servicos fica formatada em multiplas linhas com bullets', () => {
   assert.match(reply, /(?:^|\n)- Corte \+ Barba Premium/m)
   assert.match(reply, /(?:^|\n)- Corte Classic/m)
   assert.doesNotMatch(reply, /Barba Terapia, Corte \+ Barba Premium, Corte Classic/)
+  assert.doesNotMatch(reply, /R\$|55|35/)
 })
 
 test('com barbeiro recente ou preferencial a conversa usa pergunta mais contextual', () => {

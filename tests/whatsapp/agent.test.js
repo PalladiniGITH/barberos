@@ -365,9 +365,52 @@ test('guardrail de horario pergunta primeiro por horario especifico quando a dat
     nowContext: input.nowContext,
   })
 
-  assert.match(reply, /Qual horario voce gostaria/i)
-  assert.match(reply, /periodo/i)
+  assert.match(reply, /Qual horario voce gostaria|Que horas voce gostaria|Me diz o horario/i)
   assert.doesNotMatch(reply, /Voce prefere manha, tarde ou noite/i)
+  assert.doesNotMatch(reply, /periodo/i)
+})
+
+test('depois de escolher o servico o fluxo pede a data antes de perguntar barbeiro', () => {
+  const input = createAgentInput()
+  const memory = agentTesting.buildInitialMemory(input)
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+
+  const corrected = agentTesting.enforceNextActionFromMemory(
+    'ASK_PROFESSIONAL',
+    memory,
+    false,
+    input.nowContext
+  )
+
+  assert.equal(corrected, 'ASK_DATE')
+})
+
+test('depois de servico e data o fluxo pergunta barbeiro antes de falar de horario', () => {
+  const input = createAgentInput()
+  const memory = agentTesting.buildInitialMemory(input)
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.requestedDateIso = '2026-04-13'
+
+  const corrected = agentTesting.enforceNextActionFromMemory(
+    'ASK_PERIOD',
+    memory,
+    false,
+    input.nowContext
+  )
+
+  const reply = agentTesting.buildGuardrailReplyText({
+    nextAction: corrected,
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    nowContext: input.nowContext,
+  })
+
+  assert.equal(corrected, 'ASK_PROFESSIONAL')
+  assert.match(reply, /barbeiro de preferencia|qualquer um/i)
+  assert.doesNotMatch(reply, /Qual horario|Que horas/i)
 })
 
 test('guardrail de oferta de horarios sempre mostra o barbeiro junto de cada horario', () => {
@@ -469,6 +512,13 @@ test('guardrail de servico mostra a lista real quando o servico ainda nao foi de
   assert.match(reply, /(?:^|\n)- Corte Classic/m)
   assert.match(reply, /(?:^|\n)- Barba/m)
   assert.doesNotMatch(reply, /Corte Classic, Barba/)
+  assert.doesNotMatch(reply, /55|35|R\$/)
+})
+
+test('preco so entra em fluxo explicito de consulta', () => {
+  assert.equal(agentTesting.hasExplicitPriceQuestion('quero marcar um horario'), false)
+  assert.equal(agentTesting.hasExplicitPriceQuestion('qual o preco do corte classic?'), true)
+  assert.equal(agentTesting.hasExplicitPriceQuestion('quanto custa a barba?'), true)
 })
 
 test('guardrail de barbeiro pergunta a preferencia antes de qualquer oferta de horario', () => {
@@ -530,7 +580,7 @@ test('erro de falta de horario especifico vira pergunta direta de horario antes 
   })
 
   assert.equal(override.nextAction, 'ASK_PERIOD')
-  assert.match(override.replyText, /Qual horario voce gostaria/i)
+  assert.match(override.replyText, /Qual horario voce gostaria|Que horas voce gostaria|Me diz o horario/i)
   assert.doesNotMatch(override.replyText, /13:15|13:30/i)
 })
 
@@ -685,8 +735,9 @@ test('servico + barbeiro + data + periodo ainda nao bastam para pedir confirmaca
   })
 
   assert.equal(corrected, 'ASK_PERIOD')
-  assert.match(reply, /Qual horario voce gostaria/i)
+  assert.match(reply, /Qual horario voce gostaria|Que horas voce gostaria|Me diz o horario/i)
   assert.doesNotMatch(reply, /Posso confirmar/i)
+  assert.doesNotMatch(reply, /periodo/i)
 })
 
 test('servico + barbeiro + slot validado liberam confirmacao real', () => {

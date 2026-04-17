@@ -686,7 +686,7 @@ function buildProfessionalQuestion(
   }
 
   return professionalNames.length > 0
-    ? 'Voce tem preferencia de barbeiro ou pode ser qualquer um?'
+    ? 'Voce tem algum barbeiro de preferencia ou pode ser qualquer um?'
     : 'Tem algum barbeiro de preferencia?'
 }
 
@@ -742,7 +742,7 @@ function buildPeriodQuestion(input?: {
   }
 }) {
   if (!input?.requestedDateIso || !input.nowContext) {
-    return 'Perfeito. Tem algum horario especifico que voce prefere? Se quiser, tambem posso procurar por periodo.'
+    return 'Perfeito. Me diz o horario que voce quer e eu verifico pra voce.'
   }
 
   const availablePeriods = getAvailableBusinessPeriodsForDate({
@@ -754,15 +754,7 @@ function buildPeriodQuestion(input?: {
     return 'Hoje ja passou do horario de atendimento. Quer que eu veja para amanha ou outro dia?'
   }
 
-  if (availablePeriods.length === 1) {
-    return availablePeriods[0] === 'EVENING'
-      ? 'Perfeito. Para esse dia eu consigo te atender na noite. Qual horario voce gostaria?'
-      : availablePeriods[0] === 'AFTERNOON'
-        ? 'Perfeito. Para esse dia eu consigo te atender na tarde. Qual horario voce gostaria?'
-        : 'Perfeito. Para esse dia eu consigo te atender na manha. Qual horario voce gostaria?'
-  }
-
-  return 'Qual horario voce gostaria? Se preferir, tambem posso procurar por periodo.'
+  return 'Perfeito. Me diz o horario que voce quer e eu verifico pra voce.'
 }
 
 function buildSpecificTimeQuestion(input: {
@@ -773,14 +765,14 @@ function buildSpecificTimeQuestion(input: {
   const dayLabel = formatDayLabel(input.requestedDateIso, input.timezone).toLowerCase()
 
   if (input.professionalName) {
-    return `Perfeito. Para ${dayLabel} com ${input.professionalName}, qual horario voce prefere? Se quiser, tambem posso te passar as opcoes.`
+    return `Perfeito. Para ${dayLabel} com ${input.professionalName}, que horas voce gostaria?`
   }
 
-  return `Perfeito. Para ${dayLabel}, qual horario voce prefere? Se quiser, tambem posso te passar as opcoes.`
+  return `Perfeito. Para ${dayLabel}, que horas voce gostaria?`
 }
 
 function buildNoAvailabilityMessage(dateIso: string, timezone: string) {
-  return `Nao encontrei horario livre em ${formatDayLabel(dateIso, timezone).toLowerCase()} com essa combinacao. Me fala outro dia ou outro periodo que eu procuro de novo.`
+  return `Nao encontrei horario livre em ${formatDayLabel(dateIso, timezone).toLowerCase()} com essa combinacao. Me fala outro horario ou outro dia que eu procuro de novo.`
 }
 
 function buildSpecificProfessionalNoAvailabilityMessage(
@@ -856,7 +848,7 @@ function buildSuccessMessage(slot: ConversationSlot, serviceName: string, timezo
 }
 
 function buildRescheduleMessage() {
-  return 'Sem problema. Me fala outro horario, outro periodo ou outro dia que eu busco novas opcoes.'
+  return 'Sem problema. Me fala outro horario ou outro dia que eu busco novas opcoes.'
 }
 
 function buildCustomerReferenceMessage(match: CustomerNameMatch, professionals: NameMatch[]) {
@@ -1450,19 +1442,19 @@ function buildExactTimeFallbackResponse(input: {
 
   const conciseFollowUp = nearbySummary
     ? input.professionalName
-      ? `${unavailableMessage}\n\nTenho estas opcoes com ${input.professionalName}:\n\n${nearbySummary}\n\n${input.allowAlternativeProfessionalSuggestion ? 'Se preferir, eu tambem posso ver esse horario com outro barbeiro.' : 'Quer um deles ou prefere outro horario com ele?'}`
+      ? `${unavailableMessage}\n\nTenho estas opcoes com ${input.professionalName}:\n\n${nearbySummary}\n\n${input.allowAlternativeProfessionalSuggestion ? 'Se preferir, eu tambem posso ver esse horario com outro barbeiro.' : 'Quer um deles ou prefere outro horario com ele?'}` 
       : `${unavailableMessage}\n\nTenho estes horarios disponiveis:\n\n${nearbySummary}\n\nQual voce prefere?`
     : input.professionalName
       ? `${unavailableMessage} Se quiser, eu posso procurar outro horario com ${input.professionalName}${input.allowAlternativeProfessionalSuggestion ? ' ou ver esse horario com outro barbeiro' : ''}.`
-      : `${unavailableMessage} Se quiser, eu posso procurar em outro periodo.`
+      : `${unavailableMessage} Se quiser, eu posso procurar outro horario proximo para voce.`
 
   if (shouldAvoidSemanticallyRepeatedResponse({
     previousAssistantText: input.previousAssistantText,
     nextResponseText: conciseFollowUp,
   })) {
     return nearbySummary
-      ? `Nao tenho ${input.exactTime}.\n\nTenho estas opcoes:\n\n${nearbySummary}\n\nQuer que eu siga com uma delas ou busque outro periodo?`
-      : `Nao tenho ${input.exactTime}. Posso buscar em outro periodo para voce.`
+      ? `Nao tenho ${input.exactTime}.\n\nTenho estas opcoes:\n\n${nearbySummary}\n\nQuer que eu siga com uma delas ou busque outro horario?`
+      : `Nao tenho ${input.exactTime}. Posso buscar outro horario para voce.`
   }
 
   return conciseFollowUp
@@ -1552,23 +1544,21 @@ function isConversationContextReliable(input: {
 
   if (input.state === 'WAITING_PROFESSIONAL') {
     return Boolean(input.draft.selectedServiceId)
+      && Boolean(input.draft.requestedDateIso)
       && !hasProfessionalContext
-      && !input.draft.requestedDateIso
-      && !input.draft.requestedTimeLabel
       && !hasOfferedSlots
       && !hasSelectedSlot
   }
 
   if (input.state === 'WAITING_DATE') {
     return Boolean(input.draft.selectedServiceId)
-      && hasProfessionalContext
-      && hasTimeSelection
+      && !input.draft.requestedDateIso
       && !hasOfferedSlots
       && !hasSelectedSlot
   }
 
   if (input.state === 'WAITING_TIME') {
-    if (!input.draft.selectedServiceId || !hasProfessionalContext || hasSelectedSlot) {
+    if (!input.draft.selectedServiceId || !input.draft.requestedDateIso || !hasProfessionalContext || hasSelectedSlot) {
       return false
     }
 
@@ -1591,20 +1581,20 @@ function deriveStateFromDraftProgress(draft: ConversationDraft): ConversationSta
     return 'WAITING_SERVICE'
   }
 
-  if (!draft.selectedProfessionalId && !draft.allowAnyProfessional) {
-    return 'WAITING_PROFESSIONAL'
-  }
-
   if (draft.selectedStoredSlot) {
     return 'WAITING_CONFIRMATION'
   }
 
-  if (!hasResolvedTimePreference(draft.requestedTimeLabel)) {
-    return 'WAITING_TIME'
-  }
-
   if (!draft.requestedDateIso) {
     return 'WAITING_DATE'
+  }
+
+  if (!draft.selectedProfessionalId && !draft.allowAnyProfessional) {
+    return 'WAITING_PROFESSIONAL'
+  }
+
+  if (!hasResolvedTimePreference(draft.requestedTimeLabel)) {
+    return 'WAITING_TIME'
   }
 
   return 'WAITING_TIME'
@@ -3063,55 +3053,6 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     }
   }
 
-  if (!draft.allowAnyProfessional && !draft.selectedProfessionalId) {
-    const responseText = professionals.length === 1
-      ? withLeadIn(
-          `Perfeito. Vou buscar com ${professionals[0].name}. ${draft.requestedDateIso
-            ? buildSpecificTimeQuestion({
-                requestedDateIso: draft.requestedDateIso,
-                timezone,
-                professionalName: professionals[0].name,
-              })
-            : buildDateQuestion()}`,
-          responseLeadIn
-        )
-      : withLeadIn(
-          buildProfessionalQuestion(
-            professionals.map((professional) => professional.name),
-            contextualProfessionalPreference?.professionalName ?? null
-          ),
-          responseLeadIn
-        )
-
-    await prisma.whatsappConversation.update({
-      where: { id: conversation.id },
-        data: {
-          ...baseUpdate,
-          state: professionals.length === 1
-            ? (draft.requestedDateIso ? 'WAITING_TIME' : 'WAITING_DATE')
-            : 'WAITING_PROFESSIONAL',
-          selectedProfessionalId: professionals.length === 1 ? professionals[0].id : null,
-          selectedProfessionalName: professionals.length === 1 ? professionals[0].name : null,
-          allowAnyProfessional: draft.allowAnyProfessional,
-          slotOptions: JSON_NULL,
-        selectedSlot: JSON_NULL,
-        lastAssistantText: responseText,
-      },
-    })
-
-      return {
-        responseText,
-        flow: professionals.length === 1
-          ? (draft.requestedDateIso ? 'collect_period' : 'collect_date')
-          : 'collect_professional',
-        conversationId: conversation.id,
-        conversationState: professionals.length === 1
-          ? (draft.requestedDateIso ? 'WAITING_TIME' : 'WAITING_DATE')
-          : 'WAITING_PROFESSIONAL',
-        usedAI,
-      }
-    }
-
   if (effectiveState === 'WAITING_CONFIRMATION' && interpreted.intent === 'DECLINE') {
     const responseText = withLeadIn(buildRescheduleMessage(), responseLeadIn)
 
@@ -3154,6 +3095,47 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       flow: 'collect_date',
       conversationId: conversation.id,
       conversationState: 'WAITING_DATE',
+      usedAI,
+    }
+  }
+
+  if (!draft.allowAnyProfessional && !draft.selectedProfessionalId) {
+    const responseText = professionals.length === 1
+      ? withLeadIn(
+          `Perfeito. Vou buscar com ${professionals[0].name}. ${buildSpecificTimeQuestion({
+            requestedDateIso: draft.requestedDateIso,
+            timezone,
+            professionalName: professionals[0].name,
+          })}`,
+          responseLeadIn
+        )
+      : withLeadIn(
+          buildProfessionalQuestion(
+            professionals.map((professional) => professional.name),
+            contextualProfessionalPreference?.professionalName ?? null
+          ),
+          responseLeadIn
+        )
+
+    await prisma.whatsappConversation.update({
+      where: { id: conversation.id },
+      data: {
+        ...baseUpdate,
+        state: professionals.length === 1 ? 'WAITING_TIME' : 'WAITING_PROFESSIONAL',
+        selectedProfessionalId: professionals.length === 1 ? professionals[0].id : null,
+        selectedProfessionalName: professionals.length === 1 ? professionals[0].name : null,
+        allowAnyProfessional: draft.allowAnyProfessional,
+        slotOptions: JSON_NULL,
+        selectedSlot: JSON_NULL,
+        lastAssistantText: responseText,
+      },
+    })
+
+    return {
+      responseText,
+      flow: professionals.length === 1 ? 'collect_period' : 'collect_professional',
+      conversationId: conversation.id,
+      conversationState: professionals.length === 1 ? 'WAITING_TIME' : 'WAITING_PROFESSIONAL',
       usedAI,
     }
   }
