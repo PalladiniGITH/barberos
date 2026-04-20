@@ -168,12 +168,19 @@ test('requestedDate promovido nao volta para null quando o cliente informa o ser
 
 test('datas relativas reais geram requestedDateIso correto no timezone da barbearia', async () => {
   const cases = [
+    ['daqui 10 dias', '2026-04-23'],
     ['daqui 15 dias', '2026-04-28'],
     ['daqui 2 semanas', '2026-04-27'],
+    ['daqui 3 semanas', '2026-05-04'],
     ['daqui 1 mes', '2026-05-13'],
+    ['daqui um mes', '2026-05-13'],
     ['na outra sexta', '2026-04-24'],
+    ['sexta da semana que vem', '2026-04-24'],
     ['quinta da semana que vem', '2026-04-23'],
+    ['terca da semana que vem', '2026-04-21'],
+    ['quarta da proxima semana', '2026-04-22'],
     ['proxima quinta', '2026-04-16'],
+    ['proximo domingo', '2026-04-19'],
     ['domingo da outra semana', '2026-05-03'],
   ]
 
@@ -236,6 +243,43 @@ test('data relativa promovida continua no contexto e nao volta a ASK_DATE no tur
     preferredPeriod: memory.requestedTimeLabel,
     inboundText: 'periodo da noite',
   }), true)
+})
+
+test('data relativa entendida no turno segue o fluxo normal e nao volta para ASK_DATE', async () => {
+  const cases = [
+    ['daqui 15 dias', '2026-04-28'],
+    ['daqui 2 semanas', '2026-04-27'],
+    ['daqui 1 mes', '2026-05-13'],
+    ['na outra sexta', '2026-04-24'],
+    ['quinta da semana que vem', '2026-04-23'],
+    ['proxima quinta', '2026-04-16'],
+    ['domingo da outra semana', '2026-05-03'],
+  ]
+
+  for (const [message, expectedDateIso] of cases) {
+    const memory = agentTesting.buildInitialMemory(createAgentInput())
+    memory.state = 'WAITING_DATE'
+    memory.selectedServiceId = 'svc-classic'
+    memory.selectedServiceName = 'Corte Classic'
+
+    const interpreted = await interpretMessage(message, memory)
+    agentTesting.promoteIntentContextToMemory({
+      memory,
+      intent: interpreted,
+      services: SERVICES,
+      professionals: PROFESSIONALS,
+    })
+
+    const nextAction = agentTesting.enforceNextActionFromMemory(
+      'ASK_DATE',
+      memory,
+      false,
+      createAgentInput().nowContext
+    )
+
+    assert.equal(memory.requestedDateIso, expectedDateIso, message)
+    assert.notEqual(nextAction, 'ASK_DATE', message)
+  }
 })
 
 test('frases naturais de noite promovem EVENING de forma deterministica', async () => {
@@ -580,7 +624,7 @@ test('erro de falta de horario especifico vira pergunta direta de horario antes 
   })
 
   assert.equal(override.nextAction, 'ASK_PERIOD')
-  assert.match(override.replyText, /Qual horario voce gostaria/i)
+  assert.match(override.replyText, /Que horas voce gostaria|Qual horario voce gostaria/i)
   assert.doesNotMatch(override.replyText, /13:15|13:30/i)
 })
 

@@ -202,6 +202,22 @@ export function resolveWeekdayIsoDateInWeek(input: {
   return shiftIsoDate(weekStartIso, dayOffset)
 }
 
+export function resolveRelativeWeekdayIsoDate(input: {
+  referenceDateIso: string
+  weekdayIndex: number
+  relation: 'NEXT_OCCURRENCE' | 'NEXT_WEEK' | 'WEEK_AFTER_NEXT'
+}) {
+  if (input.relation === 'NEXT_OCCURRENCE') {
+    return nextWeekdayIsoDate(input.referenceDateIso, input.weekdayIndex)
+  }
+
+  return resolveWeekdayIsoDateInWeek({
+    referenceDateIso: input.referenceDateIso,
+    weekdayIndex: input.weekdayIndex,
+    weekOffset: input.relation === 'WEEK_AFTER_NEXT' ? 2 : 1,
+  })
+}
+
 export function nextWeekdayIsoDate(baseIsoDate: string, weekdayIndex: number) {
   const [year, month, day] = baseIsoDate.split('-').map(Number)
   const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
@@ -242,11 +258,12 @@ export function formatWeekdayFromIsoDate(
 export function formatDayLabelFromIsoDate(
   dateIso: string,
   timezone?: string | null,
-  locale = 'pt-BR'
+  locale = 'pt-BR',
+  referenceDate = new Date()
 ) {
   const resolvedTimezone = resolveBusinessTimezone(timezone)
 
-  if (dateIso === getTodayIsoInTimezone(resolvedTimezone)) {
+  if (dateIso === getTodayIsoInTimezone(resolvedTimezone, referenceDate)) {
     return locale === 'pt-BR' ? 'Hoje' : 'Today'
   }
 

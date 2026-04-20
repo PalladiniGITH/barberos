@@ -1,6 +1,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
+const { detectRelativeDateExpression } = require('@/lib/ai/openai-whatsapp-interpreter')
 const { __testing: conversationTesting } = require('@/lib/whatsapp-conversation')
 
 function buildSlot() {
@@ -131,6 +132,23 @@ test('detecta consultas naturais sobre agendamentos ja confirmados', () => {
     })
 
     assert.equal(detected, true, message)
+  })
+})
+
+test('expressoes relativas reais continuam reconhecidas para promover requestedDateIso no fluxo', () => {
+  const messages = [
+    'daqui 15 dias',
+    'daqui 2 semanas',
+    'daqui 1 mes',
+    'na outra sexta',
+    'quinta da semana que vem',
+    'proxima quinta',
+    'domingo da outra semana',
+    'quarta da proxima semana',
+  ]
+
+  messages.forEach((message) => {
+    assert.equal(detectRelativeDateExpression(message), true, message)
   })
 })
 

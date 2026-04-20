@@ -2860,7 +2860,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     })
   }
 
-  console.info('[whatsapp-conversation] scheduling field normalization', {
+  console.info('[whatsapp-conversation] scheduling date normalization', {
     customerId: input.customer.id,
     requestedDateBefore: baselineDraft.requestedDateIso,
     requestedDateAfter: draft.requestedDateIso,

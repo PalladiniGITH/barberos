@@ -2,8 +2,7 @@ import 'server-only'
 
 import { z } from 'zod'
 import {
-  nextWeekdayIsoDate,
-  resolveWeekdayIsoDateInWeek,
+  resolveRelativeWeekdayIsoDate,
   shiftIsoDate,
   shiftIsoDateByMonths,
   shiftIsoDateByWeeks,
@@ -59,6 +58,24 @@ const NORMALIZED_WEEKDAY_INDEX = Object.entries(WEEKDAY_INDEX).reduce<Record<str
   accumulator[normalizeText(label)] = index
   return accumulator
 }, {})
+
+const WEEKDAY_PATTERN_SOURCE = '(?:domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado)'
+const RELATIVE_AMOUNT_TOKEN_SOURCE = '(?:\\d+|um|uma)'
+const RELATIVE_OFFSET_PATTERN = new RegExp(
+  `\\bdaqui\\s+(${RELATIVE_AMOUNT_TOKEN_SOURCE})\\s+(dia|dias|semana|semanas|mes|meses)\\b`
+)
+const OTHER_WEEKDAY_PATTERN = new RegExp(`\\b(?:na|no)\\s+outr[ao]\\s+(${WEEKDAY_PATTERN_SOURCE})\\b`)
+const WEEKDAY_NEXT_WEEK_PATTERN = new RegExp(
+  `\\b(${WEEKDAY_PATTERN_SOURCE})\\s+da\\s+semana\\s+que\\s+vem\\b`
+)
+const WEEKDAY_NEXT_PROXIMA_WEEK_PATTERN = new RegExp(
+  `\\b(${WEEKDAY_PATTERN_SOURCE})\\s+da\\s+proxima\\s+semana\\b`
+)
+const WEEKDAY_WEEK_AFTER_NEXT_PATTERN = new RegExp(
+  `\\b(${WEEKDAY_PATTERN_SOURCE})\\s+da\\s+outra\\s+semana\\b`
+)
+const NEXT_WEEKDAY_PATTERN = new RegExp(`\\bproxim[ao]\\s+(${WEEKDAY_PATTERN_SOURCE})\\b`)
+const WEEKDAY_QUE_VEM_PATTERN = new RegExp(`\\b(${WEEKDAY_PATTERN_SOURCE})\\s+que\\s+vem\\b`)
 
 const IntentSchema = z.object({
   intent: z.enum(['BOOK_APPOINTMENT', 'CHECK_EXISTING_BOOKING', 'ACKNOWLEDGEMENT', 'CONFIRM', 'DECLINE', 'CHANGE_REQUEST', 'UNKNOWN']),
@@ -459,6 +476,43 @@ function findNormalizedWeekdayIndex(message: string) {
   return matches.length > 0 ? matches[0][1] : null
 }
 
+function parseRelativeAmountToken(value: string) {
+  const normalized = normalizeText(value)
+
+  if (/^\d+$/.test(normalized)) {
+    return Number(normalized)
+  }
+
+  if (normalized === 'um' || normalized === 'uma') {
+    return 1
+  }
+
+  return null
+}
+
+function inferRelativeWeekdayRelation(normalizedMessage: string) {
+  if (WEEKDAY_WEEK_AFTER_NEXT_PATTERN.test(normalizedMessage)) {
+    return 'WEEK_AFTER_NEXT' as const
+  }
+
+  if (
+    OTHER_WEEKDAY_PATTERN.test(normalizedMessage)
+    || WEEKDAY_NEXT_WEEK_PATTERN.test(normalizedMessage)
+    || WEEKDAY_NEXT_PROXIMA_WEEK_PATTERN.test(normalizedMessage)
+  ) {
+    return 'NEXT_WEEK' as const
+  }
+
+  if (
+    NEXT_WEEKDAY_PATTERN.test(normalizedMessage)
+    || WEEKDAY_QUE_VEM_PATTERN.test(normalizedMessage)
+  ) {
+    return 'NEXT_OCCURRENCE' as const
+  }
+
+  return null
+}
+
 export function detectRelativeDateExpression(message: string) {
   const normalized = normalizeText(message)
 
@@ -466,11 +520,13 @@ export function detectRelativeDateExpression(message: string) {
     normalized.includes('hoje')
     || normalized.includes('amanha')
     || normalized.includes('depois de amanha')
-    || /\bdaqui\s+(?:\d+|um|uma)\s+(?:dia|dias|semana|semanas|mes|meses)\b/.test(normalized)
-    || /\b(?:na|no)\s+outr[ao]\s+(?:domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado)\b/.test(normalized)
-    || /\b(?:domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado)\s+da\s+(?:semana\s+que\s+vem|proxima\s+semana|outra\s+semana)\b/.test(normalized)
-    || /\bproxim[ao]\s+(?:domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado)\b/.test(normalized)
-    || /\b(?:domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado)\s+que\s+vem\b/.test(normalized)
+    || RELATIVE_OFFSET_PATTERN.test(normalized)
+    || OTHER_WEEKDAY_PATTERN.test(normalized)
+    || WEEKDAY_NEXT_WEEK_PATTERN.test(normalized)
+    || WEEKDAY_NEXT_PROXIMA_WEEK_PATTERN.test(normalized)
+    || WEEKDAY_WEEK_AFTER_NEXT_PATTERN.test(normalized)
+    || NEXT_WEEKDAY_PATTERN.test(normalized)
+    || WEEKDAY_QUE_VEM_PATTERN.test(normalized)
   )
 }
 
@@ -489,23 +545,22 @@ function parseRelativeDate(message: string, todayIsoDate: string) {
     return todayIsoDate
   }
 
-  const daysFromNowMatch = normalized.match(/\bdaqui\s+(\d+)\s+dias?\b/)
-  if (daysFromNowMatch) {
-    return shiftIsoDate(todayIsoDate, Number(daysFromNowMatch[1]))
-  }
+  const relativeOffsetMatch = normalized.match(RELATIVE_OFFSET_PATTERN)
+  if (relativeOffsetMatch) {
+    const amount = parseRelativeAmountToken(relativeOffsetMatch[1])
+    const unit = relativeOffsetMatch[2]
 
-  const weeksFromNowMatch = normalized.match(/\bdaqui\s+(\d+)\s+semanas?\b/)
-  if (weeksFromNowMatch) {
-    return shiftIsoDateByWeeks(todayIsoDate, Number(weeksFromNowMatch[1]))
-  }
+    if (amount !== null) {
+      if (unit.startsWith('dia')) {
+        return shiftIsoDate(todayIsoDate, amount)
+      }
 
-  if (/\bdaqui\s+(?:1|um|uma)\s+mes\b/.test(normalized)) {
-    return shiftIsoDateByMonths(todayIsoDate, 1)
-  }
+      if (unit.startsWith('semana')) {
+        return shiftIsoDateByWeeks(todayIsoDate, amount)
+      }
 
-  const monthsFromNowMatch = normalized.match(/\bdaqui\s+(\d+)\s+mes(?:es)?\b/)
-  if (monthsFromNowMatch) {
-    return shiftIsoDateByMonths(todayIsoDate, Number(monthsFromNowMatch[1]))
+      return shiftIsoDateByMonths(todayIsoDate, amount)
+    }
   }
 
   const explicitDate = normalized.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/)
@@ -523,21 +578,11 @@ function parseRelativeDate(message: string, todayIsoDate: string) {
 
   const weekdayIndex = findNormalizedWeekdayIndex(normalized)
   if (weekdayIndex !== null) {
-    if (
-      /\boutr[ao]\s+(domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado)\b/.test(normalized)
-      || /\b(domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado)\s+da\s+semana\s+que\s+vem\b/.test(normalized)
-      || /\b(domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado)\s+da\s+proxima\s+semana\b/.test(normalized)
-      || /\b(domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado)\s+da\s+outra\s+semana\b/.test(normalized)
-    ) {
-      const weekOffset = normalized.includes('outra semana') ? 2 : 1
-      return resolveWeekdayIsoDateInWeek({
-        referenceDateIso: todayIsoDate,
-        weekdayIndex,
-        weekOffset,
-      })
-    }
-
-    return nextWeekdayIsoDate(todayIsoDate, weekdayIndex)
+    return resolveRelativeWeekdayIsoDate({
+      referenceDateIso: todayIsoDate,
+      weekdayIndex,
+      relation: inferRelativeWeekdayRelation(normalized) ?? 'NEXT_OCCURRENCE',
+    })
   }
 
   return null
@@ -1223,6 +1268,7 @@ function buildInterpreterPrompt(input: WhatsAppInterpreterInput) {
     '- Se a mensagem vier so com um nome valido de barbeiro, trate isso como escolha de profissional.',
     '- requestedDateIso deve ser yyyy-mm-dd apenas quando a data estiver clara.',
     '- Para "hoje", "amanha" e "depois de amanha", use a data local da barbearia.',
+    '- Expressoes como "daqui 15 dias", "daqui 2 semanas", "daqui 1 mes", "quinta da semana que vem", "proxima quinta" e "domingo da outra semana" tambem devem virar requestedDateIso coerente.',
     '- preferredPeriod deve ser MORNING, AFTERNOON, EVENING ou null.',
     '- timePreference deve ser EXACT, MORNING, AFTERNOON, LATE_AFTERNOON, EVENING ou NONE.',
     '- exactTime so deve ser preenchido quando o horario exato estiver explicito.',

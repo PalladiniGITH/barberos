@@ -25,12 +25,14 @@ test('localDateTimeToUtc preserva o horario local escolhido ao converter para UT
 })
 
 test('17/04 usa sempre a mesma projecao local para dia da semana', () => {
+  const referenceDate = new Date('2026-04-13T15:00:00.000Z')
+
   assert.equal(
     formatWeekdayFromIsoDate('2026-04-17', 'America/Sao_Paulo'),
     'sexta-feira'
   )
   assert.equal(
-    formatDayLabelFromIsoDate('2026-04-17', 'America/Sao_Paulo'),
+    formatDayLabelFromIsoDate('2026-04-17', 'America/Sao_Paulo', 'pt-BR', referenceDate),
     'sexta-feira, 17/04'
   )
 })
