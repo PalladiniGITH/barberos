@@ -2,10 +2,16 @@ import { NextAuthOptions, getServerSession } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { PrismaAdapter } from '@auth/prisma-adapter'
 import bcrypt from 'bcryptjs'
-import { redirect } from 'next/navigation'
 import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
 import { AUTH_ENTRY_PATH } from '@/lib/auth-routes'
+
+export class AuthenticationRequiredError extends Error {
+  constructor(message = 'Sessao autenticada obrigatoria para continuar.') {
+    super(message)
+    this.name = 'AuthenticationRequiredError'
+  }
+}
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as any,
@@ -72,10 +78,16 @@ export const authOptions: NextAuthOptions = {
 
 export const getSession = cache(() => getServerSession(authOptions))
 
+/**
+ * Assegura que a sessao autenticada existe para codigo server-side.
+ * Nao executa redirects de navegacao: o middleware e o guard oficial das rotas privadas.
+ */
 export async function requireSession() {
   const session = await getSession()
   if (!session?.user?.barbershopId) {
-    redirect(AUTH_ENTRY_PATH)
+    throw new AuthenticationRequiredError(
+      'Sessao ausente em contexto server-side protegido. O middleware deve bloquear a navegacao antes desta camada.'
+    )
   }
   return session
 }

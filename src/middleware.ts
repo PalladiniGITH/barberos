@@ -1,6 +1,21 @@
 import { withAuth } from 'next-auth/middleware'
 import { NextResponse } from 'next/server'
 
+const PROTECTED_PATHS = [
+  '/dashboard',
+  '/agendamentos',
+  '/clientes',
+  '/inteligencia',
+  '/financeiro',
+  '/equipe',
+  '/precificacao',
+  '/indicadores',
+  '/configuracoes',
+  '/desafios',
+  '/onboarding',
+  '/setup',
+] as const
+
 export default withAuth(
   function middleware(req) {
     const pathname = req.nextUrl.pathname
@@ -20,17 +35,7 @@ export default withAuth(
     callbacks: {
       authorized: ({ token, req }) => {
         const pathname = req.nextUrl.pathname
-        const protectedPaths = [
-          '/dashboard',
-          '/inteligencia',
-          '/financeiro',
-          '/equipe',
-          '/precificacao',
-          '/indicadores',
-          '/configuracoes',
-          '/desafios',
-        ]
-        if (protectedPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
+        if (PROTECTED_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
           return !!token
         }
         return true
@@ -42,6 +47,10 @@ export default withAuth(
 export const config = {
   matcher: [
     '/dashboard',
+    '/agendamentos',
+    '/agendamentos/:path*',
+    '/clientes',
+    '/clientes/:path*',
     '/inteligencia',
     '/inteligencia/:path*',
     '/financeiro',
@@ -56,5 +65,9 @@ export const config = {
     '/configuracoes/:path*',
     '/desafios',
     '/desafios/:path*',
+    '/onboarding',
+    '/onboarding/:path*',
+    '/setup',
+    '/setup/:path*',
   ],
 }
