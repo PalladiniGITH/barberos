@@ -46,7 +46,7 @@ function DashboardShellFrame({
 }: DashboardShellProps) {
   const pathname = usePathname() ?? currentPath
   const focusMode = isFocusRoute(pathname)
-  const [sidebarPinned, setSidebarPinned] = useState(true)
+  const [sidebarPinned, setSidebarPinned] = useState(false)
   const { pending } = useNavigationFeedback()
 
   useEffect(() => {
@@ -57,8 +57,8 @@ function DashboardShellFrame({
       return
     }
 
-    setSidebarPinned(true)
-  }, [])
+    setSidebarPinned(false)
+  }, [pathname])
 
   function handleSidebarPinnedChange(nextValue: boolean) {
     setSidebarPinned(nextValue)
@@ -66,7 +66,7 @@ function DashboardShellFrame({
   }
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="flex h-screen overflow-hidden bg-background text-foreground">
       <Sidebar
         fallbackPath={currentPath}
         pinned={sidebarPinned}
@@ -74,7 +74,7 @@ function DashboardShellFrame({
         onPinnedChange={handleSidebarPinnedChange}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Header
           currentPath={currentPath}
           currentSearch={currentSearch}
@@ -89,12 +89,12 @@ function DashboardShellFrame({
           className={cn(
             'min-h-0 flex-1 overflow-y-auto overscroll-y-contain transition-[opacity,transform] duration-200',
             focusMode
-              ? 'bg-[radial-gradient(circle_at_top,rgba(91,33,182,0.08),transparent_26%),linear-gradient(180deg,rgba(248,247,251,0.88),rgba(243,241,248,0.96))] px-4 pb-8 pt-4 sm:px-6'
-              : 'bg-[radial-gradient(circle_at_top,rgba(91,33,182,0.07),transparent_30%),linear-gradient(180deg,rgba(247,246,250,0.84),rgba(241,239,246,0.96))] px-4 pb-12 pt-6 sm:px-7 lg:px-8',
+              ? 'bg-[radial-gradient(circle_at_top,rgba(91,33,182,0.05),transparent_22%),linear-gradient(180deg,rgba(244,242,248,0.96),rgba(237,234,242,0.98))] px-4 pb-6 pt-4 sm:px-6'
+              : 'bg-[radial-gradient(circle_at_top,rgba(91,33,182,0.04),transparent_24%),linear-gradient(180deg,rgba(243,241,247,0.98),rgba(236,233,240,1))] px-5 pb-8 pt-5 sm:px-7',
             pending && 'opacity-80'
           )}
         >
-          <div className="mx-auto w-full max-w-[1880px]">
+          <div className="mx-auto w-full max-w-[1760px]">
             {children}
           </div>
         </main>

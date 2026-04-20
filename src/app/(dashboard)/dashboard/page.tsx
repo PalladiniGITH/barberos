@@ -404,7 +404,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         )}
       />
 
-      <section className="dashboard-spotlight overflow-hidden p-6 sm:p-7">
+      <section className="dashboard-spotlight overflow-hidden p-5 sm:p-6">
         <div className="dashboard-hero-grid">
           <div>
             <p className="spotlight-kicker">Radar operacional</p>
@@ -449,7 +449,7 @@ export default async function DashboardPage({ searchParams }: Props) {
           <aside className="premium-rail p-5">
             <p className="page-kicker">Pulso do mes</p>
             <div className="mt-3 space-y-4">
-              <div className="rounded-[1.25rem] border border-[rgba(58,47,86,0.08)] bg-white p-4 shadow-[0_14px_28px_-24px_rgba(20,15,35,0.12)]">
+              <div className="rounded-[0.95rem] border border-[rgba(52,44,78,0.1)] bg-[rgba(255,255,255,0.8)] p-4 shadow-[0_10px_18px_-14px_rgba(20,15,35,0.08)]">
                 <p className="executive-label">Meta principal</p>
                 <p className="mt-3 text-[1.8rem] font-semibold tracking-tight text-foreground">
                   {data.goalValue > 0 ? formatPercent(data.goalAttainment, 0) : 'Sem meta'}
@@ -461,7 +461,7 @@ export default async function DashboardPage({ searchParams }: Props) {
                 </p>
               </div>
 
-              <div className="rounded-[1.25rem] border border-[rgba(58,47,86,0.08)] bg-white p-4 shadow-[0_14px_28px_-24px_rgba(20,15,35,0.12)]">
+              <div className="rounded-[0.95rem] border border-[rgba(52,44,78,0.1)] bg-[rgba(255,255,255,0.8)] p-4 shadow-[0_10px_18px_-14px_rgba(20,15,35,0.08)]">
                 <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
                   <span>Percentual atingido</span>
                   <span>{formatPercent(data.goalAttainment, 0)}</span>
@@ -484,7 +484,7 @@ export default async function DashboardPage({ searchParams }: Props) {
                 </p>
               </div>
 
-              <div className="rounded-[1.25rem] border border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] p-4">
+              <div className="rounded-[0.95rem] border border-[rgba(52,44,78,0.1)] bg-[rgba(91,33,182,0.05)] p-4">
                 <p className="executive-label">Leitura rapida</p>
                 <div className="mt-3 space-y-3 text-sm">
                   <div className="flex items-center justify-between gap-3">
@@ -551,7 +551,7 @@ export default async function DashboardPage({ searchParams }: Props) {
 
             {data.goalValue > 0 ? (
               <div className="mt-5 space-y-4">
-                <div className="rounded-[1.25rem] border border-[rgba(58,47,86,0.08)] bg-white p-4">
+                <div className="rounded-[0.95rem] border border-[rgba(52,44,78,0.1)] bg-[rgba(255,255,255,0.8)] p-4">
                   <p className="executive-label">Realizado ate agora</p>
                   <p className="mt-3 text-[2rem] font-semibold tracking-tight text-foreground">
                     {formatCurrency(data.totalRevenue)}
@@ -613,7 +613,7 @@ export default async function DashboardPage({ searchParams }: Props) {
           <ProfessionalRanking data={data.ranking.slice(0, 5)} />
         ) : (
           <section className="dashboard-panel flex min-h-[280px] flex-col justify-center p-6">
-            <div className="rounded-[1.25rem] border border-dashed border-[rgba(58,47,86,0.12)] bg-[rgba(91,33,182,0.04)] p-5 text-center">
+              <div className="rounded-[0.95rem] border border-dashed border-[rgba(52,44,78,0.12)] bg-[rgba(91,33,182,0.035)] p-5 text-center">
               <p className="text-sm font-semibold text-foreground">Ranking ainda indisponivel</p>
               <p className="mt-2 text-sm leading-7 text-muted-foreground">
                 Assim que as receitas forem lancadas por profissional, o time aparece aqui com hierarquia e comparacao real.

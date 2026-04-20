@@ -4,26 +4,26 @@
 
 @layer base {
   :root {
-    --background: 240 18% 96%;
-    --foreground: 252 24% 12%;
+    --background: 244 20% 94%;
+    --foreground: 252 26% 13%;
     --card: 0 0% 100%;
-    --card-foreground: 252 24% 12%;
+    --card-foreground: 252 26% 13%;
     --popover: 0 0% 100%;
-    --popover-foreground: 252 24% 12%;
-    --primary: 267 68% 52%;
+    --popover-foreground: 252 26% 13%;
+    --primary: 266 62% 45%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 244 18% 93%;
-    --secondary-foreground: 248 16% 22%;
-    --muted: 242 16% 92%;
-    --muted-foreground: 246 10% 40%;
-    --accent: 266 76% 95%;
-    --accent-foreground: 266 38% 24%;
+    --secondary: 246 17% 90%;
+    --secondary-foreground: 248 16% 20%;
+    --muted: 244 15% 89%;
+    --muted-foreground: 246 10% 32%;
+    --accent: 264 42% 92%;
+    --accent-foreground: 266 38% 22%;
     --destructive: 354 76% 56%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 14% 85%;
-    --input: 242 18% 91%;
-    --ring: 267 68% 52%;
-    --radius: 1.125rem;
+    --border: 242 12% 80%;
+    --input: 244 13% 87%;
+    --ring: 266 62% 45%;
+    --radius: 0.875rem;
   }
 
   * {
@@ -39,10 +39,9 @@
     font-family: var(--font-sans), system-ui, sans-serif;
     font-feature-settings: 'rlig' 1, 'calt' 1;
     background:
-      radial-gradient(circle at top left, rgba(91, 33, 182, 0.09), transparent 24%),
-      radial-gradient(circle at top right, rgba(168, 85, 247, 0.08), transparent 18%),
-      linear-gradient(180deg, #f7f6fb 0%, #f3f2f8 52%, #f6f5fa 100%);
-    background-attachment: fixed;
+      radial-gradient(circle at top left, rgba(91, 33, 182, 0.07), transparent 20%),
+      radial-gradient(circle at top right, rgba(124, 58, 237, 0.05), transparent 16%),
+      linear-gradient(180deg, #f2f0f6 0%, #edeaf2 48%, #f2eff5 100%);
   }
 
   h1,
@@ -114,53 +113,53 @@
   .disclosure-panel,
   .panel-card,
   .metric-card {
-    @apply rounded-[1.55rem] border bg-white;
-    border-color: rgba(58, 47, 86, 0.08);
+    @apply rounded-[1.1rem] border bg-white;
+    border-color: rgba(52, 44, 78, 0.1);
     box-shadow:
-      0 26px 70px -42px rgba(19, 15, 36, 0.14),
-      0 14px 32px -24px rgba(91, 33, 182, 0.09),
+      0 18px 34px -26px rgba(19, 15, 36, 0.1),
+      0 10px 20px -18px rgba(91, 33, 182, 0.06),
       inset 0 1px 0 rgba(255, 255, 255, 0.9);
   }
 
   .dashboard-panel {
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(252, 251, 255, 0.98));
+      linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(249, 247, 252, 0.96));
   }
 
   .dashboard-spotlight {
-    @apply rounded-[1.9rem] border bg-white;
-    border-color: rgba(71, 51, 117, 0.1);
+    @apply rounded-[1.25rem] border bg-white;
+    border-color: rgba(71, 51, 117, 0.12);
     background:
-      radial-gradient(circle at top left, rgba(91, 33, 182, 0.11), transparent 30%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 245, 252, 0.98));
+      radial-gradient(circle at top left, rgba(91, 33, 182, 0.08), transparent 26%),
+      linear-gradient(180deg, rgba(250, 249, 252, 0.98), rgba(243, 240, 248, 0.98));
     box-shadow:
-      0 34px 88px -48px rgba(23, 18, 43, 0.18),
-      0 20px 40px -30px rgba(91, 33, 182, 0.12);
+      0 22px 42px -30px rgba(23, 18, 43, 0.12),
+      0 12px 24px -22px rgba(91, 33, 182, 0.08);
   }
 
   .premium-shell {
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 242, 249, 0.94));
+      linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(242, 239, 247, 0.95));
   }
 
   .premium-block {
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 244, 250, 0.95));
+      linear-gradient(180deg, rgba(252, 251, 253, 0.97), rgba(244, 241, 248, 0.96));
   }
 
   .premium-rail {
     background:
-      linear-gradient(180deg, rgba(247, 245, 251, 0.98), rgba(241, 238, 248, 0.96));
+      linear-gradient(180deg, rgba(245, 242, 249, 0.98), rgba(239, 235, 245, 0.98));
   }
 
   .surface-soft {
     background:
-      linear-gradient(180deg, rgba(247, 245, 251, 0.96), rgba(242, 239, 248, 0.95));
+      linear-gradient(180deg, rgba(245, 242, 249, 0.94), rgba(238, 234, 244, 0.95));
   }
 
   .surface-soft-strong {
     background:
-      linear-gradient(180deg, rgba(238, 233, 247, 0.94), rgba(246, 244, 250, 0.98));
+      linear-gradient(180deg, rgba(235, 230, 244, 0.95), rgba(244, 241, 248, 0.98));
   }
 
   .dashboard-hero-grid {
@@ -168,10 +167,10 @@
   }
 
   .hero-stat-card {
-    @apply rounded-[1.35rem] border bg-white p-5 backdrop-blur-sm;
-    border-color: rgba(71, 51, 117, 0.08);
-    background: rgba(255, 255, 255, 0.86);
-    box-shadow: 0 22px 48px -34px rgba(20, 15, 35, 0.12);
+    @apply rounded-[1rem] border bg-white p-5 backdrop-blur-sm;
+    border-color: rgba(71, 51, 117, 0.09);
+    background: rgba(250, 249, 252, 0.9);
+    box-shadow: 0 14px 24px -18px rgba(20, 15, 35, 0.08);
   }
 
   .hero-stat-card strong,
@@ -190,21 +189,21 @@
 
   .spotlight-chip,
   .surface-chip {
-    @apply inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold;
-    border-color: rgba(91, 33, 182, 0.08);
-    background: rgba(91, 33, 182, 0.055);
+    @apply inline-flex max-w-full items-center gap-2 rounded-[0.75rem] border px-3 py-1.5 text-xs font-semibold;
+    border-color: rgba(91, 33, 182, 0.1);
+    background: rgba(91, 33, 182, 0.065);
     color: hsl(var(--accent-foreground));
     width: fit-content;
   }
 
   .spotlight-stat,
   .kpi-card {
-    @apply rounded-[1.35rem] border p-5;
-    border-color: rgba(58, 47, 86, 0.08);
+    @apply rounded-[1rem] border p-5;
+    border-color: rgba(58, 47, 86, 0.1);
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 246, 251, 0.95));
+      linear-gradient(180deg, rgba(252, 251, 253, 0.98), rgba(245, 243, 249, 0.96));
     box-shadow:
-      0 20px 46px -34px rgba(20, 15, 35, 0.14),
+      0 14px 24px -18px rgba(20, 15, 35, 0.1),
       inset 0 1px 0 rgba(255, 255, 255, 0.95);
   }
 
@@ -213,11 +212,11 @@
   }
 
   .executive-metric {
-    @apply rounded-[1.35rem] border p-5;
-    border-color: rgba(58, 47, 86, 0.08);
+    @apply rounded-[1rem] border p-5;
+    border-color: rgba(58, 47, 86, 0.1);
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(249, 248, 252, 0.96));
-    box-shadow: 0 18px 38px -30px rgba(25, 18, 40, 0.12);
+      linear-gradient(180deg, rgba(252, 251, 253, 0.98), rgba(245, 243, 249, 0.96));
+    box-shadow: 0 14px 22px -18px rgba(25, 18, 40, 0.1);
   }
 
   .executive-label {
@@ -230,7 +229,7 @@
 
   .premium-dark-button,
   .action-button-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-[1rem] border border-transparent px-4 py-2.5 text-sm font-semibold text-white transition-all;
+    @apply inline-flex items-center justify-center gap-2 rounded-[0.9rem] border border-transparent px-4 py-2.5 text-sm font-semibold text-white transition-all;
     background: linear-gradient(135deg, #5b21b6, #6d28d9 52%, #7c3aed);
     box-shadow: 0 18px 40px -22px rgba(91, 33, 182, 0.42);
   }
@@ -242,10 +241,10 @@
   }
 
   .action-button {
-    @apply inline-flex items-center justify-center gap-2 rounded-[1rem] border px-4 py-2.5 text-sm font-semibold text-foreground transition-all;
-    border-color: rgba(58, 47, 86, 0.08);
-    background: rgba(255, 255, 255, 0.88);
-    box-shadow: 0 14px 26px -22px rgba(20, 15, 35, 0.12);
+    @apply inline-flex items-center justify-center gap-2 rounded-[0.9rem] border px-4 py-2.5 text-sm font-semibold text-foreground transition-all;
+    border-color: rgba(58, 47, 86, 0.1);
+    background: rgba(250, 249, 252, 0.92);
+    box-shadow: 0 10px 18px -16px rgba(20, 15, 35, 0.08);
   }
 
   .action-button:hover {
@@ -267,9 +266,9 @@
   }
 
   .panel-soft {
-    @apply rounded-[1.15rem] border p-4;
-    border-color: rgba(58, 47, 86, 0.08);
-    background: rgba(247, 245, 251, 0.9);
+    @apply rounded-[0.95rem] border p-4;
+    border-color: rgba(58, 47, 86, 0.09);
+    background: rgba(243, 240, 248, 0.92);
   }
 
   .data-table th {
@@ -284,21 +283,21 @@
 
   .auth-dark-panel,
   .auth-panel {
-    @apply rounded-[2rem] border bg-white;
-    border-color: rgba(58, 47, 86, 0.1);
-    box-shadow: 0 36px 96px -50px rgba(32, 21, 58, 0.22);
+    @apply rounded-[1.4rem] border bg-white;
+    border-color: rgba(58, 47, 86, 0.12);
+    box-shadow: 0 24px 48px -30px rgba(32, 21, 58, 0.16);
   }
 
   .auth-stat {
-    @apply rounded-[1.25rem] border px-4 py-4;
-    border-color: rgba(58, 47, 86, 0.08);
-    background: rgba(247, 245, 251, 0.88);
+    @apply rounded-[1rem] border px-4 py-4;
+    border-color: rgba(58, 47, 86, 0.1);
+    background: rgba(244, 241, 248, 0.9);
   }
 
   .auth-input {
-    @apply w-full rounded-[1rem] border px-4 py-3 text-foreground outline-none transition-all;
-    border-color: rgba(58, 47, 86, 0.1);
-    background: rgba(255, 255, 255, 0.96);
+    @apply w-full rounded-[0.9rem] border px-4 py-3 text-foreground outline-none transition-all;
+    border-color: rgba(58, 47, 86, 0.12);
+    background: rgba(255, 255, 255, 0.94);
   }
 
   .auth-input::placeholder {

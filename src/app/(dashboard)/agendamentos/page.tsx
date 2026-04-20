@@ -235,7 +235,7 @@ export default async function AgendamentosPage({ searchParams }: Props) {
         )}
       />
 
-      <section className="dashboard-spotlight overflow-hidden px-6 py-6">
+      <section className="dashboard-spotlight overflow-hidden px-5 py-5">
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_360px]">
           <div>
             <p className="spotlight-kicker">Operacao do dia</p>
@@ -290,13 +290,13 @@ export default async function AgendamentosPage({ searchParams }: Props) {
             <p className="mt-2 text-sm leading-7 text-muted-foreground">{schedule.panel.subtitle}</p>
 
             <div className="mt-5 space-y-3">
-              <div className="rounded-[1.25rem] border border-[rgba(58,47,86,0.08)] bg-white p-4">
+              <div className="rounded-[0.95rem] border border-[rgba(52,44,78,0.1)] bg-[rgba(255,255,255,0.78)] p-4">
                 <p className="executive-label">Faturamento do periodo</p>
                 <p className="mt-3 text-[1.85rem] font-semibold tracking-tight text-foreground">{formatCurrency(schedule.panel.periodRevenue)}</p>
                 <p className="mt-2 text-sm text-muted-foreground">Meta do periodo: {formatCurrency(schedule.panel.periodGoal)}</p>
               </div>
 
-              <div className="rounded-[1.25rem] border border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.05)] p-4">
+              <div className="rounded-[0.95rem] border border-[rgba(52,44,78,0.1)] bg-[rgba(91,33,182,0.06)] p-4">
                 <p className="executive-label">Ritmo da meta</p>
                 <p className="mt-3 text-[1.6rem] font-semibold tracking-tight text-foreground">{formatPercent(schedule.panel.periodGoalProgress)}</p>
                 <p className="mt-2 text-sm text-muted-foreground">Leitura do periodo com receita real, nao estimada.</p>
@@ -327,7 +327,7 @@ export default async function AgendamentosPage({ searchParams }: Props) {
                 Clique em um slot vazio para criar. Clique e arraste para escolher intervalo. Arraste um bloco existente para remarcar com seguranca.
               </p>
             </div>
-            <div className="rounded-full border border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] px-3 py-1.5 text-sm font-medium text-foreground">
+            <div className="rounded-[0.75rem] border border-[rgba(52,44,78,0.1)] bg-[rgba(91,33,182,0.05)] px-3 py-1.5 text-sm font-medium text-foreground">
               Operacao visual com bloqueios e conflitos
             </div>
           </div>
@@ -358,7 +358,7 @@ export default async function AgendamentosPage({ searchParams }: Props) {
 
             <div className="mt-4 space-y-3">
               {schedule.panel.upcomingToday.length > 0 ? schedule.panel.upcomingToday.map((appointment) => (
-                <div key={appointment.id} className="rounded-[1.1rem] border border-[rgba(58,47,86,0.08)] bg-white p-4 shadow-[0_16px_32px_-28px_rgba(22,16,39,0.12)]">
+                <div key={appointment.id} className="rounded-[0.95rem] border border-[rgba(52,44,78,0.1)] bg-[rgba(255,255,255,0.84)] p-4 shadow-[0_10px_18px_-14px_rgba(22,16,39,0.08)]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-foreground">{appointment.customerName}</p>
@@ -366,7 +366,7 @@ export default async function AgendamentosPage({ searchParams }: Props) {
                         {appointment.serviceName} com {appointment.professionalName}
                       </p>
                     </div>
-                    <span className="rounded-full bg-[rgba(91,33,182,0.08)] px-2.5 py-1 text-xs font-semibold text-primary">
+                    <span className="rounded-[0.7rem] bg-[rgba(91,33,182,0.08)] px-2.5 py-1 text-xs font-semibold text-primary">
                       {appointment.startTimeLabel}
                     </span>
                   </div>
@@ -376,7 +376,7 @@ export default async function AgendamentosPage({ searchParams }: Props) {
                   </div>
                 </div>
               )) : (
-                <div className="rounded-[1rem] border border-dashed border-[rgba(58,47,86,0.12)] bg-[rgba(91,33,182,0.04)] p-5 text-sm text-muted-foreground">
+                <div className="rounded-[0.9rem] border border-dashed border-[rgba(52,44,78,0.12)] bg-[rgba(91,33,182,0.035)] p-5 text-sm text-muted-foreground">
                   Nenhum atendimento montado para este dia. Use a grade para preencher a agenda sem sair do fluxo.
                 </div>
               )}
@@ -416,9 +416,9 @@ export default async function AgendamentosPage({ searchParams }: Props) {
                   tone: 'text-rose-600',
                 },
               ].map((item) => (
-                <div key={item.label} className="flex items-center justify-between rounded-[1rem] border border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] px-4 py-3">
+                <div key={item.label} className="flex items-center justify-between rounded-[0.9rem] border border-[rgba(52,44,78,0.1)] bg-[rgba(91,33,182,0.035)] px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-[0.9rem] bg-white">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-[0.8rem] bg-[rgba(255,255,255,0.86)]">
                       <item.icon className={cn('h-4 w-4', item.tone)} />
                     </span>
                     <div>

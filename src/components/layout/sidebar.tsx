@@ -272,18 +272,24 @@ function SidebarLink({
   onPreview: (href: string | null) => void
   children?: ReactNode
 }) {
+  const isTopLevel = level === 0
   const compact = !expanded
+  const iconSizeClass = compact
+    ? 'h-10 w-10 rounded-[0.95rem]'
+    : level === 0
+      ? 'h-10 w-10 rounded-[1rem]'
+      : 'h-[2.3rem] w-[2.3rem] rounded-[0.9rem]'
 
   return (
     <div
-      className={cn('min-w-0', level === 0 ? 'space-y-1.5' : '')}
+      className={cn('min-w-0', isTopLevel ? 'space-y-1.5' : '')}
       onMouseEnter={() => {
-        if (level === 0) {
+        if (isTopLevel) {
           onPreview(item.children ? item.href : null)
         }
       }}
       onMouseLeave={() => {
-        if (level === 0) {
+        if (isTopLevel) {
           onPreview(null)
         }
       }}
@@ -294,32 +300,63 @@ function SidebarLink({
         aria-current={active ? 'page' : undefined}
         onClick={() => onNavigate(item.href)}
         className={cn(
-          'group relative flex min-w-0 items-center gap-3 transition-all duration-200',
+          'group relative isolate flex min-w-0 items-center gap-3 overflow-hidden border transition-all duration-200',
           compact
-            ? 'mx-auto h-12 w-12 justify-center rounded-2xl'
-            : level === 0
-              ? 'min-h-[3.75rem] rounded-[1.1rem] px-3.5 py-3'
-              : 'ml-4 min-h-[3.1rem] rounded-[0.95rem] px-3 py-2',
-          active
-            ? 'bg-[linear-gradient(135deg,rgba(91,33,182,0.14),rgba(91,33,182,0.05))] text-[hsl(var(--foreground))] shadow-[0_14px_28px_-22px_rgba(91,33,182,0.28),inset_0_0_0_1px_rgba(91,33,182,0.1)]'
-            : 'text-muted-foreground hover:bg-[rgba(91,33,182,0.045)] hover:text-foreground',
-          loading ? 'opacity-80' : ''
+            ? 'mx-auto h-12 w-12 justify-center rounded-[1rem] border-transparent bg-transparent p-0 shadow-none'
+            : 'min-h-[3.55rem] w-full rounded-[1.1rem] px-2.5 py-2.5',
+          level === 1 && !compact ? 'ml-4 min-h-[3.15rem] rounded-[1rem] pr-2' : '',
+          !compact && active
+            ? 'border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.045))] text-white shadow-[0_24px_38px_-30px_rgba(2,6,23,0.86)]'
+            : !compact
+              ? 'border-transparent text-slate-400 hover:border-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.04)] hover:text-slate-100'
+              : 'text-slate-400 hover:text-slate-100',
+          loading ? 'bg-[rgba(255,255,255,0.06)] text-slate-100' : ''
         )}
       >
-        {active && !compact && (
-          <span className="absolute left-0 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-full bg-[linear-gradient(180deg,#7c3aed,#c084fc)]" />
+        {active && expanded && isTopLevel && (
+          <span className="absolute left-1.5 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-full bg-[linear-gradient(180deg,rgba(52,211,153,0.95),rgba(56,189,248,0.62))] shadow-[0_0_18px_rgba(16,185,129,0.42)]" />
         )}
-
+        {active && !compact && (
+          <span
+            className={cn(
+              'absolute inset-[1px] border border-[rgba(255,255,255,0.04)]',
+              level === 1 ? 'rounded-[calc(1rem-1px)]' : 'rounded-[calc(1.1rem-1px)]'
+            )}
+          />
+        )}
         <span
           className={cn(
-            'relative flex flex-shrink-0 items-center justify-center rounded-[0.95rem] border transition-colors',
-            compact ? 'h-10 w-10' : level === 0 ? 'h-10 w-10' : 'h-9 w-9',
+            'relative z-10 flex flex-shrink-0 items-center justify-center border transition-all duration-200',
+            iconSizeClass,
             active
-              ? 'border-[rgba(91,33,182,0.1)] bg-[rgba(91,33,182,0.11)] text-primary'
-              : 'border-[rgba(58,47,86,0.06)] bg-[rgba(255,255,255,0.86)] text-muted-foreground group-hover:border-[rgba(91,33,182,0.1)] group-hover:text-primary'
+              ? cn(
+                  'border-[rgba(52,211,153,0.18)] bg-[linear-gradient(135deg,rgba(16,185,129,0.18),rgba(15,23,42,0.94))] text-emerald-100 shadow-[0_18px_28px_-24px_rgba(16,185,129,0.46)]',
+                  compact ? 'shadow-[0_16px_28px_-22px_rgba(16,185,129,0.46)]' : ''
+                )
+              : 'border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.035)] text-slate-400 group-hover:border-[rgba(255,255,255,0.08)] group-hover:bg-[rgba(255,255,255,0.05)] group-hover:text-slate-100',
+            loading ? 'scale-[0.97] opacity-80' : ''
           )}
         >
-          <item.icon className={cn(compact ? 'h-[1rem] w-[1rem]' : 'h-[1rem] w-[1rem]')} />
+          <span
+            className={cn(
+              'absolute inset-[1px] transition-opacity duration-200',
+              compact
+                ? 'rounded-[calc(0.95rem-1px)]'
+                : level === 0
+                  ? 'rounded-[calc(1rem-1px)]'
+                  : 'rounded-[calc(0.9rem-1px)]',
+              active
+                ? 'opacity-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                : 'opacity-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] group-hover:opacity-100'
+            )}
+          />
+          <item.icon
+            className={cn(
+              'relative transition-transform duration-200',
+              compact ? 'h-[1.02rem] w-[1.02rem]' : level === 0 ? 'h-[1.02rem] w-[1.02rem]' : 'h-[0.95rem] w-[0.95rem]',
+              loading ? 'scale-95' : ''
+            )}
+          />
         </span>
 
         <div
@@ -330,11 +367,11 @@ function SidebarLink({
         >
           <div className="flex min-w-0 items-center justify-between gap-2">
             <div className="min-w-0">
-              <p className={cn('truncate font-semibold', level === 0 ? 'text-sm' : 'text-[13px]')}>
+              <p className={cn('truncate font-medium leading-none', level === 0 ? 'text-sm' : 'text-[13px]')}>
                 {item.label}
               </p>
               {level === 0 && (
-                <p className="mt-1 truncate text-xs text-muted-foreground">
+                <p className="mt-1.5 truncate text-xs leading-none text-slate-500 transition-colors duration-200 group-hover:text-slate-400">
                   {item.description}
                 </p>
               )}
@@ -343,8 +380,8 @@ function SidebarLink({
             {item.children && (
               <ChevronRight
                 className={cn(
-                  'h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform duration-200',
-                  childrenVisible ? 'rotate-90 text-primary' : ''
+                  'h-4 w-4 flex-shrink-0 text-slate-500 transition-transform duration-200',
+                  childrenVisible ? 'rotate-90 text-slate-300' : ''
                 )}
               />
             )}
@@ -439,55 +476,44 @@ export function Sidebar({
         setPreviewModuleHref(null)
       }}
       className={cn(
-        'hidden min-h-screen shrink-0 border-r border-[rgba(58,47,86,0.08)] bg-[linear-gradient(180deg,rgba(249,248,252,0.98),rgba(243,241,247,0.98))] transition-[width] duration-300 ease-out lg:flex',
-        expanded ? 'w-[320px]' : 'w-[88px]',
+        'hidden h-full overflow-hidden border-r border-[rgba(255,255,255,0.05)] bg-[linear-gradient(180deg,rgba(10,15,28,0.97),rgba(11,18,32,0.95))] text-slate-100 shadow-[18px_0_40px_-34px_rgba(2,6,23,0.92)] transition-[width] duration-300 ease-out lg:flex',
+        expanded ? 'w-[312px]' : 'w-[84px]',
         focusMode && !expanded ? 'opacity-95' : ''
       )}
     >
-      <div className="flex h-full min-w-0 flex-1 flex-col px-3 py-4">
-        <div className="overflow-hidden rounded-[1.6rem] border border-[rgba(91,33,182,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(242,239,248,0.96))] p-3.5 shadow-[0_24px_50px_-38px_rgba(24,18,41,0.16)]">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/dashboard"
-              onClick={() => startNavigation('/dashboard')}
-              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[1rem] bg-[linear-gradient(135deg,#4c1d95,#6d28d9)] text-white shadow-[0_16px_32px_-20px_rgba(91,33,182,0.48)]"
-              title="Painel executivo"
-            >
-              <Scissors className="h-4 w-4" />
-            </Link>
+      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col px-3 py-4">
+        <div className="flex min-h-[56px] items-center gap-3 overflow-hidden rounded-[1rem] px-2.5">
+          <Link
+            href="/dashboard"
+            onClick={() => startNavigation('/dashboard')}
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[0.95rem] bg-[linear-gradient(135deg,rgba(16,185,129,0.18),rgba(15,23,42,0.96))] text-emerald-200 shadow-[0_18px_34px_-24px_rgba(2,6,23,0.82)]"
+            title="Painel do negocio"
+          >
+            <Scissors className="h-4 w-4" />
+          </Link>
 
-            <div
-              className={cn(
-                'min-w-0 transition-[opacity,transform,max-width] duration-200',
-                expanded ? 'max-w-full translate-x-0 opacity-100' : 'max-w-0 -translate-x-2 opacity-0'
-              )}
-            >
-              <p className="truncate text-sm font-semibold text-foreground">BarberOS</p>
-              <p className="truncate text-xs text-muted-foreground">SaaS operacional para barbearias premium</p>
-            </div>
+          <div
+            className={cn(
+              'min-w-0 transition-[opacity,transform,max-width] duration-200',
+              expanded ? 'max-w-full translate-x-0 opacity-100' : 'max-w-0 -translate-x-2 opacity-0'
+            )}
+          >
+            <p className="truncate text-sm font-semibold text-slate-50">BarberOS</p>
+            <p className="truncate text-xs text-slate-500">Operacao diaria da barbearia</p>
           </div>
-
-          {expanded && (
-            <div className="mt-3 rounded-[1.1rem] border border-[rgba(91,33,182,0.08)] bg-[linear-gradient(180deg,rgba(248,246,252,0.98),rgba(255,255,255,0.94))] px-3 py-3 text-xs leading-5 text-muted-foreground">
-              Produto operacional para recepcao, agenda, time e resultado em um unico fluxo.
-            </div>
-          )}
         </div>
 
         <div className="mt-5 min-h-0 flex-1">
-          <nav className="h-full overflow-y-auto overscroll-y-contain pr-1" style={{ scrollbarGutter: 'stable both-edges' }}>
+          <nav
+            className="h-full overflow-y-auto overscroll-y-contain pr-1"
+            style={{ scrollbarGutter: 'stable both-edges' }}
+          >
             <div className="space-y-5 pb-4">
               {sections.map((section) => (
-                <section
-                  key={section.section}
-                  className={cn(
-                    'space-y-2',
-                    expanded && 'rounded-[1.3rem] border border-[rgba(58,47,86,0.06)] bg-[rgba(255,255,255,0.62)] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]'
-                  )}
-                >
+                <section key={section.section} className="space-y-2">
                   <div
                     className={cn(
-                      'px-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground transition-[opacity,transform,height] duration-200',
+                      'px-3 text-[10px] font-medium uppercase tracking-[0.2em] text-slate-600 transition-[opacity,transform,height] duration-200',
                       expanded ? 'h-auto translate-x-0 opacity-100' : 'h-0 -translate-x-2 overflow-hidden opacity-0'
                     )}
                   >
@@ -500,13 +526,14 @@ export function Sidebar({
           </nav>
         </div>
 
-        <div className="mt-3 shrink-0 border-t border-[rgba(58,47,86,0.08)] pt-3">
+        <div className="mt-3 shrink-0 border-t border-[rgba(255,255,255,0.05)] pt-3">
           <button
             type="button"
             onClick={() => onPinnedChange(!pinned)}
             className={cn(
-              'flex w-full items-center gap-3 rounded-[1rem] px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-[rgba(91,33,182,0.05)] hover:text-foreground',
-              expanded ? 'justify-start' : 'justify-center px-0'
+              'flex w-full items-center gap-3 rounded-[0.95rem] px-3 py-2.5 text-sm transition-colors',
+              expanded ? 'justify-start' : 'justify-center px-0',
+              'text-slate-400 hover:bg-[rgba(255,255,255,0.05)] hover:text-slate-100'
             )}
             title={pinned ? 'Soltar lateral' : 'Fixar lateral'}
           >

@@ -437,7 +437,7 @@ function ScheduleAppointmentCard({
             }
           }}
           className={cn(
-            'group absolute overflow-hidden rounded-[1.05rem] border text-left shadow-[0_20px_38px_-28px_rgba(22,16,39,0.16)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_28px_46px_-28px_rgba(22,16,39,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(91,33,182,0.32)]',
+            'group absolute overflow-hidden rounded-[0.9rem] border text-left shadow-[0_14px_24px_-16px_rgba(22,16,39,0.14)] transition-all duration-200 hover:shadow-[0_18px_28px_-18px_rgba(22,16,39,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(91,33,182,0.26)]',
             statusMeta.shell
           )}
           style={{
@@ -734,20 +734,20 @@ export function ScheduleCalendar({
 
   return (
     <>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto pb-1">
         <div className="px-4 py-5 sm:px-6" style={{ minWidth: `${calendarMinWidth}px` }}>
           <div
             className="grid gap-3"
             style={{ gridTemplateColumns: `88px repeat(${Math.max(columns.length, 1)}, minmax(${minColumnWidth}px, 1fr))` }}
           >
-            <div className="sticky left-0 z-20 rounded-[1.15rem] border border-[rgba(58,47,86,0.08)] bg-[linear-gradient(180deg,rgba(245,243,250,0.98),rgba(251,250,253,0.98))] px-3 py-3 shadow-[0_12px_28px_-24px_rgba(22,16,39,0.16)]">
+            <div className="sticky left-0 z-20 rounded-[0.95rem] border border-[rgba(52,44,78,0.1)] bg-[linear-gradient(180deg,rgba(239,235,245,0.98),rgba(247,245,250,0.98))] px-3 py-3 shadow-[0_8px_16px_-12px_rgba(22,16,39,0.12)]">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Horario</p>
             </div>
 
             {columns.map((column) => (
               <div
                 key={`${column.key}-header`}
-                className="rounded-[1.15rem] border border-[rgba(58,47,86,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,246,251,0.96))] px-4 py-3.5 shadow-[0_18px_36px_-30px_rgba(22,16,39,0.14)]"
+                className="rounded-[0.95rem] border border-[rgba(52,44,78,0.1)] bg-[linear-gradient(180deg,rgba(251,250,252,0.98),rgba(243,240,248,0.96))] px-4 py-3 shadow-[0_10px_18px_-14px_rgba(22,16,39,0.1)]"
               >
                 <p className="text-sm font-semibold tracking-tight text-foreground">{column.title}</p>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">{column.helper}</p>
@@ -759,7 +759,7 @@ export function ScheduleCalendar({
             className="mt-3 grid gap-3"
             style={{ gridTemplateColumns: `88px repeat(${Math.max(columns.length, 1)}, minmax(${minColumnWidth}px, 1fr))` }}
           >
-            <div className="sticky left-0 z-10 rounded-[1.15rem] border border-[rgba(58,47,86,0.08)] bg-[linear-gradient(180deg,rgba(245,243,250,0.96),rgba(250,249,252,0.98))] px-2 shadow-[0_10px_24px_-22px_rgba(22,16,39,0.12)]">
+            <div className="sticky left-0 z-10 rounded-[0.95rem] border border-[rgba(52,44,78,0.1)] bg-[linear-gradient(180deg,rgba(239,235,245,0.96),rgba(247,245,250,0.98))] px-2 shadow-[0_8px_16px_-12px_rgba(22,16,39,0.1)]">
               {hours.map((hour, index) => (
                 <div
                   key={hour}
@@ -767,7 +767,7 @@ export function ScheduleCalendar({
                   style={{ height: `${60 * schedulePxPerMinute}px` }}
                 >
                   <span className={cn(
-                    'absolute -top-2 left-0 rounded-[0.85rem] bg-white px-2.5 py-1 text-xs font-semibold text-foreground shadow-[0_10px_20px_-16px_rgba(22,16,39,0.18)]',
+                    'absolute -top-2 left-0 rounded-[0.7rem] bg-[rgba(255,255,255,0.94)] px-2.5 py-1 text-xs font-semibold text-foreground shadow-[0_6px_12px_-8px_rgba(22,16,39,0.14)]',
                     index === 0 ? 'top-0' : ''
                   )}>
                     {hour}
@@ -812,7 +812,7 @@ export function ScheduleCalendar({
                         currentMinutes: minutes,
                       })
                     }}
-                    className="relative overflow-hidden rounded-[1.3rem] border border-[rgba(58,47,86,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(246,244,250,0.94))] shadow-[0_22px_42px_-34px_rgba(22,16,39,0.14)]"
+                    className="relative overflow-hidden rounded-[1rem] border border-[rgba(52,44,78,0.1)] bg-[linear-gradient(180deg,rgba(251,250,252,0.98),rgba(243,240,248,0.96))] shadow-[0_14px_24px_-18px_rgba(22,16,39,0.12)]"
                     style={{ height: `${calendarHeight}px` }}
                   >
                     {hours.map((hour, index) => (
@@ -869,7 +869,7 @@ export function ScheduleCalendar({
 
                     {liveSelection && (
                       <div
-                        className="absolute inset-x-3 rounded-[1rem] border border-dashed border-[rgba(91,33,182,0.22)] bg-[rgba(91,33,182,0.1)]"
+                        className="absolute inset-x-3 rounded-[0.85rem] border border-dashed border-[rgba(91,33,182,0.18)] bg-[rgba(91,33,182,0.08)]"
                         style={{
                           top: `${getAppointmentTop(liveSelection.startMinutes, dayStartMinutes, schedulePxPerMinute)}px`,
                           height: `${Math.max(liveSelection.durationMinutes * schedulePxPerMinute, 40)}px`,
@@ -879,7 +879,7 @@ export function ScheduleCalendar({
 
                     {committedForColumn && (
                       <div
-                        className="absolute inset-x-3 rounded-[1rem] border border-[rgba(91,33,182,0.18)] bg-[rgba(91,33,182,0.08)] shadow-[0_16px_30px_-24px_rgba(22,16,39,0.16)]"
+                        className="absolute inset-x-3 rounded-[0.85rem] border border-[rgba(91,33,182,0.16)] bg-[rgba(91,33,182,0.08)] shadow-[0_12px_20px_-16px_rgba(22,16,39,0.12)]"
                         style={{
                           top: `${getAppointmentTop(committedForColumn.startMinutes, dayStartMinutes, schedulePxPerMinute)}px`,
                           height: `${Math.max(committedForColumn.durationMinutes * schedulePxPerMinute, 58)}px`,
@@ -967,7 +967,7 @@ export function ScheduleCalendar({
                     {dragPreviewForColumn && dragState && dragPreviewForColumn.itemId === dragState.item.id && (
                       <div
                         className={cn(
-                          'pointer-events-none absolute inset-x-3 rounded-[1rem] border border-dashed px-3 py-2 shadow-[0_16px_30px_-24px_rgba(22,16,39,0.16)]',
+                          'pointer-events-none absolute inset-x-3 rounded-[0.85rem] border border-dashed px-3 py-2 shadow-[0_12px_20px_-16px_rgba(22,16,39,0.12)]',
                           dragPreviewForColumn.valid
                             ? 'border-[rgba(91,33,182,0.22)] bg-[rgba(91,33,182,0.09)]'
                             : 'border-[rgba(244,63,94,0.22)] bg-[rgba(244,63,94,0.1)]'
@@ -997,7 +997,7 @@ export function ScheduleCalendar({
                     )}
 
                     {column.appointments.length === 0 && !committedForColumn && (
-                      <div className="absolute inset-x-5 top-6 rounded-[1.05rem] border border-dashed border-[rgba(58,47,86,0.12)] bg-[rgba(91,33,182,0.04)] px-4 py-3 text-xs leading-6 text-muted-foreground">
+                      <div className="absolute inset-x-5 top-6 rounded-[0.9rem] border border-dashed border-[rgba(52,44,78,0.12)] bg-[rgba(91,33,182,0.035)] px-4 py-3 text-xs leading-6 text-muted-foreground">
                         Clique para criar. Arraste para reservar um intervalo maior.
                       </div>
                     )}

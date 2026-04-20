@@ -142,14 +142,13 @@ export function Header({
   const periodLabel = getPeriodLabel(currentQuery, pathname)
 
   return (
-    <header className="sticky top-0 z-30 px-4 py-4 sm:px-6 lg:px-8">
-      <div className="rounded-[1.5rem] border border-[rgba(58,47,86,0.08)] bg-[rgba(250,249,252,0.82)] px-4 py-4 shadow-[0_20px_46px_-34px_rgba(22,16,39,0.14)] backdrop-blur-xl sm:px-5">
+    <header className="border-b border-[rgba(33,24,58,0.08)] bg-[rgba(247,245,250,0.88)] px-4 py-3 backdrop-blur-xl sm:px-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0 flex items-start gap-3">
           <button
             type="button"
             onClick={onToggleSidebar}
-            className="mt-0.5 inline-flex h-11 w-11 items-center justify-center rounded-[1rem] border border-[rgba(58,47,86,0.08)] bg-white text-muted-foreground transition-colors hover:bg-[rgba(91,33,182,0.05)] hover:text-primary"
+            className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-[0.9rem] border border-[rgba(33,24,58,0.08)] bg-[rgba(255,255,255,0.68)] text-muted-foreground transition-colors hover:bg-[rgba(91,33,182,0.06)] hover:text-foreground"
             aria-label={sidebarPinned ? 'Soltar barra lateral' : 'Fixar barra lateral'}
           >
             {sidebarPinned ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
@@ -160,11 +159,11 @@ export function Header({
               {pageMeta.breadcrumb}
             </p>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-              <h2 className="truncate text-[1.7rem] font-semibold tracking-tight text-foreground">
+              <h2 className="truncate text-[1.55rem] font-semibold tracking-tight text-foreground">
                 {pageMeta.title}
               </h2>
               {sessionUser.barbershopName && (
-                <span className="rounded-full border border-[rgba(58,47,86,0.08)] bg-white px-3 py-1 text-xs font-medium text-muted-foreground">
+                <span className="text-sm text-muted-foreground">
                   {sessionUser.barbershopName}
                 </span>
               )}
@@ -178,15 +177,15 @@ export function Header({
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="hidden min-w-[220px] items-center gap-3 rounded-[1.05rem] border border-[rgba(58,47,86,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(246,244,251,0.92))] px-3 py-2.5 text-sm xl:flex">
-            <span className="flex h-10 w-10 items-center justify-center rounded-[0.95rem] bg-[rgba(91,33,182,0.08)] text-primary">
-              <Clock3 className="h-4 w-4" />
+          <div className="hidden min-w-[190px] items-center gap-2 rounded-[0.95rem] border border-[rgba(33,24,58,0.08)] bg-[rgba(255,255,255,0.45)] px-3 py-2 text-sm xl:flex">
+            <span className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] bg-[rgba(91,33,182,0.08)] text-primary">
+              <Clock3 className="h-3.5 w-3.5" />
             </span>
             <div className="min-w-0">
-              <p className="truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <p className="truncate text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
                 {pathname.startsWith('/agendamentos') ? 'Janela' : 'Periodo'}
               </p>
-              <p className="truncate text-sm font-semibold text-foreground">{periodLabel}</p>
+              <p className="truncate text-sm font-medium text-foreground">{periodLabel}</p>
             </div>
           </div>
 
@@ -199,7 +198,6 @@ export function Header({
             }}
           />
         </div>
-      </div>
       </div>
     </header>
   )
