@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { signOut } from 'next-auth/react'
 import { ChevronDown, LogOut, Settings2 } from 'lucide-react'
+import { AUTH_ENTRY_PATH } from '@/lib/auth-routes'
 import { ROLE_LABELS, getInitials } from '@/lib/utils'
 
 interface AccountMenuProps {
@@ -59,7 +60,7 @@ export function AccountMenu({ user }: AccountMenuProps) {
               </Link>
 
               <button
-                onClick={() => signOut({ callbackUrl: '/login' })}
+                onClick={() => signOut({ callbackUrl: AUTH_ENTRY_PATH })}
                 className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
               >
                 <LogOut className="h-4 w-4" />

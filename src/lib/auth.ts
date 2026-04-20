@@ -5,13 +5,14 @@ import bcrypt from 'bcryptjs'
 import { redirect } from 'next/navigation'
 import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
+import { AUTH_ENTRY_PATH } from '@/lib/auth-routes'
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as any,
   session: { strategy: 'jwt' },
   pages: {
-    signIn: '/login',
-    error: '/login',
+    signIn: AUTH_ENTRY_PATH,
+    error: AUTH_ENTRY_PATH,
   },
   providers: [
     CredentialsProvider({
@@ -74,7 +75,7 @@ export const getSession = cache(() => getServerSession(authOptions))
 export async function requireSession() {
   const session = await getSession()
   if (!session?.user?.barbershopId) {
-    redirect('/login')
+    redirect(AUTH_ENTRY_PATH)
   }
   return session
 }

@@ -3,26 +3,10 @@ import { NextResponse } from 'next/server'
 
 export default withAuth(
   function middleware(req) {
-    const token = req.nextauth.token
     const pathname = req.nextUrl.pathname
     const requestHeaders = new Headers(req.headers)
     requestHeaders.set('x-pathname', pathname)
     requestHeaders.set('x-search', req.nextUrl.search)
-    const protectedPaths = [
-      '/dashboard',
-      '/inteligencia',
-      '/financeiro',
-      '/equipe',
-      '/precificacao',
-      '/indicadores',
-      '/configuracoes',
-      '/desafios',
-    ]
-    const requiresAuth = protectedPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`))
-
-    if (!token && requiresAuth) {
-      return NextResponse.redirect(new URL('/login', req.url))
-    }
     return NextResponse.next({
       request: {
         headers: requestHeaders,
@@ -30,6 +14,9 @@ export default withAuth(
     })
   },
   {
+    pages: {
+      signIn: '/',
+    },
     callbacks: {
       authorized: ({ token, req }) => {
         const pathname = req.nextUrl.pathname
