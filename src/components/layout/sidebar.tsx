@@ -505,7 +505,10 @@ export function Sidebar({
 
         <div className="mt-5 min-h-0 flex-1">
           <nav
-            className={cn('h-full overflow-y-auto overscroll-y-contain', expanded ? 'pr-1' : 'pr-0')}
+            className={cn(
+              'h-full overflow-y-auto overscroll-y-contain',
+              expanded ? 'pr-1' : 'scrollbar-hidden pr-0'
+            )}
             style={{ scrollbarGutter: expanded ? 'stable both-edges' : 'auto' }}
           >
             <div className="space-y-5 pb-4">

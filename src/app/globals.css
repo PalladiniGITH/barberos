@@ -358,6 +358,17 @@
 }
 
 @layer utilities {
+  .scrollbar-hidden {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
   .text-emerald-100,
   .text-emerald-200,
   .text-emerald-300 {
