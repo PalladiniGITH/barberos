@@ -208,7 +208,7 @@ function RankingList({
                   {customer.name}
                 </Link>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <span className="inline-flex items-center rounded-full border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1 text-[11px] text-[rgba(87,79,109,0.92)]">
+                  <span className="inline-flex items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-2.5 py-1 text-[11px] text-muted-foreground">
                     {CUSTOMER_TYPE_LABELS[customer.type]}
                   </span>
                   <CustomerRiskBadge customer={customer} />
@@ -431,7 +431,7 @@ export function CustomerIntelligenceSection({
                       <p className="mt-3 text-2xl font-semibold text-foreground">{formatCurrency(group.margin)}</p>
                       <p className="mt-1 text-sm text-muted-foreground">{formatPercent(group.marginPercent, 0)} de margem estimada</p>
                     </div>
-                    <span className="rounded-full border border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.78)] px-3 py-1 text-xs font-semibold text-[rgba(87,79,109,0.92)]">
+                    <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-xs font-semibold text-muted-foreground">
                       {group.customers} cliente{group.customers === 1 ? '' : 's'}
                     </span>
                   </div>
@@ -666,11 +666,11 @@ export function CustomerIntelligenceSection({
                     </td>
                     <td className="py-4 pr-4">
                       <div className="flex flex-col gap-2">
-                        <span className="inline-flex w-fit items-center rounded-full border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1 text-[11px] text-[rgba(87,79,109,0.92)]">
+                        <span className="inline-flex w-fit items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-2.5 py-1 text-[11px] text-muted-foreground">
                           {CUSTOMER_TYPE_LABELS[customer.type]}
                         </span>
                         {customer.type === 'SUBSCRIPTION' && (
-                          <span className="inline-flex w-fit items-center rounded-full border border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1 text-[11px] text-[rgba(87,79,109,0.92)]">
+                          <span className="inline-flex w-fit items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-2.5 py-1 text-[11px] text-muted-foreground">
                             {customer.extraVisits > 0
                               ? APPOINTMENT_BILLING_MODEL_LABELS.SUBSCRIPTION_EXTRA
                               : APPOINTMENT_BILLING_MODEL_LABELS.SUBSCRIPTION_INCLUDED}

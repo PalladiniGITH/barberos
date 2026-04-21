@@ -89,8 +89,8 @@ function DashboardShellFrame({
           className={cn(
             'min-h-0 flex-1 overflow-y-auto overscroll-y-contain transition-[opacity,transform] duration-200',
             focusMode
-              ? 'bg-[radial-gradient(circle_at_top,rgba(91,33,182,0.05),transparent_22%),linear-gradient(180deg,rgba(244,242,248,0.96),rgba(237,234,242,0.98))] px-4 pb-6 pt-4 sm:px-6'
-              : 'bg-[radial-gradient(circle_at_top,rgba(91,33,182,0.04),transparent_24%),linear-gradient(180deg,rgba(243,241,247,0.98),rgba(236,233,240,1))] px-5 pb-8 pt-5 sm:px-7',
+              ? 'bg-[radial-gradient(circle_at_top,rgba(124,58,237,0.12),transparent_22%),linear-gradient(180deg,rgba(21,24,33,0.98),rgba(15,17,21,1))] px-4 pb-6 pt-4 sm:px-6'
+              : 'bg-[radial-gradient(circle_at_top,rgba(124,58,237,0.09),transparent_24%),linear-gradient(180deg,rgba(17,19,26,0.98),rgba(15,17,21,1))] px-5 pb-8 pt-5 sm:px-7',
             pending && 'opacity-80'
           )}
         >

@@ -44,7 +44,7 @@ interface ScheduleBlockModalProps {
 }
 
 const fieldClassName =
-  'w-full min-w-0 rounded-[1rem] border border-[rgba(84,35,145,0.08)] bg-white px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-[rgba(124,58,237,0.2)] focus:bg-[rgba(124,58,237,0.02)] focus:ring-4 focus:ring-[rgba(124,58,237,0.1)]'
+  'w-full min-w-0 rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(15,17,21,0.86)] px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-[rgba(124,58,237,0.28)] focus:bg-[rgba(124,58,237,0.08)] focus:ring-4 focus:ring-[rgba(124,58,237,0.14)]'
 
 function normalizeOptionalText(value: string) {
   const normalized = value.trim()
@@ -183,7 +183,7 @@ export function ScheduleBlockModal({
   const triggerClass = {
     primary: 'action-button-primary',
     secondary: 'action-button',
-    icon: 'inline-flex h-9 w-9 items-center justify-center rounded-[0.9rem] border border-[rgba(84,35,145,0.08)] bg-white text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.04)] hover:text-primary',
+    icon: 'inline-flex h-9 w-9 items-center justify-center rounded-[0.9rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)] hover:text-primary',
   }[triggerMode]
 
   return (
@@ -203,8 +203,8 @@ export function ScheduleBlockModal({
         <div className="fixed inset-0 z-50 flex items-start justify-center p-3 pt-4 sm:items-center sm:p-4">
           <div className="absolute inset-0 bg-[rgba(17,24,39,0.36)] backdrop-blur-sm" onClick={() => setOpen(false)} />
 
-          <div className="relative z-10 grid w-full max-w-2xl gap-0 overflow-hidden rounded-[1.5rem] border border-[rgba(84,35,145,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(249,246,253,0.97))] shadow-[0_42px_120px_-60px_rgba(124,58,237,0.28)]">
-            <div className="flex items-start justify-between gap-4 border-b border-[rgba(84,35,145,0.08)] px-5 py-4 sm:px-6">
+          <div className="relative z-10 grid w-full max-w-2xl gap-0 overflow-hidden rounded-[1.5rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.99),rgba(15,17,21,0.98))] shadow-[0_42px_120px_-60px_rgba(2,6,23,0.88)]">
+            <div className="flex items-start justify-between gap-4 border-b border-[rgba(255,255,255,0.06)] px-5 py-4 sm:px-6">
               <div className="min-w-0">
                 <h2 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
                   {isEdit ? 'Editar bloqueio' : 'Novo bloqueio'}
@@ -217,7 +217,7 @@ export function ScheduleBlockModal({
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-[1rem] border border-[rgba(84,35,145,0.08)] bg-white text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.04)] hover:text-primary"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)] hover:text-primary"
                 aria-label="Fechar"
               >
                 <X className="h-4 w-4" />
@@ -314,7 +314,7 @@ export function ScheduleBlockModal({
                       type="button"
                       onClick={handleRemove}
                       disabled={isRemoving || isSubmitting}
-                      className="inline-flex items-center gap-2 rounded-[0.95rem] border border-[rgba(244,63,94,0.14)] bg-[rgba(244,63,94,0.06)] px-3.5 py-2 text-sm font-semibold text-rose-700 transition-colors hover:bg-[rgba(244,63,94,0.1)] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex items-center gap-2 rounded-[0.95rem] border border-[rgba(220,38,38,0.24)] bg-[rgba(220,38,38,0.12)] px-3.5 py-2 text-sm font-semibold text-rose-200 transition-colors hover:bg-[rgba(220,38,38,0.18)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {isRemoving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                       Remover

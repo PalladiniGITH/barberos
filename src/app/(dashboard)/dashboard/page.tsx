@@ -393,7 +393,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   ]
 
   return (
-    <div className="page-section flex flex-col gap-6">
+    <div className="page-section flex flex-col gap-5">
       <PageHeader
         title="Painel executivo"
         description="Uma leitura mais clara, mais forte e mais acionavel do negocio, com menos ruido e mais hierarquia."
@@ -446,10 +446,10 @@ export default async function DashboardPage({ searchParams }: Props) {
             </div>
           </div>
 
-          <aside className="premium-rail p-5">
+          <aside className="premium-rail p-4">
             <p className="page-kicker">Pulso do mes</p>
-            <div className="mt-3 space-y-4">
-              <div className="rounded-[0.95rem] border border-[rgba(52,44,78,0.1)] bg-[rgba(255,255,255,0.8)] p-4 shadow-[0_10px_18px_-14px_rgba(20,15,35,0.08)]">
+            <div className="mt-3 space-y-3">
+              <div className="rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 shadow-[0_16px_24px_-18px_rgba(2,6,23,0.5)]">
                 <p className="executive-label">Meta principal</p>
                 <p className="mt-3 text-[1.8rem] font-semibold tracking-tight text-foreground">
                   {data.goalValue > 0 ? formatPercent(data.goalAttainment, 0) : 'Sem meta'}
@@ -461,7 +461,7 @@ export default async function DashboardPage({ searchParams }: Props) {
                 </p>
               </div>
 
-              <div className="rounded-[0.95rem] border border-[rgba(52,44,78,0.1)] bg-[rgba(255,255,255,0.8)] p-4 shadow-[0_10px_18px_-14px_rgba(20,15,35,0.08)]">
+              <div className="rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 shadow-[0_16px_24px_-18px_rgba(2,6,23,0.5)]">
                 <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
                   <span>Percentual atingido</span>
                   <span>{formatPercent(data.goalAttainment, 0)}</span>
@@ -540,7 +540,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         <RevenueChart data={data.chartData} />
 
         <aside className="space-y-5">
-          <section className="premium-rail p-6">
+          <section className="premium-rail p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="page-kicker">Execucao da meta</p>
@@ -551,7 +551,7 @@ export default async function DashboardPage({ searchParams }: Props) {
 
             {data.goalValue > 0 ? (
               <div className="mt-5 space-y-4">
-                <div className="rounded-[0.95rem] border border-[rgba(52,44,78,0.1)] bg-[rgba(255,255,255,0.8)] p-4">
+                <div className="rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
                   <p className="executive-label">Realizado ate agora</p>
                   <p className="mt-3 text-[2rem] font-semibold tracking-tight text-foreground">
                     {formatCurrency(data.totalRevenue)}

@@ -129,11 +129,11 @@ function SummaryCard({
           <Icon className="h-4 w-4" />
         </span>
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{title}</p>
-          <p className="mt-1 text-xl font-semibold text-foreground">{value}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{title}</p>
+          <p className="mt-1.5 text-[1.85rem] font-semibold leading-none text-foreground">{value}</p>
         </div>
       </div>
-      <p className="mt-3 text-sm leading-6 text-muted-foreground">{helper}</p>
+      <p className="mt-2.5 text-[13px] leading-5 text-muted-foreground">{helper}</p>
     </div>
   )
 }
@@ -174,7 +174,7 @@ export default async function ClientesPage({ searchParams }: Props) {
   })
 
   return (
-    <div className="page-section mx-auto flex max-w-7xl flex-col gap-6">
+    <div className="page-section mx-auto flex max-w-7xl flex-col gap-5">
       <PageHeader
         title="Clientes"
         description="Base executiva da carteira com comportamento, valor, frequencia e sinais de risco para operacao e estrategia."
@@ -195,7 +195,7 @@ export default async function ClientesPage({ searchParams }: Props) {
         )}
       />
 
-      <section className="dashboard-panel dashboard-spotlight px-6 py-6">
+      <section className="dashboard-panel dashboard-spotlight px-5 py-5">
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_340px]">
           <div>
             <div className="flex flex-wrap gap-2">
@@ -204,7 +204,7 @@ export default async function ClientesPage({ searchParams }: Props) {
                 {directory.summary.customers} clientes no recorte
               </span>
               <span className="spotlight-chip">
-                <Sparkles className="h-3.5 w-3.5 text-emerald-200" />
+                <Sparkles className="h-3.5 w-3.5 text-primary" />
                 {directory.summary.atRiskCustomers} em observacao
               </span>
             </div>
@@ -307,7 +307,7 @@ export default async function ClientesPage({ searchParams }: Props) {
         />
       </div>
 
-      <section className="dashboard-panel p-5 sm:p-6">
+      <section className="dashboard-panel p-5 sm:p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="page-kicker">Filtros operacionais</p>

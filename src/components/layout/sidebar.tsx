@@ -300,10 +300,10 @@ function SidebarLink({
         aria-current={active ? 'page' : undefined}
         onClick={() => onNavigate(item.href)}
         className={cn(
-          'group relative isolate flex min-w-0 items-center gap-3 overflow-hidden border transition-all duration-200',
+          'group relative isolate flex min-w-0 items-center gap-3 border transition-all duration-200',
           compact
-            ? 'mx-auto h-12 w-12 justify-center rounded-[1rem] border-transparent bg-transparent p-0 shadow-none'
-            : 'min-h-[3.55rem] w-full rounded-[1.1rem] px-2.5 py-2.5',
+            ? 'mx-auto h-[3.35rem] w-[3.35rem] justify-center rounded-[1rem] border-transparent bg-transparent p-0 shadow-none overflow-visible'
+            : 'min-h-[3.55rem] w-full rounded-[1.1rem] px-2.5 py-2.5 overflow-hidden',
           level === 1 && !compact ? 'ml-4 min-h-[3.15rem] rounded-[1rem] pr-2' : '',
           !compact && active
             ? 'border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.045))] text-white shadow-[0_24px_38px_-30px_rgba(2,6,23,0.86)]'
@@ -314,7 +314,7 @@ function SidebarLink({
         )}
       >
         {active && expanded && isTopLevel && (
-          <span className="absolute left-1.5 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-full bg-[linear-gradient(180deg,rgba(52,211,153,0.95),rgba(56,189,248,0.62))] shadow-[0_0_18px_rgba(16,185,129,0.42)]" />
+          <span className="absolute left-1.5 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-full bg-[linear-gradient(180deg,rgba(124,58,237,0.96),rgba(91,33,182,0.64))] shadow-[0_0_18px_rgba(91,33,182,0.36)]" />
         )}
         {active && !compact && (
           <span
@@ -330,8 +330,8 @@ function SidebarLink({
             iconSizeClass,
             active
               ? cn(
-                  'border-[rgba(52,211,153,0.18)] bg-[linear-gradient(135deg,rgba(16,185,129,0.18),rgba(15,23,42,0.94))] text-emerald-100 shadow-[0_18px_28px_-24px_rgba(16,185,129,0.46)]',
-                  compact ? 'shadow-[0_16px_28px_-22px_rgba(16,185,129,0.46)]' : ''
+                  'border-[rgba(124,58,237,0.18)] bg-[linear-gradient(135deg,rgba(124,58,237,0.2),rgba(15,23,42,0.94))] text-violet-100 shadow-[0_18px_28px_-24px_rgba(91,33,182,0.42)]',
+                  compact ? 'shadow-[0_16px_28px_-22px_rgba(91,33,182,0.42)]' : ''
                 )
               : 'border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.035)] text-slate-400 group-hover:border-[rgba(255,255,255,0.08)] group-hover:bg-[rgba(255,255,255,0.05)] group-hover:text-slate-100',
             loading ? 'scale-[0.97] opacity-80' : ''
@@ -477,16 +477,16 @@ export function Sidebar({
       }}
       className={cn(
         'hidden h-full overflow-hidden border-r border-[rgba(255,255,255,0.05)] bg-[linear-gradient(180deg,rgba(10,15,28,0.97),rgba(11,18,32,0.95))] text-slate-100 shadow-[18px_0_40px_-34px_rgba(2,6,23,0.92)] transition-[width] duration-300 ease-out lg:flex',
-        expanded ? 'w-[312px]' : 'w-[84px]',
+        expanded ? 'w-[312px]' : 'w-[96px]',
         focusMode && !expanded ? 'opacity-95' : ''
       )}
     >
-      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col px-3 py-4">
-        <div className="flex min-h-[56px] items-center gap-3 overflow-hidden rounded-[1rem] px-2.5">
+      <div className={cn('flex h-full min-h-0 min-w-0 flex-1 flex-col py-4', expanded ? 'px-3' : 'px-2')}>
+        <div className={cn('flex min-h-[56px] items-center gap-3 rounded-[1rem]', expanded ? 'overflow-hidden px-2.5' : 'justify-center overflow-visible px-0')}>
           <Link
             href="/dashboard"
             onClick={() => startNavigation('/dashboard')}
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[0.95rem] bg-[linear-gradient(135deg,rgba(16,185,129,0.18),rgba(15,23,42,0.96))] text-emerald-200 shadow-[0_18px_34px_-24px_rgba(2,6,23,0.82)]"
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[0.95rem] bg-[linear-gradient(135deg,rgba(124,58,237,0.2),rgba(15,23,42,0.96))] text-violet-100 shadow-[0_18px_34px_-24px_rgba(2,6,23,0.82)]"
             title="Painel do negocio"
           >
             <Scissors className="h-4 w-4" />
@@ -505,8 +505,8 @@ export function Sidebar({
 
         <div className="mt-5 min-h-0 flex-1">
           <nav
-            className="h-full overflow-y-auto overscroll-y-contain pr-1"
-            style={{ scrollbarGutter: 'stable both-edges' }}
+            className={cn('h-full overflow-y-auto overscroll-y-contain', expanded ? 'pr-1' : 'pr-0')}
+            style={{ scrollbarGutter: expanded ? 'stable both-edges' : 'auto' }}
           >
             <div className="space-y-5 pb-4">
               {sections.map((section) => (

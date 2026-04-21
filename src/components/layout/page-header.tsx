@@ -8,14 +8,14 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, action }: PageHeaderProps) {
   return (
-    <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-      <div className="max-w-2xl">
+    <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+      <div className="max-w-3xl">
         <p className="page-kicker">Painel operacional</p>
-        <h1 className="page-title mt-3">
+        <h1 className="page-title mt-2.5">
           {title}
         </h1>
         {description && (
-          <p className="page-copy mt-3 max-w-xl">{description}</p>
+          <p className="page-copy mt-2 max-w-2xl">{description}</p>
         )}
       </div>
       {action && (

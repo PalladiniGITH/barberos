@@ -26,16 +26,16 @@ export function KpiCard({
     <div className={cn('kpi-card', className)}>
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{title}</p>
-          <p className="text-2xl font-bold text-foreground mt-1.5 tabular-nums">{displayValue}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{title}</p>
+          <p className="mt-2 text-[2.05rem] font-semibold leading-none text-foreground tabular-nums">{displayValue}</p>
         </div>
-        <div className={cn('p-2.5 rounded-lg bg-secondary', iconColor.replace('text-', 'bg-').replace('500', '500/10').replace('400', '400/10'))}>
-          <Icon className={cn('w-5 h-5', iconColor)} />
+        <div className={cn('flex h-10 w-10 items-center justify-center rounded-[0.9rem] bg-secondary', iconColor.replace('text-', 'bg-').replace('500', '500/10').replace('400', '400/10'))}>
+          <Icon className={cn('h-4.5 w-4.5', iconColor)} />
         </div>
       </div>
 
       {(change !== undefined || description) && (
-        <div className="mt-3 flex items-center gap-1.5">
+        <div className="mt-2.5 flex items-center gap-1.5">
           {change !== undefined && (
             <span className={cn(
               'flex items-center gap-0.5 text-xs font-medium',
@@ -46,7 +46,7 @@ export function KpiCard({
             </span>
           )}
           {description && (
-            <span className="text-xs text-muted-foreground">{description}</span>
+            <span className="text-[12px] text-muted-foreground">{description}</span>
           )}
         </div>
       )}

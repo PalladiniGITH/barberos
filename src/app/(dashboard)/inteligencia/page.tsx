@@ -44,13 +44,13 @@ function ComparisonCard({
   tone?: 'neutral' | 'positive' | 'warning'
 }) {
   const toneClass = {
-    neutral: 'border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.78)]',
+    neutral: 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)]',
     positive: 'border-[rgba(52,211,153,0.18)] bg-[rgba(52,211,153,0.08)]',
     warning: 'border-[rgba(251,191,36,0.18)] bg-[rgba(251,191,36,0.08)]',
   }[tone]
 
   const badgeClass = {
-    neutral: 'border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.72)] text-muted-foreground',
+    neutral: 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-muted-foreground',
     positive: 'border-[rgba(52,211,153,0.2)] bg-[rgba(52,211,153,0.1)] text-emerald-700',
     warning: 'border-[rgba(251,191,36,0.2)] bg-[rgba(251,191,36,0.1)] text-amber-700',
   }[tone]
@@ -59,9 +59,9 @@ function ComparisonCard({
     <div className={cn('rounded-[1.35rem] border p-4 shadow-[0_20px_44px_-34px_rgba(2,6,23,0.82)]', toneClass)}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
-          <p className="mt-3 text-[1.75rem] font-semibold tracking-tight text-foreground">{currentValue}</p>
-          <p className="mt-1 text-sm text-muted-foreground">Antes: {previousValue}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{label}</p>
+          <p className="mt-2.5 text-[1.9rem] font-semibold leading-none tracking-tight text-foreground">{currentValue}</p>
+          <p className="mt-1 text-[12px] text-muted-foreground">Antes: {previousValue}</p>
         </div>
         <span className={cn('rounded-full border px-3 py-1 text-xs font-semibold', badgeClass)}>
           {change === null ? 'Sem base' : `${change >= 0 ? '+' : ''}${formatPercent(change, 0)}`}
@@ -88,7 +88,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
   const topRecommendations = report.prioritized.slice(0, 3)
 
   return (
-    <div className="page-section mx-auto flex max-w-7xl flex-col gap-6">
+    <div className="page-section mx-auto flex max-w-7xl flex-col gap-5">
       <PageHeader
         title="Inteligencia do negocio"
         description="Um relatorio automatico da barbearia: le caixa, meta, equipe, ticket e margem para dizer o que agir primeiro."
@@ -111,8 +111,8 @@ export default async function InteligenciaPage({ searchParams }: Props) {
       />
 
       <section className="dashboard-panel overflow-hidden p-0">
-        <div className="dashboard-spotlight px-6 py-7 sm:px-7">
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_360px]">
+        <div className="dashboard-spotlight px-5 py-6 sm:px-6">
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_360px]">
             <div className="max-w-3xl">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="spotlight-chip">
@@ -133,7 +133,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
               </h2>
               <p className="spotlight-copy max-w-2xl">{report.summary.body}</p>
 
-              <div className="mt-6 rounded-[1.7rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.05)] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+              <div className="mt-5 rounded-[1.7rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.05)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                 <p className="spotlight-kicker">Prioridade agora</p>
                 <p className="mt-3 text-base leading-7 text-slate-100">{report.summary.focus}</p>
               </div>
@@ -175,7 +175,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
         </div>
 
         <div className="grid xl:grid-cols-[minmax(0,1.45fr)_360px]">
-          <div className="space-y-6 p-6 sm:p-7">
+          <div className="space-y-5 p-5 sm:p-6">
             <section className="premium-block">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -228,7 +228,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
             </section>
           </div>
 
-          <aside className="border-t border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(17,24,39,0.86),rgba(15,23,42,0.8))] p-6 sm:p-7 xl:border-l xl:border-t-0">
+          <aside className="border-t border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(17,24,39,0.86),rgba(15,23,42,0.8))] p-5 sm:p-6 xl:border-l xl:border-t-0">
             <div className="space-y-5">
               <details className="disclosure-panel">
                 <summary className="disclosure-summary">

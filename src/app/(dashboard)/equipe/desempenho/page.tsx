@@ -178,7 +178,7 @@ export default async function DesempenhoPage({ searchParams }: Props) {
       <section className="dashboard-panel dashboard-spotlight overflow-hidden p-6 sm:p-7">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-200/70">
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary/80">
               Performance comercial
             </p>
             <h2 className="mt-4 text-4xl font-semibold tracking-tight text-white">

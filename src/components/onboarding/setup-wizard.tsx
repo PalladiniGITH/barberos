@@ -158,8 +158,8 @@ export function SetupWizard({
   return (
     <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
       <aside className="dashboard-panel overflow-hidden">
-        <div className="border-b border-white/10 bg-gradient-to-br from-emerald-500/15 via-sky-500/10 to-transparent p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-300/80">
+        <div className="border-b border-white/10 bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary/80">
             Setup guiado
           </p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight text-foreground">
@@ -197,14 +197,14 @@ export function SetupWizard({
                 key={item.id}
                 className={cn(
                   'rounded-2xl border p-4 transition-colors',
-                  item.done ? 'border-emerald-500/20 bg-emerald-500/10' : 'border-border/70 bg-secondary/30',
+                  item.done ? 'border-primary/25 bg-primary/10' : 'border-border/70 bg-secondary/30',
                   index === stepIndex && 'border-primary/40'
                 )}
               >
                 <div className="flex items-start gap-3">
                   <span className={cn(
                     'mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl',
-                    item.done ? 'bg-emerald-500/15 text-emerald-300' : 'bg-background/70 text-muted-foreground'
+                    item.done ? 'bg-primary/15 text-primary' : 'bg-background/70 text-muted-foreground'
                   )}>
                     {item.done ? <CheckCircle2 className="h-4 w-4" /> : <Clock3 className="h-4 w-4" />}
                   </span>
@@ -221,15 +221,15 @@ export function SetupWizard({
             <p className="text-sm font-semibold text-foreground">O que você destrava ao finalizar</p>
             <div className="mt-3 space-y-2 text-sm text-muted-foreground">
               <p className="inline-flex items-start gap-2">
-                <Sparkles className="mt-0.5 h-4 w-4 text-emerald-300" />
+                <Sparkles className="mt-0.5 h-4 w-4 text-primary" />
                 Dashboard pronta para mostrar faturamento, lucro e meta desde o primeiro login.
               </p>
               <p className="inline-flex items-start gap-2">
-                <ShieldCheck className="mt-0.5 h-4 w-4 text-sky-300" />
+                <ShieldCheck className="mt-0.5 h-4 w-4 text-primary" />
                 Estrutura do tenant ajustada para uso real, não só para demo.
               </p>
               <p className="inline-flex items-start gap-2">
-                <CalendarDays className="mt-0.5 h-4 w-4 text-amber-200" />
+                <CalendarDays className="mt-0.5 h-4 w-4 text-primary" />
                 Meta de {currentMonthLabel} pronta para contextualizar o mês desde o início.
               </p>
             </div>
@@ -269,7 +269,7 @@ export function SetupWizard({
                   index === stepIndex
                     ? 'bg-primary'
                     : index < stepIndex
-                      ? 'bg-emerald-500'
+                      ? 'bg-primary/60'
                       : 'bg-secondary'
                 )}
                 aria-label={`Ir para etapa ${index + 1}`}

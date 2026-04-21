@@ -84,7 +84,7 @@ interface AppointmentModalProps {
 }
 
 const fieldClassName =
-  'w-full min-w-0 rounded-[1rem] border border-[rgba(84,35,145,0.08)] bg-white px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-[rgba(124,58,237,0.2)] focus:bg-[rgba(124,58,237,0.02)] focus:ring-4 focus:ring-[rgba(124,58,237,0.1)]'
+  'w-full min-w-0 rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(15,17,21,0.86)] px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-[rgba(124,58,237,0.28)] focus:bg-[rgba(124,58,237,0.08)] focus:ring-4 focus:ring-[rgba(124,58,237,0.14)]'
 
 function Field({
   label,
@@ -231,7 +231,7 @@ export function AppointmentModal({
   const triggerClass = {
     primary: 'action-button-primary',
     secondary: 'action-button',
-    icon: 'inline-flex h-9 w-9 items-center justify-center rounded-[0.9rem] border border-[rgba(84,35,145,0.08)] bg-white text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.04)] hover:text-primary',
+    icon: 'inline-flex h-9 w-9 items-center justify-center rounded-[0.9rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)] hover:text-primary',
   }[triggerMode]
 
   return (
@@ -251,8 +251,8 @@ export function AppointmentModal({
         <div className="fixed inset-0 z-50 flex items-start justify-center p-3 pt-4 sm:items-center sm:p-4">
           <div className="absolute inset-0 bg-[rgba(17,24,39,0.36)] backdrop-blur-sm" onClick={() => setOpen(false)} />
 
-          <div className="relative z-10 grid h-[min(920px,calc(100vh-1rem))] w-full max-w-5xl min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[1.5rem] border border-[rgba(84,35,145,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(249,246,253,0.97))] shadow-[0_42px_120px_-60px_rgba(124,58,237,0.28)]">
-            <div className="flex items-start justify-between gap-4 border-b border-[rgba(84,35,145,0.08)] px-5 py-4 sm:px-6">
+          <div className="relative z-10 grid h-[min(920px,calc(100vh-1rem))] w-full max-w-5xl min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[1.5rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.99),rgba(15,17,21,0.98))] shadow-[0_42px_120px_-60px_rgba(2,6,23,0.88)]">
+            <div className="flex items-start justify-between gap-4 border-b border-[rgba(255,255,255,0.06)] px-5 py-4 sm:px-6">
               <div className="min-w-0">
                 <h2 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
                   {isEdit ? 'Editar horario' : 'Novo horario'}
@@ -265,7 +265,7 @@ export function AppointmentModal({
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-[0.9rem] text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.04)] hover:text-primary"
+                className="flex h-9 w-9 items-center justify-center rounded-[0.9rem] text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)] hover:text-primary"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -303,7 +303,7 @@ export function AppointmentModal({
                               customer.type === 'SUBSCRIPTION' ? 'SUBSCRIPTION_INCLUDED' : 'AVULSO'
                             )
                           }}
-                          className="inline-flex max-w-full items-center gap-2 rounded-full border border-[rgba(84,35,145,0.08)] bg-white px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-[rgba(124,58,237,0.04)]"
+                          className="inline-flex max-w-full items-center gap-2 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)]"
                         >
                           <UserRound className="h-3 w-3 flex-shrink-0 text-primary" />
                           <span className="truncate">{customer.name}</span>
@@ -436,7 +436,7 @@ export function AppointmentModal({
                   </section>
                 </div>
 
-                <div className="mt-5 flex flex-col gap-3 border-t border-[rgba(84,35,145,0.08)] pt-5 sm:flex-row">
+                <div className="mt-5 flex flex-col gap-3 border-t border-[rgba(255,255,255,0.06)] pt-5 sm:flex-row">
                   <button
                     type="button"
                     onClick={() => setOpen(false)}
@@ -451,7 +451,7 @@ export function AppointmentModal({
                 </div>
               </form>
 
-              <aside className="min-h-0 min-w-0 overflow-y-auto border-t border-[rgba(84,35,145,0.08)] bg-[rgba(124,58,237,0.04)] px-5 py-5 xl:border-l xl:border-t-0 xl:px-6">
+              <aside className="min-h-0 min-w-0 overflow-y-auto border-t border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-5 xl:border-l xl:border-t-0 xl:px-6">
                 <div className="space-y-4">
                   <div>
                     <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Resumo do horario</p>
@@ -497,10 +497,10 @@ export function AppointmentModal({
                       <p className="mt-3 text-sm text-muted-foreground">{watch('customerPhone') || 'Sem telefone informado'}</p>
                       <p className="mt-1 truncate text-xs text-muted-foreground">{watch('customerEmail') || 'Sem email informado'}</p>
                       <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
-                        <span className="inline-flex items-center rounded-full border border-[rgba(84,35,145,0.08)] bg-white px-2.5 py-1 text-foreground">
+                        <span className="inline-flex items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-2.5 py-1 text-foreground">
                           {CUSTOMER_TYPE_LABELS[selectedCustomerType]}
                         </span>
-                        <span className="inline-flex items-center rounded-full border border-[rgba(84,35,145,0.08)] bg-white px-2.5 py-1 text-muted-foreground">
+                        <span className="inline-flex items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-2.5 py-1 text-muted-foreground">
                           {APPOINTMENT_BILLING_MODEL_LABELS[selectedBillingModel]}
                         </span>
                       </div>

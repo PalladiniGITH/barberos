@@ -27,7 +27,7 @@ export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
 
   return (
     <section className="dashboard-panel p-6">
-      <div className="flex flex-col gap-4 border-b border-[rgba(58,47,86,0.08)] pb-5 xl:flex-row xl:items-start xl:justify-between">
+      <div className="flex flex-col gap-4 border-b border-[rgba(255,255,255,0.06)] pb-5 xl:flex-row xl:items-start xl:justify-between">
         <div>
           <p className="page-kicker">Performance comercial</p>
           <h3 className="mt-2 text-[1.55rem] font-semibold tracking-tight text-foreground">Ranking dos profissionais</h3>
@@ -48,7 +48,7 @@ export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
           return (
             <article
               key={entry.id}
-              className="rounded-[1.35rem] border border-[rgba(58,47,86,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,247,251,0.96))] p-5 shadow-[0_20px_40px_-30px_rgba(22,16,39,0.12)]"
+              className="rounded-[1.35rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.98),rgba(15,17,21,0.96))] p-5 shadow-[0_20px_40px_-30px_rgba(2,6,23,0.72)]"
             >
               <div className="flex items-start gap-4">
                 <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[1rem] border border-[rgba(91,33,182,0.08)] bg-[rgba(91,33,182,0.08)] text-primary">
@@ -66,7 +66,7 @@ export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
                       </p>
                     </div>
 
-                    <div className="rounded-[1rem] border border-[rgba(58,47,86,0.08)] bg-white px-3.5 py-2.5 text-right shadow-[0_14px_26px_-22px_rgba(22,16,39,0.12)]">
+                    <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3.5 py-2.5 text-right shadow-[0_14px_26px_-22px_rgba(2,6,23,0.56)]">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Receita</p>
                       <p className="mt-1 text-base font-semibold tabular-nums text-foreground">
                         {formatCurrency(entry.revenue)}

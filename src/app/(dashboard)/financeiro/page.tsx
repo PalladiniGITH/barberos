@@ -41,14 +41,14 @@ function MetricCard({
     <div className="kpi-card">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">{title}</p>
-          <p className="mt-1.5 text-2xl font-bold tabular-nums text-foreground">{value}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{title}</p>
+          <p className="mt-2 text-[2.05rem] font-semibold leading-none tabular-nums text-foreground">{value}</p>
         </div>
-        <span className={cn('flex h-10 w-10 items-center justify-center rounded-xl', toneClasses)}>
+        <span className={cn('flex h-10 w-10 items-center justify-center rounded-[0.9rem]', toneClasses)}>
           <Icon className="h-4 w-4" />
         </span>
       </div>
-      <p className="mt-3 text-xs leading-5 text-muted-foreground">{helper}</p>
+      <p className="mt-2.5 text-[12px] leading-5 text-muted-foreground">{helper}</p>
     </div>
   )
 }
@@ -253,7 +253,7 @@ export default async function FinanceiroPage({ searchParams }: Props) {
     : 'Ainda nao ha movimentacao financeira registrada neste periodo. O painel continua pronto para assumir o primeiro ciclo.'
 
   return (
-    <div className="page-section mx-auto flex max-w-7xl flex-col gap-6">
+    <div className="page-section mx-auto flex max-w-7xl flex-col gap-5">
       <PageHeader
         title="Financeiro"
         description="Leitura executiva do caixa, das despesas e do que mais merece atencao agora."
@@ -266,10 +266,10 @@ export default async function FinanceiroPage({ searchParams }: Props) {
 
       <SectionTabs items={FINANCE_SECTION_TABS} currentPath="/financeiro" />
 
-      <section className="dashboard-panel dashboard-spotlight overflow-hidden p-6 sm:p-7">
-        <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+      <section className="dashboard-panel dashboard-spotlight overflow-hidden p-5 sm:p-6">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-200/70">Visao do periodo</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Visao do periodo</p>
             <h2 className="mt-4 text-4xl font-semibold tracking-tight text-white sm:text-5xl">
               {formatCurrency(currentNet)}
             </h2>
@@ -277,17 +277,17 @@ export default async function FinanceiroPage({ searchParams }: Props) {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[420px]">
-            <Link href="/financeiro/receitas" className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 transition-colors hover:border-primary/30 hover:bg-white/[0.06]">
+            <Link href="/financeiro/receitas" className="rounded-2xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 transition-colors hover:border-primary/30 hover:bg-white/[0.06]">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Receitas</p>
               <p className="mt-2 text-lg font-semibold text-white">{formatCurrency(totalRevenue)}</p>
               <p className="mt-1 text-xs text-slate-400">Abrir entradas</p>
             </Link>
-            <Link href="/financeiro/despesas" className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 transition-colors hover:border-primary/30 hover:bg-white/[0.06]">
+            <Link href="/financeiro/despesas" className="rounded-2xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 transition-colors hover:border-primary/30 hover:bg-white/[0.06]">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Despesas</p>
               <p className="mt-2 text-lg font-semibold text-white">{formatCurrency(totalExpense)}</p>
               <p className="mt-1 text-xs text-slate-400">Abrir saidas</p>
             </Link>
-            <Link href="/financeiro/categorias" className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 transition-colors hover:border-primary/30 hover:bg-white/[0.06]">
+            <Link href="/financeiro/categorias" className="rounded-2xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 transition-colors hover:border-primary/30 hover:bg-white/[0.06]">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Categorias</p>
               <p className="mt-2 text-lg font-semibold text-white">{categories.length}</p>
               <p className="mt-1 text-xs text-slate-400">Organizacao do uso</p>
@@ -334,7 +334,7 @@ export default async function FinanceiroPage({ searchParams }: Props) {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
-        <section className="dashboard-panel p-6">
+        <section className="dashboard-panel p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 className="text-lg font-semibold text-foreground">Tendencia dos ultimos 6 meses</h3>
@@ -352,7 +352,7 @@ export default async function FinanceiroPage({ searchParams }: Props) {
           </div>
         </section>
 
-        <section className="dashboard-panel p-6">
+        <section className="dashboard-panel p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 className="text-lg font-semibold text-foreground">Leitura executiva</h3>

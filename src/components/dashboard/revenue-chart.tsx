@@ -19,7 +19,7 @@ function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
 
   return (
-    <div className="rounded-[1.2rem] border border-[rgba(58,47,86,0.08)] bg-white p-3.5 text-foreground shadow-[0_28px_44px_-28px_rgba(20,15,35,0.16)]">
+    <div className="rounded-[1.2rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.98),rgba(15,17,21,0.96))] p-3.5 text-foreground shadow-[0_28px_44px_-28px_rgba(2,6,23,0.68)]">
       <p className="text-sm font-semibold text-foreground">{label}</p>
       <div className="mt-2.5 space-y-1.5 text-sm">
         {payload.map((entry: any) => (
@@ -50,7 +50,7 @@ export function RevenueChart({ data }: RevenueChartProps) {
         </div>
       </div>
 
-      <div className="rounded-[1.65rem] border border-[rgba(58,47,86,0.08)] bg-[linear-gradient(180deg,rgba(250,249,252,0.96),rgba(255,255,255,0.98))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
+      <div className="rounded-[1.65rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(35,38,58,0.94),rgba(21,24,33,0.98))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         <ResponsiveContainer width="100%" height={320}>
           <AreaChart data={data} margin={{ top: 8, right: 10, left: -18, bottom: 0 }}>
             <defs>
@@ -64,16 +64,16 @@ export function RevenueChart({ data }: RevenueChartProps) {
               </linearGradient>
             </defs>
 
-            <CartesianGrid stroke="rgba(58,47,86,0.08)" strokeDasharray="4 4" vertical={false} />
+            <CartesianGrid stroke="rgba(255,255,255,0.08)" strokeDasharray="4 4" vertical={false} />
             <XAxis
               axisLine={false}
               dataKey="month"
-              tick={{ fill: 'rgba(79, 74, 95, 0.84)', fontSize: 12 }}
+              tick={{ fill: 'rgba(156, 163, 175, 0.86)', fontSize: 12 }}
               tickLine={false}
             />
             <YAxis
               axisLine={false}
-              tick={{ fill: 'rgba(79, 74, 95, 0.84)', fontSize: 12 }}
+              tick={{ fill: 'rgba(156, 163, 175, 0.86)', fontSize: 12 }}
               tickFormatter={(value) => `R$${(value / 1000).toFixed(0)}k`}
               tickLine={false}
             />

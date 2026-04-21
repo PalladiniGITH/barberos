@@ -44,7 +44,7 @@ function getActions(status: AppointmentFormValue['status']): StatusAction[] {
         icon: CheckCircle2,
         label: 'Confirmar',
         status: 'CONFIRMED',
-        className: 'hover:border-emerald-400/40 hover:bg-emerald-400/12 hover:text-emerald-100',
+        className: 'hover:border-violet-400/40 hover:bg-violet-400/12 hover:text-violet-100',
       },
       {
         icon: Ban,
@@ -61,7 +61,7 @@ function getActions(status: AppointmentFormValue['status']): StatusAction[] {
         icon: CheckCheck,
         label: 'Concluir',
         status: 'COMPLETED',
-        className: 'hover:border-emerald-400/40 hover:bg-emerald-400/12 hover:text-emerald-100',
+        className: 'hover:border-violet-400/40 hover:bg-violet-400/12 hover:text-violet-100',
       },
       {
         icon: UserX,

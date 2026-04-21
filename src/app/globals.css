@@ -4,28 +4,37 @@
 
 @layer base {
   :root {
-    --background: 244 20% 94%;
-    --foreground: 252 28% 11%;
-    --card: 240 20% 99%;
-    --card-foreground: 252 28% 11%;
-    --popover: 240 20% 99%;
-    --popover-foreground: 252 28% 11%;
-    --primary: 266 62% 45%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 246 17% 90%;
-    --secondary-foreground: 248 18% 18%;
-    --muted: 244 15% 89%;
-    --muted-foreground: 246 11% 27%;
-    --accent: 264 42% 92%;
-    --accent-foreground: 266 38% 22%;
-    --destructive: 354 76% 56%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 242 12% 75%;
-    --input: 244 13% 83%;
-    --ring: 266 62% 45%;
-    --inverse-foreground: 240 22% 97%;
-    --inverse-muted-foreground: 244 14% 80%;
-    --inverse-accent-foreground: 0 0% 100%;
+    --background: 220 17% 7%;
+    --foreground: 220 13% 91%;
+    --card: 225 22% 11%;
+    --card-foreground: 220 13% 91%;
+    --popover: 228 26% 15%;
+    --popover-foreground: 220 13% 91%;
+    --primary: 262 83% 58%;
+    --primary-hover: 263 70% 50%;
+    --primary-active: 263 69% 42%;
+    --primary-foreground: 220 13% 96%;
+    --secondary: 232 25% 18%;
+    --secondary-foreground: 220 13% 91%;
+    --muted: 228 26% 15%;
+    --muted-foreground: 218 11% 65%;
+    --subtle-foreground: 220 9% 46%;
+    --accent: 258 90% 66%;
+    --accent-foreground: 220 13% 96%;
+    --accent-strong: 263 69% 42%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 220 13% 96%;
+    --success: 142 76% 36%;
+    --border: 229 24% 22%;
+    --border-soft: 232 25% 18%;
+    --input: 229 24% 22%;
+    --ring: 262 83% 58%;
+    --surface: 225 22% 11%;
+    --surface-2: 228 26% 15%;
+    --surface-soft: 232 25% 18%;
+    --inverse-foreground: 220 13% 96%;
+    --inverse-muted-foreground: 220 10% 79%;
+    --inverse-accent-foreground: 258 90% 82%;
     --radius: 0.875rem;
   }
 
@@ -34,7 +43,7 @@
   }
 
   html {
-    color-scheme: light;
+    color-scheme: dark;
   }
 
   body {
@@ -42,9 +51,9 @@
     font-family: var(--font-sans), system-ui, sans-serif;
     font-feature-settings: 'rlig' 1, 'calt' 1;
     background:
-      radial-gradient(circle at top left, rgba(91, 33, 182, 0.07), transparent 20%),
-      radial-gradient(circle at top right, rgba(124, 58, 237, 0.05), transparent 16%),
-      linear-gradient(180deg, #f2f0f6 0%, #edeaf2 48%, #f2eff5 100%);
+      radial-gradient(circle at top left, rgba(124, 58, 237, 0.18), transparent 24%),
+      radial-gradient(circle at top right, rgba(109, 40, 217, 0.14), transparent 22%),
+      linear-gradient(180deg, #11131a 0%, #0f1115 42%, #0f1115 100%);
   }
 
   h1,
@@ -76,16 +85,16 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: rgba(53, 32, 92, 0.035);
+    background: rgba(255, 255, 255, 0.025);
   }
 
   ::-webkit-scrollbar-thumb {
-    background: rgba(91, 33, 182, 0.2);
+    background: rgba(124, 58, 237, 0.38);
     border-radius: 999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(91, 33, 182, 0.3);
+    background: rgba(124, 58, 237, 0.56);
   }
 }
 
@@ -96,15 +105,15 @@
 
   .page-kicker,
   .spotlight-kicker {
-    @apply text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground;
+    @apply text-[10px] font-semibold uppercase tracking-[0.26em] text-muted-foreground;
   }
 
   .page-title {
-    @apply text-[2.4rem] font-semibold tracking-tight text-foreground sm:text-[2.9rem];
+    @apply text-[2.45rem] font-semibold leading-[0.96] tracking-tight text-foreground sm:text-[2.95rem];
   }
 
   .page-copy {
-    @apply text-sm leading-7 text-muted-foreground;
+    @apply text-[14px] leading-6 text-muted-foreground;
   }
 
   .dashboard-panel,
@@ -116,64 +125,64 @@
   .disclosure-panel,
   .panel-card,
   .metric-card {
-    @apply rounded-[1.1rem] border bg-white;
-    border-color: rgba(52, 44, 78, 0.13);
+    @apply rounded-[1.1rem] border text-card-foreground;
+    border-color: hsl(var(--border));
     box-shadow:
-      0 18px 34px -26px rgba(19, 15, 36, 0.12),
-      0 10px 20px -18px rgba(91, 33, 182, 0.08),
-      inset 0 1px 0 rgba(255, 255, 255, 0.9);
+      0 28px 54px -36px rgba(2, 6, 23, 0.82),
+      0 12px 26px -20px rgba(91, 33, 182, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
   .dashboard-panel {
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 240, 249, 0.98));
+      linear-gradient(180deg, rgba(28, 32, 48, 0.98), rgba(21, 24, 33, 0.98));
   }
 
   .dashboard-spotlight {
-    @apply rounded-[1.25rem] border bg-white;
-    border-color: rgba(71, 51, 117, 0.14);
+    @apply rounded-[1.25rem] border;
+    border-color: rgba(139, 92, 246, 0.18);
     background:
-      radial-gradient(circle at top left, rgba(91, 33, 182, 0.1), transparent 28%),
-      linear-gradient(180deg, rgba(251, 249, 253, 0.99), rgba(240, 236, 246, 0.99));
+      radial-gradient(circle at top left, rgba(124, 58, 237, 0.18), transparent 28%),
+      linear-gradient(180deg, rgba(35, 38, 58, 0.98), rgba(21, 24, 33, 0.99));
     box-shadow:
-      0 22px 42px -30px rgba(23, 18, 43, 0.14),
-      0 12px 24px -22px rgba(91, 33, 182, 0.1);
+      0 30px 62px -38px rgba(2, 6, 23, 0.86),
+      0 16px 34px -28px rgba(91, 33, 182, 0.3);
   }
 
   .premium-shell {
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(241, 236, 247, 0.97));
+      linear-gradient(180deg, rgba(28, 32, 48, 0.98), rgba(21, 24, 33, 0.98));
   }
 
   .premium-block {
     background:
-      linear-gradient(180deg, rgba(252, 251, 253, 0.99), rgba(241, 237, 247, 0.98));
+      linear-gradient(180deg, rgba(24, 28, 40, 0.98), rgba(15, 17, 21, 0.98));
   }
 
   .premium-rail {
     background:
-      linear-gradient(180deg, rgba(244, 240, 248, 0.99), rgba(236, 231, 244, 0.99));
+      linear-gradient(180deg, rgba(35, 38, 58, 0.96), rgba(21, 24, 33, 0.94));
   }
 
   .surface-soft {
     background:
-      linear-gradient(180deg, rgba(244, 240, 248, 0.96), rgba(234, 229, 242, 0.97));
+      linear-gradient(180deg, rgba(35, 38, 58, 0.9), rgba(28, 32, 48, 0.88));
   }
 
   .surface-soft-strong {
     background:
-      linear-gradient(180deg, rgba(231, 225, 241, 0.98), rgba(241, 237, 247, 0.99));
+      linear-gradient(180deg, rgba(42, 47, 69, 0.94), rgba(28, 32, 48, 0.96));
   }
 
   .dashboard-hero-grid {
-    @apply grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_360px];
+    @apply grid gap-3 xl:grid-cols-[minmax(0,1.3fr)_360px];
   }
 
   .hero-stat-card {
-    @apply rounded-[1rem] border bg-white p-5 backdrop-blur-sm;
-    border-color: rgba(71, 51, 117, 0.09);
-    background: rgba(250, 249, 252, 0.9);
-    box-shadow: 0 14px 24px -18px rgba(20, 15, 35, 0.08);
+    @apply rounded-[1rem] border p-4 backdrop-blur-sm;
+    border-color: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.04);
+    box-shadow: 0 18px 28px -20px rgba(2, 6, 23, 0.45);
   }
 
   .hero-stat-card strong,
@@ -183,80 +192,80 @@
   }
 
   .spotlight-title {
-    @apply mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-[3.75rem];
+    @apply mt-2.5 text-[2.9rem] font-semibold leading-[0.95] tracking-tight text-foreground sm:text-[3.5rem];
   }
 
   .spotlight-copy {
-    @apply mt-3 text-[15px] leading-7 text-muted-foreground;
+    @apply mt-2.5 text-[14px] leading-6 text-muted-foreground;
   }
 
   .spotlight-chip,
   .surface-chip {
-    @apply inline-flex max-w-full items-center gap-2 rounded-[0.75rem] border px-3 py-1.5 text-xs font-semibold;
-    border-color: rgba(91, 33, 182, 0.14);
-    background: rgba(91, 33, 182, 0.08);
-    color: hsl(var(--accent-foreground));
+    @apply inline-flex max-w-full items-center gap-1.5 rounded-[0.72rem] border px-2.5 py-1.5 text-[11px] font-semibold;
+    border-color: rgba(139, 92, 246, 0.22);
+    background: rgba(109, 40, 217, 0.18);
+    color: hsl(var(--foreground));
     width: fit-content;
   }
 
   .spotlight-stat,
   .kpi-card {
-    @apply rounded-[1rem] border p-5;
-    border-color: rgba(58, 47, 86, 0.12);
+    @apply rounded-[1rem] border p-4;
+    border-color: rgba(255, 255, 255, 0.06);
     background:
-      linear-gradient(180deg, rgba(252, 251, 253, 0.99), rgba(242, 238, 248, 0.98));
+      linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
     box-shadow:
-      0 14px 24px -18px rgba(20, 15, 35, 0.12),
-      inset 0 1px 0 rgba(255, 255, 255, 0.95);
+      0 18px 30px -20px rgba(2, 6, 23, 0.45),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
   .metric-card {
-    @apply p-6;
+    @apply p-5;
   }
 
   .executive-metric {
-    @apply rounded-[1rem] border p-5;
-    border-color: rgba(58, 47, 86, 0.1);
+    @apply rounded-[1rem] border p-4;
+    border-color: rgba(255, 255, 255, 0.06);
     background:
-      linear-gradient(180deg, rgba(252, 251, 253, 0.98), rgba(245, 243, 249, 0.96));
-    box-shadow: 0 14px 22px -18px rgba(25, 18, 40, 0.1);
+      linear-gradient(180deg, rgba(28, 32, 48, 0.98), rgba(21, 24, 33, 0.98));
+    box-shadow: 0 18px 28px -20px rgba(2, 6, 23, 0.42);
   }
 
   .executive-label {
-    @apply text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground;
+    @apply text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground;
   }
 
   .executive-value {
-    @apply mt-3 text-[2rem] font-semibold tracking-tight text-foreground;
+    @apply mt-2.5 text-[2.1rem] font-semibold leading-none tracking-tight text-foreground;
   }
 
   .premium-dark-button,
   .action-button-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-[0.9rem] border border-transparent px-4 py-2.5 text-sm font-semibold text-white transition-all;
-    background: linear-gradient(135deg, #5b21b6, #6d28d9 52%, #7c3aed);
-    box-shadow: 0 18px 40px -22px rgba(91, 33, 182, 0.42);
+    @apply inline-flex items-center justify-center gap-2 rounded-[0.9rem] border border-transparent px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-all;
+    background: linear-gradient(135deg, #5b21b6, #6d28d9 48%, #7c3aed);
+    box-shadow: 0 22px 42px -24px rgba(91, 33, 182, 0.5);
   }
 
   .premium-dark-button:hover,
   .action-button-primary:hover {
     transform: translateY(-1px);
-    box-shadow: 0 24px 46px -24px rgba(91, 33, 182, 0.46);
+    box-shadow: 0 28px 48px -24px rgba(91, 33, 182, 0.56);
   }
 
   .action-button {
     @apply inline-flex items-center justify-center gap-2 rounded-[0.9rem] border px-4 py-2.5 text-sm font-semibold text-foreground transition-all;
-    border-color: rgba(58, 47, 86, 0.1);
-    background: rgba(250, 249, 252, 0.92);
-    box-shadow: 0 10px 18px -16px rgba(20, 15, 35, 0.08);
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    box-shadow: 0 12px 20px -16px rgba(2, 6, 23, 0.42);
   }
 
   .action-button:hover {
-    background: rgba(91, 33, 182, 0.045);
-    border-color: rgba(91, 33, 182, 0.12);
+    background: rgba(109, 40, 217, 0.12);
+    border-color: rgba(124, 58, 237, 0.18);
   }
 
   .disclosure-summary {
-    @apply flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-5;
+    @apply flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4;
   }
 
   .disclosure-summary::-webkit-details-marker {
@@ -264,14 +273,14 @@
   }
 
   .disclosure-body {
-    @apply border-t px-6 pb-6 pt-5;
-    border-color: rgba(58, 47, 86, 0.08);
+    @apply border-t px-5 pb-5 pt-4;
+    border-color: rgba(255, 255, 255, 0.06);
   }
 
   .panel-soft {
-    @apply rounded-[0.95rem] border p-4;
-    border-color: rgba(58, 47, 86, 0.12);
-    background: rgba(240, 236, 246, 0.96);
+    @apply rounded-[0.95rem] border p-3;
+    border-color: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.03);
   }
 
   .data-table th {
@@ -280,38 +289,40 @@
 
   .auth-shell {
     background:
-      radial-gradient(circle at top left, rgba(91, 33, 182, 0.14), transparent 28%),
-      linear-gradient(180deg, #f8f7fb 0%, #f2f0f7 100%);
+      radial-gradient(circle at top left, rgba(124, 58, 237, 0.2), transparent 28%),
+      radial-gradient(circle at bottom right, rgba(109, 40, 217, 0.12), transparent 24%),
+      linear-gradient(180deg, #141723 0%, #0f1115 100%);
   }
 
   .auth-dark-panel,
   .auth-panel {
-    @apply rounded-[1.4rem] border bg-white;
-    border-color: rgba(58, 47, 86, 0.12);
-    box-shadow: 0 24px 48px -30px rgba(32, 21, 58, 0.16);
+    @apply rounded-[1.4rem] border;
+    border-color: rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, rgba(28, 32, 48, 0.98), rgba(15, 17, 21, 0.98));
+    box-shadow: 0 32px 58px -32px rgba(2, 6, 23, 0.82);
   }
 
   .auth-stat {
     @apply rounded-[1rem] border px-4 py-4;
-    border-color: rgba(58, 47, 86, 0.1);
-    background: rgba(244, 241, 248, 0.9);
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
   }
 
   .auth-input {
     @apply w-full rounded-[0.9rem] border px-4 py-3 text-foreground outline-none transition-all;
-    border-color: rgba(58, 47, 86, 0.12);
-    background: rgba(255, 255, 255, 0.94);
+    border-color: hsl(var(--border));
+    background: rgba(15, 17, 21, 0.9);
   }
 
   .auth-input::placeholder {
-    color: rgba(92, 85, 111, 0.72);
+    color: rgba(156, 163, 175, 0.76);
   }
 
   .auth-input:focus {
-    border-color: rgba(91, 33, 182, 0.22);
+    border-color: rgba(124, 58, 237, 0.32);
     box-shadow:
-      0 0 0 4px rgba(91, 33, 182, 0.12),
-      inset 0 1px 0 rgba(255, 255, 255, 0.72);
+      0 0 0 4px rgba(124, 58, 237, 0.14),
+      inset 0 1px 0 rgba(255, 255, 255, 0.03);
   }
 
   .nav-progress-bar {
@@ -334,303 +345,96 @@
   }
 
   .surface-inverse-subtle {
-    border-color: rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.045);
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.06);
     color: hsl(var(--inverse-muted-foreground));
   }
 
   .surface-inverse-chip {
-    border-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.12);
     background: rgba(255, 255, 255, 0.08);
     color: hsl(var(--inverse-muted-foreground));
   }
 }
 
 @layer utilities {
-  :where(
-      .dashboard-panel,
-      .dashboard-spotlight,
-      .premium-shell,
-      .premium-block,
-      .premium-rail,
-      .surface-soft,
-      .surface-soft-strong,
-      .disclosure-panel,
-      .panel-card,
-      .metric-card,
-      .spotlight-stat,
-      .kpi-card,
-      .hero-stat-card,
-      .auth-panel,
-      .auth-dark-panel
-    ):where(:not(.surface-inverse, .surface-inverse *)) {
-    color: hsl(var(--foreground));
+  .text-emerald-100,
+  .text-emerald-200,
+  .text-emerald-300 {
+    color: rgb(187 247 208);
   }
 
-  :where(
-      .dashboard-panel,
-      .dashboard-spotlight,
-      .premium-shell,
-      .premium-block,
-      .premium-rail,
-      .surface-soft,
-      .surface-soft-strong,
-      .disclosure-panel,
-      .panel-card,
-      .metric-card,
-      .spotlight-stat,
-      .kpi-card,
-      .hero-stat-card,
-      .auth-panel,
-      .auth-dark-panel
-    ) :where(:not(.surface-inverse, .surface-inverse *)):is(.text-white, .text-slate-50, .text-slate-100, .text-slate-200) {
-    color: rgba(43, 36, 63, 0.96);
+  .text-emerald-400 {
+    color: rgb(134 239 172);
   }
 
-  :where(
-      .dashboard-panel,
-      .dashboard-spotlight,
-      .premium-shell,
-      .premium-block,
-      .premium-rail,
-      .surface-soft,
-      .surface-soft-strong,
-      .disclosure-panel,
-      .panel-card,
-      .metric-card,
-      .spotlight-stat,
-      .kpi-card,
-      .hero-stat-card,
-      .auth-panel,
-      .auth-dark-panel
-    ) :where(:not(.surface-inverse, .surface-inverse *)):is(.text-slate-300, .text-slate-400, .text-slate-500, .text-emerald-200\/70, .text-emerald-200, .text-sky-200) {
-    color: rgba(88, 80, 112, 0.9);
+  .text-emerald-500,
+  .text-emerald-600,
+  .text-emerald-700,
+  .text-green-500 {
+    color: rgb(74 222 128);
   }
 
-  :where(
-      .dashboard-panel,
-      .dashboard-spotlight,
-      .premium-shell,
-      .premium-block,
-      .premium-rail,
-      .surface-soft,
-      .surface-soft-strong,
-      .disclosure-panel,
-      .panel-card,
-      .metric-card,
-      .spotlight-stat,
-      .kpi-card,
-      .hero-stat-card,
-      .auth-panel,
-      .auth-dark-panel
-    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='border-white/10'],
-  :where(
-      .dashboard-panel,
-      .dashboard-spotlight,
-      .premium-shell,
-      .premium-block,
-      .premium-rail,
-      .surface-soft,
-      .surface-soft-strong,
-      .disclosure-panel,
-      .panel-card,
-      .metric-card,
-      .spotlight-stat,
-      .kpi-card,
-      .hero-stat-card,
-      .auth-panel,
-      .auth-dark-panel
-    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='border-[rgba(255,255,255,0.05)]'],
-  :where(
-      .dashboard-panel,
-      .dashboard-spotlight,
-      .premium-shell,
-      .premium-block,
-      .premium-rail,
-      .surface-soft,
-      .surface-soft-strong,
-      .disclosure-panel,
-      .panel-card,
-      .metric-card,
-      .spotlight-stat,
-      .kpi-card,
-      .hero-stat-card,
-      .auth-panel,
-      .auth-dark-panel
-    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='border-[rgba(255,255,255,0.06)]'],
-  :where(
-      .dashboard-panel,
-      .dashboard-spotlight,
-      .premium-shell,
-      .premium-block,
-      .premium-rail,
-      .surface-soft,
-      .surface-soft-strong,
-      .disclosure-panel,
-      .panel-card,
-      .metric-card,
-      .spotlight-stat,
-      .kpi-card,
-      .hero-stat-card,
-      .auth-panel,
-      .auth-dark-panel
-    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='border-[rgba(255,255,255,0.08)]'],
-  :where(
-      .dashboard-panel,
-      .dashboard-spotlight,
-      .premium-shell,
-      .premium-block,
-      .premium-rail,
-      .surface-soft,
-      .surface-soft-strong,
-      .disclosure-panel,
-      .panel-card,
-      .metric-card,
-      .spotlight-stat,
-      .kpi-card,
-      .hero-stat-card,
-      .auth-panel,
-      .auth-dark-panel
-    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='border-[rgba(255,255,255,0.12)]'] {
-    border-color: rgba(58, 47, 86, 0.12);
+  .text-emerald-200\/70,
+  .text-emerald-300\/80 {
+    color: rgb(187 247 208 / 0.78);
   }
 
-  :where(
-      .dashboard-panel,
-      .dashboard-spotlight,
-      .premium-shell,
-      .premium-block,
-      .premium-rail,
-      .surface-soft,
-      .surface-soft-strong,
-      .disclosure-panel,
-      .panel-card,
-      .metric-card,
-      .spotlight-stat,
-      .kpi-card,
-      .hero-stat-card,
-      .auth-panel,
-      .auth-dark-panel
-    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='bg-white/[0.04]'],
-  :where(
-      .dashboard-panel,
-      .dashboard-spotlight,
-      .premium-shell,
-      .premium-block,
-      .premium-rail,
-      .surface-soft,
-      .surface-soft-strong,
-      .disclosure-panel,
-      .panel-card,
-      .metric-card,
-      .spotlight-stat,
-      .kpi-card,
-      .hero-stat-card,
-      .auth-panel,
-      .auth-dark-panel
-    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='bg-white/[0.05]'],
-  :where(
-      .dashboard-panel,
-      .dashboard-spotlight,
-      .premium-shell,
-      .premium-block,
-      .premium-rail,
-      .surface-soft,
-      .surface-soft-strong,
-      .disclosure-panel,
-      .panel-card,
-      .metric-card,
-      .spotlight-stat,
-      .kpi-card,
-      .hero-stat-card,
-      .auth-panel,
-      .auth-dark-panel
-    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='bg-[rgba(255,255,255,0.06)]'],
-  :where(
-      .dashboard-panel,
-      .dashboard-spotlight,
-      .premium-shell,
-      .premium-block,
-      .premium-rail,
-      .surface-soft,
-      .surface-soft-strong,
-      .disclosure-panel,
-      .panel-card,
-      .metric-card,
-      .spotlight-stat,
-      .kpi-card,
-      .hero-stat-card,
-      .auth-panel,
-      .auth-dark-panel
-    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='bg-[rgba(255,255,255,0.08)]'],
-  :where(
-      .dashboard-panel,
-      .dashboard-spotlight,
-      .premium-shell,
-      .premium-block,
-      .premium-rail,
-      .surface-soft,
-      .surface-soft-strong,
-      .disclosure-panel,
-      .panel-card,
-      .metric-card,
-      .spotlight-stat,
-      .kpi-card,
-      .hero-stat-card,
-      .auth-panel,
-      .auth-dark-panel
-    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='bg-[rgba(255,255,255,0.02)]'],
-  :where(
-      .dashboard-panel,
-      .dashboard-spotlight,
-      .premium-shell,
-      .premium-block,
-      .premium-rail,
-      .surface-soft,
-      .surface-soft-strong,
-      .disclosure-panel,
-      .panel-card,
-      .metric-card,
-      .spotlight-stat,
-      .kpi-card,
-      .hero-stat-card,
-      .auth-panel,
-      .auth-dark-panel
-    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='bg-[rgba(255,255,255,0.03)]'],
-  :where(
-      .dashboard-panel,
-      .dashboard-spotlight,
-      .premium-shell,
-      .premium-block,
-      .premium-rail,
-      .surface-soft,
-      .surface-soft-strong,
-      .disclosure-panel,
-      .panel-card,
-      .metric-card,
-      .spotlight-stat,
-      .kpi-card,
-      .hero-stat-card,
-      .auth-panel,
-      .auth-dark-panel
-    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='bg-[rgba(255,255,255,0.04)]'],
-  :where(
-      .dashboard-panel,
-      .dashboard-spotlight,
-      .premium-shell,
-      .premium-block,
-      .premium-rail,
-      .surface-soft,
-      .surface-soft-strong,
-      .disclosure-panel,
-      .panel-card,
-      .metric-card,
-      .spotlight-stat,
-      .kpi-card,
-      .hero-stat-card,
-      .auth-panel,
-      .auth-dark-panel
-    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='bg-[rgba(255,255,255,0.05)]'] {
-    background: rgba(91, 33, 182, 0.055);
+  .bg-emerald-400,
+  .bg-emerald-500 {
+    background-color: hsl(var(--success));
+  }
+
+  .bg-emerald-400\/12,
+  .bg-emerald-500\/08,
+  .bg-emerald-500\/10,
+  .bg-emerald-500\/12,
+  .bg-emerald-500\/15,
+  .bg-emerald-500\/20 {
+    background-color: rgba(22, 163, 74, 0.12);
+  }
+
+  .border-emerald-500\/20,
+  .border-emerald-500\/15,
+  .border-emerald-400\/40 {
+    border-color: rgba(34, 197, 94, 0.24);
+  }
+
+  .hover\:bg-emerald-500\/20:hover,
+  .hover\:bg-emerald-400\/12:hover {
+    background-color: rgba(22, 163, 74, 0.16);
+  }
+
+  .hover\:border-emerald-400\/40:hover {
+    border-color: rgba(34, 197, 94, 0.34);
+  }
+
+  .hover\:text-emerald-100:hover {
+    color: rgb(187 247 208);
+  }
+
+  .from-emerald-500\/90 {
+    --tw-gradient-from: rgb(22 163 74 / 0.9) var(--tw-gradient-from-position);
+    --tw-gradient-to: rgb(22 163 74 / 0) var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+  }
+
+  .via-emerald-400\/70 {
+    --tw-gradient-to: rgb(74 222 128 / 0) var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), rgb(74 222 128 / 0.7) var(--tw-gradient-via-position), var(--tw-gradient-to);
+  }
+
+  [class*='bg-[rgba(16,185,129'],
+  [class*='bg-[rgba(52,211,153'] {
+    background: rgba(22, 163, 74, 0.12);
+  }
+
+  [class*='border-[rgba(16,185,129'],
+  [class*='border-[rgba(52,211,153'] {
+    border-color: rgba(34, 197, 94, 0.24);
+  }
+
+  [class*='text-green-'] {
+    color: hsl(var(--success));
   }
 }

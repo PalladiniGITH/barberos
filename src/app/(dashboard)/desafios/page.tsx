@@ -193,7 +193,7 @@ export default async function DesafiosPage() {
                             <h3 className="text-lg font-semibold text-foreground">{challenge.title}</h3>
                             <span className={cn(
                               'inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold',
-                              challenge.active ? 'bg-emerald-500/15 text-emerald-300' : 'bg-secondary text-muted-foreground'
+                              challenge.active ? 'bg-primary/15 text-primary' : 'bg-secondary text-muted-foreground'
                             )}>
                               {challenge.active ? <Flame className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
                               {challenge.active ? 'Ativo agora' : 'Encerrado'}

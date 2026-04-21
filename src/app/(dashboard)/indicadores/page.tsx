@@ -202,7 +202,7 @@ export default async function IndicadoresPage({ searchParams }: Props) {
   ]
 
   return (
-    <div className="page-section mx-auto flex max-w-7xl flex-col gap-6">
+    <div className="page-section mx-auto flex max-w-7xl flex-col gap-5">
       <PageHeader
         title="Saúde do negócio"
         description="Leia crescimento, margem e consistência da operação sem depender de planilha."
@@ -213,10 +213,10 @@ export default async function IndicadoresPage({ searchParams }: Props) {
         )}
       />
 
-      <section className="dashboard-panel dashboard-spotlight overflow-hidden p-6 sm:p-7">
+      <section className="dashboard-panel dashboard-spotlight overflow-hidden p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-200/70">
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary/80">
               Sala de leitura
             </p>
             <h2 className="mt-4 text-4xl font-semibold tracking-tight text-white">

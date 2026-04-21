@@ -142,13 +142,13 @@ export function Header({
   const periodLabel = getPeriodLabel(currentQuery, pathname)
 
   return (
-    <header className="border-b border-[rgba(33,24,58,0.08)] bg-[rgba(247,245,250,0.88)] px-4 py-3 backdrop-blur-xl sm:px-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+    <header className="border-b border-[rgba(255,255,255,0.06)] bg-[rgba(21,24,33,0.88)] px-4 py-2.5 backdrop-blur-xl sm:px-6">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0 flex items-start gap-3">
           <button
             type="button"
             onClick={onToggleSidebar}
-            className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-[0.9rem] border border-[rgba(33,24,58,0.08)] bg-[rgba(255,255,255,0.68)] text-muted-foreground transition-colors hover:bg-[rgba(91,33,182,0.06)] hover:text-foreground"
+            className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-[0.9rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)] hover:text-foreground"
             aria-label={sidebarPinned ? 'Soltar barra lateral' : 'Fixar barra lateral'}
           >
             {sidebarPinned ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
@@ -158,8 +158,8 @@ export function Header({
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
               {pageMeta.breadcrumb}
             </p>
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-              <h2 className="truncate text-[1.55rem] font-semibold tracking-tight text-foreground">
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <h2 className="truncate text-[1.65rem] font-semibold leading-tight tracking-tight text-foreground">
                 {pageMeta.title}
               </h2>
               {sessionUser.barbershopName && (
@@ -177,8 +177,8 @@ export function Header({
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="hidden min-w-[190px] items-center gap-2 rounded-[0.95rem] border border-[rgba(33,24,58,0.08)] bg-[rgba(255,255,255,0.45)] px-3 py-2 text-sm xl:flex">
-            <span className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] bg-[rgba(91,33,182,0.08)] text-primary">
+          <div className="hidden min-w-[190px] items-center gap-2 rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1.5 text-sm xl:flex">
+            <span className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] bg-[rgba(124,58,237,0.16)] text-primary">
               <Clock3 className="h-3.5 w-3.5" />
             </span>
             <div className="min-w-0">

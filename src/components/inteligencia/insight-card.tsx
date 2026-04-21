@@ -77,7 +77,7 @@ export function InsightCard({
   return (
     <article
       className={cn(
-        'relative isolate overflow-hidden rounded-[1.45rem] border bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,247,251,0.96))] p-5 shadow-[0_24px_44px_-34px_rgba(22,16,39,0.14)]',
+        'relative isolate overflow-hidden rounded-[1.45rem] border bg-[linear-gradient(180deg,rgba(28,32,48,0.98),rgba(15,17,21,0.96))] p-5 shadow-[0_24px_44px_-34px_rgba(2,6,23,0.72)]',
         meta.panelClass
       )}
     >
@@ -95,7 +95,7 @@ export function InsightCard({
         </div>
 
         {insight.metric && (
-          <div className="rounded-[1rem] border border-[rgba(58,47,86,0.08)] bg-white px-3 py-2 text-right shadow-[0_14px_26px_-24px_rgba(22,16,39,0.12)]">
+          <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-right shadow-[0_14px_26px_-24px_rgba(2,6,23,0.56)]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               {insight.metric.label}
             </p>

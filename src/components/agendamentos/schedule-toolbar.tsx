@@ -86,11 +86,11 @@ export function ScheduleToolbar({
   return (
     <div className="flex w-full flex-col gap-3 xl:min-w-[720px]">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-end">
-        <div className="flex min-w-0 items-center gap-1 rounded-[0.95rem] border border-[rgba(52,44,78,0.1)] bg-[rgba(248,246,251,0.94)] p-1">
+        <div className="flex min-w-0 items-center gap-1 rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-1">
           <button
             type="button"
             onClick={() => goToDate('previous')}
-            className="rounded-[0.75rem] p-2 text-muted-foreground transition-colors hover:bg-[rgba(91,33,182,0.06)] hover:text-foreground"
+            className="rounded-[0.75rem] p-2 text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)] hover:text-foreground"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -98,7 +98,7 @@ export function ScheduleToolbar({
           <button
             type="button"
             onClick={() => goToDate('today')}
-            className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-[0.8rem] border border-[rgba(91,33,182,0.1)] bg-[rgba(255,255,255,0.78)] px-3 py-2 text-foreground"
+            className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-[0.8rem] border border-[rgba(124,58,237,0.18)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-foreground"
           >
             <CalendarDays className="h-3.5 w-3.5 text-primary" />
             <span className="truncate text-center text-sm font-semibold">{label}</span>
@@ -107,7 +107,7 @@ export function ScheduleToolbar({
           <button
             type="button"
             onClick={() => goToDate('next')}
-            className="rounded-[0.75rem] p-2 text-muted-foreground transition-colors hover:bg-[rgba(91,33,182,0.06)] hover:text-foreground"
+            className="rounded-[0.75rem] p-2 text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)] hover:text-foreground"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -115,12 +115,12 @@ export function ScheduleToolbar({
 
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center xl:justify-end">
           {professionalLocked ? (
-            <div className="inline-flex min-w-0 items-center gap-2 rounded-[0.9rem] border border-[rgba(91,33,182,0.1)] bg-[rgba(91,33,182,0.07)] px-3 py-2 text-sm font-medium text-primary">
+            <div className="inline-flex min-w-0 items-center gap-2 rounded-[0.9rem] border border-[rgba(124,58,237,0.18)] bg-[rgba(124,58,237,0.12)] px-3 py-2 text-sm font-medium text-primary">
               <BadgeCheck className="h-4 w-4 flex-shrink-0" />
               <span className="truncate">{professionalLockedLabel ?? 'Minha agenda'}</span>
             </div>
           ) : (
-            <div className="flex min-w-0 items-center gap-2 rounded-[0.9rem] border border-[rgba(52,44,78,0.1)] bg-[rgba(248,246,251,0.94)] px-3 py-2">
+            <div className="flex min-w-0 items-center gap-2 rounded-[0.9rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2">
               <ListFilter className="h-4 w-4 text-muted-foreground" />
               <select
                 value={selectedProfessionalId ?? ''}
@@ -183,8 +183,8 @@ export function ScheduleToolbar({
             className={cn(
               'inline-flex items-center gap-2 rounded-[0.8rem] border px-3 py-1.5 text-sm font-semibold transition-colors',
               view === item.value
-                ? 'border-[rgba(91,33,182,0.12)] bg-[rgba(91,33,182,0.08)] text-primary'
-                : 'border-[rgba(52,44,78,0.1)] bg-[rgba(248,246,251,0.9)] text-muted-foreground hover:bg-[rgba(91,33,182,0.05)] hover:text-foreground'
+                ? 'border-[rgba(124,58,237,0.18)] bg-[rgba(124,58,237,0.12)] text-primary'
+                : 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-muted-foreground hover:bg-[rgba(124,58,237,0.08)] hover:text-foreground'
             )}
           >
             <item.icon className="h-4 w-4" />

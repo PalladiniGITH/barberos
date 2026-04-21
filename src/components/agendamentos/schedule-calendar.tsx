@@ -118,7 +118,7 @@ function getAppointmentStatusMeta(item: PositionedAppointment) {
     return {
       accent: 'from-violet-700/90 via-violet-500/75 to-transparent',
       badge: 'border-[rgba(91,33,182,0.14)] bg-[rgba(91,33,182,0.09)] text-primary',
-      shell: 'border-[rgba(91,33,182,0.16)] bg-[linear-gradient(180deg,rgba(91,33,182,0.14),rgba(255,255,255,0.98))]',
+      shell: 'border-[rgba(124,58,237,0.2)] bg-[linear-gradient(180deg,rgba(91,33,182,0.18),rgba(28,32,48,0.98))]',
     } as const
   }
 
@@ -126,27 +126,27 @@ function getAppointmentStatusMeta(item: PositionedAppointment) {
     PENDING: {
       accent: 'from-amber-500/90 via-amber-300/70 to-transparent',
       badge: 'border-[rgba(245,158,11,0.12)] bg-[rgba(245,158,11,0.08)] text-amber-700',
-      shell: 'border-[rgba(245,158,11,0.14)] bg-[linear-gradient(180deg,rgba(245,158,11,0.12),rgba(255,255,255,0.98))]',
+      shell: 'border-[rgba(245,158,11,0.18)] bg-[linear-gradient(180deg,rgba(245,158,11,0.18),rgba(28,32,48,0.98))]',
     },
     CONFIRMED: {
       accent: 'from-emerald-500/90 via-emerald-400/70 to-transparent',
       badge: 'border-[rgba(16,185,129,0.12)] bg-[rgba(16,185,129,0.08)] text-emerald-700',
-      shell: 'border-[rgba(16,185,129,0.14)] bg-[linear-gradient(180deg,rgba(16,185,129,0.11),rgba(255,255,255,0.98))]',
+      shell: 'border-[rgba(34,197,94,0.18)] bg-[linear-gradient(180deg,rgba(22,163,74,0.18),rgba(28,32,48,0.98))]',
     },
     CANCELLED: {
       accent: 'from-rose-500/90 via-rose-400/70 to-transparent',
       badge: 'border-[rgba(244,63,94,0.12)] bg-[rgba(244,63,94,0.08)] text-rose-700',
-      shell: 'border-[rgba(244,63,94,0.14)] bg-[linear-gradient(180deg,rgba(244,63,94,0.1),rgba(255,255,255,0.98))]',
+      shell: 'border-[rgba(244,63,94,0.18)] bg-[linear-gradient(180deg,rgba(244,63,94,0.18),rgba(28,32,48,0.98))]',
     },
     COMPLETED: {
       accent: 'from-sky-500/90 via-sky-400/70 to-transparent',
       badge: 'border-[rgba(14,165,233,0.12)] bg-[rgba(14,165,233,0.08)] text-sky-700',
-      shell: 'border-[rgba(14,165,233,0.14)] bg-[linear-gradient(180deg,rgba(14,165,233,0.1),rgba(255,255,255,0.98))]',
+      shell: 'border-[rgba(14,165,233,0.18)] bg-[linear-gradient(180deg,rgba(14,165,233,0.18),rgba(28,32,48,0.98))]',
     },
     NO_SHOW: {
       accent: 'from-pink-500/90 via-fuchsia-400/70 to-transparent',
       badge: 'border-[rgba(236,72,153,0.12)] bg-[rgba(236,72,153,0.08)] text-pink-700',
-      shell: 'border-[rgba(236,72,153,0.14)] bg-[linear-gradient(180deg,rgba(236,72,153,0.1),rgba(255,255,255,0.98))]',
+      shell: 'border-[rgba(236,72,153,0.18)] bg-[linear-gradient(180deg,rgba(236,72,153,0.18),rgba(28,32,48,0.98))]',
     },
   } as const
 
@@ -266,8 +266,8 @@ function AppointmentDetailsDialog({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-[rgba(17,24,39,0.42)] backdrop-blur-md" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,760px)] -translate-x-1/2 -translate-y-1/2 rounded-[1.6rem] border border-[rgba(58,47,86,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(246,244,250,0.98))] shadow-[0_56px_120px_-58px_rgba(22,16,39,0.28)] outline-none">
-          <div className="flex items-start justify-between gap-4 border-b border-[rgba(58,47,86,0.08)] px-6 py-5">
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,760px)] -translate-x-1/2 -translate-y-1/2 rounded-[1.6rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.99),rgba(15,17,21,0.98))] shadow-[0_56px_120px_-58px_rgba(2,6,23,0.9)] outline-none">
+          <div className="flex items-start justify-between gap-4 border-b border-[rgba(255,255,255,0.06)] px-6 py-5">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
                 {appointment.localDateLabel} - {appointment.startTimeLabel} - {appointment.endTimeLabel}
@@ -283,7 +283,7 @@ function AppointmentDetailsDialog({
             <Dialog.Close asChild>
               <button
                 type="button"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-[1rem] border border-[rgba(58,47,86,0.08)] bg-white text-muted-foreground transition-colors hover:bg-[rgba(91,33,182,0.04)] hover:text-primary"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)] hover:text-primary"
                 aria-label="Fechar"
               >
                 <X className="h-4 w-4" />
@@ -450,7 +450,7 @@ function ScheduleAppointmentCard({
           <span className={cn('absolute inset-y-0 left-0 w-[3px] bg-gradient-to-b', statusMeta.accent)} />
           <div className="flex h-full min-w-0 flex-col justify-between px-3 py-3">
             <div className="flex items-start justify-between gap-2">
-              <span className="inline-flex rounded-full border border-[rgba(58,47,86,0.08)] bg-white/95 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-foreground">
+              <span className="inline-flex rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(15,17,21,0.78)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-foreground">
                 {item.startTimeLabel}
               </span>
               <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
@@ -505,7 +505,7 @@ function ScheduleAppointmentCard({
           sideOffset={12}
           onMouseEnter={() => setPreviewOpen(true)}
           onMouseLeave={() => setPreviewOpen(false)}
-          className="z-50 w-[320px] rounded-[1.3rem] border border-[rgba(84,35,145,0.08)] bg-white p-4 text-foreground shadow-[0_36px_90px_-44px_rgba(124,58,237,0.24)]"
+          className="z-50 w-[320px] rounded-[1.3rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.98),rgba(15,17,21,0.98))] p-4 text-foreground shadow-[0_36px_90px_-44px_rgba(2,6,23,0.82)]"
         >
           <ScheduleItemPreview item={item} />
           <Popover.Arrow className="fill-white" />
@@ -740,14 +740,14 @@ export function ScheduleCalendar({
             className="grid gap-3"
             style={{ gridTemplateColumns: `88px repeat(${Math.max(columns.length, 1)}, minmax(${minColumnWidth}px, 1fr))` }}
           >
-            <div className="sticky left-0 z-20 rounded-[0.95rem] border border-[rgba(52,44,78,0.1)] bg-[linear-gradient(180deg,rgba(239,235,245,0.98),rgba(247,245,250,0.98))] px-3 py-3 shadow-[0_8px_16px_-12px_rgba(22,16,39,0.12)]">
+            <div className="sticky left-0 z-20 rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(35,38,58,0.98),rgba(21,24,33,0.98))] px-3 py-3 shadow-[0_16px_24px_-18px_rgba(2,6,23,0.54)]">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Horario</p>
             </div>
 
             {columns.map((column) => (
               <div
                 key={`${column.key}-header`}
-                className="rounded-[0.95rem] border border-[rgba(52,44,78,0.1)] bg-[linear-gradient(180deg,rgba(251,250,252,0.98),rgba(243,240,248,0.96))] px-4 py-3 shadow-[0_10px_18px_-14px_rgba(22,16,39,0.1)]"
+                className="rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(35,38,58,0.98),rgba(21,24,33,0.96))] px-4 py-3 shadow-[0_16px_24px_-18px_rgba(2,6,23,0.5)]"
               >
                 <p className="text-sm font-semibold tracking-tight text-foreground">{column.title}</p>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">{column.helper}</p>
@@ -759,7 +759,7 @@ export function ScheduleCalendar({
             className="mt-3 grid gap-3"
             style={{ gridTemplateColumns: `88px repeat(${Math.max(columns.length, 1)}, minmax(${minColumnWidth}px, 1fr))` }}
           >
-            <div className="sticky left-0 z-10 rounded-[0.95rem] border border-[rgba(52,44,78,0.1)] bg-[linear-gradient(180deg,rgba(239,235,245,0.96),rgba(247,245,250,0.98))] px-2 shadow-[0_8px_16px_-12px_rgba(22,16,39,0.1)]">
+            <div className="sticky left-0 z-10 rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(35,38,58,0.96),rgba(21,24,33,0.98))] px-2 shadow-[0_16px_24px_-18px_rgba(2,6,23,0.5)]">
               {hours.map((hour, index) => (
                 <div
                   key={hour}
@@ -767,7 +767,7 @@ export function ScheduleCalendar({
                   style={{ height: `${60 * schedulePxPerMinute}px` }}
                 >
                   <span className={cn(
-                    'absolute -top-2 left-0 rounded-[0.7rem] bg-[rgba(255,255,255,0.94)] px-2.5 py-1 text-xs font-semibold text-foreground shadow-[0_6px_12px_-8px_rgba(22,16,39,0.14)]',
+                    'absolute -top-2 left-0 rounded-[0.7rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(15,17,21,0.86)] px-2.5 py-1 text-xs font-semibold text-foreground shadow-[0_10px_16px_-10px_rgba(2,6,23,0.5)]',
                     index === 0 ? 'top-0' : ''
                   )}>
                     {hour}
@@ -812,7 +812,7 @@ export function ScheduleCalendar({
                         currentMinutes: minutes,
                       })
                     }}
-                    className="relative overflow-hidden rounded-[1rem] border border-[rgba(52,44,78,0.1)] bg-[linear-gradient(180deg,rgba(251,250,252,0.98),rgba(243,240,248,0.96))] shadow-[0_14px_24px_-18px_rgba(22,16,39,0.12)]"
+                    className="relative overflow-hidden rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.98),rgba(21,24,33,0.96))] shadow-[0_18px_28px_-20px_rgba(2,6,23,0.56)]"
                     style={{ height: `${calendarHeight}px` }}
                   >
                     {hours.map((hour, index) => (
@@ -987,7 +987,7 @@ export function ScheduleCalendar({
                             </p>
                           </div>
                           {savingMoveId === dragState.item.id && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(15,17,21,0.86)] px-2 py-1 text-[11px] font-medium text-muted-foreground">
                               <Move className="h-3 w-3 animate-pulse" />
                               salvando
                             </span>

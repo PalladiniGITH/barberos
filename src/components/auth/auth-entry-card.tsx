@@ -48,7 +48,7 @@ export function AuthEntryCard({
   }
 
   return (
-    <main className="min-h-screen px-4 py-8 sm:px-6 lg:px-8">
+    <main className="auth-shell min-h-screen px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl items-center gap-6 lg:grid-cols-[minmax(0,1.15fr)_440px]">
         <section className="premium-shell p-8 sm:p-10 lg:p-12">
           <div className="spotlight-chip">
@@ -110,9 +110,9 @@ export function AuthEntryCard({
               </div>
 
               {errorMessage && (
-                <div className="rounded-[1rem] border border-[rgba(244,63,94,0.16)] bg-[rgba(244,63,94,0.08)] px-4 py-3 text-sm font-medium text-rose-700">
-                  {errorMessage}
-                </div>
+              <div className="rounded-[1rem] border border-[rgba(220,38,38,0.24)] bg-[rgba(220,38,38,0.12)] px-4 py-3 text-sm font-medium text-rose-200">
+                {errorMessage}
+              </div>
               )}
 
               <label className="block">
@@ -122,7 +122,7 @@ export function AuthEntryCard({
                   autoComplete="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  className="w-full rounded-[1rem] border border-[rgba(84,35,145,0.08)] bg-white px-3.5 py-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-[rgba(124,58,237,0.2)] focus:ring-4 focus:ring-[rgba(124,58,237,0.1)]"
+                  className="auth-input rounded-[1rem] px-3.5 py-3 text-sm"
                   placeholder="voce@barbearia.com"
                   required
                 />
@@ -135,7 +135,7 @@ export function AuthEntryCard({
                   autoComplete="current-password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  className="w-full rounded-[1rem] border border-[rgba(84,35,145,0.08)] bg-white px-3.5 py-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-[rgba(124,58,237,0.2)] focus:ring-4 focus:ring-[rgba(124,58,237,0.1)]"
+                  className="auth-input rounded-[1rem] px-3.5 py-3 text-sm"
                   placeholder="Sua senha"
                   required
                 />
