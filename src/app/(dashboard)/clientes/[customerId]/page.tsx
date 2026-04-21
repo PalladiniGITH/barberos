@@ -89,8 +89,8 @@ function FilterLink({
       className={cn(
         'inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
         active
-          ? 'border-[rgba(52,211,153,0.22)] bg-[rgba(16,185,129,0.12)] text-emerald-100'
-          : 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-slate-300 hover:bg-[rgba(255,255,255,0.07)]'
+          ? 'border-[rgba(91,33,182,0.18)] bg-[rgba(91,33,182,0.1)] text-[rgba(87,42,173,0.96)]'
+          : 'border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.72)] text-[rgba(87,79,109,0.92)] hover:bg-[rgba(91,33,182,0.06)] hover:text-foreground'
       )}
     >
       {label}
@@ -106,9 +106,9 @@ function ToneBadge({
   tone?: 'neutral' | 'positive' | 'warning'
 }) {
   const toneClass = {
-    neutral: 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-slate-300',
-    positive: 'border-[rgba(52,211,153,0.18)] bg-[rgba(16,185,129,0.12)] text-emerald-100',
-    warning: 'border-[rgba(251,191,36,0.18)] bg-[rgba(251,191,36,0.12)] text-amber-100',
+    neutral: 'border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.72)] text-[rgba(87,79,109,0.92)]',
+    positive: 'border-[rgba(52,211,153,0.18)] bg-[rgba(16,185,129,0.12)] text-emerald-700',
+    warning: 'border-[rgba(251,191,36,0.18)] bg-[rgba(251,191,36,0.12)] text-amber-700',
   }[tone]
 
   return (
@@ -132,7 +132,7 @@ function SummaryCard({
   tone?: 'neutral' | 'positive' | 'warning'
 }) {
   const toneClass = {
-    neutral: 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)]',
+    neutral: 'border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.74)]',
     positive: 'border-[rgba(52,211,153,0.18)] bg-[rgba(16,185,129,0.08)]',
     warning: 'border-[rgba(251,191,36,0.18)] bg-[rgba(251,191,36,0.08)]',
   }[tone]
@@ -140,7 +140,7 @@ function SummaryCard({
   return (
     <div className={cn('rounded-[1.1rem] border p-4 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.82)]', toneClass)}>
       <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(15,23,42,0.56)] text-slate-200">
+        <span className="flex h-10 w-10 items-center justify-center rounded-[0.95rem] border border-[rgba(91,33,182,0.12)] bg-[rgba(91,33,182,0.08)] text-primary">
           <Icon className="h-4 w-4" />
         </span>
         <div>

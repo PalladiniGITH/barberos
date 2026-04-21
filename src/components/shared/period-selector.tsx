@@ -46,17 +46,17 @@ export function PeriodSelector({ month, year, pathname, queryParams }: PeriodSel
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1
 
   return (
-    <div className="flex items-center gap-1 rounded-[1.1rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(30,41,59,0.78),rgba(15,23,42,0.7))] p-1 shadow-[0_18px_34px_-24px_rgba(2,6,23,0.72)]">
+    <div className="flex items-center gap-1 rounded-[1.1rem] border border-[rgba(58,47,86,0.12)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,240,249,0.98))] p-1 shadow-[0_18px_34px_-24px_rgba(24,18,40,0.12)]">
       <Link
         href={buildPeriodHref(pathname, previousMonth, previousYear, queryParams)}
-        className="rounded-[0.85rem] p-2 text-muted-foreground transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-foreground"
+        className="rounded-[0.85rem] p-2 text-muted-foreground transition-colors hover:bg-[rgba(91,33,182,0.07)] hover:text-foreground"
       >
         <ChevronLeft className="h-4 w-4" />
       </Link>
 
-      <div className="flex items-center gap-2 rounded-[0.95rem] border border-[rgba(52,211,153,0.14)] bg-[linear-gradient(135deg,rgba(17,24,39,0.96),rgba(15,23,42,0.9))] px-3 py-2 text-slate-100 shadow-[0_16px_30px_-20px_rgba(2,6,23,0.72)]">
-        <Calendar className="h-3.5 w-3.5 text-slate-300" />
-        <span className="min-w-36 text-center text-sm font-medium text-slate-50">
+      <div className="flex items-center gap-2 rounded-[0.95rem] border border-[rgba(91,33,182,0.16)] bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(236,230,245,0.98))] px-3 py-2 text-foreground shadow-[0_16px_30px_-20px_rgba(24,18,40,0.14)]">
+        <Calendar className="h-3.5 w-3.5 text-primary" />
+        <span className="min-w-36 text-center text-sm font-semibold text-foreground">
           {formatLabel(month, year)}
         </span>
       </div>
@@ -74,7 +74,7 @@ export function PeriodSelector({ month, year, pathname, queryParams }: PeriodSel
       ) : (
         <Link
           href={buildPeriodHref(pathname, nextMonth, nextYear, queryParams)}
-          className="rounded-[0.85rem] p-2 text-muted-foreground transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-foreground"
+          className="rounded-[0.85rem] p-2 text-muted-foreground transition-colors hover:bg-[rgba(91,33,182,0.07)] hover:text-foreground"
         >
           <ChevronRight className="h-4 w-4" />
         </Link>

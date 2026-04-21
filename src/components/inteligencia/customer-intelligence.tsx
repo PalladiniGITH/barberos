@@ -79,8 +79,8 @@ function FilterLink({
       className={cn(
         'inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
         active
-          ? 'border-[rgba(52,211,153,0.22)] bg-[rgba(16,185,129,0.12)] text-emerald-100'
-          : 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-slate-300 hover:bg-[rgba(255,255,255,0.07)]'
+          ? 'border-[rgba(91,33,182,0.18)] bg-[rgba(91,33,182,0.1)] text-[rgba(87,42,173,0.96)]'
+          : 'border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.72)] text-[rgba(87,79,109,0.92)] hover:bg-[rgba(91,33,182,0.06)] hover:text-foreground'
       )}
     >
       {label}
@@ -102,7 +102,7 @@ function SummaryMetric({
   tone?: 'neutral' | 'positive' | 'warning'
 }) {
   const toneClass = {
-    neutral: 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)]',
+    neutral: 'border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.74)]',
     positive: 'border-[rgba(52,211,153,0.18)] bg-[rgba(16,185,129,0.08)]',
     warning: 'border-[rgba(251,191,36,0.18)] bg-[rgba(251,191,36,0.08)]',
   }[tone]
@@ -110,7 +110,7 @@ function SummaryMetric({
   return (
     <div className={cn('rounded-[1.1rem] border p-4 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.82)]', toneClass)}>
       <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(15,23,42,0.56)] text-slate-200">
+        <span className="flex h-10 w-10 items-center justify-center rounded-[0.95rem] border border-[rgba(91,33,182,0.12)] bg-[rgba(91,33,182,0.08)] text-primary">
           <Icon className="h-4 w-4" />
         </span>
         <div>
@@ -125,11 +125,11 @@ function SummaryMetric({
 
 function CustomerRiskBadge({ customer }: { customer: CustomerIntelligenceCustomerSnapshot }) {
   const toneClass = {
-    healthy: 'border-[rgba(52,211,153,0.22)] bg-[rgba(16,185,129,0.1)] text-emerald-100',
-    warning: 'border-[rgba(251,191,36,0.22)] bg-[rgba(251,191,36,0.12)] text-amber-100',
-    loss: 'border-[rgba(251,113,133,0.22)] bg-[rgba(251,113,133,0.12)] text-rose-100',
-    underused: 'border-[rgba(56,189,248,0.22)] bg-[rgba(56,189,248,0.12)] text-sky-100',
-    neutral: 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-slate-300',
+    healthy: 'border-[rgba(52,211,153,0.22)] bg-[rgba(16,185,129,0.1)] text-emerald-700',
+    warning: 'border-[rgba(251,191,36,0.22)] bg-[rgba(251,191,36,0.12)] text-amber-700',
+    loss: 'border-[rgba(251,113,133,0.22)] bg-[rgba(251,113,133,0.12)] text-rose-700',
+    underused: 'border-[rgba(56,189,248,0.22)] bg-[rgba(56,189,248,0.12)] text-sky-700',
+    neutral: 'border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.7)] text-[rgba(87,79,109,0.92)]',
   }[customer.riskLevel]
 
   return (
@@ -141,9 +141,9 @@ function CustomerRiskBadge({ customer }: { customer: CustomerIntelligenceCustome
 
 function RevenueConfidenceBadge({ customer }: { customer: CustomerIntelligenceCustomerSnapshot }) {
   const toneClass = {
-    real: 'border-[rgba(52,211,153,0.22)] bg-[rgba(16,185,129,0.1)] text-emerald-100',
-    mixed: 'border-[rgba(251,191,36,0.22)] bg-[rgba(251,191,36,0.12)] text-amber-100',
-    estimated: 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-slate-300',
+    real: 'border-[rgba(52,211,153,0.22)] bg-[rgba(16,185,129,0.1)] text-emerald-700',
+    mixed: 'border-[rgba(251,191,36,0.22)] bg-[rgba(251,191,36,0.12)] text-amber-700',
+    estimated: 'border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.7)] text-[rgba(87,79,109,0.92)]',
   }[customer.revenueConfidence]
 
   return (
@@ -193,7 +193,7 @@ function RankingList({
 
       <div className="mt-4 space-y-3">
         {items.length > 0 ? items.map((customer) => (
-          <div key={customer.id} className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+          <div key={customer.id} className="rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <Link
@@ -208,7 +208,7 @@ function RankingList({
                   {customer.name}
                 </Link>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <span className="inline-flex items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-2.5 py-1 text-[11px] text-slate-200">
+                  <span className="inline-flex items-center rounded-full border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1 text-[11px] text-[rgba(87,79,109,0.92)]">
                     {CUSTOMER_TYPE_LABELS[customer.type]}
                   </span>
                   <CustomerRiskBadge customer={customer} />
@@ -227,7 +227,7 @@ function RankingList({
             </div>
           </div>
         )) : (
-          <div className="rounded-[1rem] border border-dashed border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.02)] p-4 text-sm text-muted-foreground">
+          <div className="rounded-[1rem] border border-dashed border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.62)] p-4 text-sm text-muted-foreground">
             Ainda nao ha dados suficientes para montar este ranking no filtro atual.
           </div>
         )}
@@ -370,7 +370,7 @@ export function CustomerIntelligenceSection({
 
             <Link
               href={`/clientes?month=${month}&year=${year}${customers.filters.professionalId ? `&professionalId=${customers.filters.professionalId}` : ''}${customers.filters.customerType !== 'all' ? `&customerType=${customers.filters.customerType}` : ''}`}
-              className="inline-flex items-center gap-2 rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-sm text-slate-300 transition-colors hover:bg-[rgba(255,255,255,0.06)] hover:text-white"
+              className="inline-flex items-center gap-2 rounded-[0.95rem] border border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.76)] px-3 py-2 text-sm text-[rgba(87,79,109,0.92)] transition-colors hover:bg-[rgba(91,33,182,0.06)] hover:text-foreground"
             >
               <UserRound className="h-4 w-4" />
               Abrir modulo de clientes
@@ -424,14 +424,14 @@ export function CustomerIntelligenceSection({
 
             <div className="mt-5 grid gap-4 lg:grid-cols-2">
               {[customers.groups.subscription, customers.groups.walkIn].map((group) => (
-                <div key={group.type} className="rounded-[1.2rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-5 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.82)]">
+                <div key={group.type} className="rounded-[1.2rem] border border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.76)] p-5 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.82)]">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{group.label}</p>
                       <p className="mt-3 text-2xl font-semibold text-foreground">{formatCurrency(group.margin)}</p>
                       <p className="mt-1 text-sm text-muted-foreground">{formatPercent(group.marginPercent, 0)} de margem estimada</p>
                     </div>
-                    <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(15,23,42,0.42)] px-3 py-1 text-xs font-semibold text-slate-200">
+                    <span className="rounded-full border border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.78)] px-3 py-1 text-xs font-semibold text-[rgba(87,79,109,0.92)]">
                       {group.customers} cliente{group.customers === 1 ? '' : 's'}
                     </span>
                   </div>
@@ -582,12 +582,12 @@ export function CustomerIntelligenceSection({
 
             <div className="mt-4 space-y-3">
               {customerInsights.length > 0 ? customerInsights.map((insight) => (
-                <div key={insight.id} className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+                <div key={insight.id} className="rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
                   <p className="text-sm font-semibold text-foreground">{insight.title}</p>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">{insight.explanation}</p>
                 </div>
               )) : (
-                <div className="rounded-[1rem] border border-dashed border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.02)] p-4 text-sm text-muted-foreground">
+                <div className="rounded-[1rem] border border-dashed border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.62)] p-4 text-sm text-muted-foreground">
                   Ainda nao ha leitura suficiente para montar alertas de clientes neste recorte.
                 </div>
               )}
@@ -599,15 +599,15 @@ export function CustomerIntelligenceSection({
             <h3 className="mt-2 text-lg font-semibold text-foreground">Transparencia analitica</h3>
 
             <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-              <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
                 <p className="font-semibold text-foreground">Receita real</p>
                 <p className="mt-2 leading-6">{customers.methodology.realRevenueDefinition}</p>
               </div>
-              <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
                 <p className="font-semibold text-foreground">Receita estimada</p>
                 <p className="mt-2 leading-6">{customers.methodology.estimatedRevenueDefinition}</p>
               </div>
-              <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
                 <p className="font-semibold text-foreground">Custo e margem</p>
                 <p className="mt-2 leading-6">{customers.methodology.marginDefinition}</p>
               </div>
@@ -666,11 +666,11 @@ export function CustomerIntelligenceSection({
                     </td>
                     <td className="py-4 pr-4">
                       <div className="flex flex-col gap-2">
-                        <span className="inline-flex w-fit items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-2.5 py-1 text-[11px] text-slate-200">
+                        <span className="inline-flex w-fit items-center rounded-full border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1 text-[11px] text-[rgba(87,79,109,0.92)]">
                           {CUSTOMER_TYPE_LABELS[customer.type]}
                         </span>
                         {customer.type === 'SUBSCRIPTION' && (
-                          <span className="inline-flex w-fit items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(15,23,42,0.42)] px-2.5 py-1 text-[11px] text-slate-300">
+                          <span className="inline-flex w-fit items-center rounded-full border border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1 text-[11px] text-[rgba(87,79,109,0.92)]">
                             {customer.extraVisits > 0
                               ? APPOINTMENT_BILLING_MODEL_LABELS.SUBSCRIPTION_EXTRA
                               : APPOINTMENT_BILLING_MODEL_LABELS.SUBSCRIPTION_INCLUDED}
@@ -716,7 +716,7 @@ export function CustomerIntelligenceSection({
             <h3 className="mt-2 text-lg font-semibold text-foreground">Respostas do recorte atual</h3>
 
             <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-              <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
                 <p className="font-semibold text-foreground">Quem mais ajuda no lucro?</p>
                 <p className="mt-2 leading-6">
                   {customers.rankings.mostProfitable[0]
@@ -725,7 +725,7 @@ export function CustomerIntelligenceSection({
                 </p>
               </div>
 
-              <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
                 <p className="font-semibold text-foreground">Quem mais consome tempo e retorno baixo?</p>
                 <p className="mt-2 leading-6">
                   {customers.rankings.leastProfitable[0]
@@ -734,7 +734,7 @@ export function CustomerIntelligenceSection({
                 </p>
               </div>
 
-              <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
                 <p className="font-semibold text-foreground">O plano atual esta saudavel?</p>
                 <p className="mt-2 leading-6">
                   {customers.plan.enabled
@@ -745,7 +745,7 @@ export function CustomerIntelligenceSection({
                 </p>
               </div>
 
-              <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
                 <p className="font-semibold text-foreground">Alertas executivos</p>
                 <div className="mt-2 space-y-2 leading-6">
                   {executiveAlerts.map((alert) => (
@@ -754,7 +754,7 @@ export function CustomerIntelligenceSection({
                 </div>
               </div>
 
-              <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
                 <p className="font-semibold text-foreground">Leitura de incerteza</p>
                 <p className="mt-2 leading-6">{customers.methodology.caution}</p>
               </div>

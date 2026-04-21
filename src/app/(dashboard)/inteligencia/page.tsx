@@ -44,15 +44,15 @@ function ComparisonCard({
   tone?: 'neutral' | 'positive' | 'warning'
 }) {
   const toneClass = {
-    neutral: 'border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(30,41,59,0.8),rgba(15,23,42,0.7))]',
+    neutral: 'border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.78)]',
     positive: 'border-[rgba(52,211,153,0.18)] bg-[rgba(52,211,153,0.08)]',
     warning: 'border-[rgba(251,191,36,0.18)] bg-[rgba(251,191,36,0.08)]',
   }[tone]
 
   const badgeClass = {
-    neutral: 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-muted-foreground',
-    positive: 'border-[rgba(52,211,153,0.2)] bg-[rgba(52,211,153,0.1)] text-emerald-200',
-    warning: 'border-[rgba(251,191,36,0.2)] bg-[rgba(251,191,36,0.1)] text-amber-200',
+    neutral: 'border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.72)] text-muted-foreground',
+    positive: 'border-[rgba(52,211,153,0.2)] bg-[rgba(52,211,153,0.1)] text-emerald-700',
+    warning: 'border-[rgba(251,191,36,0.2)] bg-[rgba(251,191,36,0.1)] text-amber-700',
   }[tone]
 
   return (
