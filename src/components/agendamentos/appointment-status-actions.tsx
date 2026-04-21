@@ -146,7 +146,7 @@ export function AppointmentStatusActions({
       <Popover.Trigger asChild>
         <button
           type="button"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.05)] text-slate-300 transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-white"
+          className="surface-inverse surface-inverse-subtle inline-flex h-8 w-8 items-center justify-center rounded-lg border text-slate-300 transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-white"
           title="Abrir detalhes"
         >
           <MoreHorizontal className="h-4 w-4" />
@@ -158,7 +158,7 @@ export function AppointmentStatusActions({
           side="top"
           align="end"
           sideOffset={10}
-          className="z-50 w-[280px] rounded-[1.3rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(30,41,59,0.98),rgba(15,23,42,0.96))] p-4 text-slate-100 shadow-[0_32px_80px_-42px_rgba(2,6,23,0.92)] backdrop-blur-xl"
+          className="surface-inverse z-50 w-[280px] rounded-[1.3rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(30,41,59,0.98),rgba(15,23,42,0.96))] p-4 text-slate-100 shadow-[0_32px_80px_-42px_rgba(2,6,23,0.92)] backdrop-blur-xl"
         >
           <div className="space-y-4">
             <div>
@@ -169,7 +169,7 @@ export function AppointmentStatusActions({
               <p className="mt-1 text-sm text-slate-300">{meta.service?.name ?? 'Servico'}</p>
             </div>
 
-            <div className="grid gap-2 rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-3 text-xs text-slate-300">
+            <div className="surface-inverse-subtle grid gap-2 rounded-[1rem] border p-3 text-xs text-slate-300">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-slate-400">Barbeiro</span>
                 <span className="font-medium text-slate-100">{meta.professional?.name ?? 'Nao informado'}</span>
@@ -195,7 +195,7 @@ export function AppointmentStatusActions({
             </div>
 
             {appointment.notes && (
-              <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-3">
+              <div className="surface-inverse-subtle rounded-[1rem] border p-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                   Observacao
                 </p>
@@ -220,7 +220,7 @@ export function AppointmentStatusActions({
                   type="button"
                   disabled={isPending}
                   onClick={() => handleStatusChange(action.status)}
-                  className={`flex items-center justify-between rounded-xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2.5 text-sm font-medium text-slate-100 transition-colors ${action.className}`}
+                  className={`surface-inverse-subtle flex items-center justify-between rounded-xl border px-3 py-2.5 text-sm font-medium text-slate-100 transition-colors ${action.className}`}
                 >
                   <span className="inline-flex items-center gap-2">
                     {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <action.icon className="h-3.5 w-3.5" />}

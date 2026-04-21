@@ -23,6 +23,9 @@
     --border: 242 12% 75%;
     --input: 244 13% 83%;
     --ring: 266 62% 45%;
+    --inverse-foreground: 240 22% 97%;
+    --inverse-muted-foreground: 244 14% 80%;
+    --inverse-accent-foreground: 0 0% 100%;
     --radius: 0.875rem;
   }
 
@@ -317,6 +320,30 @@
     box-shadow: 0 0 18px rgba(91, 33, 182, 0.24);
     animation: nav-progress 1.05s ease-in-out infinite;
   }
+
+  .surface-inverse {
+    color: hsl(var(--inverse-foreground));
+  }
+
+  .surface-inverse :is(.text-white, .text-slate-50, .text-slate-100, .text-slate-200, .text-foreground) {
+    color: hsl(var(--inverse-foreground));
+  }
+
+  .surface-inverse :is(.text-slate-300, .text-slate-400, .text-slate-500, .text-muted-foreground) {
+    color: hsl(var(--inverse-muted-foreground));
+  }
+
+  .surface-inverse-subtle {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.045);
+    color: hsl(var(--inverse-muted-foreground));
+  }
+
+  .surface-inverse-chip {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.08);
+    color: hsl(var(--inverse-muted-foreground));
+  }
 }
 
 @layer utilities {
@@ -336,7 +363,7 @@
       .hero-stat-card,
       .auth-panel,
       .auth-dark-panel
-    ) {
+    ):where(:not(.surface-inverse, .surface-inverse *)) {
     color: hsl(var(--foreground));
   }
 
@@ -356,7 +383,7 @@
       .hero-stat-card,
       .auth-panel,
       .auth-dark-panel
-    ) :is(.text-white, .text-slate-50, .text-slate-100, .text-slate-200) {
+    ) :where(:not(.surface-inverse, .surface-inverse *)):is(.text-white, .text-slate-50, .text-slate-100, .text-slate-200) {
     color: rgba(43, 36, 63, 0.96);
   }
 
@@ -376,7 +403,7 @@
       .hero-stat-card,
       .auth-panel,
       .auth-dark-panel
-    ) :is(.text-slate-300, .text-slate-400, .text-slate-500, .text-emerald-200\/70, .text-emerald-200, .text-sky-200) {
+    ) :where(:not(.surface-inverse, .surface-inverse *)):is(.text-slate-300, .text-slate-400, .text-slate-500, .text-emerald-200\/70, .text-emerald-200, .text-sky-200) {
     color: rgba(88, 80, 112, 0.9);
   }
 
@@ -396,7 +423,7 @@
       .hero-stat-card,
       .auth-panel,
       .auth-dark-panel
-    ) [class*='border-white/10'],
+    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='border-white/10'],
   :where(
       .dashboard-panel,
       .dashboard-spotlight,
@@ -413,7 +440,7 @@
       .hero-stat-card,
       .auth-panel,
       .auth-dark-panel
-    ) [class*='border-[rgba(255,255,255,0.05)]'],
+    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='border-[rgba(255,255,255,0.05)]'],
   :where(
       .dashboard-panel,
       .dashboard-spotlight,
@@ -430,7 +457,7 @@
       .hero-stat-card,
       .auth-panel,
       .auth-dark-panel
-    ) [class*='border-[rgba(255,255,255,0.06)]'],
+    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='border-[rgba(255,255,255,0.06)]'],
   :where(
       .dashboard-panel,
       .dashboard-spotlight,
@@ -447,7 +474,7 @@
       .hero-stat-card,
       .auth-panel,
       .auth-dark-panel
-    ) [class*='border-[rgba(255,255,255,0.08)]'],
+    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='border-[rgba(255,255,255,0.08)]'],
   :where(
       .dashboard-panel,
       .dashboard-spotlight,
@@ -464,7 +491,7 @@
       .hero-stat-card,
       .auth-panel,
       .auth-dark-panel
-    ) [class*='border-[rgba(255,255,255,0.12)]'] {
+    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='border-[rgba(255,255,255,0.12)]'] {
     border-color: rgba(58, 47, 86, 0.12);
   }
 
@@ -484,7 +511,7 @@
       .hero-stat-card,
       .auth-panel,
       .auth-dark-panel
-    ) [class*='bg-white/[0.04]'],
+    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='bg-white/[0.04]'],
   :where(
       .dashboard-panel,
       .dashboard-spotlight,
@@ -501,7 +528,7 @@
       .hero-stat-card,
       .auth-panel,
       .auth-dark-panel
-    ) [class*='bg-white/[0.05]'],
+    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='bg-white/[0.05]'],
   :where(
       .dashboard-panel,
       .dashboard-spotlight,
@@ -518,7 +545,7 @@
       .hero-stat-card,
       .auth-panel,
       .auth-dark-panel
-    ) [class*='bg-[rgba(255,255,255,0.06)]'],
+    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='bg-[rgba(255,255,255,0.06)]'],
   :where(
       .dashboard-panel,
       .dashboard-spotlight,
@@ -535,7 +562,7 @@
       .hero-stat-card,
       .auth-panel,
       .auth-dark-panel
-    ) [class*='bg-[rgba(255,255,255,0.08)]'],
+    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='bg-[rgba(255,255,255,0.08)]'],
   :where(
       .dashboard-panel,
       .dashboard-spotlight,
@@ -552,7 +579,7 @@
       .hero-stat-card,
       .auth-panel,
       .auth-dark-panel
-    ) [class*='bg-[rgba(255,255,255,0.02)]'],
+    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='bg-[rgba(255,255,255,0.02)]'],
   :where(
       .dashboard-panel,
       .dashboard-spotlight,
@@ -569,7 +596,7 @@
       .hero-stat-card,
       .auth-panel,
       .auth-dark-panel
-    ) [class*='bg-[rgba(255,255,255,0.03)]'],
+    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='bg-[rgba(255,255,255,0.03)]'],
   :where(
       .dashboard-panel,
       .dashboard-spotlight,
@@ -586,7 +613,7 @@
       .hero-stat-card,
       .auth-panel,
       .auth-dark-panel
-    ) [class*='bg-[rgba(255,255,255,0.04)]'],
+    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='bg-[rgba(255,255,255,0.04)]'],
   :where(
       .dashboard-panel,
       .dashboard-spotlight,
@@ -603,7 +630,7 @@
       .hero-stat-card,
       .auth-panel,
       .auth-dark-panel
-    ) [class*='bg-[rgba(255,255,255,0.05)]'] {
+    ) :where(:not(.surface-inverse, .surface-inverse *))[class*='bg-[rgba(255,255,255,0.05)]'] {
     background: rgba(91, 33, 182, 0.055);
   }
 }

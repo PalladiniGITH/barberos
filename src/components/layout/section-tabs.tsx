@@ -32,7 +32,7 @@ export function SectionTabs({ items, currentPath }: SectionTabsProps) {
               className={cn(
                 'rounded-[1.2rem] border px-4 py-3 transition-all',
                 active
-                  ? 'border-[rgba(52,211,153,0.18)] bg-[linear-gradient(135deg,rgba(30,41,59,0.94),rgba(15,23,42,0.92))] text-white shadow-[0_20px_44px_-26px_rgba(2,6,23,0.74)]'
+                  ? 'surface-inverse border-[rgba(52,211,153,0.18)] bg-[linear-gradient(135deg,rgba(30,41,59,0.94),rgba(15,23,42,0.92))] text-white shadow-[0_20px_44px_-26px_rgba(2,6,23,0.74)]'
                   : 'border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.03)] hover:border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.05)]'
               )}
             >
