@@ -7,6 +7,10 @@ const { loadEnvConfig } = nextEnv
 
 const REQUIRED_ENV_VARS = ['DATABASE_URL', 'NEXTAUTH_SECRET']
 const RECOMMENDED_ENV_VARS = ['NEXTAUTH_URL']
+const AUTOMATION_BOOT_DELAY_MS = 15000
+const AUTOMATION_HEARTBEAT_MS = 60000
+const AUTOMATION_ROUTE_PATH = '/api/internal/campaign-automation/run'
+const AUTOMATION_SECRET_HEADER = 'x-automation-secret'
 
 function getMissingEnvVars(names) {
   return names.filter((name) => !process.env[name]?.trim())
@@ -18,6 +22,110 @@ function logBoot(event, details = {}) {
 
 function logBootError(event, details = {}) {
   console.error(`[boot] ${event}`, details)
+}
+
+function getAutomationRunnerSecret() {
+  return process.env.AUTOMATION_RUNNER_SECRET?.trim() || process.env.NEXTAUTH_SECRET?.trim() || null
+}
+
+function isCustomerCampaignAutomationEnabled() {
+  const rawValue = process.env.CUSTOMER_CAMPAIGN_AUTOMATION_ENABLED?.trim()
+
+  if (!rawValue) {
+    return true
+  }
+
+  return rawValue.toLowerCase() === 'true'
+}
+
+function getInternalBaseUrl(host, port) {
+  const normalizedHost = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host
+  return `http://${normalizedHost}:${port}`
+}
+
+function startCampaignAutomationHeartbeat({ host, port }) {
+  if (!isCustomerCampaignAutomationEnabled()) {
+    logBoot('campaign_automation_disabled')
+    return () => undefined
+  }
+
+  const sharedSecret = getAutomationRunnerSecret()
+
+  if (!sharedSecret) {
+    logBootError('campaign_automation_missing_secret')
+    return () => undefined
+  }
+
+  const baseUrl = getInternalBaseUrl(host, port)
+  let timer = null
+  let stopped = false
+  let inFlight = false
+
+  const tick = async () => {
+    if (stopped || inFlight) {
+      return
+    }
+
+    inFlight = true
+
+    try {
+      const response = await fetch(`${baseUrl}${AUTOMATION_ROUTE_PATH}`, {
+        method: 'POST',
+        headers: {
+          [AUTOMATION_SECRET_HEADER]: sharedSecret,
+        },
+      })
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => '')
+        logBootError('campaign_automation_tick_failed', {
+          status: response.status,
+          body: text || response.statusText,
+        })
+        return
+      }
+
+      const payload = await response.json().catch(() => null)
+      logBoot('campaign_automation_tick_completed', {
+        checkedBarbershops: payload?.summary?.checkedBarbershops ?? 0,
+        createdRuns: payload?.summary?.createdRuns ?? 0,
+        deliveriesSent: payload?.summary?.deliveriesSent ?? 0,
+        deliveriesFailed: payload?.summary?.deliveriesFailed ?? 0,
+      })
+    } catch (error) {
+      logBootError('campaign_automation_tick_error', {
+        message: error instanceof Error ? error.message : String(error),
+      })
+    } finally {
+      inFlight = false
+    }
+  }
+
+  const initialTimer = setTimeout(() => {
+    if (stopped) {
+      return
+    }
+
+    tick().catch(() => undefined)
+    timer = setInterval(() => {
+      tick().catch(() => undefined)
+    }, AUTOMATION_HEARTBEAT_MS)
+  }, AUTOMATION_BOOT_DELAY_MS)
+
+  logBoot('campaign_automation_heartbeat_started', {
+    baseUrl,
+    route: AUTOMATION_ROUTE_PATH,
+    bootDelayMs: AUTOMATION_BOOT_DELAY_MS,
+    intervalMs: AUTOMATION_HEARTBEAT_MS,
+  })
+
+  return () => {
+    stopped = true
+    clearTimeout(initialTimer)
+    if (timer) {
+      clearInterval(timer)
+    }
+  }
 }
 
 async function verifyPrismaConnection() {
@@ -71,6 +179,11 @@ async function main() {
     env: process.env,
   })
 
+  const stopCampaignAutomationHeartbeat = startCampaignAutomationHeartbeat({
+    host,
+    port,
+  })
+
   logBoot('next_started', {
     pid: child.pid,
     host,
@@ -90,6 +203,8 @@ async function main() {
     if (!child.killed) {
       child.kill(signal)
     }
+
+    stopCampaignAutomationHeartbeat()
   }
 
   process.on('SIGTERM', () => forwardSignal('SIGTERM'))
@@ -108,6 +223,7 @@ async function main() {
   })
 
   child.on('exit', (code, signal) => {
+    stopCampaignAutomationHeartbeat()
     console.warn('[boot] next_exited', { code, signal })
     process.exit(code ?? (signal ? 1 : 0))
   })

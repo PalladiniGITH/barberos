@@ -109,6 +109,9 @@ function resolvePoolCustomerKey(input: {
 }
 
 export async function resetDemoOperationalData(prisma: PrismaClient, barbershopId: string) {
+  await prisma.campaignAutomationDelivery.deleteMany({ where: { barbershopId } })
+  await prisma.campaignAutomationRun.deleteMany({ where: { barbershopId } })
+  await prisma.campaignAutomationConfig.deleteMany({ where: { barbershopId } })
   await prisma.challengeResult.deleteMany({
     where: {
       challenge: {

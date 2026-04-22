@@ -26,22 +26,25 @@ model Barbershop {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
-  users                 User[]
-  professionals         Professional[]
-  customers             Customer[]
-  appointments          Appointment[]
-  services              Service[]
-  revenues              Revenue[]
-  expenses              Expense[]
-  categories            FinancialCategory[]
-  monthlyGoals          MonthlyGoal[]
-  challenges            Challenge[]
-  supplies              Supply[]
-  pricingRules          PricingRule[]
-  campaignMetrics       CampaignMetric[]
-  commissions           Commission[]
-  messagingEvents       MessagingEvent[]
-  whatsappConversations WhatsappConversation[]
+  users                        User[]
+  professionals                Professional[]
+  customers                    Customer[]
+  appointments                 Appointment[]
+  services                     Service[]
+  revenues                     Revenue[]
+  expenses                     Expense[]
+  categories                   FinancialCategory[]
+  monthlyGoals                 MonthlyGoal[]
+  challenges                   Challenge[]
+  supplies                     Supply[]
+  pricingRules                 PricingRule[]
+  campaignMetrics              CampaignMetric[]
+  commissions                  Commission[]
+  campaignAutomationConfigs    CampaignAutomationConfig[]
+  campaignAutomationRuns       CampaignAutomationRun[]
+  campaignAutomationDeliveries CampaignAutomationDelivery[]
+  messagingEvents              MessagingEvent[]
+  whatsappConversations        WhatsappConversation[]
 
   @@map("barbershops")
 }
@@ -137,12 +140,12 @@ model Professional {
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @updatedAt
 
-  revenues          Revenue[]
-  appointments      Appointment[]
-  preferredByCustomers Customer[] @relation("CustomerPreferredProfessional")
-  professionalGoals ProfessionalGoal[]
-  challengeResults  ChallengeResult[]
-  commissions       Commission[]
+  revenues             Revenue[]
+  appointments         Appointment[]
+  preferredByCustomers Customer[]         @relation("CustomerPreferredProfessional")
+  professionalGoals    ProfessionalGoal[]
+  challengeResults     ChallengeResult[]
+  commissions          Commission[]
 
   @@unique([email, barbershopId])
   @@index([barbershopId, active])
@@ -274,30 +277,34 @@ model Service {
 // ─────────────────────────────────────────────
 
 model Customer {
-  id                    String              @id @default(cuid())
-  name                  String
-  phone                 String?
-  email                 String?
-  notes                 String?
-  type                  CustomerType        @default(WALK_IN)
-  subscriptionStatus    SubscriptionStatus?
-  subscriptionPrice     Decimal?            @db.Decimal(10, 2)
-  subscriptionStartedAt DateTime?
-  preferredProfessionalId String?
-  preferredProfessional Professional?      @relation("CustomerPreferredProfessional", fields: [preferredProfessionalId], references: [id])
+  id                             String              @id @default(cuid())
+  name                           String
+  phone                          String?
+  email                          String?
+  birthDate                      DateTime?
+  marketingOptOutAt              DateTime?
+  notes                          String?
+  type                           CustomerType        @default(WALK_IN)
+  subscriptionStatus             SubscriptionStatus?
+  subscriptionPrice              Decimal?            @db.Decimal(10, 2)
+  subscriptionStartedAt          DateTime?
+  preferredProfessionalId        String?
+  preferredProfessional          Professional?       @relation("CustomerPreferredProfessional", fields: [preferredProfessionalId], references: [id])
   preferredProfessionalUpdatedAt DateTime?
-  active                Boolean             @default(true)
-  barbershopId          String
-  barbershop            Barbershop          @relation(fields: [barbershopId], references: [id])
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
+  active                         Boolean             @default(true)
+  barbershopId                   String
+  barbershop                     Barbershop          @relation(fields: [barbershopId], references: [id])
+  createdAt                      DateTime            @default(now())
+  updatedAt                      DateTime            @updatedAt
 
-  appointments          Appointment[]
-  revenues              Revenue[]
-  messagingEvents       MessagingEvent[]
-  whatsappConversations WhatsappConversation[]
+  appointments                 Appointment[]
+  campaignAutomationDeliveries CampaignAutomationDelivery[]
+  revenues                     Revenue[]
+  messagingEvents              MessagingEvent[]
+  whatsappConversations        WhatsappConversation[]
 
   @@index([barbershopId, name])
+  @@index([barbershopId, birthDate])
   @@index([barbershopId, phone])
   @@index([barbershopId, email])
   @@index([barbershopId, preferredProfessionalId])
@@ -636,4 +643,115 @@ model CampaignMetric {
   updatedAt          DateTime   @updatedAt
 
   @@map("campaign_metrics")
+}
+
+model CampaignAutomationConfig {
+  id                 String                        @id @default(cuid())
+  barbershopId       String
+  barbershop         Barbershop                    @relation(fields: [barbershopId], references: [id])
+  campaignType       CampaignAutomationType
+  active             Boolean                       @default(true)
+  cooldownDays       Int
+  benefitType        CampaignAutomationBenefitType @default(CUSTOM)
+  benefitDescription String?
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
+
+  deliveries CampaignAutomationDelivery[]
+
+  @@unique([barbershopId, campaignType])
+  @@index([barbershopId, active])
+  @@map("campaign_automation_configs")
+}
+
+model CampaignAutomationRun {
+  id           String                      @id @default(cuid())
+  barbershopId String
+  barbershop   Barbershop                  @relation(fields: [barbershopId], references: [id])
+  localDateIso String
+  timezone     String
+  trigger      CampaignAutomationTrigger   @default(SCHEDULER)
+  status       CampaignAutomationRunStatus @default(RUNNING)
+  startedAt    DateTime                    @default(now())
+  completedAt  DateTime?
+  lastError    String?
+  summary      Json?
+  createdAt    DateTime                    @default(now())
+  updatedAt    DateTime                    @updatedAt
+
+  deliveries CampaignAutomationDelivery[]
+
+  @@unique([barbershopId, localDateIso])
+  @@index([status, startedAt])
+  @@index([barbershopId, startedAt])
+  @@map("campaign_automation_runs")
+}
+
+model CampaignAutomationDelivery {
+  id                 String                           @id @default(cuid())
+  barbershopId       String
+  barbershop         Barbershop                       @relation(fields: [barbershopId], references: [id])
+  runId              String
+  run                CampaignAutomationRun            @relation(fields: [runId], references: [id], onDelete: Cascade)
+  configId           String?
+  config             CampaignAutomationConfig?        @relation(fields: [configId], references: [id])
+  customerId         String
+  customer           Customer                         @relation(fields: [customerId], references: [id])
+  campaignType       CampaignAutomationType
+  channel            CampaignAutomationChannel        @default(WHATSAPP)
+  destinationPhone   String
+  dedupeKey          String                           @unique
+  status             CampaignAutomationDeliveryStatus @default(PENDING)
+  usedAi             Boolean                          @default(false)
+  benefitType        CampaignAutomationBenefitType?
+  benefitDescription String?
+  generatedMessage   String?
+  fallbackMessage    String?
+  sentAt             DateTime?
+  lastError          String?
+  messagingEventId   String?
+  metadata           Json?
+  createdAt          DateTime                         @default(now())
+  updatedAt          DateTime                         @updatedAt
+
+  @@index([barbershopId, campaignType, status, createdAt])
+  @@index([barbershopId, customerId, campaignType, createdAt])
+  @@index([runId, campaignType, status])
+  @@map("campaign_automation_deliveries")
+}
+
+enum CampaignAutomationType {
+  BIRTHDAY
+  WALK_IN_INACTIVE
+  SUBSCRIPTION_ABSENT
+}
+
+enum CampaignAutomationBenefitType {
+  NONE
+  DISCOUNT_COUPON
+  FREE_ADD_ON
+  CUSTOM
+}
+
+enum CampaignAutomationTrigger {
+  SCHEDULER
+  MANUAL
+}
+
+enum CampaignAutomationRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum CampaignAutomationChannel {
+  WHATSAPP
+}
+
+enum CampaignAutomationDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
 }

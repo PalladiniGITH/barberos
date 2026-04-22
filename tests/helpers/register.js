@@ -12,6 +12,10 @@ Module._resolveFilename = function resolveFilename(request, parent, isMain, opti
     return path.join(__dirname, 'server-only-stub.js')
   }
 
+  if (request === '@auth/prisma-adapter') {
+    return path.join(__dirname, 'auth-prisma-adapter-stub.js')
+  }
+
   if (request.startsWith('@/')) {
     const mappedPath = path.join(process.cwd(), 'src', request.slice(2))
     return originalResolveFilename.call(this, mappedPath, parent, isMain, options)

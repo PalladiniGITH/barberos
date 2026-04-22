@@ -44,6 +44,9 @@ export interface SeedPreviewSnapshot {
   } | null
   resetPlan: string[]
   existingOperational: {
+    campaignAutomationConfigs: number
+    campaignAutomationRuns: number
+    campaignAutomationDeliveries: number
     appointments: number
     revenues: number
     expenses: number
@@ -113,6 +116,9 @@ export async function collectSeedPreview(prisma: PrismaClient): Promise<SeedPrev
 
   const existingOperational = targetBarbershop
     ? await prisma.$transaction([
+        prisma.campaignAutomationConfig.count({ where: { barbershopId: targetBarbershop.id } }),
+        prisma.campaignAutomationRun.count({ where: { barbershopId: targetBarbershop.id } }),
+        prisma.campaignAutomationDelivery.count({ where: { barbershopId: targetBarbershop.id } }),
         prisma.appointment.count({ where: { barbershopId: targetBarbershop.id } }),
         prisma.revenue.count({ where: { barbershopId: targetBarbershop.id } }),
         prisma.expense.count({ where: { barbershopId: targetBarbershop.id } }),
@@ -157,6 +163,9 @@ export async function collectSeedPreview(prisma: PrismaClient): Promise<SeedPrev
         }
       : null,
     resetPlan: [
+      'campaign_automation_deliveries',
+      'campaign_automation_runs',
+      'campaign_automation_configs',
       'challenge_results',
       'challenges',
       'commissions',
@@ -169,15 +178,18 @@ export async function collectSeedPreview(prisma: PrismaClient): Promise<SeedPrev
     ],
     existingOperational: existingOperational
       ? {
-          appointments: existingOperational[0],
-          revenues: existingOperational[1],
-          expenses: existingOperational[2],
-          monthlyGoals: existingOperational[3],
-          professionalGoals: existingOperational[4],
-          challenges: existingOperational[5],
-          challengeResults: existingOperational[6],
-          commissions: existingOperational[7],
-          campaignMetrics: existingOperational[8],
+          campaignAutomationConfigs: existingOperational[0],
+          campaignAutomationRuns: existingOperational[1],
+          campaignAutomationDeliveries: existingOperational[2],
+          appointments: existingOperational[3],
+          revenues: existingOperational[4],
+          expenses: existingOperational[5],
+          monthlyGoals: existingOperational[6],
+          professionalGoals: existingOperational[7],
+          challenges: existingOperational[8],
+          challengeResults: existingOperational[9],
+          commissions: existingOperational[10],
+          campaignMetrics: existingOperational[11],
         }
       : null,
   }

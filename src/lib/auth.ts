@@ -6,6 +6,10 @@ import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
 import { AUTH_ENTRY_PATH, normalizeAppRole, type AppRole } from '@/lib/auth-routes'
 
+const withStableCache: typeof cache = typeof cache === 'function'
+  ? cache
+  : ((factory: Parameters<typeof cache>[0]) => factory) as typeof cache
+
 export class AuthenticationRequiredError extends Error {
   constructor(message = 'Sessao autenticada obrigatoria para continuar.') {
     super(message)
@@ -83,7 +87,7 @@ export const authOptions: NextAuthOptions = {
   },
 }
 
-export const getSession = cache(() => getServerSession(authOptions))
+export const getSession = withStableCache(() => getServerSession(authOptions))
 
 /**
  * Assegura que a sessao autenticada existe para codigo server-side.
