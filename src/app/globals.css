@@ -370,6 +370,18 @@
   .surface-light :is(.text-muted-foreground, .text-slate-300, .text-slate-400, .text-slate-500, .text-slate-600) {
     color: hsl(var(--surface-light-muted-foreground));
   }
+
+  .surface-light :is(.dashboard-panel, .premium-block, .premium-rail, .surface-soft, .surface-soft-strong, .disclosure-panel, .surface-inverse, .surface-inverse-subtle, .surface-inverse-chip) {
+    color: hsl(var(--inverse-foreground));
+  }
+
+  .surface-light :is(.dashboard-panel, .premium-block, .premium-rail, .surface-soft, .surface-soft-strong, .disclosure-panel, .surface-inverse, .surface-inverse-subtle, .surface-inverse-chip) :is(.text-foreground, .text-card-foreground, .text-white, .text-slate-50, .text-slate-100, .text-slate-200) {
+    color: hsl(var(--inverse-foreground));
+  }
+
+  .surface-light :is(.dashboard-panel, .premium-block, .premium-rail, .surface-soft, .surface-soft-strong, .disclosure-panel, .surface-inverse, .surface-inverse-subtle, .surface-inverse-chip) :is(.text-muted-foreground, .text-slate-300, .text-slate-400, .text-slate-500) {
+    color: hsl(var(--inverse-muted-foreground));
+  }
 }
 
 @layer utilities {

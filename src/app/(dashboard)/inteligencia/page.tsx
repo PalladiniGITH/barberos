@@ -51,12 +51,12 @@ function ComparisonCard({
 
   const badgeClass = {
     neutral: 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-muted-foreground',
-    positive: 'border-[rgba(52,211,153,0.2)] bg-[rgba(52,211,153,0.1)] text-emerald-700',
-    warning: 'border-[rgba(251,191,36,0.2)] bg-[rgba(251,191,36,0.1)] text-amber-700',
+    positive: 'border-[rgba(52,211,153,0.2)] bg-[rgba(52,211,153,0.1)] text-emerald-100',
+    warning: 'border-[rgba(251,191,36,0.2)] bg-[rgba(251,191,36,0.1)] text-amber-100',
   }[tone]
 
   return (
-    <div className={cn('rounded-[1.35rem] border p-4 shadow-[0_20px_44px_-34px_rgba(2,6,23,0.82)]', toneClass)}>
+    <div className={cn('surface-inverse rounded-[1.35rem] border p-4 shadow-[0_20px_44px_-34px_rgba(2,6,23,0.82)]', toneClass)}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{label}</p>
@@ -277,7 +277,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
                 <h3 className="mt-2 text-lg font-semibold text-foreground">Prioridades de acao</h3>
                 <div className="mt-4 space-y-3">
                   {topRecommendations.map((insight, index) => (
-                    <div key={insight.id} className="rounded-[1.25rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 shadow-[0_18px_34px_-26px_rgba(2,6,23,0.82)]">
+                    <div key={insight.id} className="surface-inverse rounded-[1.25rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 shadow-[0_18px_34px_-26px_rgba(2,6,23,0.82)]">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                         {index + 1}. agir agora
                       </p>
@@ -300,7 +300,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
                 </summary>
 
                 <div className="disclosure-body grid gap-3">
-                  <Link href="/financeiro/despesas" className="rounded-[1.25rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 transition-colors hover:bg-[rgba(255,255,255,0.06)]">
+                  <Link href="/financeiro/despesas" className="surface-inverse rounded-[1.25rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 transition-colors hover:bg-[rgba(255,255,255,0.06)]">
                     <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                       <TrendingDown className="h-4 w-4 text-primary" />
                       Revisar despesas
@@ -310,7 +310,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
                     </p>
                   </Link>
 
-                  <Link href="/equipe/desempenho" className="rounded-[1.25rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 transition-colors hover:bg-[rgba(255,255,255,0.06)]">
+                  <Link href="/equipe/desempenho" className="surface-inverse rounded-[1.25rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 transition-colors hover:bg-[rgba(255,255,255,0.06)]">
                     <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                       <Target className="h-4 w-4 text-primary" />
                       Ajustar time
@@ -320,7 +320,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
                     </p>
                   </Link>
 
-                  <Link href="/precificacao/resultado" className="rounded-[1.25rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 transition-colors hover:bg-[rgba(255,255,255,0.06)]">
+                  <Link href="/precificacao/resultado" className="surface-inverse rounded-[1.25rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 transition-colors hover:bg-[rgba(255,255,255,0.06)]">
                     <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                       <CircleDollarSign className="h-4 w-4 text-primary" />
                       Defender margem
@@ -330,7 +330,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
                     </p>
                   </Link>
 
-                  <Link href="/indicadores" className="rounded-[1.25rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 transition-colors hover:bg-[rgba(255,255,255,0.06)]">
+                  <Link href="/indicadores" className="surface-inverse rounded-[1.25rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 transition-colors hover:bg-[rgba(255,255,255,0.06)]">
                     <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                       <TrendingUp className="h-4 w-4 text-primary" />
                       Ler tendencia

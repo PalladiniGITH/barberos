@@ -18,24 +18,24 @@ function getSeverityMeta(severity: BusinessInsight['severity']) {
         Icon: ShieldAlert,
         badge: 'Prioridade alta',
         panelClass: 'border-[rgba(244,63,94,0.14)]',
-        iconClass: 'bg-[rgba(244,63,94,0.08)] text-rose-600',
-        badgeClass: 'border-[rgba(244,63,94,0.12)] bg-[rgba(244,63,94,0.06)] text-rose-600',
+        iconClass: 'bg-[rgba(244,63,94,0.14)] text-rose-100',
+        badgeClass: 'border-[rgba(244,63,94,0.18)] bg-[rgba(244,63,94,0.12)] text-rose-100',
       }
     case 'warning':
       return {
         Icon: AlertTriangle,
         badge: 'Atencao',
         panelClass: 'border-[rgba(245,158,11,0.14)]',
-        iconClass: 'bg-[rgba(245,158,11,0.1)] text-amber-600',
-        badgeClass: 'border-[rgba(245,158,11,0.12)] bg-[rgba(245,158,11,0.06)] text-amber-700',
+        iconClass: 'bg-[rgba(245,158,11,0.14)] text-amber-100',
+        badgeClass: 'border-[rgba(245,158,11,0.18)] bg-[rgba(245,158,11,0.12)] text-amber-100',
       }
     case 'opportunity':
       return {
         Icon: Lightbulb,
         badge: 'Oportunidade',
         panelClass: 'border-[rgba(91,33,182,0.12)]',
-        iconClass: 'bg-[rgba(91,33,182,0.08)] text-primary',
-        badgeClass: 'border-[rgba(91,33,182,0.12)] bg-[rgba(91,33,182,0.05)] text-primary',
+        iconClass: 'bg-[rgba(91,33,182,0.14)] text-violet-100',
+        badgeClass: 'border-[rgba(91,33,182,0.18)] bg-[rgba(91,33,182,0.12)] text-violet-100',
       }
     case 'positive':
     default:
@@ -43,8 +43,8 @@ function getSeverityMeta(severity: BusinessInsight['severity']) {
         Icon: TrendingUp,
         badge: 'Bom sinal',
         panelClass: 'border-[rgba(16,185,129,0.14)]',
-        iconClass: 'bg-[rgba(16,185,129,0.1)] text-emerald-600',
-        badgeClass: 'border-[rgba(16,185,129,0.12)] bg-[rgba(16,185,129,0.06)] text-emerald-700',
+        iconClass: 'bg-[rgba(16,185,129,0.14)] text-emerald-100',
+        badgeClass: 'border-[rgba(16,185,129,0.18)] bg-[rgba(16,185,129,0.12)] text-emerald-100',
       }
   }
 }
@@ -52,14 +52,14 @@ function getSeverityMeta(severity: BusinessInsight['severity']) {
 export function IntelligenceModeBadge({ report }: { report: BusinessIntelligenceReport }) {
   const isFallbackLocal = report.runtime.userModeLabel === 'Analise local ativa no momento'
   const toneClass = report.mode === 'ai'
-    ? 'border-[rgba(91,33,182,0.12)] bg-[rgba(91,33,182,0.06)] text-primary'
+    ? 'border-[rgba(91,33,182,0.18)] bg-[rgba(91,33,182,0.12)] text-violet-100'
     : isFallbackLocal
-      ? 'border-[rgba(245,158,11,0.12)] bg-[rgba(245,158,11,0.06)] text-amber-700'
-      : 'border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] text-muted-foreground'
+      ? 'border-[rgba(245,158,11,0.18)] bg-[rgba(245,158,11,0.12)] text-amber-100'
+      : 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-slate-300'
 
   return (
     <span className={cn('inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold', toneClass)}>
-      <BrainCircuit className={cn('h-3.5 w-3.5', report.mode === 'ai' ? 'text-primary' : 'text-muted-foreground')} />
+      <BrainCircuit className={cn('h-3.5 w-3.5', report.mode === 'ai' ? 'text-violet-100' : 'text-slate-300')} />
       {report.runtime.userModeLabel}
     </span>
   )
@@ -77,7 +77,7 @@ export function InsightCard({
   return (
     <article
       className={cn(
-        'relative isolate overflow-hidden rounded-[1.45rem] border bg-[linear-gradient(180deg,rgba(28,32,48,0.98),rgba(15,17,21,0.96))] p-5 shadow-[0_24px_44px_-34px_rgba(2,6,23,0.72)]',
+        'surface-inverse relative isolate overflow-hidden rounded-[1.45rem] border bg-[linear-gradient(180deg,rgba(28,32,48,0.98),rgba(15,17,21,0.96))] p-5 shadow-[0_24px_44px_-34px_rgba(2,6,23,0.72)]',
         meta.panelClass
       )}
     >
