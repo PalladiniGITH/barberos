@@ -13,7 +13,7 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "ts-node prisma/seed.ts",
+    "db:seed": "tsx prisma/seed.ts",
     "db:backfill:customer-intelligence": "ts-node prisma/backfill-customer-intelligence.ts",
     "whatsapp:reset:test": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/reset-whatsapp-test-data.ts",
     "db:studio": "prisma studio",
