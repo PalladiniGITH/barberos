@@ -32,6 +32,8 @@
     --surface: 225 22% 11%;
     --surface-2: 228 26% 15%;
     --surface-soft: 232 25% 18%;
+    --surface-light-foreground: 229 31% 16%;
+    --surface-light-muted-foreground: 228 15% 38%;
     --inverse-foreground: 220 13% 96%;
     --inverse-muted-foreground: 220 10% 79%;
     --inverse-accent-foreground: 258 90% 82%;
@@ -354,6 +356,19 @@
     border-color: rgba(255, 255, 255, 0.12);
     background: rgba(255, 255, 255, 0.08);
     color: hsl(var(--inverse-muted-foreground));
+  }
+
+  .surface-light {
+    color: hsl(var(--surface-light-foreground));
+  }
+
+  .surface-light strong,
+  .surface-light :is(.text-foreground, .text-card-foreground, .text-white, .text-slate-50, .text-slate-100, .text-slate-200) {
+    color: hsl(var(--surface-light-foreground));
+  }
+
+  .surface-light :is(.text-muted-foreground, .text-slate-300, .text-slate-400, .text-slate-500, .text-slate-600) {
+    color: hsl(var(--surface-light-muted-foreground));
   }
 }
 

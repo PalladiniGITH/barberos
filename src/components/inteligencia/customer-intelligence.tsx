@@ -108,7 +108,7 @@ function SummaryMetric({
   }[tone]
 
   return (
-    <div className={cn('rounded-[1.1rem] border p-4 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.82)]', toneClass)}>
+    <div className={cn('surface-light rounded-[1.1rem] border p-4 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.82)]', toneClass)}>
       <div className="flex items-center gap-3">
         <span className="flex h-10 w-10 items-center justify-center rounded-[0.95rem] border border-[rgba(91,33,182,0.12)] bg-[rgba(91,33,182,0.08)] text-primary">
           <Icon className="h-4 w-4" />
@@ -193,7 +193,7 @@ function RankingList({
 
       <div className="mt-4 space-y-3">
         {items.length > 0 ? items.map((customer) => (
-          <div key={customer.id} className="rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
+          <div key={customer.id} className="surface-light rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <Link
@@ -227,7 +227,7 @@ function RankingList({
             </div>
           </div>
         )) : (
-          <div className="rounded-[1rem] border border-dashed border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.62)] p-4 text-sm text-muted-foreground">
+          <div className="surface-light rounded-[1rem] border border-dashed border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.62)] p-4 text-sm text-muted-foreground">
             Ainda nao ha dados suficientes para montar este ranking no filtro atual.
           </div>
         )}
@@ -424,7 +424,7 @@ export function CustomerIntelligenceSection({
 
             <div className="mt-5 grid gap-4 lg:grid-cols-2">
               {[customers.groups.subscription, customers.groups.walkIn].map((group) => (
-                <div key={group.type} className="rounded-[1.2rem] border border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.76)] p-5 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.82)]">
+                <div key={group.type} className="surface-light rounded-[1.2rem] border border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.76)] p-5 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.82)]">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{group.label}</p>
@@ -582,12 +582,12 @@ export function CustomerIntelligenceSection({
 
             <div className="mt-4 space-y-3">
               {customerInsights.length > 0 ? customerInsights.map((insight) => (
-                <div key={insight.id} className="rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
+                <div key={insight.id} className="surface-light rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
                   <p className="text-sm font-semibold text-foreground">{insight.title}</p>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">{insight.explanation}</p>
                 </div>
               )) : (
-                <div className="rounded-[1rem] border border-dashed border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.62)] p-4 text-sm text-muted-foreground">
+                <div className="surface-light rounded-[1rem] border border-dashed border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.62)] p-4 text-sm text-muted-foreground">
                   Ainda nao ha leitura suficiente para montar alertas de clientes neste recorte.
                 </div>
               )}
@@ -599,15 +599,15 @@ export function CustomerIntelligenceSection({
             <h3 className="mt-2 text-lg font-semibold text-foreground">Transparencia analitica</h3>
 
             <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-              <div className="rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
+              <div className="surface-light rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
                 <p className="font-semibold text-foreground">Receita real</p>
                 <p className="mt-2 leading-6">{customers.methodology.realRevenueDefinition}</p>
               </div>
-              <div className="rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
+              <div className="surface-light rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
                 <p className="font-semibold text-foreground">Receita estimada</p>
                 <p className="mt-2 leading-6">{customers.methodology.estimatedRevenueDefinition}</p>
               </div>
-              <div className="rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
+              <div className="surface-light rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
                 <p className="font-semibold text-foreground">Custo e margem</p>
                 <p className="mt-2 leading-6">{customers.methodology.marginDefinition}</p>
               </div>
@@ -716,7 +716,7 @@ export function CustomerIntelligenceSection({
             <h3 className="mt-2 text-lg font-semibold text-foreground">Respostas do recorte atual</h3>
 
             <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-              <div className="rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
+              <div className="surface-light rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
                 <p className="font-semibold text-foreground">Quem mais ajuda no lucro?</p>
                 <p className="mt-2 leading-6">
                   {customers.rankings.mostProfitable[0]
@@ -725,7 +725,7 @@ export function CustomerIntelligenceSection({
                 </p>
               </div>
 
-              <div className="rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
+              <div className="surface-light rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
                 <p className="font-semibold text-foreground">Quem mais consome tempo e retorno baixo?</p>
                 <p className="mt-2 leading-6">
                   {customers.rankings.leastProfitable[0]
@@ -734,7 +734,7 @@ export function CustomerIntelligenceSection({
                 </p>
               </div>
 
-              <div className="rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
+              <div className="surface-light rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
                 <p className="font-semibold text-foreground">O plano atual esta saudavel?</p>
                 <p className="mt-2 leading-6">
                   {customers.plan.enabled
@@ -745,7 +745,7 @@ export function CustomerIntelligenceSection({
                 </p>
               </div>
 
-              <div className="rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
+              <div className="surface-light rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
                 <p className="font-semibold text-foreground">Alertas executivos</p>
                 <div className="mt-2 space-y-2 leading-6">
                   {executiveAlerts.map((alert) => (
@@ -754,7 +754,7 @@ export function CustomerIntelligenceSection({
                 </div>
               </div>
 
-              <div className="rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
+              <div className="surface-light rounded-[1rem] border border-[rgba(58,47,86,0.1)] bg-[rgba(255,255,255,0.7)] p-4">
                 <p className="font-semibold text-foreground">Leitura de incerteza</p>
                 <p className="mt-2 leading-6">{customers.methodology.caution}</p>
               </div>
