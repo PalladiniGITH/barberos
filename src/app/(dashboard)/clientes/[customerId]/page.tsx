@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   BadgeDollarSign,
   CalendarClock,
-  Clock3,
   ShieldAlert,
   Sparkles,
   UserRound,
@@ -14,6 +13,7 @@ import {
 import { requireSession } from '@/lib/auth'
 import { resolvePeriod } from '@/lib/period'
 import { getCustomerProfileData } from '@/lib/clientes'
+import { CustomerProfileEditModal } from '@/components/clientes/customer-profile-edit-modal'
 import { PageHeader } from '@/components/layout/page-header'
 import { PeriodSelector } from '@/components/shared/period-selector'
 import {
@@ -89,8 +89,8 @@ function FilterLink({
       className={cn(
         'inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
         active
-          ? 'border-[rgba(91,33,182,0.18)] bg-[rgba(91,33,182,0.1)] text-[rgba(87,42,173,0.96)]'
-          : 'border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.72)] text-[rgba(87,79,109,0.92)] hover:bg-[rgba(91,33,182,0.06)] hover:text-foreground'
+          ? 'border-[rgba(91,33,182,0.22)] bg-[rgba(91,33,182,0.16)] text-violet-100'
+          : 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-slate-300 hover:bg-[rgba(91,33,182,0.12)] hover:text-slate-100'
       )}
     >
       {label}
@@ -106,9 +106,9 @@ function ToneBadge({
   tone?: 'neutral' | 'positive' | 'warning'
 }) {
   const toneClass = {
-    neutral: 'border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.72)] text-[rgba(87,79,109,0.92)]',
-    positive: 'border-[rgba(52,211,153,0.18)] bg-[rgba(16,185,129,0.12)] text-emerald-700',
-    warning: 'border-[rgba(251,191,36,0.18)] bg-[rgba(251,191,36,0.12)] text-amber-700',
+    neutral: 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-slate-300',
+    positive: 'border-[rgba(52,211,153,0.22)] bg-[rgba(16,185,129,0.12)] text-emerald-100',
+    warning: 'border-[rgba(251,191,36,0.22)] bg-[rgba(251,191,36,0.12)] text-amber-100',
   }[tone]
 
   return (
@@ -132,23 +132,23 @@ function SummaryCard({
   tone?: 'neutral' | 'positive' | 'warning'
 }) {
   const toneClass = {
-    neutral: 'border-[rgba(58,47,86,0.12)] bg-[rgba(255,255,255,0.74)]',
-    positive: 'border-[rgba(52,211,153,0.18)] bg-[rgba(16,185,129,0.08)]',
-    warning: 'border-[rgba(251,191,36,0.18)] bg-[rgba(251,191,36,0.08)]',
+    neutral: 'border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.98),rgba(21,24,33,0.98))]',
+    positive: 'border-[rgba(22,163,74,0.2)] bg-[radial-gradient(circle_at_top_left,rgba(22,163,74,0.16),transparent_38%),linear-gradient(180deg,rgba(24,38,32,0.98),rgba(21,24,33,0.98))]',
+    warning: 'border-[rgba(245,158,11,0.22)] bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.16),transparent_38%),linear-gradient(180deg,rgba(40,31,24,0.98),rgba(21,24,33,0.98))]',
   }[tone]
 
   return (
-    <div className={cn('surface-light rounded-[1.1rem] border p-4 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.82)]', toneClass)}>
+    <div className={cn('surface-inverse rounded-[1.1rem] border p-4 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.82)]', toneClass)}>
       <div className="flex items-center gap-3">
         <span className="flex h-10 w-10 items-center justify-center rounded-[0.95rem] border border-[rgba(91,33,182,0.12)] bg-[rgba(91,33,182,0.08)] text-primary">
           <Icon className="h-4 w-4" />
         </span>
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{title}</p>
-          <p className="mt-1 text-xl font-semibold text-foreground">{value}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{title}</p>
+          <p className="mt-1.5 text-[1.85rem] font-semibold leading-none text-foreground">{value}</p>
         </div>
       </div>
-      <p className="mt-3 text-sm leading-6 text-muted-foreground">{helper}</p>
+      <p className="mt-2.5 text-[13px] leading-5 text-muted-foreground">{helper}</p>
     </div>
   )
 }
@@ -157,6 +157,7 @@ export default async function ClienteProfilePage({ params, searchParams }: Props
   const session = await requireSession()
   const { month, year } = resolvePeriod(searchParams)
   const professionalId = searchParams.professionalId ?? null
+  const canEditCustomer = session.user.role === 'OWNER' || session.user.role === 'MANAGER'
   const profile = await getCustomerProfileData({
     barbershopId: session.user.barbershopId,
     customerId: params.customerId,
@@ -183,11 +184,15 @@ export default async function ClienteProfilePage({ params, searchParams }: Props
 
         <div className="flex flex-wrap gap-2">
           <ToneBadge label={CUSTOMER_TYPE_LABELS[profile.customer.type]} tone={profile.customer.type === 'SUBSCRIPTION' ? 'positive' : 'neutral'} />
+          <ToneBadge label={profile.customer.active ? 'Cadastro ativo' : 'Cadastro inativo'} tone={profile.customer.active ? 'positive' : 'warning'} />
           {profile.customer.subscriptionStatus && (
             <ToneBadge
               label={SUBSCRIPTION_STATUS_LABELS[profile.customer.subscriptionStatus]}
               tone={profile.customer.subscriptionStatus === 'ACTIVE' ? 'positive' : 'warning'}
             />
+          )}
+          {profile.customer.marketingOptOut && (
+            <ToneBadge label="Campanhas bloqueadas" tone="warning" />
           )}
           <ToneBadge
             label={profile.snapshot.revenueConfidenceLabel}
@@ -200,14 +205,22 @@ export default async function ClienteProfilePage({ params, searchParams }: Props
         title={profile.customer.name}
         description="Historico, frequencia, valor gerado, margem estimada e comportamento recente para leitura operacional e comercial."
         action={(
-          <Suspense>
-            <PeriodSelector
-              month={month}
-              year={year}
-              pathname={`/clientes/${params.customerId}`}
-              queryParams={{ professionalId }}
-            />
-          </Suspense>
+          <>
+            {canEditCustomer ? (
+              <CustomerProfileEditModal
+                customer={profile.customer}
+                professionals={profile.preferredProfessionalOptions}
+              />
+            ) : null}
+            <Suspense>
+              <PeriodSelector
+                month={month}
+                year={year}
+                pathname={`/clientes/${params.customerId}`}
+                queryParams={{ professionalId }}
+              />
+            </Suspense>
+          </>
         )}
       />
 

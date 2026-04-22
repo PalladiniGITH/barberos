@@ -68,10 +68,16 @@ export interface CustomerProfileData {
     name: string
     phone: string | null
     email: string | null
+    birthDate: string | null
     notes: string | null
     type: 'SUBSCRIPTION' | 'WALK_IN'
     subscriptionStatus: 'ACTIVE' | 'PAUSED' | 'CANCELLED' | null
     subscriptionPrice: number | null
+    subscriptionStartedAt: string | null
+    preferredProfessionalId: string | null
+    preferredProfessionalName: string | null
+    active: boolean
+    marketingOptOut: boolean
   }
   filters: {
     month: number
@@ -81,6 +87,7 @@ export interface CustomerProfileData {
   snapshot: CustomerDirectoryRow
   methodology: Awaited<ReturnType<typeof getBusinessInsightsData>>['customers']['methodology']
   professionals: Array<{ id: string; name: string }>
+  preferredProfessionalOptions: Array<{ id: string; name: string }>
   periodSummary: {
     visits: number
     completedVisits: number
@@ -226,6 +233,16 @@ function buildRecentBehavior(args: {
   }
 
   return messages
+}
+
+function formatDateInputValue(date: Date | null | undefined) {
+  if (!date) return null
+
+  const year = date.getUTCFullYear()
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
 }
 
 const getCustomersDirectoryDataCached = cache(async (
@@ -403,10 +420,20 @@ const getCustomerProfileDataCached = cache(async (
       name: true,
       phone: true,
       email: true,
+      birthDate: true,
+      marketingOptOutAt: true,
       notes: true,
       type: true,
       subscriptionStatus: true,
       subscriptionPrice: true,
+      subscriptionStartedAt: true,
+      preferredProfessionalId: true,
+      preferredProfessional: {
+        select: {
+          name: true,
+        },
+      },
+      active: true,
     },
   })
 
@@ -453,7 +480,7 @@ const getCustomerProfileDataCached = cache(async (
         revenueConfidenceLabel: 'Sem base no recorte',
       }
 
-  const [appointmentHistory, completedAppointments, lifetimeSummary] = await Promise.all([
+  const [appointmentHistory, completedAppointments, lifetimeSummary, preferredProfessionalOptions] = await Promise.all([
     prisma.appointment.findMany({
       where: {
         barbershopId,
@@ -509,6 +536,27 @@ const getCustomerProfileDataCached = cache(async (
         },
       },
     }),
+    prisma.professional.findMany({
+      where: customerRecord.preferredProfessionalId
+        ? {
+            barbershopId,
+            OR: [
+              { active: true },
+              { id: customerRecord.preferredProfessionalId },
+            ],
+          }
+        : {
+            barbershopId,
+            active: true,
+          },
+      select: {
+        id: true,
+        name: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    }),
   ])
 
   const serviceCounts = new Map<string, number>()
@@ -555,10 +603,16 @@ const getCustomerProfileDataCached = cache(async (
       name: customerRecord.name,
       phone: customerRecord.phone,
       email: customerRecord.email,
+      birthDate: formatDateInputValue(customerRecord.birthDate),
       notes: customerRecord.notes,
       type: customerRecord.type,
       subscriptionStatus: customerRecord.subscriptionStatus,
       subscriptionPrice: customerRecord.subscriptionPrice ? Number(customerRecord.subscriptionPrice) : null,
+      subscriptionStartedAt: formatDateInputValue(customerRecord.subscriptionStartedAt),
+      preferredProfessionalId: customerRecord.preferredProfessionalId,
+      preferredProfessionalName: customerRecord.preferredProfessional?.name ?? null,
+      active: customerRecord.active,
+      marketingOptOut: Boolean(customerRecord.marketingOptOutAt),
     },
     filters: {
       month,
@@ -571,6 +625,7 @@ const getCustomerProfileDataCached = cache(async (
       id: professional.id,
       name: professional.name,
     })),
+    preferredProfessionalOptions,
     periodSummary: {
       visits: appointmentHistory.length,
       completedVisits: completedAppointments.length,
