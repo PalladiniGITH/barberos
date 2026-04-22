@@ -425,6 +425,7 @@ export default async function DashboardPage({ searchParams }: Props) {
     barbershopId: session.user.barbershopId,
     month,
     year,
+    viewerRole: session.user.role,
   })
   const data = buildDashboardData(intelligenceReport)
   const barbershopHealth = buildBarbershopHealthSnapshot(intelligenceReport.context.customers)

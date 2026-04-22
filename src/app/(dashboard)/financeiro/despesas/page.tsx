@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { AlertCircle, ArrowUpRight, CheckCircle2, Clock, TrendingDown } from 'lucide-react'
-import { requireSession } from '@/lib/auth'
+import { assertAdministrativeRole, requireSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getMonthRange, formatCurrency, formatDate, EXPENSE_TYPE_LABELS, cn } from '@/lib/utils'
 import { resolvePeriod } from '@/lib/period'
@@ -23,6 +23,7 @@ interface Props {
 
 export default async function DespesasPage({ searchParams }: Props) {
   const session = await requireSession()
+  assertAdministrativeRole(session.user.role, 'Sem permissao para consultar as despesas da barbearia.')
   const { month, year } = resolvePeriod(searchParams)
   const { start, end } = getMonthRange(month, year)
   const { barbershopId } = session.user

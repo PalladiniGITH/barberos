@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { requireSession } from '@/lib/auth'
+import { assertAdministrativeRole, requireSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { cn, formatCurrency, formatPercent } from '@/lib/utils'
 import { PageHeader } from '@/components/layout/page-header'
@@ -11,6 +11,7 @@ export const metadata: Metadata = { title: 'Precificação' }
 
 export default async function PrecificacaoPage() {
   const session = await requireSession()
+  assertAdministrativeRole(session.user.role, 'Sem permissao para consultar a precificacao global da barbearia.')
 
   const [services, supplies] = await Promise.all([
     prisma.service.findMany({

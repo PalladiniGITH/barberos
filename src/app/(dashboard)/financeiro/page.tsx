@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import { type LucideIcon, ArrowUpRight, BadgeDollarSign, Banknote, Layers3, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
-import { requireSession } from '@/lib/auth'
+import { assertAdministrativeRole, requireSession } from '@/lib/auth'
 import { formatCurrency, formatPercent, getMonthRange } from '@/lib/utils'
 import { resolvePeriod } from '@/lib/period'
 import { PageHeader } from '@/components/layout/page-header'
@@ -111,6 +111,7 @@ function MonthBars({
 
 export default async function FinanceiroPage({ searchParams }: Props) {
   const session = await requireSession()
+  assertAdministrativeRole(session.user.role, 'Sem permissao para consultar o modulo financeiro da barbearia.')
   const { month, year } = resolvePeriod(searchParams)
   const { start, end } = getMonthRange(month, year)
   const previous = new Date(year, month - 2, 1)

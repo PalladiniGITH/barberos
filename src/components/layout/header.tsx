@@ -39,6 +39,38 @@ function getPageMeta(pathname: string, role?: string | null) {
     }
   }
 
+  if (role === 'BARBER' && pathname.startsWith('/agendamentos')) {
+    return {
+      breadcrumb: 'Minha agenda',
+      title: 'Agenda pessoal',
+      helper: 'Seus horarios, encaixes e atendimentos do dia sem ruido administrativo.',
+    }
+  }
+
+  if (role === 'BARBER' && pathname.startsWith('/equipe/metas')) {
+    return {
+      breadcrumb: 'Minhas metas',
+      title: 'Meta individual',
+      helper: 'Seu objetivo do periodo, progresso atual e o que falta para fechar bem o mes.',
+    }
+  }
+
+  if (role === 'BARBER' && pathname.startsWith('/equipe/desempenho')) {
+    return {
+      breadcrumb: 'Meu desempenho',
+      title: 'Resultado pessoal',
+      helper: 'Ticket, comissao, produtos e leitura direta do seu desempenho.',
+    }
+  }
+
+  if (role === 'BARBER' && pathname.startsWith('/configuracoes')) {
+    return {
+      breadcrumb: 'Minha conta',
+      title: 'Perfil e acesso',
+      helper: 'Seus dados de acesso e o vinculo profissional usado na operacao.',
+    }
+  }
+
   if (pathname.startsWith('/inteligencia')) {
     return {
       breadcrumb: 'Inteligencia',

@@ -8,6 +8,8 @@ import {
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { Prisma } from '@prisma/client'
+import { AuthorizationError } from '@/lib/auth'
+import { isBarberRole } from '@/lib/auth-routes'
 import { prisma } from '@/lib/prisma'
 import {
   ACTIVE_APPOINTMENT_STATUS_VALUES,
@@ -544,12 +546,24 @@ export async function getSchedulePageData(input: {
   date: string
   view: ScheduleView
   professionalId?: string | null
+  viewerRole?: string | null
+  viewerProfessionalId?: string | null
 }) {
+  const scopedProfessionalId = isBarberRole(input.viewerRole)
+    ? input.viewerProfessionalId ?? null
+    : input.professionalId ?? null
+
+  if (isBarberRole(input.viewerRole) && !scopedProfessionalId) {
+    throw new AuthorizationError(
+      'Seu usuario BARBER nao esta vinculado a um profissional ativo para consultar a agenda.'
+    )
+  }
+
   return getCachedSchedulePageData(
     input.barbershopId,
     input.date,
     input.view,
-    input.professionalId ?? null
+    scopedProfessionalId
   )
 }
 

@@ -82,6 +82,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
     year,
     professionalId,
     customerType,
+    viewerRole: session.user.role,
   })
 
   const { context } = report

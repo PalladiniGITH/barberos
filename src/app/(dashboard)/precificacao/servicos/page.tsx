@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { requireSession } from '@/lib/auth'
+import { assertAdministrativeRole, requireSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { cn, formatCurrency, formatPercent } from '@/lib/utils'
 import { PageHeader } from '@/components/layout/page-header'
@@ -25,6 +25,7 @@ const starterServices = [
 
 export default async function ServicosPage() {
   const session = await requireSession()
+  assertAdministrativeRole(session.user.role, 'Sem permissao para consultar os servicos e precificacao da barbearia.')
 
   const services = await prisma.service.findMany({
     where: { barbershopId: session.user.barbershopId },

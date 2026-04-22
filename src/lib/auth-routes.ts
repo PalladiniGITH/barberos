@@ -2,6 +2,48 @@ export const AUTH_ENTRY_PATH = '/'
 export const AUTHENTICATED_HOME_PATH = '/dashboard'
 const NEXTAUTH_SIGNIN_PATH = '/api/auth/signin'
 
+export type AppRole = 'OWNER' | 'MANAGER' | 'BARBER' | 'FINANCIAL'
+
+const BARBER_ALLOWED_PATHS = [
+  '/dashboard',
+  '/agendamentos',
+  '/equipe/metas',
+  '/equipe/desempenho',
+  '/configuracoes',
+  '/onboarding',
+  '/setup',
+] as const
+
+function matchesProtectedPath(pathname: string, protectedPath: string) {
+  return pathname === protectedPath || pathname.startsWith(`${protectedPath}/`)
+}
+
+export function normalizeAppRole(value?: string | null): AppRole | null {
+  if (value === 'OWNER' || value === 'MANAGER' || value === 'BARBER' || value === 'FINANCIAL') {
+    return value
+  }
+
+  return null
+}
+
+export function isBarberRole(value?: string | null): value is 'BARBER' {
+  return normalizeAppRole(value) === 'BARBER'
+}
+
+export function canRoleAccessPath(role: string | null | undefined, pathname: string) {
+  const normalizedRole = normalizeAppRole(role)
+
+  if (!normalizedRole) {
+    return true
+  }
+
+  if (normalizedRole !== 'BARBER') {
+    return true
+  }
+
+  return BARBER_ALLOWED_PATHS.some((allowedPath) => matchesProtectedPath(pathname, allowedPath))
+}
+
 export function normalizeCallbackPath(value?: string | null) {
   if (typeof value !== 'string') {
     return AUTHENTICATED_HOME_PATH

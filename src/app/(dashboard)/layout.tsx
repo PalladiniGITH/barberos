@@ -15,7 +15,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     select: { onboardingCompletedAt: true },
   })
 
-  if (!barbershop?.onboardingCompletedAt) {
+  if (!barbershop?.onboardingCompletedAt && session.user.role !== 'BARBER') {
     redirect('/onboarding')
   }
 

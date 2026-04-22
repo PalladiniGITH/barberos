@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { cache } from 'react'
+import { assertAdministrativeRole } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getComparisonWindow } from '@/lib/period'
 import { getBusinessInsightsData } from '@/lib/insights-data'
@@ -636,7 +637,13 @@ export function getCustomersDirectoryData(params: {
   customerType?: CustomerTypeFilter
   frequency?: CustomerFrequencyFilter
   value?: CustomerValueFilter
+  viewerRole: string | null | undefined
 }) {
+  assertAdministrativeRole(
+    params.viewerRole,
+    'Sem permissao para consultar a base global de clientes da barbearia.'
+  )
+
   return getCustomersDirectoryDataCached(
     params.barbershopId,
     params.month,
@@ -654,7 +661,13 @@ export function getCustomerProfileData(params: {
   month: number
   year: number
   professionalId?: string | null
+  viewerRole: string | null | undefined
 }) {
+  assertAdministrativeRole(
+    params.viewerRole,
+    'Sem permissao para consultar o perfil global de clientes da barbearia.'
+  )
+
   return getCustomerProfileDataCached(
     params.barbershopId,
     params.customerId,

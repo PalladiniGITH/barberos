@@ -3,11 +3,24 @@
 import { revalidatePath } from 'next/cache'
 import { CategoryType } from '@prisma/client'
 import { z } from 'zod'
-import { requireSession } from '@/lib/auth'
+import { requireSession, assertAdministrativeRole, AuthorizationError } from '@/lib/auth'
 import { getMonthYearInTimezone } from '@/lib/onboarding'
 import { prisma } from '@/lib/prisma'
 
 type ActionResult = { success: true } | { success: false; error: string }
+
+function blockBarberOnboardingAction(role: string) {
+  try {
+    assertAdministrativeRole(role, 'Sem permissao para concluir o onboarding da barbearia.')
+    return null
+  } catch (error) {
+    if (error instanceof AuthorizationError) {
+      return { success: false, error: error.message } satisfies ActionResult
+    }
+
+    throw error
+  }
+}
 
 const ProfessionalInputSchema = z.object({
   name: z.string().min(2, 'Cada profissional precisa ter ao menos 2 caracteres').max(100),
@@ -77,6 +90,11 @@ async function ensureDefaultCategories(
 export async function completeOnboarding(rawData: unknown): Promise<ActionResult> {
   const session = await requireSession()
   const { barbershopId } = session.user
+  const blocked = blockBarberOnboardingAction(session.user.role)
+
+  if (blocked) {
+    return blocked
+  }
 
   const parsed = OnboardingSchema.safeParse(rawData)
   if (!parsed.success) {

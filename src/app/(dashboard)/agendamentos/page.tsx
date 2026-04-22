@@ -9,7 +9,6 @@ import {
   XCircle,
 } from 'lucide-react'
 import { requireSession } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 import type { ScheduleAppointmentItem, ScheduleView } from '@/lib/agendamentos'
 import {
   getSchedulePageData,
@@ -17,6 +16,7 @@ import {
   SCHEDULE_END_HOUR,
   SCHEDULE_START_HOUR,
 } from '@/lib/agendamentos'
+import { findSessionProfessional } from '@/lib/professionals/session-professional'
 import { ScheduleCalendar } from '@/components/agendamentos/schedule-calendar'
 import { ScheduleToolbar } from '@/components/agendamentos/schedule-toolbar'
 import { PageHeader } from '@/components/layout/page-header'
@@ -150,21 +150,34 @@ export default async function AgendamentosPage({ searchParams }: Props) {
   const session = await requireSession()
   const filters = resolveScheduleSearch(searchParams)
   const inferredProfessional = session.user.role === 'BARBER'
-    ? await prisma.professional.findFirst({
-        where: {
-          barbershopId: session.user.barbershopId,
-          active: true,
-          OR: [
-            session.user.email ? { email: session.user.email } : undefined,
-            session.user.name ? { name: session.user.name } : undefined,
-          ].filter(Boolean) as Array<{ email?: string; name?: string }>,
-        },
-        select: {
-          id: true,
-          name: true,
-        },
+    ? await findSessionProfessional({
+        barbershopId: session.user.barbershopId,
+        email: session.user.email,
+        name: session.user.name,
       })
     : null
+
+  if (session.user.role === 'BARBER' && !inferredProfessional) {
+    return (
+      <div className="page-section flex flex-col gap-5">
+        <PageHeader
+          title="Minha agenda"
+          description="Nao encontramos um cadastro profissional vinculado ao seu usuario para liberar sua agenda individual."
+        />
+
+        <section className="dashboard-panel p-6">
+          <p className="page-kicker">Vinculo pendente</p>
+          <h2 className="mt-2 text-[1.4rem] font-semibold tracking-tight text-foreground">
+            Seu usuario ainda nao esta ligado a um barbeiro ativo.
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">
+            Assim que a equipe vincular este login ao seu cadastro profissional, a grade passa a abrir somente a sua agenda com seguranca.
+          </p>
+        </section>
+      </div>
+    )
+  }
+
   const professionalLocked = Boolean(inferredProfessional && session.user.role === 'BARBER')
   const effectiveProfessionalId = professionalLocked ? inferredProfessional?.id ?? null : filters.professionalId
   const schedule = await getSchedulePageData({
@@ -172,6 +185,8 @@ export default async function AgendamentosPage({ searchParams }: Props) {
     date: filters.date,
     view: filters.view,
     professionalId: effectiveProfessionalId,
+    viewerRole: session.user.role,
+    viewerProfessionalId: inferredProfessional?.id ?? null,
   })
 
   if (schedule.professionals.length === 0 || schedule.services.length === 0) {

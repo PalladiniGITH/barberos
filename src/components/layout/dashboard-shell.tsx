@@ -71,6 +71,7 @@ function DashboardShellFrame({
         fallbackPath={currentPath}
         pinned={sidebarPinned}
         focusMode={focusMode}
+        role={user.role}
         onPinnedChange={handleSidebarPinnedChange}
       />
 

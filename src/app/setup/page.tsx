@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { requireSession } from '@/lib/auth'
+import { assertAdministrativeRole, requireSession } from '@/lib/auth'
 import { SetupWizard } from '@/components/onboarding/setup-wizard'
 import { getOnboardingState } from '@/lib/onboarding'
 import { prisma } from '@/lib/prisma'
@@ -20,6 +20,7 @@ function capitalize(value: string) {
 
 export default async function SetupPage() {
   const session = await requireSession()
+  assertAdministrativeRole(session.user.role, 'Sem permissao para acessar o setup inicial da barbearia.')
   const state = await getOnboardingState(session.user.barbershopId)
 
   if (state.isComplete) {

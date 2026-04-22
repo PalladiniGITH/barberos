@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { requireSession } from '@/lib/auth'
+import { assertAdministrativeRole, requireSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency, formatPercent, formatPeriodLabel, getMonthRange } from '@/lib/utils'
 import { resolvePeriod } from '@/lib/period'
@@ -19,6 +19,7 @@ interface Props {
 
 export default async function EquipePage({ searchParams }: Props) {
   const session = await requireSession()
+  assertAdministrativeRole(session.user.role, 'Sem permissao para consultar a visao administrativa da equipe.')
   const { month, year } = resolvePeriod(searchParams)
   const { start, end } = getMonthRange(month, year)
 

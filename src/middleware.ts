@@ -1,5 +1,6 @@
 import { withAuth } from 'next-auth/middleware'
 import { NextResponse } from 'next/server'
+import { AUTHENTICATED_HOME_PATH, canRoleAccessPath } from '@/lib/auth-routes'
 
 const PROTECTED_PATHS = [
   '/dashboard',
@@ -19,6 +20,15 @@ const PROTECTED_PATHS = [
 export default withAuth(
   function middleware(req) {
     const pathname = req.nextUrl.pathname
+    const role = typeof req.nextauth.token?.role === 'string' ? req.nextauth.token.role : null
+
+    if (role && !canRoleAccessPath(role, pathname)) {
+      const redirectUrl = req.nextUrl.clone()
+      redirectUrl.pathname = AUTHENTICATED_HOME_PATH
+      redirectUrl.search = ''
+      return NextResponse.redirect(redirectUrl)
+    }
+
     const requestHeaders = new Headers(req.headers)
     requestHeaders.set('x-pathname', pathname)
     requestHeaders.set('x-search', req.nextUrl.search)

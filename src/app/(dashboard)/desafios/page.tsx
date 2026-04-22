@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { requireSession } from '@/lib/auth'
+import { assertAdministrativeRole, requireSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
   CHALLENGE_TYPE_LABELS,
@@ -55,6 +55,7 @@ function templateTypeLabel(type: string) {
 
 export default async function DesafiosPage() {
   const session = await requireSession()
+  assertAdministrativeRole(session.user.role, 'Sem permissao para consultar os desafios comerciais da equipe.')
   const now = new Date()
   const currentMonth = now.getMonth() + 1
   const currentYear = now.getFullYear()

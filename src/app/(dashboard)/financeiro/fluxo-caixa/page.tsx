@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { ArrowUpRight, BarChart3, TrendingDown, TrendingUp } from 'lucide-react'
-import { requireSession } from '@/lib/auth'
+import { assertAdministrativeRole, requireSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency, formatPercent, getMonthRange, cn } from '@/lib/utils'
 import { resolvePeriod } from '@/lib/period'
@@ -82,6 +82,7 @@ function FlowBars({
 
 export default async function FluxoCaixaPage({ searchParams }: Props) {
   const session = await requireSession()
+  assertAdministrativeRole(session.user.role, 'Sem permissao para consultar o fluxo de caixa da barbearia.')
   const { month, year } = resolvePeriod(searchParams)
   const { start, end } = getMonthRange(month, year)
   const previous = new Date(year, month - 2, 1)

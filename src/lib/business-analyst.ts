@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { cache } from 'react'
+import { assertAdministrativeRole } from '@/lib/auth'
 import {
   buildDeterministicBusinessReport,
   type BusinessIntelligenceReport,
@@ -29,7 +30,13 @@ export async function getBusinessAnalystReport(params: {
   year: number
   professionalId?: string | null
   customerType?: CustomerTypeFilter
+  viewerRole: string | null | undefined
 }): Promise<BusinessIntelligenceReport> {
+  assertAdministrativeRole(
+    params.viewerRole,
+    'Sem permissao para consultar a inteligencia global da barbearia.'
+  )
+
   return getBusinessAnalystReportCached(
     params.barbershopId,
     params.month,

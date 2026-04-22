@@ -21,6 +21,7 @@ import {
   Wallet,
   Zap,
 } from 'lucide-react'
+import { isBarberRole } from '@/lib/auth-routes'
 import { cn } from '@/lib/utils'
 import { useNavigationFeedback } from '@/components/layout/navigation-feedback'
 
@@ -36,7 +37,7 @@ type SidebarItem = {
   children?: SidebarItem[]
 }
 
-const sidebarItems: SidebarItem[] = [
+const defaultSidebarItems: SidebarItem[] = [
   {
     href: '/dashboard',
     icon: LayoutDashboard,
@@ -210,8 +211,53 @@ const sidebarItems: SidebarItem[] = [
   },
 ]
 
+const barberSidebarItems: SidebarItem[] = [
+  {
+    href: '/dashboard',
+    icon: LayoutDashboard,
+    label: 'Minha operacao',
+    description: 'Resumo pessoal do seu dia e do periodo.',
+    section: 'essencial',
+    exact: true,
+  },
+  {
+    href: '/agendamentos',
+    icon: CalendarClock,
+    label: 'Minha agenda',
+    description: 'Seus horarios, encaixes e atendimentos.',
+    section: 'essencial',
+  },
+  {
+    href: '/equipe/metas',
+    icon: Target,
+    label: 'Minhas metas',
+    description: 'Objetivo individual e leitura do periodo.',
+    section: 'essencial',
+  },
+  {
+    href: '/equipe/desempenho',
+    icon: BarChart3,
+    label: 'Meu desempenho',
+    description: 'Ticket, comissao e ritmo do seu resultado.',
+    section: 'essencial',
+  },
+  {
+    href: '/configuracoes',
+    icon: Settings,
+    label: 'Minha conta',
+    description: 'Perfil, configuracoes pessoais e vinculo profissional.',
+    section: 'conta',
+  },
+]
+
 const sectionLabels: Record<NavSection, string> = {
   essencial: 'Essencial',
+  modulos: 'Modulos',
+  conta: 'Conta',
+}
+
+const barberSectionLabels: Record<NavSection, string> = {
+  essencial: 'Minha operacao',
   modulos: 'Modulos',
   conta: 'Conta',
 }
@@ -409,17 +455,22 @@ export function Sidebar({
   fallbackPath,
   pinned,
   focusMode,
+  role,
   onPinnedChange,
 }: {
   fallbackPath: string
   pinned: boolean
   focusMode: boolean
+  role?: string | null
   onPinnedChange: (value: boolean) => void
 }) {
   const pathname = usePathname() ?? fallbackPath
   const { startNavigation, targetHref } = useNavigationFeedback()
   const [hovered, setHovered] = useState(false)
   const [previewModuleHref, setPreviewModuleHref] = useState<string | null>(null)
+  const barberView = isBarberRole(role)
+  const sidebarItems = barberView ? barberSidebarItems : defaultSidebarItems
+  const currentSectionLabels = barberView ? barberSectionLabels : sectionLabels
   const expanded = pinned || hovered
   const activeTopLevelHref = resolveActiveHref(sidebarItems, pathname)
   const openModuleHref = expanded ? previewModuleHref ?? activeTopLevelHref : null
@@ -430,12 +481,12 @@ export function Sidebar({
 
   const sections = useMemo(
     () =>
-      (Object.keys(sectionLabels) as NavSection[]).map((section) => ({
+      (Object.keys(currentSectionLabels) as NavSection[]).map((section) => ({
         section,
-        label: sectionLabels[section],
+        label: currentSectionLabels[section],
         items: sidebarItems.filter((item) => item.section === section),
-      })),
-    []
+      })).filter((section) => section.items.length > 0),
+    [currentSectionLabels, sidebarItems]
   )
 
   function renderItems(items: SidebarItem[], level = 0): ReactNode {
@@ -487,7 +538,7 @@ export function Sidebar({
             href="/dashboard"
             onClick={() => startNavigation('/dashboard')}
             className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[0.95rem] bg-[linear-gradient(135deg,rgba(124,58,237,0.2),rgba(15,23,42,0.96))] text-violet-100 shadow-[0_18px_34px_-24px_rgba(2,6,23,0.82)]"
-            title="Painel do negocio"
+            title={barberView ? 'Meu painel' : 'Painel do negocio'}
           >
             <Scissors className="h-4 w-4" />
           </Link>
@@ -499,7 +550,9 @@ export function Sidebar({
             )}
           >
             <p className="truncate text-sm font-semibold text-slate-50">BarberOS</p>
-            <p className="truncate text-xs text-slate-500">Operacao diaria da barbearia</p>
+            <p className="truncate text-xs text-slate-500">
+              {barberView ? 'Painel do profissional' : 'Operacao diaria da barbearia'}
+            </p>
           </div>
         </div>
 

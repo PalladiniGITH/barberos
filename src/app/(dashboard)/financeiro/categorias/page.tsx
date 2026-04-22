@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { type LucideIcon, ArrowUpRight, Tags, Wallet, ArrowDownCircle, ArrowUpCircle } from 'lucide-react'
-import { requireSession } from '@/lib/auth'
+import { assertAdministrativeRole, requireSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency, cn, getMonthRange } from '@/lib/utils'
 import { resolvePeriod } from '@/lib/period'
@@ -132,6 +132,7 @@ function CategoryBlock({
 
 export default async function CategoriasPage({ searchParams }: Props) {
   const session = await requireSession()
+  assertAdministrativeRole(session.user.role, 'Sem permissao para consultar as categorias financeiras da barbearia.')
   const { month, year } = resolvePeriod(searchParams)
   const { start, end } = getMonthRange(month, year)
   const { barbershopId } = session.user

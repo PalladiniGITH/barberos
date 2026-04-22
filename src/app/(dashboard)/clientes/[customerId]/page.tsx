@@ -163,6 +163,7 @@ export default async function ClienteProfilePage({ params, searchParams }: Props
     month,
     year,
     professionalId,
+    viewerRole: session.user.role,
   })
 
   if (!profile) {

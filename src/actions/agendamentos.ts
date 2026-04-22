@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { assertOwnership, requireSession } from '@/lib/auth'
+import { isBarberRole } from '@/lib/auth-routes'
 import {
   buildBusinessDateTimeFromTimeLabel,
   formatTimeInTimezone,
@@ -21,8 +22,15 @@ import {
   normalizeProfessionalOperationalConfig,
   resolveProfessionalServicePrice,
 } from '@/lib/professionals/operational-config'
+import { findSessionProfessional } from '@/lib/professionals/session-professional'
 
 type ActionResult = { success: true } | { success: false; error: string }
+type Session = Awaited<ReturnType<typeof requireSession>>
+type SchedulingActorScope = {
+  isBarber: boolean
+  professionalId: string | null
+  professionalName: string | null
+}
 
 const AppointmentSchema = z.object({
   customerId: z.string().cuid().optional().nullable(),
@@ -117,6 +125,59 @@ async function getBarbershopTimezone(barbershopId: string) {
   })
 
   return resolveBusinessTimezone(barbershop?.timezone)
+}
+
+async function resolveSchedulingActorScope(session: Session): Promise<SchedulingActorScope> {
+  if (!isBarberRole(session.user.role)) {
+    return {
+      isBarber: false,
+      professionalId: null,
+      professionalName: null,
+    }
+  }
+
+  const professional = await findSessionProfessional({
+    barbershopId: session.user.barbershopId,
+    email: session.user.email,
+    name: session.user.name,
+  })
+
+  return {
+    isBarber: true,
+    professionalId: professional?.id ?? null,
+    professionalName: professional?.name ?? null,
+  }
+}
+
+function buildMissingBarberProfessionalError(): ActionResult {
+  return {
+    success: false,
+    error: 'Seu usuario BARBER nao esta vinculado a um profissional ativo. Nao foi possivel operar a agenda.',
+  }
+}
+
+function ensureBarberProfessionalScope(
+  scope: SchedulingActorScope,
+  professionalId: string | null | undefined
+): ActionResult | null {
+  if (!scope.isBarber) {
+    return null
+  }
+
+  if (!scope.professionalId) {
+    return buildMissingBarberProfessionalError()
+  }
+
+  if (professionalId !== scope.professionalId) {
+    return {
+      success: false,
+      error: scope.professionalName
+        ? `Sem permissao para operar a agenda de outro profissional. Seu escopo esta limitado a ${scope.professionalName}.`
+        : 'Sem permissao para operar a agenda de outro profissional.',
+    }
+  }
+
+  return null
 }
 
 function buildStartAt(date: string, time: string, timezone: string) {
@@ -438,6 +499,7 @@ async function getSchedulingEntitiesForAppointment(input: {
 export async function createAppointment(rawData: unknown): Promise<ActionResult> {
   const session = await requireSession()
   const { barbershopId } = session.user
+  const scope = await resolveSchedulingActorScope(session)
 
   const parsed = AppointmentSchema.safeParse(rawData)
   if (!parsed.success) {
@@ -446,6 +508,12 @@ export async function createAppointment(rawData: unknown): Promise<ActionResult>
 
   try {
     const data = parsed.data
+    const blocked = ensureBarberProfessionalScope(scope, data.professionalId)
+
+    if (blocked) {
+      return blocked
+    }
+
     const customerName = data.customerName.trim()
     const billingModel = normalizeBillingModel(data.customerType, data.billingModel)
     const timezone = await getBarbershopTimezone(barbershopId)
@@ -558,14 +626,21 @@ export async function createAppointment(rawData: unknown): Promise<ActionResult>
 export async function updateAppointment(id: string, rawData: unknown): Promise<ActionResult> {
   const session = await requireSession()
   const { barbershopId } = session.user
+  const scope = await resolveSchedulingActorScope(session)
 
   const existingAppointment = await prisma.appointment.findUnique({
     where: { id },
-    select: { id: true, barbershopId: true },
+    select: { id: true, barbershopId: true, professionalId: true },
   })
 
   if (!existingAppointment || existingAppointment.barbershopId !== barbershopId) {
     return { success: false, error: 'Agendamento nao encontrado.' }
+  }
+
+  const blockedExistingScope = ensureBarberProfessionalScope(scope, existingAppointment.professionalId)
+
+  if (blockedExistingScope) {
+    return blockedExistingScope
   }
 
   const parsed = AppointmentSchema.safeParse(rawData)
@@ -575,6 +650,12 @@ export async function updateAppointment(id: string, rawData: unknown): Promise<A
 
   try {
     const data = parsed.data
+    const blockedTargetScope = ensureBarberProfessionalScope(scope, data.professionalId)
+
+    if (blockedTargetScope) {
+      return blockedTargetScope
+    }
+
     const billingModel = normalizeBillingModel(data.customerType, data.billingModel)
     const timezone = await getBarbershopTimezone(barbershopId)
 
@@ -685,6 +766,7 @@ export async function updateAppointment(id: string, rawData: unknown): Promise<A
 export async function updateAppointmentStatus(id: string, rawStatus: unknown): Promise<ActionResult> {
   const session = await requireSession()
   const { barbershopId } = session.user
+  const scope = await resolveSchedulingActorScope(session)
 
   const parsedStatus = AppointmentStatusSchema.safeParse(rawStatus)
   if (!parsedStatus.success) {
@@ -693,11 +775,17 @@ export async function updateAppointmentStatus(id: string, rawStatus: unknown): P
 
   const existingAppointment = await prisma.appointment.findUnique({
     where: { id },
-    select: { id: true, barbershopId: true, customerId: true },
+    select: { id: true, barbershopId: true, customerId: true, professionalId: true },
   })
 
   if (!existingAppointment || existingAppointment.barbershopId !== barbershopId) {
     return { success: false, error: 'Agendamento nao encontrado.' }
+  }
+
+  const blocked = ensureBarberProfessionalScope(scope, existingAppointment.professionalId)
+
+  if (blocked) {
+    return blocked
   }
 
   const status = parsedStatus.data
@@ -729,6 +817,7 @@ export async function updateAppointmentStatus(id: string, rawStatus: unknown): P
 export async function moveAppointmentSlot(id: string, rawData: unknown): Promise<ActionResult> {
   const session = await requireSession()
   const { barbershopId } = session.user
+  const scope = await resolveSchedulingActorScope(session)
 
   const parsed = SlotMoveSchema.safeParse(rawData)
   if (!parsed.success) {
@@ -740,6 +829,7 @@ export async function moveAppointmentSlot(id: string, rawData: unknown): Promise
     select: {
       id: true,
       barbershopId: true,
+      professionalId: true,
       durationMinutes: true,
       sourceReference: true,
     },
@@ -749,12 +839,24 @@ export async function moveAppointmentSlot(id: string, rawData: unknown): Promise
     return { success: false, error: 'Agendamento nao encontrado.' }
   }
 
+  const blockedExistingScope = ensureBarberProfessionalScope(scope, existingAppointment.professionalId)
+
+  if (blockedExistingScope) {
+    return blockedExistingScope
+  }
+
   if (isOperationalBlockSourceReference(existingAppointment.sourceReference)) {
     return { success: false, error: 'Use o fluxo de bloqueio para mover esse bloco.' }
   }
 
   try {
     const data = parsed.data
+    const blockedTargetScope = ensureBarberProfessionalScope(scope, data.professionalId)
+
+    if (blockedTargetScope) {
+      return blockedTargetScope
+    }
+
     const timezone = await getBarbershopTimezone(barbershopId)
     const startAt = buildStartAt(data.date, data.time, timezone)
     const endAt = new Date(startAt.getTime() + existingAppointment.durationMinutes * 60_000)
@@ -794,6 +896,7 @@ export async function moveAppointmentSlot(id: string, rawData: unknown): Promise
 export async function createScheduleBlock(rawData: unknown): Promise<ActionResult> {
   const session = await requireSession()
   const { barbershopId } = session.user
+  const scope = await resolveSchedulingActorScope(session)
 
   const parsed = ScheduleBlockSchema.safeParse(rawData)
   if (!parsed.success) {
@@ -802,6 +905,12 @@ export async function createScheduleBlock(rawData: unknown): Promise<ActionResul
 
   try {
     const data = parsed.data
+    const blocked = ensureBarberProfessionalScope(scope, data.professionalId)
+
+    if (blocked) {
+      return blocked
+    }
+
     const timezone = await getBarbershopTimezone(barbershopId)
     const startAt = buildStartAt(data.date, data.startTime, timezone)
     const endAt = buildStartAt(data.date, data.endTime, timezone)
@@ -856,6 +965,7 @@ export async function createScheduleBlock(rawData: unknown): Promise<ActionResul
 export async function moveScheduleBlock(id: string, rawData: unknown): Promise<ActionResult> {
   const session = await requireSession()
   const { barbershopId } = session.user
+  const scope = await resolveSchedulingActorScope(session)
 
   const parsed = ScheduleBlockSchema.safeParse(rawData)
   if (!parsed.success) {
@@ -864,15 +974,27 @@ export async function moveScheduleBlock(id: string, rawData: unknown): Promise<A
 
   const existingBlock = await prisma.appointment.findUnique({
     where: { id },
-    select: { id: true, barbershopId: true, sourceReference: true, notes: true },
+    select: { id: true, barbershopId: true, professionalId: true, sourceReference: true, notes: true },
   })
 
   if (!existingBlock || existingBlock.barbershopId !== barbershopId || !isOperationalBlockSourceReference(existingBlock.sourceReference)) {
     return { success: false, error: 'Bloqueio nao encontrado.' }
   }
 
+  const blockedExistingScope = ensureBarberProfessionalScope(scope, existingBlock.professionalId)
+
+  if (blockedExistingScope) {
+    return blockedExistingScope
+  }
+
   try {
     const data = parsed.data
+    const blockedTargetScope = ensureBarberProfessionalScope(scope, data.professionalId)
+
+    if (blockedTargetScope) {
+      return blockedTargetScope
+    }
+
     const timezone = await getBarbershopTimezone(barbershopId)
     const startAt = buildStartAt(data.date, data.startTime, timezone)
     const endAt = buildStartAt(data.date, data.endTime, timezone)
@@ -918,14 +1040,21 @@ export async function moveScheduleBlock(id: string, rawData: unknown): Promise<A
 export async function removeScheduleBlock(id: string): Promise<ActionResult> {
   const session = await requireSession()
   const { barbershopId } = session.user
+  const scope = await resolveSchedulingActorScope(session)
 
   const existingBlock = await prisma.appointment.findUnique({
     where: { id },
-    select: { id: true, barbershopId: true, sourceReference: true },
+    select: { id: true, barbershopId: true, professionalId: true, sourceReference: true },
   })
 
   if (!existingBlock || existingBlock.barbershopId !== barbershopId || !isOperationalBlockSourceReference(existingBlock.sourceReference)) {
     return { success: false, error: 'Bloqueio nao encontrado.' }
+  }
+
+  const blocked = ensureBarberProfessionalScope(scope, existingBlock.professionalId)
+
+  if (blocked) {
+    return blocked
   }
 
   try {

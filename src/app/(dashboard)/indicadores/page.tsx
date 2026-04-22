@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
-import { requireSession } from '@/lib/auth'
+import { assertAdministrativeRole, requireSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
   formatCurrency,
@@ -117,6 +117,7 @@ function TrendIndicator({
 
 export default async function IndicadoresPage({ searchParams }: Props) {
   const session = await requireSession()
+  assertAdministrativeRole(session.user.role, 'Sem permissao para consultar os indicadores executivos da barbearia.')
   const { month, year } = resolvePeriod(searchParams)
   const comparison = getComparisonWindow(month, year)
   const { data, currentMonth } = await getIndicatorsData(

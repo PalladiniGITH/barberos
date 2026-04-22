@@ -171,6 +171,7 @@ export default async function ClientesPage({ searchParams }: Props) {
     customerType: filters.customerType,
     frequency: filters.frequency,
     value: filters.value,
+    viewerRole: session.user.role,
   })
 
   return (

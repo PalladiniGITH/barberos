@@ -8,6 +8,14 @@ import { attendanceScopeToFlags } from '@/lib/professionals/operational-config'
 
 type ActionResult = { success: true } | { success: false; error: string }
 
+function blockBarberAdministrativeAction(role: string) {
+  if (role === 'BARBER') {
+    return { success: false, error: 'Sem permissao para alterar configuracoes administrativas da equipe.' } satisfies ActionResult
+  }
+
+  return null
+}
+
 function parseOptionalDecimal(value: unknown) {
   if (value === '' || value === null || value === undefined) {
     return null
@@ -43,6 +51,11 @@ const ProfessionalSchema = z.object({
 export async function createProfessional(rawData: unknown): Promise<ActionResult> {
   const session = await requireSession()
   const { barbershopId } = session.user
+  const blocked = blockBarberAdministrativeAction(session.user.role)
+
+  if (blocked) {
+    return blocked
+  }
 
   const parsed = ProfessionalSchema.safeParse(rawData)
   if (!parsed.success) return { success: false, error: parsed.error.errors[0]?.message ?? 'Dados inválidos' }
@@ -90,6 +103,11 @@ export async function createProfessional(rawData: unknown): Promise<ActionResult
 export async function updateProfessional(id: string, rawData: unknown): Promise<ActionResult> {
   const session = await requireSession()
   const { barbershopId } = session.user
+  const blocked = blockBarberAdministrativeAction(session.user.role)
+
+  if (blocked) {
+    return blocked
+  }
 
   const existing = await prisma.professional.findUnique({ where: { id }, select: { barbershopId: true } })
   if (!existing || existing.barbershopId !== barbershopId) return { success: false, error: 'Não autorizado' }
@@ -131,6 +149,12 @@ export async function updateProfessional(id: string, rawData: unknown): Promise<
 
 export async function toggleProfessionalActive(id: string): Promise<ActionResult> {
   const session = await requireSession()
+  const blocked = blockBarberAdministrativeAction(session.user.role)
+
+  if (blocked) {
+    return blocked
+  }
+
   const prof = await prisma.professional.findUnique({ where: { id }, select: { barbershopId: true, active: true } })
   if (!prof || prof.barbershopId !== session.user.barbershopId) return { success: false, error: 'Não autorizado' }
   await prisma.professional.update({ where: { id }, data: { active: !prof.active } })
@@ -154,6 +178,11 @@ const MonthlyGoalSchema = z.object({
 export async function upsertMonthlyGoal(rawData: unknown): Promise<ActionResult> {
   const session = await requireSession()
   const { barbershopId } = session.user
+  const blocked = blockBarberAdministrativeAction(session.user.role)
+
+  if (blocked) {
+    return blocked
+  }
 
   const parsed = MonthlyGoalSchema.safeParse(rawData)
   if (!parsed.success) return { success: false, error: parsed.error.errors[0]?.message ?? 'Dados inválidos' }
@@ -184,6 +213,11 @@ const ProfGoalSchema = z.object({
 export async function upsertProfessionalGoal(rawData: unknown): Promise<ActionResult> {
   const session = await requireSession()
   const { barbershopId } = session.user
+  const blocked = blockBarberAdministrativeAction(session.user.role)
+
+  if (blocked) {
+    return blocked
+  }
 
   const parsed = ProfGoalSchema.safeParse(rawData)
   if (!parsed.success) return { success: false, error: parsed.error.errors[0]?.message ?? 'Dados inválidos' }

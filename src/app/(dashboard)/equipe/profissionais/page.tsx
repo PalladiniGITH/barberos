@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { Crown } from 'lucide-react'
-import { requireSession } from '@/lib/auth'
+import { assertAdministrativeRole, requireSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { resolvePeriod } from '@/lib/period'
 import { serializeForClient } from '@/lib/serialize-for-client'
@@ -22,6 +22,7 @@ interface Props { searchParams: { month?: string; year?: string } }
 
 export default async function ProfissionaisPage({ searchParams }: Props) {
   const session = await requireSession()
+  assertAdministrativeRole(session.user.role, 'Sem permissao para consultar os profissionais da equipe.')
   const { month, year } = resolvePeriod(searchParams)
   const start = new Date(year, month - 1, 1)
   const end = new Date(year, month, 0, 23, 59, 59, 999)
