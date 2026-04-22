@@ -112,6 +112,9 @@ interface DragState {
 
 const EVENT_GAP = 8
 const MINIMUM_SELECTION_DURATION = 30
+const SCHEDULE_MAJOR_GRID_LINE = 'rgba(148, 163, 184, 0.18)'
+const SCHEDULE_MAJOR_GRID_LINE_SOFT = 'rgba(15, 17, 21, 0.42)'
+const SCHEDULE_MINOR_GRID_LINE = 'rgba(124, 58, 237, 0.14)'
 
 function getAppointmentStatusMeta(item: PositionedAppointment) {
   if (item.itemType === 'BLOCK') {
@@ -763,8 +766,12 @@ export function ScheduleCalendar({
               {hours.map((hour, index) => (
                 <div
                   key={hour}
-                  className="relative border-t border-[rgba(58,47,86,0.06)] first:border-t-0"
-                  style={{ height: `${60 * schedulePxPerMinute}px` }}
+                  className="relative border-t"
+                  style={{
+                    height: `${60 * schedulePxPerMinute}px`,
+                    borderTopColor: index === 0 ? 'transparent' : SCHEDULE_MAJOR_GRID_LINE,
+                    boxShadow: index === 0 ? undefined : `inset 0 1px 0 ${SCHEDULE_MAJOR_GRID_LINE_SOFT}`,
+                  }}
                 >
                   <span className={cn(
                     'absolute -top-2 left-0 rounded-[0.7rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(15,17,21,0.86)] px-2.5 py-1 text-xs font-semibold text-foreground shadow-[0_10px_16px_-10px_rgba(2,6,23,0.5)]',
@@ -818,13 +825,20 @@ export function ScheduleCalendar({
                     {hours.map((hour, index) => (
                       <div key={`${column.key}-${hour}`}>
                         <div
-                          className="absolute inset-x-0 border-t border-[rgba(58,47,86,0.08)]"
-                          style={{ top: `${index * 60 * schedulePxPerMinute}px` }}
+                          className="absolute inset-x-0 border-t"
+                          style={{
+                            top: `${index * 60 * schedulePxPerMinute}px`,
+                            borderColor: SCHEDULE_MAJOR_GRID_LINE,
+                            boxShadow: `0 1px 0 ${SCHEDULE_MAJOR_GRID_LINE_SOFT}`,
+                          }}
                         />
                         {index < hours.length - 1 && (
                           <div
-                            className="absolute inset-x-0 border-t border-dashed border-[rgba(58,47,86,0.05)]"
-                            style={{ top: `${index * 60 * schedulePxPerMinute + 30 * schedulePxPerMinute}px` }}
+                            className="absolute inset-x-0 border-t border-dashed"
+                            style={{
+                              top: `${index * 60 * schedulePxPerMinute + 30 * schedulePxPerMinute}px`,
+                              borderColor: SCHEDULE_MINOR_GRID_LINE,
+                            }}
                           />
                         )}
                       </div>
