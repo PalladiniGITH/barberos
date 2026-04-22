@@ -15,9 +15,12 @@ type EvolutionConfig = {
 type EvolutionRequestInit = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: unknown
+  requestName?: string
+  requestPayloadForLogs?: unknown
 }
 
 type UnknownRecord = Record<string, unknown>
+type EvolutionSendTextPayloadFormat = 'v2_text' | 'v1_textMessage'
 
 export type EvolutionWebhookEvent =
   | 'MESSAGES_UPSERT'
@@ -35,6 +38,11 @@ export interface EvolutionSendTextInput {
   text: string
   delay?: number
   instance?: string
+}
+
+export interface EvolutionSendTextPayloadCandidate {
+  format: EvolutionSendTextPayloadFormat
+  body: Record<string, unknown>
 }
 
 export interface EvolutionWebhookConfigResult {
@@ -62,6 +70,43 @@ export interface EvolutionNormalizedWebhookPayload {
   ignoreReason: string | null
   dedupeKey: string
   raw: unknown
+}
+
+export interface EvolutionApiErrorDiagnostics {
+  status: number | null
+  requestPath: string
+  requestName: string
+  requestPayload: unknown
+  responseBody: unknown
+}
+
+export class EvolutionApiError extends Error {
+  status: number | null
+  requestPath: string
+  requestName: string
+  requestPayload: unknown
+  responseBody: unknown
+
+  constructor(message: string, diagnostics: EvolutionApiErrorDiagnostics) {
+    super(message)
+    this.name = 'EvolutionApiError'
+    Object.setPrototypeOf(this, new.target.prototype)
+    this.status = diagnostics.status
+    this.requestPath = diagnostics.requestPath
+    this.requestName = diagnostics.requestName
+    this.requestPayload = diagnostics.requestPayload
+    this.responseBody = diagnostics.responseBody
+  }
+
+  toLogObject() {
+    return {
+      status: this.status,
+      requestPath: this.requestPath,
+      requestName: this.requestName,
+      requestPayload: this.requestPayload,
+      responseBody: this.responseBody,
+    }
+  }
 }
 
 function asRecord(value: unknown): UnknownRecord | null {
@@ -126,6 +171,79 @@ function normalizeBaseUrl(value: string) {
   return value.trim().replace(/\/+$/, '')
 }
 
+function trimTextForLogs(value: string | null | undefined, maxLength = 180) {
+  if (!value) {
+    return value ?? null
+  }
+
+  return value.length > maxLength
+    ? `${value.slice(0, maxLength)}...`
+    : value
+}
+
+function maskPhoneForLogs(value: string | null | undefined) {
+  if (!value) {
+    return value ?? null
+  }
+
+  const digits = value.replace(/\D/g, '')
+
+  if (digits.length <= 4) {
+    return digits
+  }
+
+  return `${digits.slice(0, Math.min(4, digits.length - 4))}***${digits.slice(-4)}`
+}
+
+function sanitizeValueForLogs(value: unknown): unknown {
+  if (value === null || value === undefined) {
+    return value ?? null
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return value
+  }
+
+  if (typeof value === 'string') {
+    return trimTextForLogs(value)
+  }
+
+  if (Array.isArray(value)) {
+    return value.slice(0, 10).map((item) => sanitizeValueForLogs(item))
+  }
+
+  const record = asRecord(value)
+  if (!record) {
+    return String(value)
+  }
+
+  return Object.fromEntries(
+    Object.entries(record).map(([key, fieldValue]) => {
+      const normalizedKey = key.toLowerCase()
+
+      if (
+        normalizedKey.includes('secret')
+        || normalizedKey.includes('token')
+        || normalizedKey.includes('apikey')
+        || normalizedKey.includes('authorization')
+      ) {
+        return [key, '[redacted]']
+      }
+
+      if (normalizedKey === 'number' || normalizedKey.includes('phone')) {
+        return [key, maskPhoneForLogs(asString(fieldValue) ?? String(fieldValue))]
+      }
+
+      if (normalizedKey === 'text' || normalizedKey === 'message') {
+        const text = asString(fieldValue)
+        return [key, text ? { length: text.length, preview: trimTextForLogs(text, 80) } : sanitizeValueForLogs(fieldValue)]
+      }
+
+      return [key, sanitizeValueForLogs(fieldValue)]
+    })
+  )
+}
+
 function normalizeEvolutionEventName(value: string | null) {
   if (!value) {
     return 'UNKNOWN'
@@ -138,6 +256,70 @@ function normalizeEvolutionEventName(value: string | null) {
     .toUpperCase()
 
   return normalized || 'UNKNOWN'
+}
+
+export function normalizeEvolutionPhoneNumber(value: string | null | undefined) {
+  if (!value) {
+    return null
+  }
+
+  let digits = value.replace(/\D/g, '').replace(/^0+/, '')
+  if (!digits) {
+    return null
+  }
+
+  if ((digits.length === 12 || digits.length === 13) && digits.startsWith('55')) {
+    return digits
+  }
+
+  if (digits.length === 10 || digits.length === 11) {
+    return `55${digits}`
+  }
+
+  return digits.length >= 12 ? digits : null
+}
+
+export function buildEvolutionSendTextPayloadCandidates(input: EvolutionSendTextInput): EvolutionSendTextPayloadCandidate[] {
+  const normalizedNumber = normalizeEvolutionPhoneNumber(input.number)
+
+  if (!normalizedNumber) {
+    return []
+  }
+
+  return [
+    {
+      format: 'v2_text',
+      body: {
+        number: normalizedNumber,
+        text: input.text,
+        delay: input.delay ?? 0,
+      },
+    },
+    {
+      format: 'v1_textMessage',
+      body: {
+        number: normalizedNumber,
+        textMessage: {
+          text: input.text,
+        },
+        options: {
+          delay: input.delay ?? 0,
+          presence: 'composing',
+        },
+      },
+    },
+  ]
+}
+
+export function sanitizeEvolutionSendTextPayloadForLogs(
+  payload: Record<string, unknown>,
+  format: EvolutionSendTextPayloadFormat
+) {
+  return {
+    format,
+    keys: Object.keys(payload),
+    payload: sanitizeValueForLogs(payload),
+  }
 }
 
 function getPublicAppUrl() {
@@ -212,8 +394,21 @@ async function evolutionRequest<T = unknown>(pathname: string, init: EvolutionRe
   }
 
   if (!response.ok) {
-    throw new Error(
-      `Evolution API ${response.status}: ${typeof data === 'object' && data && 'message' in data ? String((data as UnknownRecord).message) : typeof data === 'string' && data ? data : response.statusText}`
+    const message = typeof data === 'object' && data && 'message' in data
+      ? String((data as UnknownRecord).message)
+      : typeof data === 'string' && data
+        ? data
+        : response.statusText
+
+    throw new EvolutionApiError(
+      `Evolution API ${response.status}: ${message}`,
+      {
+        status: response.status,
+        requestPath: pathname,
+        requestName: init.requestName ?? pathname,
+        requestPayload: init.requestPayloadForLogs ?? sanitizeValueForLogs(init.body),
+        responseBody: sanitizeValueForLogs(data),
+      }
     )
   }
 
@@ -336,20 +531,61 @@ export function isEvolutionWebhookRequestAuthorized(request: Request) {
 }
 
 export async function sendEvolutionTextMessage(input: EvolutionSendTextInput) {
-  const normalizedNumber = normalizeRemotePhone(input.number)
+  const payloadCandidates = buildEvolutionSendTextPayloadCandidates(input)
 
-  if (!normalizedNumber) {
+  if (payloadCandidates.length === 0) {
     throw new Error('Numero invalido para envio Evolution.')
   }
 
-  return evolutionRequest(`/message/sendText/${input.instance ?? getEvolutionInstanceName()}`, {
-    method: 'POST',
-    body: {
-      number: normalizedNumber,
-      text: input.text,
-      delay: input.delay ?? 0,
-    },
-  })
+  const requestPath = `/message/sendText/${input.instance ?? getEvolutionInstanceName()}`
+  const fallbackEligibleStatuses = new Set([400, 422])
+  const failures: EvolutionApiError[] = []
+
+  for (const candidate of payloadCandidates) {
+    try {
+      return await evolutionRequest(requestPath, {
+        method: 'POST',
+        body: candidate.body,
+        requestName: `sendText:${candidate.format}`,
+        requestPayloadForLogs: sanitizeEvolutionSendTextPayloadForLogs(candidate.body, candidate.format),
+      })
+    } catch (error) {
+      if (error instanceof EvolutionApiError) {
+        failures.push(error)
+
+        const canTryNextPayload =
+          fallbackEligibleStatuses.has(error.status ?? 0)
+          && candidate.format !== payloadCandidates.at(-1)?.format
+
+        if (canTryNextPayload) {
+          continue
+        }
+
+        break
+      }
+
+      throw error
+    }
+  }
+
+  const lastFailure = failures.at(-1)
+
+  if (lastFailure) {
+    throw new EvolutionApiError(lastFailure.message, {
+      status: lastFailure.status,
+      requestPath: lastFailure.requestPath,
+      requestName: lastFailure.requestName,
+      requestPayload: {
+        attempts: failures.map((failure) => failure.requestPayload),
+      },
+      responseBody: {
+        lastResponse: lastFailure.responseBody,
+        attemptedFormats: failures.map((failure) => failure.requestName.replace('sendText:', '')),
+      },
+    })
+  }
+
+  throw new Error('Falha ao enviar mensagem pela Evolution.')
 }
 
 export async function sendTextMessage(input: EvolutionSendTextInput) {

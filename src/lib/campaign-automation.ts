@@ -10,10 +10,16 @@ import {
   MessagingProvider,
   Prisma,
   type CampaignAutomationConfig,
+  type CampaignAutomationRun,
   type Customer,
 } from '@prisma/client'
 import { z } from 'zod'
-import { sendTextMessage, getEvolutionInstanceName } from '@/lib/integrations/evolution'
+import {
+  EvolutionApiError,
+  getEvolutionInstanceName,
+  normalizeEvolutionPhoneNumber,
+  sendTextMessage,
+} from '@/lib/integrations/evolution'
 import { prisma } from '@/lib/prisma'
 import {
   formatIsoDateInTimezone,
@@ -112,6 +118,17 @@ interface DeliveryPreparation {
   usedAi: boolean
   aiFailureReason: OpenAIFailureReason | null
 }
+
+type DailyRunRecordResult =
+  | {
+      id: string
+      created: true
+    }
+  | {
+      id: string
+      created: false
+      status: CampaignAutomationRun['status']
+    }
 
 type OpenAIFailureReason =
   | 'disabled'
@@ -307,6 +324,33 @@ function getSafeEvolutionInstanceName() {
     return getEvolutionInstanceName()
   } catch {
     return process.env.EVOLUTION_INSTANCE?.trim() || 'evolution'
+  }
+}
+
+export function describeExistingDailyRunReason(status: CampaignAutomationRun['status']) {
+  if (status === CampaignAutomationRunStatus.RUNNING) {
+    return 'already_running_today'
+  }
+
+  if (status === CampaignAutomationRunStatus.FAILED) {
+    return 'already_failed_today'
+  }
+
+  return 'already_processed_today'
+}
+
+function buildDeliveryFailureDiagnostics(error: unknown) {
+  if (error instanceof EvolutionApiError) {
+    return {
+      type: 'evolution_api_error',
+      message: error.message,
+      evolution: error.toLogObject(),
+    }
+  }
+
+  return {
+    type: 'unknown_error',
+    message: error instanceof Error ? error.message : String(error),
   }
 }
 
@@ -947,7 +991,7 @@ async function prepareDeliveryMessage(input: {
   customer: CampaignCustomerSnapshot
   barbershopName: string
 }): Promise<DeliveryPreparation> {
-  const normalizedPhone = normalizePhoneDigits(input.customer.phone)
+  const normalizedPhone = normalizeEvolutionPhoneNumber(input.customer.phone)
 
   if (!normalizedPhone) {
     throw new Error('Telefone invalido para campanha automatica.')
@@ -1028,19 +1072,26 @@ async function processCampaignType(input: {
   let deliveriesSkipped = 0
 
   for (const customer of eligibleCustomers) {
-    const normalizedPhone = normalizePhoneDigits(customer.phone)
-    if (!normalizedPhone) {
+    let prepared: DeliveryPreparation
+
+    try {
+      prepared = await prepareDeliveryMessage({
+        config: input.config,
+        customer,
+        barbershopName: input.barbershop.name,
+      })
+    } catch (error) {
       deliveriesSkipped += 1
+
+      logCampaignError('delivery_preparation_failed', {
+        campaignType: input.config.campaignType,
+        barbershopSlug: input.barbershop.slug,
+        customerId: customer.id,
+        error: error instanceof Error ? error.message : String(error),
+      })
+
       continue
     }
-
-    const fallbackMessage = buildCampaignFallbackMessage({
-      campaignType: input.config.campaignType,
-      customerName: customer.name,
-      barbershopName: input.barbershop.name,
-      benefitType: input.config.benefitType,
-      benefitDescription: input.config.benefitDescription,
-    })
 
     const dedupeKey = buildCampaignDeliveryDedupeKey({
       campaignType: input.config.campaignType,
@@ -1055,9 +1106,9 @@ async function processCampaignType(input: {
       config: input.config,
       customer,
       barbershopId: input.barbershop.id,
-      destinationPhone: normalizedPhone,
+      destinationPhone: prepared.normalizedPhone,
       dedupeKey,
-      fallbackMessage,
+      fallbackMessage: prepared.fallbackMessage,
     })
 
     if (!deliveryId) {
@@ -1066,12 +1117,6 @@ async function processCampaignType(input: {
     }
 
     deliveriesCreated += 1
-
-    const prepared = await prepareDeliveryMessage({
-      config: input.config,
-      customer,
-      barbershopName: input.barbershop.name,
-    })
 
     try {
       const providerPayload = await sendTextMessage({
@@ -1123,7 +1168,8 @@ async function processCampaignType(input: {
         usedAi: prepared.usedAi,
       })
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
+      const diagnostics = buildDeliveryFailureDiagnostics(error)
+      const message = diagnostics.message
       const messagingEventId = await createAutomationMessagingEvent({
         barbershopId: input.barbershop.id,
         customerId: customer.id,
@@ -1135,7 +1181,7 @@ async function processCampaignType(input: {
         benefitDescription: input.config.benefitDescription ?? null,
         deliveryId,
         runId: input.runId,
-        providerPayload: { error: message },
+        providerPayload: diagnostics,
         status: 'FAILED',
         errorMessage: message,
       })
@@ -1155,6 +1201,7 @@ async function processCampaignType(input: {
             aiFailureReason: prepared.aiFailureReason,
             lastCompletedLocalDateIso: activity.lastCompletedByCustomerId.get(customer.id) ?? null,
             hasFutureAppointment: activity.futureAppointmentCustomerIds.has(customer.id),
+            failureDiagnostics: diagnostics,
           } as Prisma.InputJsonValue,
         },
       })
@@ -1166,6 +1213,7 @@ async function processCampaignType(input: {
         barbershopSlug: input.barbershop.slug,
         customerId: customer.id,
         error: message,
+        diagnostics,
       })
     }
   }
@@ -1185,9 +1233,32 @@ async function createDailyRunRecord(input: {
   localDateIso: string
   timezone: string
   trigger: CampaignAutomationTrigger
-}) {
+}): Promise<DailyRunRecordResult> {
+  const where = {
+    barbershopId_localDateIso: {
+      barbershopId: input.barbershopId,
+      localDateIso: input.localDateIso,
+    },
+  } as const
+
+  const existingRun = await prisma.campaignAutomationRun.findUnique({
+    where,
+    select: {
+      id: true,
+      status: true,
+    },
+  })
+
+  if (existingRun) {
+    return {
+      id: existingRun.id,
+      created: false,
+      status: existingRun.status,
+    }
+  }
+
   try {
-    return await prisma.campaignAutomationRun.create({
+    const createdRun = await prisma.campaignAutomationRun.create({
       data: {
         barbershopId: input.barbershopId,
         localDateIso: input.localDateIso,
@@ -1199,12 +1270,31 @@ async function createDailyRunRecord(input: {
         id: true,
       },
     })
+
+    return {
+      id: createdRun.id,
+      created: true,
+    }
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError
       && error.code === 'P2002'
     ) {
-      return null
+      const racedRun = await prisma.campaignAutomationRun.findUnique({
+        where,
+        select: {
+          id: true,
+          status: true,
+        },
+      })
+
+      if (racedRun) {
+        return {
+          id: racedRun.id,
+          created: false,
+          status: racedRun.status,
+        }
+      }
     }
 
     throw error
@@ -1241,10 +1331,10 @@ async function executeDailyRunForBarbershop(input: {
     trigger: input.trigger,
   })
 
-  if (!run) {
+  if (!run.created) {
     return {
       outcome: 'skipped' as const,
-      reason: 'already_ran_today',
+      reason: describeExistingDailyRunReason(run.status),
       localDateIso: localNow.dateIso,
       timezone,
     }

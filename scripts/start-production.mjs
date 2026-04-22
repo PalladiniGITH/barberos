@@ -43,6 +43,16 @@ function getInternalBaseUrl(host, port) {
   return `http://${normalizedHost}:${port}`
 }
 
+function summarizeCampaignAutomationReasons(summary) {
+  const reasons = {}
+
+  for (const item of summary?.barbershops ?? []) {
+    reasons[item.reason] = (reasons[item.reason] ?? 0) + 1
+  }
+
+  return reasons
+}
+
 function startCampaignAutomationHeartbeat({ host, port }) {
   if (!isCustomerCampaignAutomationEnabled()) {
     logBoot('campaign_automation_disabled')
@@ -86,11 +96,37 @@ function startCampaignAutomationHeartbeat({ host, port }) {
       }
 
       const payload = await response.json().catch(() => null)
+      const summary = payload?.summary ?? null
+      const checkedBarbershops = summary?.checkedBarbershops ?? 0
+      const dueBarbershops = summary?.dueBarbershops ?? 0
+      const createdRuns = summary?.createdRuns ?? 0
+      const failedRuns = summary?.failedRuns ?? 0
+      const deliveriesSent = summary?.deliveriesSent ?? 0
+      const deliveriesFailed = summary?.deliveriesFailed ?? 0
+      const deliveriesCreated = summary?.deliveriesCreated ?? 0
+      const deliveriesSkipped = summary?.deliveriesSkipped ?? 0
+      const reasons = summarizeCampaignAutomationReasons(summary)
+
+      if (createdRuns === 0 && failedRuns === 0) {
+        logBoot(dueBarbershops > 0 ? 'campaign_automation_tick_noop' : 'campaign_automation_tick_waiting_window', {
+          checkedBarbershops,
+          dueBarbershops,
+          skippedRuns: summary?.skippedRuns ?? 0,
+          reasons,
+        })
+        return
+      }
+
       logBoot('campaign_automation_tick_completed', {
-        checkedBarbershops: payload?.summary?.checkedBarbershops ?? 0,
-        createdRuns: payload?.summary?.createdRuns ?? 0,
-        deliveriesSent: payload?.summary?.deliveriesSent ?? 0,
-        deliveriesFailed: payload?.summary?.deliveriesFailed ?? 0,
+        checkedBarbershops,
+        dueBarbershops,
+        createdRuns,
+        failedRuns,
+        deliveriesCreated,
+        deliveriesSent,
+        deliveriesFailed,
+        deliveriesSkipped,
+        reasons,
       })
     } catch (error) {
       logBootError('campaign_automation_tick_error', {

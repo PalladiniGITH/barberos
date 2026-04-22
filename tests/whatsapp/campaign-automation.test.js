@@ -9,6 +9,7 @@ const {
 const {
   buildCampaignDeliveryDedupeKey,
   buildCampaignFallbackMessage,
+  describeExistingDailyRunReason,
   evaluateCampaignEligibility,
   shouldRunDailyCampaignAtLocalTime,
 } = require('@/lib/campaign-automation')
@@ -260,4 +261,11 @@ test('delivery dedupe keys remain deterministic by campaign scope', () => {
     }),
     'walk-in-inactive:shop-1:customer-1:2026-04-22'
   )
+})
+
+test('existing daily runs become noop reasons instead of operational errors', () => {
+  assert.equal(describeExistingDailyRunReason('RUNNING'), 'already_running_today')
+  assert.equal(describeExistingDailyRunReason('FAILED'), 'already_failed_today')
+  assert.equal(describeExistingDailyRunReason('COMPLETED'), 'already_processed_today')
+  assert.equal(describeExistingDailyRunReason('SKIPPED'), 'already_processed_today')
 })

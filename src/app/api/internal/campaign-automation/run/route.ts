@@ -15,12 +15,23 @@ export async function POST(request: Request) {
     )
   }
 
-  const summary = await runDueCustomerCampaignAutomation({
-    trigger: CampaignAutomationTrigger.SCHEDULER,
-  })
+  try {
+    const summary = await runDueCustomerCampaignAutomation({
+      trigger: CampaignAutomationTrigger.SCHEDULER,
+    })
 
-  return NextResponse.json({
-    ok: true,
-    summary,
-  })
+    return NextResponse.json({
+      ok: true,
+      summary,
+    })
+  } catch (error) {
+    console.error('[campaign-automation-route] run_failed', {
+      message: error instanceof Error ? error.message : String(error),
+    })
+
+    return NextResponse.json(
+      { ok: false, error: 'Campaign automation run failed.' },
+      { status: 500 }
+    )
+  }
 }
