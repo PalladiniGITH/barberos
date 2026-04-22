@@ -262,7 +262,7 @@ export function isCampaignAutomationEnabled() {
     return readBooleanEnv('CUSTOMER_CAMPAIGN_AUTOMATION_ENABLED')
   }
 
-  return true
+  return false
 }
 
 function normalizePhoneDigits(value: string | null | undefined) {
