@@ -16,6 +16,7 @@ import { SectionTabs } from '@/components/layout/section-tabs'
 import { PeriodSelector } from '@/components/shared/period-selector'
 import { ArrowUpRight, BadgeCheck, Crown, Target, TrendingUp, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { resolveProfessionalCommissionRatePercent } from '@/lib/professionals/operational-config'
 
 export const metadata: Metadata = { title: 'Desempenho' }
 
@@ -93,9 +94,14 @@ export default async function DesempenhoPage({ searchParams }: Props) {
       const progress = goalValue > 0 ? Math.min(100, (revenue / goalValue) * 100) : 0
       const ticket = count > 0 ? revenue / count : 0
       const status = goal ? getGoalStatus(revenue, goalValue, goalMin) : null
+      const projectedCommission = revenue * (
+        resolveProfessionalCommissionRatePercent({
+          professionalRate: professional.commissionRate ? Number(professional.commissionRate) : null,
+        }) / 100
+      )
       return {
         ...professional,
-        commission: commissionMap.get(professional.id) ?? 0,
+        commission: commissionMap.get(professional.id) ?? projectedCommission,
         count,
         goalValue,
         progress,

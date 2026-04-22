@@ -177,7 +177,7 @@ export function AppointmentStatusActions({
               <div className="flex items-center justify-between gap-3">
                 <span className="text-slate-400">Valor</span>
                 <span className="font-medium text-slate-100">
-                  {formatCurrency(meta.service?.price ?? 0)}
+                  {formatCurrency(appointment.priceSnapshot ?? meta.service?.price ?? 0)}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-3">

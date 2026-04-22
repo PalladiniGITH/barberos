@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/layout/page-header'
 import { SectionTabs } from '@/components/layout/section-tabs'
 import { PeriodSelector } from '@/components/shared/period-selector'
 import { ArrowUpRight, Crown, Target, TrendingUp, Users } from 'lucide-react'
+import { resolveProfessionalCommissionRatePercent } from '@/lib/professionals/operational-config'
 
 export const metadata: Metadata = { title: 'Equipe' }
 
@@ -54,21 +55,38 @@ export default async function EquipePage({ searchParams }: Props) {
   const activeProfessionals = professionals.filter((professional) => professional.active).length
   const attendanceCount = revenueByPro.reduce((sum, item) => sum + item._count, 0)
   const averageTicket = attendanceCount > 0 ? teamRevenue / attendanceCount : 0
-  const commissionTotal = commissions.reduce(
-    (sum, commission) => sum + Number(commission.commissionAmount) + Number(commission.bonus),
-    0
+  const commissionMap = new Map(
+    commissions.map((commission) => [
+      commission.professionalId,
+      Number(commission.commissionAmount) + Number(commission.bonus),
+    ])
   )
 
   const teamGoal = monthlyGoal ? Number(monthlyGoal.revenueGoal) : 0
   const goalProgress = teamGoal > 0 ? Math.min(100, (teamRevenue / teamGoal) * 100) : 0
-  const leader = professionals
+  const professionalsWithRevenue = professionals
     .map((professional) => {
       const revenueData = revenueByPro.find((item) => item.professionalId === professional.id)
       const revenue = Number(revenueData?._sum.amount ?? 0)
       const count = revenueData?._count ?? 0
-      return { ...professional, revenue, count }
+      const projectedCommission = revenue * (
+        resolveProfessionalCommissionRatePercent({
+          professionalRate: professional.commissionRate ? Number(professional.commissionRate) : null,
+        }) / 100
+      )
+
+      return {
+        ...professional,
+        revenue,
+        count,
+        projectedCommission: commissionMap.get(professional.id) ?? projectedCommission,
+      }
     })
-    .sort((left, right) => right.revenue - left.revenue)[0]
+  const commissionTotal = professionalsWithRevenue.reduce(
+    (sum, professional) => sum + professional.projectedCommission,
+    0
+  )
+  const leader = professionalsWithRevenue.sort((left, right) => right.revenue - left.revenue)[0]
 
   const monthLabel = formatPeriodLabel(month, year)
 

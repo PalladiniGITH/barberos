@@ -17,6 +17,11 @@ import {
 import { requireSession } from '@/lib/auth'
 import type { BusinessInsightHref, BusinessIntelligenceReport } from '@/lib/business-insights'
 import { getBusinessAnalystReport } from '@/lib/business-analyst'
+import { buildBarbershopHealthSnapshot } from '@/lib/barbershop-health'
+import { getBarberDashboardData } from '@/lib/barber-dashboard'
+import { findSessionProfessional } from '@/lib/professionals/session-professional'
+import { BarberHomePanel } from '@/components/dashboard/barber-home-panel'
+import { BarbershopHealthPanel } from '@/components/dashboard/barbershop-health-panel'
 import { ProfessionalRanking } from '@/components/dashboard/professional-ranking'
 import { RevenueChart } from '@/components/dashboard/revenue-chart'
 import { DashboardInsightsPreview } from '@/components/inteligencia/insight-card'
@@ -359,12 +364,70 @@ function buildAlerts(input: {
 export default async function DashboardPage({ searchParams }: Props) {
   const session = await requireSession()
   const { month, year } = resolvePeriod(searchParams)
+  const sessionProfessional = session.user.role === 'BARBER'
+    ? await findSessionProfessional({
+        barbershopId: session.user.barbershopId,
+        email: session.user.email,
+        name: session.user.name,
+      })
+    : null
+
+  if (session.user.role === 'BARBER') {
+    if (!sessionProfessional) {
+      return (
+        <div className="page-section flex flex-col gap-5">
+          <PageHeader
+            title="Meu painel"
+            description="Nao encontramos um cadastro profissional vinculado ao seu usuario para montar sua visao individual."
+          />
+
+          <section className="dashboard-panel p-6">
+            <p className="page-kicker">Vinculo pendente</p>
+            <h2 className="mt-2 text-[1.4rem] font-semibold tracking-tight text-foreground">Seu usuario ainda nao esta ligado a um barbeiro ativo.</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">
+              Assim que a equipe conectar este login ao seu cadastro profissional, o dashboard passa a mostrar agenda, meta, produtos e comissao estimada automaticamente.
+            </p>
+          </section>
+        </div>
+      )
+    }
+
+    const barberDashboardData = await getBarberDashboardData({
+      barbershopId: session.user.barbershopId,
+      professionalId: sessionProfessional.id,
+      month,
+      year,
+    })
+
+    if (!barberDashboardData) {
+      return (
+        <div className="page-section flex flex-col gap-5">
+          <PageHeader
+            title="Meu painel"
+            description="Nao foi possivel montar sua leitura individual agora."
+          />
+
+          <section className="dashboard-panel p-6">
+            <p className="page-kicker">Painel indisponivel</p>
+            <h2 className="mt-2 text-[1.4rem] font-semibold tracking-tight text-foreground">Tivemos um problema ao consolidar seus indicadores.</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">
+              A agenda e o restante do sistema continuam acessiveis. Vale revisar o cadastro do barbeiro e as metas do periodo antes do deploy.
+            </p>
+          </section>
+        </div>
+      )
+    }
+
+    return <BarberHomePanel data={barberDashboardData} />
+  }
+
   const intelligenceReport = await getBusinessAnalystReport({
     barbershopId: session.user.barbershopId,
     month,
     year,
   })
   const data = buildDashboardData(intelligenceReport)
+  const barbershopHealth = buildBarbershopHealthSnapshot(intelligenceReport.context.customers)
 
   const goalBarProgress = Math.min(100, data.goalAttainment)
   const alerts = buildAlerts({
@@ -536,6 +599,8 @@ export default async function DashboardPage({ searchParams }: Props) {
           trend={data.ticketChange}
         />
       </section>
+
+      <BarbershopHealthPanel health={barbershopHealth} />
 
       {primaryAlert && <AlertBanner alert={primaryAlert} />}
 

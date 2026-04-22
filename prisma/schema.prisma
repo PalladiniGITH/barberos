@@ -120,16 +120,22 @@ model VerificationToken {
 // ─────────────────────────────────────────────
 
 model Professional {
-  id           String     @id @default(cuid())
-  name         String
-  email        String?
-  phone        String?
-  avatar       String?
-  active       Boolean    @default(true)
-  barbershopId String
-  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id                  String     @id @default(cuid())
+  name                String
+  email               String?
+  phone               String?
+  avatar              String?
+  active              Boolean    @default(true)
+  commissionRate      Decimal?   @db.Decimal(5, 2)
+  haircutPrice        Decimal?   @db.Decimal(10, 2)
+  beardPrice          Decimal?   @db.Decimal(10, 2)
+  comboPrice          Decimal?   @db.Decimal(10, 2)
+  acceptsWalkIn       Boolean    @default(true)
+  acceptsSubscription Boolean    @default(true)
+  barbershopId        String
+  barbershop          Barbershop @relation(fields: [barbershopId], references: [id])
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 
   revenues          Revenue[]
   appointments      Appointment[]

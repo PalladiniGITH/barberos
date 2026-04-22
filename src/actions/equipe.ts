@@ -1,16 +1,43 @@
 'use server'
 
 import { z } from 'zod'
-import { prisma } from '@/lib/prisma'
-import { requireSession } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
+import { requireSession } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import { attendanceScopeToFlags } from '@/lib/professionals/operational-config'
 
 type ActionResult = { success: true } | { success: false; error: string }
+
+function parseOptionalDecimal(value: unknown) {
+  if (value === '' || value === null || value === undefined) {
+    return null
+  }
+
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : value
+}
 
 const ProfessionalSchema = z.object({
   name: z.string().min(2, 'Nome deve ter ao menos 2 caracteres').max(100),
   email: z.string().email('Email inválido').optional().or(z.literal('')),
   phone: z.string().max(20).optional().or(z.literal('')),
+  commissionRate: z.preprocess(
+    parseOptionalDecimal,
+    z.number().min(0, 'Comissao invalida').max(100, 'Comissao invalida').nullable().optional()
+  ),
+  haircutPrice: z.preprocess(
+    parseOptionalDecimal,
+    z.number().positive('Preco do corte invalido').max(9999, 'Preco do corte invalido').nullable().optional()
+  ),
+  beardPrice: z.preprocess(
+    parseOptionalDecimal,
+    z.number().positive('Preco da barba invalido').max(9999, 'Preco da barba invalido').nullable().optional()
+  ),
+  comboPrice: z.preprocess(
+    parseOptionalDecimal,
+    z.number().positive('Preco do combo invalido').max(9999, 'Preco do combo invalido').nullable().optional()
+  ),
+  attendanceScope: z.enum(['BOTH', 'SUBSCRIPTION_ONLY', 'WALK_IN_ONLY']).default('BOTH'),
 })
 
 export async function createProfessional(rawData: unknown): Promise<ActionResult> {
@@ -20,7 +47,17 @@ export async function createProfessional(rawData: unknown): Promise<ActionResult
   const parsed = ProfessionalSchema.safeParse(rawData)
   if (!parsed.success) return { success: false, error: parsed.error.errors[0]?.message ?? 'Dados inválidos' }
 
-  const { name, email, phone } = parsed.data
+  const {
+    name,
+    email,
+    phone,
+    commissionRate,
+    haircutPrice,
+    beardPrice,
+    comboPrice,
+    attendanceScope,
+  } = parsed.data
+  const attendanceFlags = attendanceScopeToFlags(attendanceScope)
 
   // Verifica duplicata de email no mesmo tenant
   if (email) {
@@ -31,10 +68,22 @@ export async function createProfessional(rawData: unknown): Promise<ActionResult
   }
 
   await prisma.professional.create({
-    data: { name, email: email || null, phone: phone || null, barbershopId },
+    data: {
+      name,
+      email: email || null,
+      phone: phone || null,
+      commissionRate,
+      haircutPrice,
+      beardPrice,
+      comboPrice,
+      ...attendanceFlags,
+      barbershopId,
+    },
   })
 
   revalidatePath('/equipe/profissionais')
+  revalidatePath('/agendamentos')
+  revalidatePath('/dashboard')
   return { success: true }
 }
 
@@ -48,14 +97,35 @@ export async function updateProfessional(id: string, rawData: unknown): Promise<
   const parsed = ProfessionalSchema.safeParse(rawData)
   if (!parsed.success) return { success: false, error: parsed.error.errors[0]?.message ?? 'Dados inválidos' }
 
-  const { name, email, phone } = parsed.data
+  const {
+    name,
+    email,
+    phone,
+    commissionRate,
+    haircutPrice,
+    beardPrice,
+    comboPrice,
+    attendanceScope,
+  } = parsed.data
+  const attendanceFlags = attendanceScopeToFlags(attendanceScope)
 
   await prisma.professional.update({
     where: { id },
-    data: { name, email: email || null, phone: phone || null },
+    data: {
+      name,
+      email: email || null,
+      phone: phone || null,
+      commissionRate,
+      haircutPrice,
+      beardPrice,
+      comboPrice,
+      ...attendanceFlags,
+    },
   })
 
   revalidatePath('/equipe/profissionais')
+  revalidatePath('/agendamentos')
+  revalidatePath('/dashboard')
   return { success: true }
 }
 
@@ -65,6 +135,8 @@ export async function toggleProfessionalActive(id: string): Promise<ActionResult
   if (!prof || prof.barbershopId !== session.user.barbershopId) return { success: false, error: 'Não autorizado' }
   await prisma.professional.update({ where: { id }, data: { active: !prof.active } })
   revalidatePath('/equipe/profissionais')
+  revalidatePath('/agendamentos')
+  revalidatePath('/dashboard')
   return { success: true }
 }
 

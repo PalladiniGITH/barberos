@@ -22,8 +22,16 @@ interface HeaderProps {
   onToggleSidebar: () => void
 }
 
-function getPageMeta(pathname: string) {
+function getPageMeta(pathname: string, role?: string | null) {
   if (pathname === '/dashboard') {
+    if (role === 'BARBER') {
+      return {
+        breadcrumb: 'Meu painel',
+        title: 'Minha operacao',
+        helper: 'Agenda, meta, desempenho e leitura individual do seu periodo.',
+      }
+    }
+
     return {
       breadcrumb: 'Visao geral',
       title: 'Painel executivo',
@@ -138,7 +146,7 @@ export function Header({
   const searchParams = useSearchParams()
   const search = searchParams?.toString()
   const currentQuery = search ? `?${search}` : currentSearch
-  const pageMeta = getPageMeta(pathname)
+  const pageMeta = getPageMeta(pathname, sessionUser.role)
   const periodLabel = getPeriodLabel(currentQuery, pathname)
 
   return (

@@ -27,6 +27,11 @@ import {
   localDateTimeToUtc,
   resolveBusinessTimezone,
 } from '@/lib/timezone'
+import {
+  canProfessionalHandleCustomerType,
+  normalizeProfessionalOperationalConfig,
+  resolveProfessionalServicePrice,
+} from '@/lib/professionals/operational-config'
 
 function safeRevalidateSchedulePath(path: string) {
   try {
@@ -548,6 +553,7 @@ export async function createAppointmentFromWhatsApp(input: {
         id: true,
         duration: true,
         price: true,
+        name: true,
       },
     }),
     prisma.professional.findFirst({
@@ -558,12 +564,29 @@ export async function createAppointmentFromWhatsApp(input: {
       },
       select: {
         id: true,
+        name: true,
+        haircutPrice: true,
+        beardPrice: true,
+        comboPrice: true,
+        acceptsWalkIn: true,
+        acceptsSubscription: true,
       },
     }),
   ])
 
   if (!customer || !service || !professional) {
     throw new Error('Dados de agendamento indisponiveis para o fluxo do WhatsApp.')
+  }
+
+  if (!canProfessionalHandleCustomerType({
+    customerType: customer.type,
+    professional,
+  })) {
+    throw new Error(
+      customer.type === 'SUBSCRIPTION'
+        ? `${professional.name} nao atende clientes de assinatura.`
+        : `${professional.name} nao atende clientes avulsos.`
+    )
   }
 
   const { chosenLocalDateTime, startAt } = resolveWhatsAppAppointmentStartAt({
@@ -630,6 +653,12 @@ export async function createAppointmentFromWhatsApp(input: {
     throw new Error('O horario selecionado nao esta mais disponivel.')
   }
 
+  const resolvedPrice = resolveProfessionalServicePrice({
+    serviceName: service.name,
+    basePrice: Number(service.price),
+    professional: normalizeProfessionalOperationalConfig(professional),
+  })
+
   const appointment = await prisma.appointment.create({
     data: {
       barbershopId: input.barbershopId,
@@ -642,7 +671,7 @@ export async function createAppointmentFromWhatsApp(input: {
       startAt,
       endAt,
       durationMinutes: service.duration,
-      priceSnapshot: service.price,
+      priceSnapshot: resolvedPrice.price,
       notes: input.notes?.trim() || null,
       sourceReference: input.sourceReference,
       confirmedAt: new Date(),

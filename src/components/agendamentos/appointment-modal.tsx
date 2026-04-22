@@ -13,17 +13,28 @@ import {
   Phone,
   Plus,
   Scissors,
+  Search,
   Sparkles,
   UserRound,
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { createAppointment, updateAppointment } from '@/actions/agendamentos'
+import {
+  createAppointment,
+  searchCustomersForAppointment,
+  updateAppointment,
+} from '@/actions/agendamentos'
 import type {
   ScheduleToolbarCustomer,
   ScheduleToolbarProfessional,
   ScheduleToolbarService,
 } from '@/lib/agendamentos'
+import {
+  canProfessionalHandleCustomerType,
+  PROFESSIONAL_ATTENDANCE_SCOPE_LABELS,
+  resolveProfessionalAttendanceScope,
+  resolveProfessionalServicePrice,
+} from '@/lib/professionals/operational-config'
 import {
   APPOINTMENT_BILLING_MODEL_LABELS,
   APPOINTMENT_STATUS_LABELS,
@@ -66,7 +77,17 @@ export interface AppointmentFormValue {
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW'
   source: 'MANUAL' | 'WHATSAPP'
   billingModel: 'AVULSO' | 'SUBSCRIPTION_INCLUDED' | 'SUBSCRIPTION_EXTRA'
+  priceSnapshot?: number | null
   notes: string | null
+}
+
+interface CustomerSearchResult {
+  id: string
+  name: string
+  phone: string | null
+  email: string | null
+  type: 'SUBSCRIPTION' | 'WALK_IN'
+  subscriptionPrice: number | null
 }
 
 interface AppointmentModalProps {
@@ -122,6 +143,9 @@ export function AppointmentModal({
   const setOpen = onOpenChange ?? setInternalOpen
   const router = useRouter()
   const isEdit = Boolean(appointment)
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('')
+  const [customerSearchResults, setCustomerSearchResults] = useState<CustomerSearchResult[]>([])
+  const [isSearchingCustomers, setIsSearchingCustomers] = useState(false)
 
   const defaultValues = useMemo<FormData>(() => ({
     customerId: appointment?.customerId ?? '',
@@ -155,6 +179,8 @@ export function AppointmentModal({
   useEffect(() => {
     if (open) {
       reset(defaultValues)
+      setCustomerSearchQuery('')
+      setCustomerSearchResults([])
     }
   }, [defaultValues, open, reset])
 
@@ -190,8 +216,90 @@ export function AppointmentModal({
     }
   }, [selectedBillingModel, selectedCustomerType, selectedSubscriptionPrice, setValue])
 
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    const query = customerSearchQuery.trim()
+
+    if (query.length < 2) {
+      setCustomerSearchResults([])
+      setIsSearchingCustomers(false)
+      return
+    }
+
+    let cancelled = false
+    const timeoutId = window.setTimeout(async () => {
+      setIsSearchingCustomers(true)
+
+      try {
+        const results = await searchCustomersForAppointment(query)
+        if (!cancelled) {
+          setCustomerSearchResults(results)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('customer search failed', error)
+          setCustomerSearchResults([])
+        }
+      } finally {
+        if (!cancelled) {
+          setIsSearchingCustomers(false)
+        }
+      }
+    }, 250)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timeoutId)
+    }
+  }, [customerSearchQuery, open])
+
   const selectedService = services.find((service) => service.id === selectedServiceId)
   const selectedProfessional = professionals.find((professional) => professional.id === selectedProfessionalId)
+  const selectedProfessionalScope = selectedProfessional
+    ? PROFESSIONAL_ATTENDANCE_SCOPE_LABELS[
+        resolveProfessionalAttendanceScope({
+          acceptsSubscription: selectedProfessional.acceptsSubscription,
+          acceptsWalkIn: selectedProfessional.acceptsWalkIn,
+        })
+      ]
+    : null
+  const professionalCanHandleCustomerType = selectedProfessional
+    ? canProfessionalHandleCustomerType({
+        customerType: selectedCustomerType,
+        professional: selectedProfessional,
+      })
+    : true
+  const resolvedServicePrice = selectedService
+    ? resolveProfessionalServicePrice({
+        serviceName: selectedService.name,
+        basePrice: selectedService.price,
+        professional: selectedProfessional,
+      })
+    : null
+  const serviceDisplayPrice = resolvedServicePrice?.price ?? selectedService?.price ?? null
+  const usesProfessionalPriceOverride = Boolean(
+    selectedService
+    && resolvedServicePrice
+    && resolvedServicePrice.price !== selectedService.price
+  )
+
+  function applyCustomerSelection(customer: CustomerSearchResult | ScheduleToolbarCustomer) {
+    setValue('customerId', customer.id)
+    setValue('customerName', customer.name)
+    setValue('customerPhone', customer.phone ?? '')
+    setValue('customerEmail', customer.email ?? '')
+    setValue('customerType', customer.type)
+    setValue('subscriptionPrice', customer.subscriptionPrice ? String(customer.subscriptionPrice) : '')
+    setValue(
+      'billingModel',
+      customer.type === 'SUBSCRIPTION' ? 'SUBSCRIPTION_INCLUDED' : 'AVULSO'
+    )
+    setCustomerSearchQuery('')
+    setCustomerSearchResults([])
+  }
 
   const customerNameField = register('customerName', {
     onChange: () => setValue('customerId', ''),
@@ -279,6 +387,57 @@ export function AppointmentModal({
                 <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
                   <section className="space-y-3">
                     <div className="flex items-center gap-2">
+                      <Search className="h-4 w-4 text-primary" />
+                      <p className="text-sm font-semibold text-foreground">Buscar cliente existente</p>
+                    </div>
+
+                    <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-3">
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <input
+                          value={customerSearchQuery}
+                          onChange={(event) => setCustomerSearchQuery(event.target.value)}
+                          placeholder="Busque por nome ou telefone"
+                          className={cn(fieldClassName, 'pl-10')}
+                        />
+                      </div>
+
+                      <div className="mt-3 space-y-2">
+                        {isSearchingCustomers && (
+                          <div className="flex items-center gap-2 rounded-[0.9rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-xs text-muted-foreground">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Procurando cliente...
+                          </div>
+                        )}
+
+                        {!isSearchingCustomers && customerSearchQuery.trim().length >= 2 && customerSearchResults.length === 0 && (
+                          <div className="rounded-[0.9rem] border border-dashed border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] px-3 py-2 text-xs text-muted-foreground">
+                            Nenhum cliente encontrado. Voce pode seguir com cadastro manual abaixo.
+                          </div>
+                        )}
+
+                        {customerSearchResults.map((customer) => (
+                          <button
+                            key={customer.id}
+                            type="button"
+                            onClick={() => applyCustomerSelection(customer)}
+                            className="flex w-full items-center justify-between gap-3 rounded-[0.9rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-left transition-colors hover:bg-[rgba(124,58,237,0.12)]"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-foreground">{customer.name}</p>
+                              <p className="truncate text-xs text-muted-foreground">
+                                {customer.phone ?? customer.email ?? 'Sem contato cadastrado'}
+                              </p>
+                            </div>
+                            <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(124,58,237,0.08)] px-2 py-1 text-[10px] font-semibold text-primary">
+                              {CUSTOMER_TYPE_LABELS[customer.type]}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
                       <Sparkles className="h-4 w-4 text-primary" />
                       <p className="text-sm font-semibold text-foreground">Clientes recentes</p>
                     </div>
@@ -288,21 +447,7 @@ export function AppointmentModal({
                         <button
                           key={customer.id}
                           type="button"
-                          onClick={() => {
-                            setValue('customerId', customer.id)
-                            setValue('customerName', customer.name)
-                            setValue('customerPhone', customer.phone ?? '')
-                            setValue('customerEmail', customer.email ?? '')
-                            setValue('customerType', customer.type)
-                            setValue(
-                              'subscriptionPrice',
-                              customer.subscriptionPrice ? String(customer.subscriptionPrice) : ''
-                            )
-                            setValue(
-                              'billingModel',
-                              customer.type === 'SUBSCRIPTION' ? 'SUBSCRIPTION_INCLUDED' : 'AVULSO'
-                            )
-                          }}
+                          onClick={() => applyCustomerSelection(customer)}
                           className="inline-flex max-w-full items-center gap-2 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)]"
                         >
                           <UserRound className="h-3 w-3 flex-shrink-0 text-primary" />
@@ -394,6 +539,16 @@ export function AppointmentModal({
                           ))}
                         </select>
                       </Field>
+                      {selectedProfessionalScope && (
+                        <p className="mt-1.5 text-xs text-muted-foreground">
+                          Escopo: {selectedProfessionalScope}
+                        </p>
+                      )}
+                      {!professionalCanHandleCustomerType && selectedProfessional && (
+                        <p className="mt-1.5 text-xs text-amber-500">
+                          Esse barbeiro nao atende {selectedCustomerType === 'SUBSCRIPTION' ? 'assinatura' : 'avulso'}.
+                        </p>
+                      )}
                     </div>
 
                     <div className="xl:col-span-3">
@@ -407,6 +562,12 @@ export function AppointmentModal({
                           ))}
                         </select>
                       </Field>
+                      {selectedService && serviceDisplayPrice !== null && (
+                        <p className="mt-1.5 text-xs text-muted-foreground">
+                          Valor operacional: {formatCurrency(serviceDisplayPrice)}
+                          {usesProfessionalPriceOverride ? ' com ajuste do barbeiro.' : ' pelo catalogo base.'}
+                        </p>
+                      )}
                     </div>
                   </section>
 
@@ -444,7 +605,11 @@ export function AppointmentModal({
                   >
                     Cancelar
                   </button>
-                  <button type="submit" disabled={isSubmitting} className="action-button-primary h-11 flex-1 disabled:opacity-50">
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || !professionalCanHandleCustomerType}
+                    className="action-button-primary h-11 flex-1 disabled:opacity-50"
+                  >
                     {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
                     {isSubmitting ? 'Salvando...' : isEdit ? 'Salvar ajustes' : 'Salvar agendamento'}
                   </button>
@@ -475,9 +640,12 @@ export function AppointmentModal({
                       </div>
                       <p className="mt-3 text-sm text-muted-foreground">{selectedService?.name ?? 'Selecione um servico'}</p>
                       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <span>{selectedService ? formatCurrency(selectedService.price) : 'Sem valor'}</span>
+                        <span>{selectedService && serviceDisplayPrice !== null ? formatCurrency(serviceDisplayPrice) : 'Sem valor'}</span>
                         <span>{selectedService ? `${selectedService.duration} min` : 'Sem duracao'}</span>
                       </div>
+                      {usesProfessionalPriceOverride && (
+                        <p className="mt-2 text-xs text-primary">Preco individual aplicado para esse barbeiro.</p>
+                      )}
                     </div>
 
                     <div className="panel-soft p-4">
@@ -487,6 +655,14 @@ export function AppointmentModal({
                       </div>
                       <p className="mt-3 text-sm text-muted-foreground">{selectedProfessional?.name ?? 'Selecione o barbeiro'}</p>
                       <p className="mt-1 text-xs text-muted-foreground">Status: {APPOINTMENT_STATUS_LABELS[selectedStatus]}</p>
+                      {selectedProfessionalScope && (
+                        <p className="mt-2 text-xs text-muted-foreground">{selectedProfessionalScope}</p>
+                      )}
+                      {!professionalCanHandleCustomerType && (
+                        <p className="mt-2 text-xs text-amber-500">
+                          Ajuste o barbeiro para continuar com {selectedCustomerType === 'SUBSCRIPTION' ? 'assinatura' : 'atendimento avulso'}.
+                        </p>
+                      )}
                     </div>
 
                     <div className="panel-soft p-4">
@@ -512,11 +688,16 @@ export function AppointmentModal({
                         Valor e duracao
                       </div>
                       <p className="mt-3 text-xl font-semibold text-foreground">
-                        {selectedService ? formatCurrency(selectedService.price) : 'Selecione um servico'}
+                        {selectedService && serviceDisplayPrice !== null ? formatCurrency(serviceDisplayPrice) : 'Selecione um servico'}
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {selectedService ? `${selectedService.duration} minutos reservados na agenda.` : 'A duracao vem direto do catalogo.'}
                       </p>
+                      {usesProfessionalPriceOverride && (
+                        <p className="mt-3 text-xs text-primary">
+                          O valor acima veio da configuracao individual do barbeiro.
+                        </p>
+                      )}
                       {selectedCustomerType === 'SUBSCRIPTION' && (
                         <p className="mt-3 text-xs text-muted-foreground">
                           Mensalidade atual: {selectedSubscriptionPrice ? formatCurrency(selectedSubscriptionPrice) : 'Defina a mensalidade do plano.'}

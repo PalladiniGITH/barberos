@@ -45,6 +45,12 @@ export interface ScheduleSearchParams {
 export interface ScheduleToolbarProfessional {
   id: string
   name: string
+  commissionRate: number | null
+  haircutPrice: number | null
+  beardPrice: number | null
+  comboPrice: number | null
+  acceptsWalkIn: boolean
+  acceptsSubscription: boolean
 }
 
 export interface ScheduleToolbarService {
@@ -281,7 +287,16 @@ const getCachedSchedulePageData = cache(
       await Promise.all([
         prisma.professional.findMany({
           where: { barbershopId, active: true },
-          select: { id: true, name: true },
+          select: {
+            id: true,
+            name: true,
+            commissionRate: true,
+            haircutPrice: true,
+            beardPrice: true,
+            comboPrice: true,
+            acceptsWalkIn: true,
+            acceptsSubscription: true,
+          },
           orderBy: { name: 'asc' },
         }),
         prisma.service.findMany({
@@ -371,8 +386,20 @@ const getCachedSchedulePageData = cache(
     const selectedProfessional = rawProfessionalId
       ? professionals.find((professional) => professional.id === rawProfessionalId) ?? null
       : null
+    const scheduleProfessionals: ScheduleToolbarProfessional[] = professionals.map((professional) => ({
+      id: professional.id,
+      name: professional.name,
+      commissionRate: professional.commissionRate ? Number(professional.commissionRate) : null,
+      haircutPrice: professional.haircutPrice ? Number(professional.haircutPrice) : null,
+      beardPrice: professional.beardPrice ? Number(professional.beardPrice) : null,
+      comboPrice: professional.comboPrice ? Number(professional.comboPrice) : null,
+      acceptsWalkIn: professional.acceptsWalkIn,
+      acceptsSubscription: professional.acceptsSubscription,
+    }))
 
-    const visibleProfessionals = selectedProfessional ? [selectedProfessional] : professionals
+    const visibleProfessionals = selectedProfessional
+      ? scheduleProfessionals.filter((professional) => professional.id === selectedProfessional.id)
+      : scheduleProfessionals
     const laneMap = Object.fromEntries(visibleProfessionals.map((professional, index) => [professional.id, index]))
 
     const serializedAppointments: ScheduleAppointmentItem[] = appointments.map((appointment) =>
@@ -438,7 +465,7 @@ const getCachedSchedulePageData = cache(
       rangeLabel: capitalize(format(baseDate, "EEEE, dd 'de' MMMM", { locale: ptBR })),
       view: rawView,
       selectedProfessionalId: selectedProfessional?.id ?? null,
-      professionals,
+      professionals: scheduleProfessionals,
       services: services.map((service) => ({
         id: service.id,
         name: service.name,

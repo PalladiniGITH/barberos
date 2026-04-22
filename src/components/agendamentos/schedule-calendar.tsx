@@ -193,6 +193,7 @@ function buildAppointmentFormValue(appointment: PositionedAppointment) {
     status: appointment.status,
     source: appointment.source,
     billingModel: appointment.billingModel,
+    priceSnapshot: appointment.priceSnapshot,
     notes: appointment.notes,
   }
 }

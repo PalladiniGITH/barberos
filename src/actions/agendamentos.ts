@@ -16,6 +16,11 @@ import {
   OPERATIONAL_BLOCK_CUSTOMER_NAME,
   OPERATIONAL_BLOCK_SERVICE_NAME,
 } from '@/lib/agendamentos/operational-blocks'
+import {
+  canProfessionalHandleCustomerType,
+  normalizeProfessionalOperationalConfig,
+  resolveProfessionalServicePrice,
+} from '@/lib/professionals/operational-config'
 
 type ActionResult = { success: true } | { success: false; error: string }
 
@@ -80,6 +85,29 @@ function normalizeBillingModel(
   }
 
   return billingModel === 'AVULSO' ? 'SUBSCRIPTION_INCLUDED' : billingModel
+}
+
+function normalizeCustomerSearchQuery(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
+function normalizeDigits(value: string) {
+  return value.replace(/\D/g, '')
+}
+
+function buildProfessionalScopeError(input: {
+  professionalName: string
+  customerType: 'SUBSCRIPTION' | 'WALK_IN'
+}) {
+  if (input.customerType === 'SUBSCRIPTION') {
+    return `${input.professionalName} nao esta configurado para atender clientes de assinatura.`
+  }
+
+  return `${input.professionalName} nao esta configurado para atendimento avulso.`
 }
 
 async function getBarbershopTimezone(barbershopId: string) {
@@ -199,6 +227,82 @@ async function resolveCustomerId(input: {
   return customer.id
 }
 
+export async function searchCustomersForAppointment(rawQuery: unknown) {
+  const session = await requireSession()
+  const query = typeof rawQuery === 'string' ? rawQuery.trim() : ''
+
+  if (query.length < 2) {
+    return []
+  }
+
+  const normalizedQuery = normalizeCustomerSearchQuery(query)
+  const digitsQuery = normalizeDigits(query)
+
+  const customers = await prisma.customer.findMany({
+    where: {
+      barbershopId: session.user.barbershopId,
+      active: true,
+      OR: [
+        { name: { contains: query, mode: 'insensitive' } },
+        { phone: { contains: query } },
+        { email: { contains: query, mode: 'insensitive' } },
+        ...(digitsQuery.length >= 3 ? [{ phone: { contains: digitsQuery } }] : []),
+      ],
+    },
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      email: true,
+      type: true,
+      subscriptionPrice: true,
+      updatedAt: true,
+    },
+    orderBy: { updatedAt: 'desc' },
+    take: 12,
+  })
+
+  return customers
+    .map((customer) => {
+      const normalizedName = normalizeCustomerSearchQuery(customer.name)
+      const normalizedPhone = normalizeDigits(customer.phone ?? '')
+      const normalizedEmail = normalizeCustomerSearchQuery(customer.email ?? '')
+      const exactNameMatch = normalizedName === normalizedQuery
+      const nameStartsWith = normalizedName.startsWith(normalizedQuery)
+      const phoneStartsWith = digitsQuery.length >= 3 && normalizedPhone.startsWith(digitsQuery)
+      const phoneContains = digitsQuery.length >= 3 && normalizedPhone.includes(digitsQuery)
+      const emailStartsWith = normalizedEmail.startsWith(normalizedQuery)
+
+      const relevance = exactNameMatch
+        ? 400
+        : nameStartsWith
+          ? 320
+          : phoneStartsWith
+            ? 280
+            : emailStartsWith
+              ? 240
+              : phoneContains
+                ? 220
+                : normalizedName.includes(normalizedQuery)
+                  ? 180
+                  : normalizedEmail.includes(normalizedQuery)
+                    ? 120
+                    : 0
+
+      return {
+        id: customer.id,
+        name: customer.name,
+        phone: customer.phone,
+        email: customer.email,
+        type: customer.type,
+        subscriptionPrice: customer.subscriptionPrice ? Number(customer.subscriptionPrice) : null,
+        relevance,
+      }
+    })
+    .filter((customer) => customer.relevance > 0)
+    .sort((left, right) => right.relevance - left.relevance || left.name.localeCompare(right.name))
+}
+
 async function ensureAppointmentSlotAvailable(input: {
   appointmentId?: string
   barbershopId: string
@@ -302,6 +406,35 @@ async function ensureOperationalBlockEntities(barbershopId: string) {
   }
 }
 
+async function getSchedulingEntitiesForAppointment(input: {
+  serviceId: string
+  professionalId: string
+}) {
+  const [service, professional] = await Promise.all([
+    prisma.service.findUnique({
+      where: { id: input.serviceId },
+      select: { duration: true, price: true, active: true, name: true },
+    }),
+    prisma.professional.findUnique({
+      where: { id: input.professionalId },
+      select: {
+        name: true,
+        commissionRate: true,
+        haircutPrice: true,
+        beardPrice: true,
+        comboPrice: true,
+        acceptsWalkIn: true,
+        acceptsSubscription: true,
+      },
+    }),
+  ])
+
+  return {
+    service,
+    professional,
+  }
+}
+
 export async function createAppointment(rawData: unknown): Promise<ActionResult> {
   const session = await requireSession()
   const { barbershopId } = session.user
@@ -323,13 +456,30 @@ export async function createAppointment(rawData: unknown): Promise<ActionResult>
       data.customerId ? assertOwnership(barbershopId, 'customer', data.customerId) : Promise.resolve(),
     ])
 
-    const service = await prisma.service.findUnique({
-      where: { id: data.serviceId },
-      select: { duration: true, price: true, active: true },
+    const { service, professional } = await getSchedulingEntitiesForAppointment({
+      serviceId: data.serviceId,
+      professionalId: data.professionalId,
     })
 
     if (!service?.active) {
       return { success: false, error: 'Servico indisponivel para agendamento.' }
+    }
+
+    if (!professional) {
+      return { success: false, error: 'Profissional indisponivel para agendamento.' }
+    }
+
+    if (!canProfessionalHandleCustomerType({
+      customerType: data.customerType,
+      professional,
+    })) {
+      return {
+        success: false,
+        error: buildProfessionalScopeError({
+          professionalName: professional.name,
+          customerType: data.customerType,
+        }),
+      }
     }
 
     const startAt = buildStartAt(data.date, data.time, timezone)
@@ -363,6 +513,12 @@ export async function createAppointment(rawData: unknown): Promise<ActionResult>
       subscriptionPrice: data.subscriptionPrice ?? null,
     })
 
+    const resolvedPrice = resolveProfessionalServicePrice({
+      serviceName: service.name,
+      basePrice: Number(service.price),
+      professional: normalizeProfessionalOperationalConfig(professional),
+    })
+
     await prisma.appointment.create({
       data: {
         barbershopId,
@@ -376,7 +532,7 @@ export async function createAppointment(rawData: unknown): Promise<ActionResult>
         startAt,
         endAt,
         durationMinutes: service.duration,
-        priceSnapshot: Number(service.price),
+        priceSnapshot: resolvedPrice.price,
         notes: normalizeOptionalText(data.notes),
         confirmedAt: data.status === 'CONFIRMED' ? new Date() : null,
         cancelledAt: data.status === 'CANCELLED' ? new Date() : null,
@@ -428,13 +584,30 @@ export async function updateAppointment(id: string, rawData: unknown): Promise<A
       data.customerId ? assertOwnership(barbershopId, 'customer', data.customerId) : Promise.resolve(),
     ])
 
-    const service = await prisma.service.findUnique({
-      where: { id: data.serviceId },
-      select: { duration: true, price: true, active: true },
+    const { service, professional } = await getSchedulingEntitiesForAppointment({
+      serviceId: data.serviceId,
+      professionalId: data.professionalId,
     })
 
     if (!service?.active) {
       return { success: false, error: 'Servico indisponivel para agendamento.' }
+    }
+
+    if (!professional) {
+      return { success: false, error: 'Profissional indisponivel para agendamento.' }
+    }
+
+    if (!canProfessionalHandleCustomerType({
+      customerType: data.customerType,
+      professional,
+    })) {
+      return {
+        success: false,
+        error: buildProfessionalScopeError({
+          professionalName: professional.name,
+          customerType: data.customerType,
+        }),
+      }
     }
 
     const startAt = buildStartAt(data.date, data.time, timezone)
@@ -469,6 +642,12 @@ export async function updateAppointment(id: string, rawData: unknown): Promise<A
       subscriptionPrice: data.subscriptionPrice ?? null,
     })
 
+    const resolvedPrice = resolveProfessionalServicePrice({
+      serviceName: service.name,
+      basePrice: Number(service.price),
+      professional: normalizeProfessionalOperationalConfig(professional),
+    })
+
     await prisma.appointment.update({
       where: { id },
       data: {
@@ -482,7 +661,7 @@ export async function updateAppointment(id: string, rawData: unknown): Promise<A
         startAt,
         endAt,
         durationMinutes: service.duration,
-        priceSnapshot: Number(service.price),
+        priceSnapshot: resolvedPrice.price,
         notes: normalizeOptionalText(data.notes),
         confirmedAt: data.status === 'CONFIRMED' ? new Date() : null,
         cancelledAt: data.status === 'CANCELLED' ? new Date() : null,
