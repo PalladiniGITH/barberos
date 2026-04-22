@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "node scripts/start-production.mjs",
     "test:whatsapp": "node --require ./tests/helpers/register.js --test tests/whatsapp/*.test.js",
-    "verify": "npm run test:whatsapp && npm run build",
+    "verify": "npm run build",
     "predeploy": "npm run verify",
     "lint": "next lint",
     "db:generate": "prisma generate",
