@@ -34,6 +34,7 @@ model Barbershop {
   revenues                     Revenue[]
   expenses                     Expense[]
   categories                   FinancialCategory[]
+  operationalCategories        OperationalCategory[]
   monthlyGoals                 MonthlyGoal[]
   challenges                   Challenge[]
   supplies                     Supply[]
@@ -253,22 +254,30 @@ enum ExpenseType {
 // ─────────────────────────────────────────────
 
 model Service {
-  id           String     @id @default(cuid())
+  id           String               @id @default(cuid())
   name         String
   description  String?
-  price        Decimal    @db.Decimal(10, 2)
+  price        Decimal              @db.Decimal(10, 2)
   duration     Int // minutos
-  active       Boolean    @default(true)
+  active       Boolean              @default(true)
+  categoryId   String?
+  category     OperationalCategory? @relation(fields: [categoryId], references: [id])
+  importedFrom String?
+  externalId   String?
+  importedAt   DateTime?
   barbershopId String
-  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  barbershop   Barbershop           @relation(fields: [barbershopId], references: [id])
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
 
   revenues      Revenue[]
   appointments  Appointment[]
   serviceInputs ServiceInput[]
   pricingRule   PricingRule?
 
+  @@index([barbershopId, active])
+  @@index([barbershopId, categoryId])
+  @@index([barbershopId, importedFrom, externalId])
   @@map("services")
 }
 
@@ -465,18 +474,56 @@ enum WhatsappConversationState {
 }
 
 model Supply {
-  id           String     @id @default(cuid())
-  name         String
-  unit         String // ml, g, un, L
-  unitCost     Decimal    @db.Decimal(10, 4)
-  barbershopId String
-  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id            String               @id @default(cuid())
+  name          String
+  unit          String // ml, g, un, L
+  unitCost      Decimal              @db.Decimal(10, 4)
+  stockQuantity Decimal?             @db.Decimal(10, 4)
+  active        Boolean              @default(true)
+  categoryId    String?
+  category      OperationalCategory? @relation(fields: [categoryId], references: [id])
+  importedFrom  String?
+  externalId    String?
+  importedAt    DateTime?
+  barbershopId  String
+  barbershop    Barbershop           @relation(fields: [barbershopId], references: [id])
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
 
   serviceInputs ServiceInput[]
 
+  @@index([barbershopId, active])
+  @@index([barbershopId, categoryId])
+  @@index([barbershopId, importedFrom, externalId])
   @@map("supplies")
+}
+
+model OperationalCategory {
+  id           String                  @id @default(cuid())
+  barbershopId String
+  barbershop   Barbershop              @relation(fields: [barbershopId], references: [id])
+  name         String
+  type         OperationalCategoryType
+  active       Boolean                 @default(true)
+  importedFrom String?
+  externalId   String?
+  importedAt   DateTime?
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  services Service[]
+  supplies Supply[]
+
+  @@unique([barbershopId, type, name])
+  @@index([barbershopId, type, active])
+  @@index([barbershopId, importedFrom, externalId])
+  @@map("operational_categories")
+}
+
+enum OperationalCategoryType {
+  SERVICE
+  SUPPLY
+  PRODUCT
 }
 
 model ServiceInput {
