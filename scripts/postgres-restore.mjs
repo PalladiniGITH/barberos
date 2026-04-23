@@ -2,7 +2,6 @@ import path from 'node:path'
 import process from 'node:process'
 import {
   countPublicTablesWithPsql,
-  dockerContainerExists,
   ensureDirectory,
   getBackupRuntimeConfig,
   logRestore,
@@ -10,6 +9,7 @@ import {
   parseCliArgs,
   requireFlag,
   resolveBackupStrategy,
+  resolveDockerContainer,
   runCommand,
 } from './lib/postgres-backup-utils.mjs'
 
@@ -58,6 +58,7 @@ async function validateBackupFile(filePath) {
 async function runDockerRestore(config) {
   const archiveName = path.basename(config.filePath)
   const tempArchivePath = `/tmp/${archiveName}`
+  const containerName = config.resolvedContainer
   const baseEnv = {
     PGPASSWORD: config.database.password,
   }
@@ -66,7 +67,7 @@ async function runDockerRestore(config) {
     'exec',
     '-e',
     `PGPASSWORD=${config.database.password}`,
-    config.container,
+    containerName,
     'psql',
     '-h',
     '127.0.0.1',
@@ -80,14 +81,14 @@ async function runDockerRestore(config) {
   ], { env: baseEnv })
 
   try {
-    await runCommand(config.dockerBinary, ['cp', config.filePath, `${config.container}:${tempArchivePath}`])
+    await runCommand(config.dockerBinary, ['cp', config.filePath, `${containerName}:${tempArchivePath}`])
 
     if (config.dropCreate) {
       await runCommand(config.dockerBinary, [
         'exec',
         '-e',
         `PGPASSWORD=${config.database.password}`,
-        config.container,
+        containerName,
         'dropdb',
         '-h',
         '127.0.0.1',
@@ -103,7 +104,7 @@ async function runDockerRestore(config) {
         'exec',
         '-e',
         `PGPASSWORD=${config.database.password}`,
-        config.container,
+        containerName,
         'createdb',
         '-h',
         '127.0.0.1',
@@ -119,7 +120,7 @@ async function runDockerRestore(config) {
       'exec',
       '-e',
       `PGPASSWORD=${config.database.password}`,
-      config.container,
+      containerName,
       'pg_restore',
       '-h',
       '127.0.0.1',
@@ -145,7 +146,7 @@ async function runDockerRestore(config) {
   } finally {
     await runCommand(config.dockerBinary, [
       'exec',
-      config.container,
+      containerName,
       'rm',
       '-f',
       tempArchivePath,
@@ -234,20 +235,18 @@ async function main() {
   await validateBackupFile(config.filePath)
 
   const strategy = await resolveBackupStrategy(config)
-
-  if (strategy === 'docker-exec' && config.container) {
-    const containerExists = await dockerContainerExists(config.dockerBinary, config.container)
-
-    if (!containerExists) {
-      throw new Error(`Container de restore nao encontrado: ${config.container}`)
-    }
-  }
+  const dockerTarget = strategy === 'docker-exec'
+    ? await resolveDockerContainer(config, { required: true })
+    : null
 
   logRestore('starting', {
     backupFile: config.filePath,
     targetDatabase: config.targetDatabase,
     dropCreate: config.dropCreate,
     strategy,
+    container: dockerTarget?.containerName ?? null,
+    containerResolution: dockerTarget?.source ?? null,
+    containerHint: config.container || config.containerHint || null,
   })
 
   const restoreResult = strategy === 'docker-exec'

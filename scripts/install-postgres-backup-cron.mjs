@@ -73,6 +73,10 @@ async function main() {
     schedule: `${String(config.cronHour).padStart(2, '0')}:${String(config.cronMinute).padStart(2, '0')} ${config.timezone}`,
     logFile: config.logFile,
     backupDir: config.dailyDir,
+    containerHint: config.container || config.containerHint || null,
+    containerResolution: config.container
+      ? 'explicita por POSTGRES_BACKUP_CONTAINER'
+      : 'descoberta automatica em runtime pelo host do DATABASE_URL + Docker inspect',
   })
 }
 

@@ -5,7 +5,6 @@ import {
   acquireFileLock,
   buildBackupFileName,
   countPublicTablesWithPsql,
-  dockerContainerExists,
   ensureDirectory,
   formatBackupTimestamp,
   formatBytes,
@@ -17,6 +16,7 @@ import {
   pruneBackups,
   redactDatabaseTarget,
   resolveBackupStrategy,
+  resolveDockerContainer,
   runCommand,
   writeBackupMetadata,
   writeSha256File,
@@ -32,7 +32,7 @@ Uso:
 Variaveis principais:
   POSTGRES_BACKUP_DIR             diretorio raiz dos backups
   POSTGRES_BACKUP_RETENTION_DAILY quantidade de dumps diarios mantidos
-  POSTGRES_BACKUP_CONTAINER       container do Postgres no host Docker/EasyPanel
+  POSTGRES_BACKUP_CONTAINER       container, servico ou prefixo do Postgres no host Docker/EasyPanel
   POSTGRES_BACKUP_STRATEGY        docker-exec | local
   POSTGRES_BACKUP_TIMEZONE        timezone do timestamp e do cron
 
@@ -42,6 +42,7 @@ Saida padrao:
 
 async function runDockerBackup(config, archivePath, archiveName) {
   const tempArchivePath = `/tmp/${archiveName}`
+  const containerName = config.resolvedContainer
   const dockerEnv = {
     PGPASSWORD: config.database.password,
   }
@@ -51,7 +52,7 @@ async function runDockerBackup(config, archivePath, archiveName) {
       'exec',
       '-e',
       `PGPASSWORD=${config.database.password}`,
-      config.container,
+      containerName,
       'pg_dump',
       '-h',
       '127.0.0.1',
@@ -75,7 +76,7 @@ async function runDockerBackup(config, archivePath, archiveName) {
       'exec',
       '-e',
       `PGPASSWORD=${config.database.password}`,
-      config.container,
+      containerName,
       'pg_restore',
       '--list',
       tempArchivePath,
@@ -83,13 +84,13 @@ async function runDockerBackup(config, archivePath, archiveName) {
 
     await runCommand(config.dockerBinary, [
       'cp',
-      `${config.container}:${tempArchivePath}`,
+      `${containerName}:${tempArchivePath}`,
       archivePath,
     ])
   } finally {
     await runCommand(config.dockerBinary, [
       'exec',
-      config.container,
+      containerName,
       'rm',
       '-f',
       tempArchivePath,
@@ -147,6 +148,9 @@ async function main() {
 
   const config = getBackupRuntimeConfig()
   const strategy = await resolveBackupStrategy(config)
+  const dockerTarget = strategy === 'docker-exec'
+    ? await resolveDockerContainer(config, { required: true })
+    : null
 
   await ensureDirectory(config.backupRoot)
   await ensureDirectory(config.dailyDir)
@@ -157,14 +161,6 @@ async function main() {
   const releaseLock = await acquireFileLock(lockFilePath, config.lockStaleMs)
 
   try {
-    if (strategy === 'docker-exec' && config.container) {
-      const containerExists = await dockerContainerExists(config.dockerBinary, config.container)
-
-      if (!containerExists) {
-        throw new Error(`Container de backup nao encontrado: ${config.container}`)
-      }
-    }
-
     const timestamp = formatBackupTimestamp(new Date(), config.timezone)
     const archiveName = buildBackupFileName(config.database.database, timestamp)
     const archivePath = path.join(config.dailyDir, archiveName)
@@ -174,7 +170,9 @@ async function main() {
       backupTarget: redactDatabaseTarget(config.database.rawUrl),
       backupDir: config.dailyDir,
       retentionDaily: config.retentionDaily,
-      container: config.container ?? null,
+      container: dockerTarget?.containerName ?? null,
+      containerResolution: dockerTarget?.source ?? null,
+      containerHint: config.container || config.containerHint || null,
     })
 
     const backupResult = strategy === 'docker-exec'

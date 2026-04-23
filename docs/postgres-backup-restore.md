@@ -37,7 +37,9 @@ POSTGRES_BACKUP_CONTAINER="barberos_barberos-postgres"
 
 Observacoes:
 
-- `POSTGRES_BACKUP_CONTAINER` pode ficar vazio quando o hostname do `DATABASE_URL` ja for o nome do container.
+- `POSTGRES_BACKUP_CONTAINER` continua opcional e, quando definido, tem prioridade total.
+- esse valor pode ser o nome exato do container ou um hint estavel, como o nome do servico `barberos_barberos-postgres`.
+- se a variavel ficar vazia, o script tenta descobrir o container automaticamente a partir do host do `DATABASE_URL`, nomes/prefixos de containers, labels do Swarm/Compose e aliases de rede.
 - se nada for definido, o projeto usa `/var/backups/barbermain/postgres` no Linux.
 
 ## Onde os backups ficam
@@ -155,5 +157,5 @@ O script nao imprime senha do banco nem credenciais em texto puro.
 
 - o restore exige `--force` de proposito, para evitar execucao destrutiva acidental
 - o cron precisa rodar no host Linux com acesso ao `docker`
-- se o nome do container do PostgreSQL mudar no EasyPanel, ajustar `POSTGRES_BACKUP_CONTAINER`
+- se o nome do task/container mudar no EasyPanel, a descoberta automatica deve continuar funcionando; use `POSTGRES_BACKUP_CONTAINER` apenas se quiser fixar um hint mais estavel
 - antes de um restore no banco principal, interromper acessos concorrentes se quiser o procedimento mais seguro possivel

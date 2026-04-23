@@ -135,12 +135,49 @@ function isLocalDatabaseHost(host) {
   return ['localhost', '127.0.0.1', '::1'].includes(host)
 }
 
-function resolveDefaultBackupContainer(host) {
-  if (!host || isLocalDatabaseHost(host) || host.includes('.')) {
+function isIpAddressLike(host) {
+  return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host) || host.includes(':')
+}
+
+function resolveDefaultBackupContainerHint(host) {
+  if (!host || isLocalDatabaseHost(host) || isIpAddressLike(host)) {
     return null
   }
 
   return host
+}
+
+function normalizeContainerIdentifier(value) {
+  return String(value || '').trim().replace(/^\/+/, '')
+}
+
+function stripSwarmTaskSuffix(value) {
+  return normalizeContainerIdentifier(value).replace(/\.\d+\.[A-Za-z0-9_-]+$/, '')
+}
+
+function buildContainerLookupHints(value) {
+  const normalized = normalizeContainerIdentifier(value)
+
+  if (!normalized) {
+    return []
+  }
+
+  const hints = new Set([normalized, stripSwarmTaskSuffix(normalized)])
+  const firstSegment = normalized.includes('.') ? normalized.split('.')[0] : null
+
+  if (firstSegment && !isIpAddressLike(firstSegment) && firstSegment.length >= 4) {
+    hints.add(stripSwarmTaskSuffix(firstSegment))
+  }
+
+  if (normalized.includes('_')) {
+    const suffixAfterStack = normalized.slice(normalized.indexOf('_') + 1)
+
+    if (suffixAfterStack.length >= 4) {
+      hints.add(stripSwarmTaskSuffix(suffixAfterStack))
+    }
+  }
+
+  return [...hints].filter(Boolean)
 }
 
 export function getBackupRuntimeConfig() {
@@ -155,7 +192,8 @@ export function getBackupRuntimeConfig() {
   const timezone = process.env.POSTGRES_BACKUP_TIMEZONE?.trim()
     || process.env.APP_TIMEZONE?.trim()
     || DEFAULT_BACKUP_TIMEZONE
-  const container = process.env.POSTGRES_BACKUP_CONTAINER?.trim() || resolveDefaultBackupContainer(database.host)
+  const configuredContainer = process.env.POSTGRES_BACKUP_CONTAINER?.trim() || null
+  const containerHint = configuredContainer || resolveDefaultBackupContainerHint(database.host)
   const dockerBinary = process.env.DOCKER_BIN?.trim() || 'docker'
   const lockStaleMs = readIntegerEnv('POSTGRES_BACKUP_LOCK_STALE_MS', DEFAULT_LOCK_STALE_MS)
   const dailyDir = path.join(backupRoot, 'daily')
@@ -173,12 +211,15 @@ export function getBackupRuntimeConfig() {
     cronHour,
     cronMinute,
     timezone,
-    container,
+    container: configuredContainer,
+    containerHint,
     dockerBinary,
     lockStaleMs,
     nodeBinary: process.execPath,
     projectRoot: process.cwd(),
     database,
+    resolvedContainer: null,
+    resolvedContainerSource: null,
   }
 }
 
@@ -274,13 +315,248 @@ export async function dockerContainerExists(dockerBinary, containerName) {
   }
 }
 
+async function listRunningDockerContainers(dockerBinary) {
+  const idResult = await runCommand(dockerBinary, ['ps', '-q'])
+  const ids = idResult.stdout
+    .split(/\r?\n/)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+
+  if (ids.length === 0) {
+    return []
+  }
+
+  const inspectResult = await runCommand(dockerBinary, ['inspect', ...ids])
+  const containers = JSON.parse(inspectResult.stdout)
+
+  return containers.map((container) => {
+    const labels = container?.Config?.Labels ?? {}
+    const networks = container?.NetworkSettings?.Networks ?? {}
+    const aliases = [...new Set(
+      Object.values(networks)
+        .flatMap((network) => network?.Aliases ?? [])
+        .map((alias) => normalizeContainerIdentifier(alias))
+        .filter(Boolean)
+    )]
+
+    return {
+      id: container?.Id ?? '',
+      name: normalizeContainerIdentifier(container?.Name),
+      serviceName: normalizeContainerIdentifier(
+        labels['com.docker.swarm.service.name']
+        || labels['com.docker.compose.service']
+        || ''
+      ),
+      image: container?.Config?.Image ?? '',
+      aliases,
+    }
+  })
+}
+
+function scoreResolvedContainer(container, hint) {
+  let score = 0
+  let match = null
+  const normalizedHint = normalizeContainerIdentifier(hint)
+
+  if (!normalizedHint) {
+    return { score, match }
+  }
+
+  if (container.name === normalizedHint) {
+    score = 200
+    match = 'name-exact'
+  } else if (container.name.startsWith(`${normalizedHint}.`)) {
+    score = 180
+    match = 'name-prefix'
+  } else if (container.serviceName === normalizedHint) {
+    score = 170
+    match = 'service-exact'
+  } else if (
+    container.serviceName.endsWith(`_${normalizedHint}`)
+    || container.serviceName.endsWith(`-${normalizedHint}`)
+  ) {
+    score = 150
+    match = 'service-suffix'
+  } else if (container.aliases.includes(normalizedHint)) {
+    score = 140
+    match = 'network-alias'
+  } else if (container.serviceName.includes(normalizedHint)) {
+    score = 120
+    match = 'service-contains'
+  } else if (container.name.includes(normalizedHint)) {
+    score = 110
+    match = 'name-contains'
+  } else if (container.aliases.some((alias) => alias.includes(normalizedHint))) {
+    score = 100
+    match = 'alias-contains'
+  }
+
+  if (score > 0 && /postgres/i.test(`${container.name} ${container.serviceName} ${container.image}`)) {
+    score += 10
+  }
+
+  return { score, match }
+}
+
+function pickSinglePostgresContainer(containers) {
+  const postgresContainers = containers.filter((container) => (
+    /postgres/i.test(container.name)
+    || /postgres/i.test(container.serviceName)
+    || /postgres/i.test(container.image)
+  ))
+
+  return postgresContainers.length === 1 ? postgresContainers[0] : null
+}
+
+export async function resolveDockerContainer(config, options = {}) {
+  const { required = false } = options
+
+  if (config.resolvedContainer) {
+    return {
+      containerName: config.resolvedContainer,
+      source: config.resolvedContainerSource,
+    }
+  }
+
+  const explicitContainer = normalizeContainerIdentifier(config.container)
+
+  if (explicitContainer && await dockerContainerExists(config.dockerBinary, explicitContainer)) {
+    config.resolvedContainer = explicitContainer
+    config.resolvedContainerSource = 'env:POSTGRES_BACKUP_CONTAINER (exact)'
+
+    return {
+      containerName: explicitContainer,
+      source: config.resolvedContainerSource,
+    }
+  }
+
+  let containers = []
+
+  try {
+    containers = await listRunningDockerContainers(config.dockerBinary)
+  } catch (error) {
+    if (required) {
+      throw new Error(
+        `Nao foi possivel inspecionar os containers Docker para descobrir o Postgres: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      )
+    }
+
+    return null
+  }
+
+  const hintSources = []
+
+  if (explicitContainer) {
+    hintSources.push({
+      raw: explicitContainer,
+      source: 'env:POSTGRES_BACKUP_CONTAINER',
+      minScore: 100,
+    })
+  }
+
+  if (config.containerHint && normalizeContainerIdentifier(config.containerHint) !== explicitContainer) {
+    hintSources.push({
+      raw: normalizeContainerIdentifier(config.containerHint),
+      source: explicitContainer ? 'database host fallback' : 'database host',
+      minScore: 120,
+    })
+  }
+
+  let bestMatch = null
+  let secondBestMatch = null
+
+  for (const hintSource of hintSources) {
+    const hints = buildContainerLookupHints(hintSource.raw)
+
+    for (const hint of hints) {
+      for (const container of containers) {
+        const { score, match } = scoreResolvedContainer(container, hint)
+
+        if (score < hintSource.minScore || !match) {
+          continue
+        }
+
+        const candidate = {
+          score,
+          match,
+          hint,
+          hintSource: hintSource.source,
+          containerName: container.name,
+          serviceName: container.serviceName || null,
+        }
+
+        if (!bestMatch || candidate.score > bestMatch.score) {
+          secondBestMatch = bestMatch
+          bestMatch = candidate
+          continue
+        }
+
+        if (
+          candidate.score === bestMatch.score
+          && candidate.containerName !== bestMatch.containerName
+          && (!secondBestMatch || candidate.score > secondBestMatch.score)
+        ) {
+          secondBestMatch = candidate
+        }
+      }
+    }
+  }
+
+  if (
+    bestMatch
+    && secondBestMatch
+    && bestMatch.score === secondBestMatch.score
+    && bestMatch.containerName !== secondBestMatch.containerName
+  ) {
+    const message = `Descoberta do container Postgres ficou ambigua: ${bestMatch.containerName} e ${secondBestMatch.containerName} pontuaram igual. Configure POSTGRES_BACKUP_CONTAINER explicitamente.`
+
+    if (required) {
+      throw new Error(message)
+    }
+
+    return null
+  }
+
+  if (!bestMatch) {
+    const singlePostgresContainer = pickSinglePostgresContainer(containers)
+
+    if (singlePostgresContainer) {
+      config.resolvedContainer = singlePostgresContainer.name
+      config.resolvedContainerSource = 'docker inspect (single postgres container)'
+
+      return {
+        containerName: config.resolvedContainer,
+        source: config.resolvedContainerSource,
+      }
+    }
+
+    if (required) {
+      throw new Error(
+        `Nao foi possivel descobrir automaticamente o container do Postgres. Hint usado: ${
+          explicitContainer || config.containerHint || config.database.host || 'nenhum'
+        }. Configure POSTGRES_BACKUP_CONTAINER explicitamente.`
+      )
+    }
+
+    return null
+  }
+
+  config.resolvedContainer = bestMatch.containerName
+  config.resolvedContainerSource = `${bestMatch.hintSource} (${bestMatch.match}: ${bestMatch.hint})`
+
+  return {
+    containerName: config.resolvedContainer,
+    source: config.resolvedContainerSource,
+  }
+}
+
 export async function resolveBackupStrategy(config) {
   const forced = process.env.POSTGRES_BACKUP_STRATEGY?.trim()
 
   if (forced === 'docker-exec') {
-    if (!config.container) {
-      throw new Error('POSTGRES_BACKUP_STRATEGY=docker-exec, mas nenhum container foi resolvido.')
-    }
+    await resolveDockerContainer(config, { required: true })
     return 'docker-exec'
   }
 
@@ -288,7 +564,7 @@ export async function resolveBackupStrategy(config) {
     return 'local'
   }
 
-  if (config.container && await dockerContainerExists(config.dockerBinary, config.container)) {
+  if (await resolveDockerContainer(config)) {
     return 'docker-exec'
   }
 
@@ -297,7 +573,7 @@ export async function resolveBackupStrategy(config) {
   }
 
   throw new Error(
-    'Nao foi possivel resolver uma estrategia de backup. Configure POSTGRES_BACKUP_CONTAINER ou instale pg_dump/pg_restore no host.'
+    'Nao foi possivel resolver uma estrategia de backup. Descubra automaticamente um container Docker valido ou instale pg_dump/pg_restore no host.'
   )
 }
 
