@@ -8,6 +8,7 @@ const {
 
 const {
   buildCampaignDeliveryDedupeKey,
+  buildCampaignMessagingEventDedupeKey,
   buildCampaignFallbackMessage,
   describeExistingDailyRunReason,
   evaluateCampaignEligibility,
@@ -260,6 +261,15 @@ test('delivery dedupe keys remain deterministic by campaign scope', () => {
       localYear: 2026,
     }),
     'walk-in-inactive:shop-1:customer-1:2026-04-22'
+  )
+})
+
+test('messaging event dedupe keys are anchored to the concrete delivery id', () => {
+  assert.equal(
+    buildCampaignMessagingEventDedupeKey({
+      deliveryId: 'delivery-123',
+    }),
+    'campaign-event:delivery-123'
   )
 })
 

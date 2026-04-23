@@ -522,6 +522,12 @@ export function buildCampaignDeliveryDedupeKey(input: {
   }
 }
 
+export function buildCampaignMessagingEventDedupeKey(input: {
+  deliveryId: string
+}) {
+  return `campaign-event:${input.deliveryId}`
+}
+
 function describeCampaignBenefit(input: {
   benefitType: CampaignAutomationBenefitType | null | undefined
   benefitDescription: string | null | undefined
@@ -933,57 +939,44 @@ async function createAutomationMessagingEvent(input: {
   status: 'PROCESSED' | 'FAILED'
   errorMessage?: string | null
 }) {
-  try {
-    const event = await prisma.messagingEvent.create({
-      data: {
-        barbershopId: input.barbershopId,
-        customerId: input.customerId,
-        provider: MessagingProvider.EVOLUTION,
-        direction: 'OUTBOUND',
-        status: input.status,
-        eventType: `CAMPAIGN_${input.campaignType}`,
-        instanceName: getSafeEvolutionInstanceName(),
-        dedupeKey: `campaign:${input.deliveryDedupeKey}`,
-        remotePhone: input.phone,
-        bodyText: input.message,
-        responseText: input.status === 'PROCESSED' ? input.message : null,
-        lastError: input.errorMessage ?? null,
-        payload: {
-          source: 'campaign-automation',
-          campaignType: input.campaignType,
-          deliveryId: input.deliveryId,
-          runId: input.runId,
-          usedAi: input.usedAi,
-          benefitDescription: input.benefitDescription,
-          providerPayload: input.providerPayload,
-        } as Prisma.InputJsonValue,
-        processedAt: new Date(),
-      },
-      select: {
-        id: true,
-      },
-    })
+  const dedupeKey = buildCampaignMessagingEventDedupeKey({
+    deliveryId: input.deliveryId,
+  })
 
-    return event.id
-  } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError
-      && error.code === 'P2002'
-    ) {
-      const existing = await prisma.messagingEvent.findUnique({
-        where: {
-          dedupeKey: `campaign:${input.deliveryDedupeKey}`,
-        },
-        select: {
-          id: true,
-        },
-      })
+  const event = await prisma.messagingEvent.upsert({
+    where: { dedupeKey },
+    update: {},
+    create: {
+      barbershopId: input.barbershopId,
+      customerId: input.customerId,
+      provider: MessagingProvider.EVOLUTION,
+      direction: 'OUTBOUND',
+      status: input.status,
+      eventType: `CAMPAIGN_${input.campaignType}`,
+      instanceName: getSafeEvolutionInstanceName(),
+      dedupeKey,
+      remotePhone: input.phone,
+      bodyText: input.message,
+      responseText: input.status === 'PROCESSED' ? input.message : null,
+      lastError: input.errorMessage ?? null,
+      payload: {
+        source: 'campaign-automation',
+        campaignType: input.campaignType,
+        deliveryId: input.deliveryId,
+        deliveryDedupeKey: input.deliveryDedupeKey,
+        runId: input.runId,
+        usedAi: input.usedAi,
+        benefitDescription: input.benefitDescription,
+        providerPayload: input.providerPayload,
+      } as Prisma.InputJsonValue,
+      processedAt: new Date(),
+    },
+    select: {
+      id: true,
+    },
+  })
 
-      return existing?.id ?? null
-    }
-
-    throw error
-  }
+  return event.id
 }
 
 async function prepareDeliveryMessage(input: {
