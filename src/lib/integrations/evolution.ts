@@ -626,9 +626,18 @@ export async function configureEvolutionInstanceWebhook(input?: {
     body: {
       enabled: true,
       url: webhookUrl,
-      webhook_by_events: false,
-      webhook_base64: false,
+      webhookByEvents: false,
+      webhookBase64: false,
       events,
+      webhook: {
+        enabled: true,
+        url: webhookUrl,
+        webhookByEvents: false,
+        webhookBase64: false,
+        webhook_by_events: false,
+        webhook_base64: false,
+        events,
+      },
     },
   })
 
