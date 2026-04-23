@@ -558,6 +558,11 @@ export function ScheduleCalendar({
     return timeLabelToMinutes(lastHour) + 60
   }, [hours])
 
+  function clearCurrentSelection() {
+    setPointerSelection(null)
+    setCommittedSelection(null)
+  }
+
   function getColumnByKey(columnKey: string) {
     return columns.find((column) => column.key === columnKey) ?? null
   }
@@ -804,7 +809,7 @@ export function ScheduleCalendar({
                     }}
                     onPointerDown={(event) => {
                       const target = event.target as HTMLElement
-                      if (target.closest('[data-schedule-item]')) {
+                      if (target.closest('[data-schedule-item], [data-schedule-selection-actions]')) {
                         return
                       }
 
@@ -894,6 +899,7 @@ export function ScheduleCalendar({
 
                     {committedForColumn && (
                       <div
+                        data-schedule-selection-actions
                         className="absolute inset-x-3 rounded-[0.85rem] border border-[rgba(91,33,182,0.16)] bg-[rgba(91,33,182,0.08)] shadow-[0_12px_20px_-16px_rgba(22,16,39,0.12)]"
                         style={{
                           top: `${getAppointmentTop(committedForColumn.startMinutes, dayStartMinutes, schedulePxPerMinute)}px`,
@@ -920,7 +926,7 @@ export function ScheduleCalendar({
                                   defaultTime: minutesToTimeLabel(committedForColumn.startMinutes),
                                   defaultProfessionalId: committedForColumn.professionalId,
                                 })
-                                setCommittedSelection(null)
+                                clearCurrentSelection()
                               }}
                               className="action-button-primary px-3 py-2 text-xs"
                             >
@@ -962,6 +968,7 @@ export function ScheduleCalendar({
                                   laneIndex: 0,
                                   laneCount: 1,
                                 })
+                                clearCurrentSelection()
                               }}
                               className="action-button px-3 py-2 text-xs"
                             >
@@ -969,7 +976,11 @@ export function ScheduleCalendar({
                             </button>
                             <button
                               type="button"
-                              onClick={() => setCommittedSelection(null)}
+                              onClick={(event) => {
+                                event.preventDefault()
+                                event.stopPropagation()
+                                clearCurrentSelection()
+                              }}
                               className="action-button px-3 py-2 text-xs"
                             >
                               Cancelar

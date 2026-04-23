@@ -41,6 +41,9 @@ type ExistingServiceInput = {
   quantity: unknown
 }
 
+const catalogFieldClassName = 'min-w-0 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary'
+const catalogLabelClassName = 'min-w-0 space-y-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground'
+
 function ServiceInputFields({
   existingInputs = [],
   supplies,
@@ -51,13 +54,16 @@ function ServiceInputFields({
   const rows = Array.from({ length: Math.max(4, existingInputs.length + 1) }, (_, index) => existingInputs[index] ?? null)
 
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 space-y-2">
       {rows.map((input, index) => (
-        <div key={`${input?.supplyId ?? 'empty'}-${index}`} className="grid gap-2 md:grid-cols-[1fr_120px]">
+        <div
+          key={`${input?.supplyId ?? 'empty'}-${index}`}
+          className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_112px]"
+        >
           <select
             name="supplyId"
             defaultValue={input?.supplyId ?? ''}
-            className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary"
+            className={catalogFieldClassName}
           >
             <option value="">Sem insumo</option>
             {supplies.map((supply) => (
@@ -69,7 +75,7 @@ function ServiceInputFields({
             defaultValue={input ? Number(input.quantity).toString() : ''}
             inputMode="decimal"
             placeholder="Qtd."
-            className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary"
+            className={catalogFieldClassName}
           />
         </div>
       ))}
@@ -230,63 +236,70 @@ export default async function ServicosPage() {
                   Servicos migrados continuam editaveis: preco, duracao, categoria, status e insumos usados.
                 </p>
               </div>
-              <form action={saveServiceFromForm} className="mt-4 space-y-4">
+              <form action={saveServiceFromForm} className="mt-4 min-w-0 space-y-4">
                 <input type="hidden" name="active" value="true" />
-                <div className="grid gap-3 md:grid-cols-[1.4fr_0.7fr_0.7fr]">
-                  <label className="space-y-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,0.7fr)_minmax(0,0.7fr)]">
+                  <label className={catalogLabelClassName}>
                     Nome
                     <input
                       name="name"
                       required
                       placeholder="Corte, barba, combo..."
-                      className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm normal-case tracking-normal text-foreground outline-none transition focus:border-primary"
+                      className={catalogFieldClassName}
                     />
                   </label>
-                  <label className="space-y-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  <label className={catalogLabelClassName}>
                     Preco
                     <input
                       name="price"
                       required
                       inputMode="decimal"
                       placeholder="80,00"
-                      className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm normal-case tracking-normal text-foreground outline-none transition focus:border-primary"
+                      className={catalogFieldClassName}
                     />
                   </label>
-                  <label className="space-y-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  <label className={catalogLabelClassName}>
                     Duracao
                     <input
                       name="duration"
                       required
                       inputMode="numeric"
                       placeholder="45"
-                      className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm normal-case tracking-normal text-foreground outline-none transition focus:border-primary"
+                      className={catalogFieldClassName}
                     />
                   </label>
                 </div>
-                <textarea
-                  name="description"
-                  placeholder="Descricao curta para recepcao e operacao"
-                  className="min-h-20 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary"
-                />
-                <select
-                  name="categoryId"
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary"
-                >
-                  <option value="">Sem categoria</option>
-                  {serviceCategories.filter((category) => category.active).map((category) => (
-                    <option key={category.id} value={category.id}>{category.name}</option>
-                  ))}
-                </select>
-                <div>
+                <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_240px]">
+                  <textarea
+                    name="description"
+                    placeholder="Descricao curta para recepcao e operacao"
+                    className={cn(catalogFieldClassName, 'min-h-20 resize-y')}
+                  />
+                  <label className={catalogLabelClassName}>
+                    Categoria
+                    <select
+                      name="categoryId"
+                      className={catalogFieldClassName}
+                    >
+                      <option value="">Sem categoria</option>
+                      {serviceCategories.filter((category) => category.active).map((category) => (
+                        <option key={category.id} value={category.id}>{category.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="min-w-0 overflow-hidden">
                   <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Composicao de insumos</p>
                   <ServiceInputFields supplies={supplies} />
                 </div>
-                <button
-                  type="submit"
-                  className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary-hover"
-                >
-                  Salvar servico
-                </button>
+                <div className="flex flex-wrap justify-end gap-3">
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary-hover"
+                  >
+                    Salvar servico
+                  </button>
+                </div>
               </form>
             </div>
           )}
@@ -432,34 +445,41 @@ export default async function ServicosPage() {
                   </div>
 
                   {canManageCatalog && (
-                    <details className="mt-5 rounded-2xl border border-border/70 bg-background/45 p-4">
+                    <details className="mt-5 overflow-hidden rounded-2xl border border-border/70 bg-background/45 p-4">
                       <summary className="cursor-pointer text-sm font-semibold text-foreground">Editar cadastro do servico</summary>
-                      <form action={saveServiceFromForm} className="mt-4 space-y-4">
+                      <form action={saveServiceFromForm} className="mt-4 min-w-0 space-y-4">
                         <input type="hidden" name="id" value={service.id} />
                         <input type="hidden" name="active" value={service.active ? 'true' : 'false'} />
-                        <div className="grid gap-3 md:grid-cols-[1.3fr_0.6fr_0.6fr]">
-                          <input name="name" defaultValue={service.name} required className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary" />
-                          <input name="price" defaultValue={Number(service.price).toString()} required inputMode="decimal" className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary" />
-                          <input name="duration" defaultValue={service.duration.toString()} required inputMode="numeric" className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary" />
+                        <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)_minmax(0,0.7fr)]">
+                          <input name="name" defaultValue={service.name} required className={catalogFieldClassName} />
+                          <input name="price" defaultValue={Number(service.price).toString()} required inputMode="decimal" className={catalogFieldClassName} />
+                          <input name="duration" defaultValue={service.duration.toString()} required inputMode="numeric" className={catalogFieldClassName} />
                         </div>
-                        <textarea
-                          name="description"
-                          defaultValue={service.description ?? ''}
-                          className="min-h-20 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-                        />
-                        <select name="categoryId" defaultValue={service.categoryId ?? ''} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary">
-                          <option value="">Sem categoria</option>
-                          {serviceCategories.filter((category) => category.active || category.id === service.categoryId).map((category) => (
-                            <option key={category.id} value={category.id}>{category.name}{category.active ? '' : ' (inativa)'}</option>
-                          ))}
-                        </select>
-                        <div>
+                        <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_240px]">
+                          <textarea
+                            name="description"
+                            defaultValue={service.description ?? ''}
+                            className={cn(catalogFieldClassName, 'min-h-20 resize-y')}
+                          />
+                          <label className={catalogLabelClassName}>
+                            Categoria
+                            <select name="categoryId" defaultValue={service.categoryId ?? ''} className={catalogFieldClassName}>
+                              <option value="">Sem categoria</option>
+                              {serviceCategories.filter((category) => category.active || category.id === service.categoryId).map((category) => (
+                                <option key={category.id} value={category.id}>{category.name}{category.active ? '' : ' (inativa)'}</option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                        <div className="min-w-0 overflow-hidden">
                           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Composicao de insumos</p>
                           <ServiceInputFields supplies={supplies} existingInputs={service.serviceInputs} />
                         </div>
-                        <button type="submit" className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary-hover">
-                          Atualizar servico
-                        </button>
+                        <div className="flex flex-wrap justify-end gap-3">
+                          <button type="submit" className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary-hover">
+                            Atualizar servico
+                          </button>
+                        </div>
                       </form>
                     </details>
                   )}

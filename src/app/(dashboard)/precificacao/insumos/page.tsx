@@ -31,6 +31,9 @@ const starterSupplies = [
   { name: 'Lâmina descartável', unit: 'un', cost: 'R$ 1,50', useCase: 'Barba, acabamento e limpeza' },
 ]
 
+const catalogFieldClassName = 'min-w-0 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary'
+const catalogLabelClassName = 'min-w-0 space-y-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground'
+
 export default async function InsumosPage() {
   const session = await requireSession()
   assertAdministrativeRole(session.user.role, 'Sem permissao para consultar os insumos e custos da barbearia.')
@@ -144,50 +147,52 @@ export default async function InsumosPage() {
                   Dados vindos de outro sistema entram como cadastro normal e continuam editaveis aqui.
                 </p>
               </div>
-              <form action={saveSupplyFromForm} className="mt-4 grid gap-3 md:grid-cols-[1.4fr_0.7fr_0.7fr_0.7fr]">
+              <form action={saveSupplyFromForm} className="mt-4 min-w-0 space-y-4">
                 <input type="hidden" name="active" value="true" />
-                <label className="space-y-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Nome
-                  <input
-                    name="name"
-                    required
-                    placeholder="Shampoo, pomada, toalha..."
-                    className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm normal-case tracking-normal text-foreground outline-none transition focus:border-primary"
-                  />
-                </label>
-                <label className="space-y-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Unidade
-                  <input
-                    name="unit"
-                    required
-                    placeholder="ml, un, g"
-                    className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm normal-case tracking-normal text-foreground outline-none transition focus:border-primary"
-                  />
-                </label>
-                <label className="space-y-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Custo unit.
-                  <input
-                    name="unitCost"
-                    required
-                    inputMode="decimal"
-                    placeholder="12,50"
-                    className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm normal-case tracking-normal text-foreground outline-none transition focus:border-primary"
-                  />
-                </label>
-                <label className="space-y-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Quantidade
-                  <input
-                    name="stockQuantity"
-                    inputMode="decimal"
-                    placeholder="10"
-                    className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm normal-case tracking-normal text-foreground outline-none transition focus:border-primary"
-                  />
-                </label>
-                <label className="space-y-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground md:col-span-3">
+                <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)]">
+                  <label className={catalogLabelClassName}>
+                    Nome
+                    <input
+                      name="name"
+                      required
+                      placeholder="Shampoo, pomada, toalha..."
+                      className={catalogFieldClassName}
+                    />
+                  </label>
+                  <label className={catalogLabelClassName}>
+                    Unidade
+                    <input
+                      name="unit"
+                      required
+                      placeholder="ml, un, g"
+                      className={catalogFieldClassName}
+                    />
+                  </label>
+                  <label className={catalogLabelClassName}>
+                    Custo unit.
+                    <input
+                      name="unitCost"
+                      required
+                      inputMode="decimal"
+                      placeholder="12,50"
+                      className={catalogFieldClassName}
+                    />
+                  </label>
+                  <label className={catalogLabelClassName}>
+                    Quantidade
+                    <input
+                      name="stockQuantity"
+                      inputMode="decimal"
+                      placeholder="10"
+                      className={catalogFieldClassName}
+                    />
+                  </label>
+                </div>
+                <label className={catalogLabelClassName}>
                   Categoria
                   <select
                     name="categoryId"
-                    className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm normal-case tracking-normal text-foreground outline-none transition focus:border-primary"
+                    className={catalogFieldClassName}
                   >
                     <option value="">Sem categoria</option>
                     {supplyCategories.filter((category) => category.active).map((category) => (
@@ -195,12 +200,14 @@ export default async function InsumosPage() {
                     ))}
                   </select>
                 </label>
-                <button
-                  type="submit"
-                  className="self-end rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary-hover"
-                >
-                  Salvar insumo
-                </button>
+                <div className="flex flex-wrap justify-end gap-3">
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary-hover"
+                  >
+                    Salvar insumo
+                  </button>
+                </div>
               </form>
             </div>
           )}
@@ -290,24 +297,31 @@ export default async function InsumosPage() {
                       {canManageCatalog && (
                         <tr className="border-b border-border/50 bg-background/40">
                           <td colSpan={7} className="px-5 py-3">
-                            <details className="rounded-xl border border-border/70 bg-secondary/20 p-3">
+                            <details className="overflow-hidden rounded-xl border border-border/70 bg-secondary/20 p-3">
                               <summary className="cursor-pointer text-sm font-semibold text-foreground">Editar {supply.name}</summary>
-                              <form action={saveSupplyFromForm} className="mt-4 grid gap-3 md:grid-cols-[1.4fr_0.6fr_0.7fr_0.7fr]">
+                              <form action={saveSupplyFromForm} className="mt-4 min-w-0 space-y-4">
                                 <input type="hidden" name="id" value={supply.id} />
                                 <input type="hidden" name="active" value={supply.active ? 'true' : 'false'} />
-                                <input name="name" defaultValue={supply.name} required className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary" />
-                                <input name="unit" defaultValue={supply.unit} required className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary" />
-                                <input name="unitCost" defaultValue={Number(supply.unitCost).toString()} required inputMode="decimal" className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary" />
-                                <input name="stockQuantity" defaultValue={supply.stockQuantity === null ? '' : Number(supply.stockQuantity).toString()} inputMode="decimal" className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary" />
-                                <select name="categoryId" defaultValue={supply.categoryId ?? ''} className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary md:col-span-3">
-                                  <option value="">Sem categoria</option>
-                                  {supplyCategories.filter((category) => category.active || category.id === supply.categoryId).map((category) => (
-                                    <option key={category.id} value={category.id}>{category.name}{category.active ? '' : ' (inativa)'}</option>
-                                  ))}
-                                </select>
-                                <button type="submit" className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary-hover">
-                                  Atualizar
-                                </button>
+                                <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,0.7fr)_minmax(0,0.8fr)_minmax(0,0.8fr)]">
+                                  <input name="name" defaultValue={supply.name} required className={catalogFieldClassName} />
+                                  <input name="unit" defaultValue={supply.unit} required className={catalogFieldClassName} />
+                                  <input name="unitCost" defaultValue={Number(supply.unitCost).toString()} required inputMode="decimal" className={catalogFieldClassName} />
+                                  <input name="stockQuantity" defaultValue={supply.stockQuantity === null ? '' : Number(supply.stockQuantity).toString()} inputMode="decimal" className={catalogFieldClassName} />
+                                </div>
+                                <label className={catalogLabelClassName}>
+                                  Categoria
+                                  <select name="categoryId" defaultValue={supply.categoryId ?? ''} className={catalogFieldClassName}>
+                                    <option value="">Sem categoria</option>
+                                    {supplyCategories.filter((category) => category.active || category.id === supply.categoryId).map((category) => (
+                                      <option key={category.id} value={category.id}>{category.name}{category.active ? '' : ' (inativa)'}</option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <div className="flex flex-wrap justify-end gap-3">
+                                  <button type="submit" className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary-hover">
+                                    Atualizar
+                                  </button>
+                                </div>
                               </form>
                             </details>
                           </td>
