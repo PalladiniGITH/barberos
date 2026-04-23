@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { requireSession } from '@/lib/auth'
+import { PRODUCT_NAME } from '@/lib/branding'
 import { prisma } from '@/lib/prisma'
 import { ROLE_LABELS, formatCurrency, formatPercent } from '@/lib/utils'
 import { PageHeader } from '@/components/layout/page-header'
@@ -74,7 +75,7 @@ export default async function ConfiguracoesPage() {
 
           <div className="dashboard-panel p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Barbearia</p>
-            <p className="mt-3 text-2xl font-semibold text-foreground">{barbershop?.name ?? 'BarberOS'}</p>
+            <p className="mt-3 text-2xl font-semibold text-foreground">{barbershop?.name ?? PRODUCT_NAME}</p>
             <p className="mt-2 text-sm text-muted-foreground">Seu vinculo operacional atual dentro do sistema.</p>
           </div>
 
@@ -116,7 +117,7 @@ export default async function ConfiguracoesPage() {
                   </div>
                   <div>
                     <p className="text-muted-foreground">Barbearia</p>
-                    <p className="mt-1 font-medium text-foreground">{barbershop?.name ?? 'BarberOS'}</p>
+                    <p className="mt-1 font-medium text-foreground">{barbershop?.name ?? PRODUCT_NAME}</p>
                     <p className="text-muted-foreground">{barbershop?.slug ?? session.user.barbershopSlug}</p>
                   </div>
                   <div>

@@ -2,11 +2,13 @@ import 'server-only'
 
 import { createHash, timingSafeEqual } from 'node:crypto'
 import {
+  AppointmentSource,
   CampaignAutomationBenefitType,
   CampaignAutomationDeliveryStatus,
   CampaignAutomationRunStatus,
   CampaignAutomationTrigger,
   CampaignAutomationType,
+  MessagingDirection,
   MessagingProvider,
   Prisma,
   type CampaignAutomationConfig,
@@ -108,6 +110,67 @@ export interface CampaignAutomationRunSummary {
       eligibleCustomers: number
     }
   }>
+}
+
+export interface CampaignAutomationManagementData {
+  enabled: boolean
+  status: 'active' | 'inactive' | 'attention'
+  statusLabel: string
+  statusDescription: string
+  executionTimeLabel: string
+  localDateIso: string
+  timezone: string
+  lastRun: {
+    localDateIso: string
+    status: CampaignAutomationRunStatus
+    startedAt: Date
+    completedAt: Date | null
+    deliveriesSent: number
+    deliveriesFailed: number
+    deliveriesSkipped: number
+  } | null
+  nextWindow: {
+    localDateIso: string
+    timeLabel: string
+    description: string
+  }
+  todayTotals: {
+    eligibleCustomers: number
+    deliveriesCreated: number
+    deliveriesSent: number
+    deliveriesFailed: number
+    deliveriesSkipped: number
+    deliveryRate: number | null
+  }
+  campaignSummaries: Array<{
+    campaignType: CampaignAutomationType
+    active: boolean
+    benefitDescription: string | null
+    eligibleCustomers: number
+    deliveriesCreated: number
+    deliveriesSent: number
+    deliveriesFailed: number
+    deliveriesSkipped: number
+    deliveryRate: number | null
+    usedAiCount: number
+    fallbackCount: number
+  }>
+  recentDeliveries: Array<{
+    id: string
+    customerName: string
+    campaignType: CampaignAutomationType
+    benefitDescription: string | null
+    status: CampaignAutomationDeliveryStatus
+    sentAt: Date | null
+    createdAt: Date
+    usedAi: boolean
+    usedFallback: boolean
+  }>
+  estimatedImpact: {
+    windowDays: number
+    respondedCustomers: number
+    rebookedCustomers: number
+  }
 }
 
 interface DeliveryPreparation {
@@ -528,6 +591,158 @@ export function buildCampaignMessagingEventDedupeKey(input: {
   return `campaign-event:${input.deliveryId}`
 }
 
+const MANAGEMENT_CAMPAIGN_TYPES = [
+  CampaignAutomationType.BIRTHDAY,
+  CampaignAutomationType.WALK_IN_INACTIVE,
+  CampaignAutomationType.SUBSCRIPTION_ABSENT,
+] as const
+
+type CampaignResultSnapshot = {
+  eligibleCustomers: number
+  deliveriesCreated: number
+  deliveriesSent: number
+  deliveriesFailed: number
+  deliveriesSkipped: number
+}
+
+function asAutomationRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null
+}
+
+function asAutomationNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
+function isKnownCampaignType(value: unknown): value is CampaignAutomationType {
+  return (
+    value === CampaignAutomationType.BIRTHDAY
+    || value === CampaignAutomationType.WALK_IN_INACTIVE
+    || value === CampaignAutomationType.SUBSCRIPTION_ABSENT
+  )
+}
+
+function calculateDeliveryRate(sent: number, failed: number) {
+  const totalFinished = sent + failed
+  return totalFinished > 0 ? (sent / totalFinished) * 100 : null
+}
+
+function extractCampaignResultsFromRunSummary(summary: unknown) {
+  const summaryRecord = asAutomationRecord(summary)
+  const rawResults = Array.isArray(summaryRecord?.campaignResults)
+    ? summaryRecord.campaignResults
+    : []
+
+  const results = new Map<CampaignAutomationType, CampaignResultSnapshot>()
+
+  rawResults.forEach((rawResult) => {
+    const record = asAutomationRecord(rawResult)
+    if (!record) {
+      return
+    }
+
+    const campaignType = record.campaignType
+
+    if (!isKnownCampaignType(campaignType)) {
+      return
+    }
+
+    results.set(campaignType, {
+      eligibleCustomers: asAutomationNumber(record.eligibleCustomers),
+      deliveriesCreated: asAutomationNumber(record.deliveriesCreated),
+      deliveriesSent: asAutomationNumber(record.deliveriesSent),
+      deliveriesFailed: asAutomationNumber(record.deliveriesFailed),
+      deliveriesSkipped: asAutomationNumber(record.deliveriesSkipped),
+    })
+  })
+
+  return results
+}
+
+function extractRunTotalsFromSummary(summary: unknown) {
+  const summaryRecord = asAutomationRecord(summary)
+  const totalsRecord = asAutomationRecord(summaryRecord?.totals)
+
+  return {
+    deliveriesSent: asAutomationNumber(totalsRecord?.deliveriesSent),
+    deliveriesFailed: asAutomationNumber(totalsRecord?.deliveriesFailed),
+    deliveriesSkipped: asAutomationNumber(totalsRecord?.deliveriesSkipped),
+  }
+}
+
+function buildNextAutomationWindow(input: {
+  localDateIso: string
+  dueToday: boolean
+  alreadyRanToday: boolean
+}) {
+  if (input.dueToday && input.alreadyRanToday) {
+    return {
+      localDateIso: shiftIsoDate(input.localDateIso, 1),
+      timeLabel: '09:00',
+      description: 'Proxima execucao diaria esperada.',
+    }
+  }
+
+  if (input.dueToday) {
+    return {
+      localDateIso: input.localDateIso,
+      timeLabel: '09:00',
+      description: 'Janela de hoje ja esta aberta.',
+    }
+  }
+
+  return {
+    localDateIso: input.localDateIso,
+    timeLabel: '09:00',
+    description: 'Execucao prevista para hoje.',
+  }
+}
+
+async function countEligibleCustomersForManagementPanel(input: {
+  barbershopId: string
+  campaignType: CampaignAutomationType
+  localDateIso: string
+  localYear: number
+  cooldownDays: number
+  timezone: string
+  referenceDate: Date
+}) {
+  const baseCustomers = await getBaseCustomersForCampaign({
+    barbershopId: input.barbershopId,
+    campaignType: input.campaignType,
+  })
+
+  if (baseCustomers.length === 0) {
+    return 0
+  }
+
+  const activity = await loadCustomerActivity({
+    barbershopId: input.barbershopId,
+    customerIds: baseCustomers.map((customer) => customer.id),
+    campaignType: input.campaignType,
+    localDateIso: input.localDateIso,
+    timezone: input.timezone,
+    cooldownDays: input.cooldownDays,
+    referenceDate: input.referenceDate,
+  })
+
+  return baseCustomers.filter((customer) =>
+    evaluateCampaignEligibility({
+      campaignType: input.campaignType,
+      localDateIso: input.localDateIso,
+      localYear: input.localYear,
+      cooldownDays: input.cooldownDays,
+      customer,
+      activity: {
+        lastCompletedLocalDateIso: activity.lastCompletedByCustomerId.get(customer.id) ?? null,
+        hasFutureAppointment: activity.futureAppointmentCustomerIds.has(customer.id),
+        latestSentLocalDateIso: activity.latestSentByCustomerId.get(customer.id) ?? null,
+      },
+    }).eligible
+  ).length
+}
+
 function describeCampaignBenefit(input: {
   benefitType: CampaignAutomationBenefitType | null | undefined
   benefitDescription: string | null | undefined
@@ -660,7 +875,7 @@ async function generateCampaignMessageWithAI(input: {
         text: {
           format: {
             type: 'json_schema',
-            name: 'barberos_campaign_message',
+            name: 'barbermain_campaign_message',
             strict: true,
             schema: CAMPAIGN_MESSAGE_JSON_SCHEMA,
           },
@@ -1291,6 +1506,307 @@ async function createDailyRunRecord(input: {
     }
 
     throw error
+  }
+}
+
+export async function getCampaignAutomationManagementData(input: {
+  barbershopId: string
+  referenceDate?: Date
+}): Promise<CampaignAutomationManagementData> {
+  const referenceDate = input.referenceDate ?? new Date()
+  const barbershop = await prisma.barbershop.findUnique({
+    where: { id: input.barbershopId },
+    select: {
+      id: true,
+      timezone: true,
+    },
+  })
+
+  if (!barbershop) {
+    throw new Error('Barbearia nao encontrada para o painel de campanhas automaticas.')
+  }
+
+  const timezone = resolveBusinessTimezone(barbershop.timezone)
+  const localNow = getCurrentDateTimeInTimezone(timezone, referenceDate)
+  const localDateIso = localNow.dateIso
+  const dueToday = shouldRunDailyCampaignAtLocalTime(localNow)
+
+  const [
+    configs,
+    todayRun,
+    latestRun,
+    todayDeliveries,
+    recentDeliveries,
+    recentSentDeliveries,
+  ] = await Promise.all([
+    prisma.campaignAutomationConfig.findMany({
+      where: { barbershopId: input.barbershopId },
+      orderBy: { campaignType: 'asc' },
+    }),
+    prisma.campaignAutomationRun.findUnique({
+      where: {
+        barbershopId_localDateIso: {
+          barbershopId: input.barbershopId,
+          localDateIso,
+        },
+      },
+      select: {
+        id: true,
+        localDateIso: true,
+        status: true,
+        startedAt: true,
+        completedAt: true,
+        summary: true,
+      },
+    }),
+    prisma.campaignAutomationRun.findFirst({
+      where: { barbershopId: input.barbershopId },
+      orderBy: { startedAt: 'desc' },
+      select: {
+        id: true,
+        localDateIso: true,
+        status: true,
+        startedAt: true,
+        completedAt: true,
+        summary: true,
+      },
+    }),
+    prisma.campaignAutomationDelivery.findMany({
+      where: {
+        barbershopId: input.barbershopId,
+        run: { localDateIso },
+      },
+      select: {
+        campaignType: true,
+        status: true,
+        usedAi: true,
+      },
+    }),
+    prisma.campaignAutomationDelivery.findMany({
+      where: { barbershopId: input.barbershopId },
+      orderBy: [{ sentAt: 'desc' }, { createdAt: 'desc' }],
+      take: 8,
+      select: {
+        id: true,
+        campaignType: true,
+        benefitDescription: true,
+        status: true,
+        sentAt: true,
+        createdAt: true,
+        usedAi: true,
+        generatedMessage: true,
+        fallbackMessage: true,
+        customer: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    }),
+    prisma.campaignAutomationDelivery.findMany({
+      where: {
+        barbershopId: input.barbershopId,
+        status: CampaignAutomationDeliveryStatus.SENT,
+        sentAt: {
+          gte: new Date(referenceDate.getTime() - 30 * 24 * 60 * 60 * 1000),
+        },
+      },
+      select: {
+        customerId: true,
+        sentAt: true,
+      },
+    }),
+  ])
+
+  const configByType = new Map(configs.map((config) => [config.campaignType, config]))
+  const todayResultsByType = extractCampaignResultsFromRunSummary(todayRun?.summary)
+
+  const campaignSummaries = await Promise.all(
+    MANAGEMENT_CAMPAIGN_TYPES.map(async (campaignType) => {
+      const config = configByType.get(campaignType)
+      const defaultConfig = DEFAULT_CAMPAIGN_CONFIGS[campaignType]
+      const summaryResult = todayResultsByType.get(campaignType)
+      const deliveries = todayDeliveries.filter((delivery) => delivery.campaignType === campaignType)
+      const sent = deliveries.filter((delivery) => delivery.status === CampaignAutomationDeliveryStatus.SENT).length
+      const failed = deliveries.filter((delivery) => delivery.status === CampaignAutomationDeliveryStatus.FAILED).length
+      const skippedByDeliveryStatus = deliveries.filter((delivery) => delivery.status === CampaignAutomationDeliveryStatus.SKIPPED).length
+      const usedAiCount = deliveries.filter((delivery) => delivery.usedAi).length
+      const fallbackCount = deliveries.filter((delivery) => (
+        delivery.status === CampaignAutomationDeliveryStatus.SENT && !delivery.usedAi
+      )).length
+
+      const eligibleCustomers = summaryResult
+        ? summaryResult.eligibleCustomers
+        : await countEligibleCustomersForManagementPanel({
+            barbershopId: input.barbershopId,
+            campaignType,
+            localDateIso,
+            localYear: localNow.year,
+            cooldownDays: config?.cooldownDays ?? defaultConfig.cooldownDays,
+            timezone,
+            referenceDate,
+          })
+
+      return {
+        campaignType,
+        active: config?.active ?? defaultConfig.active,
+        benefitDescription: config?.benefitDescription ?? defaultConfig.benefitDescription,
+        eligibleCustomers,
+        deliveriesCreated: summaryResult?.deliveriesCreated ?? deliveries.length,
+        deliveriesSent: sent,
+        deliveriesFailed: failed,
+        deliveriesSkipped: summaryResult?.deliveriesSkipped ?? skippedByDeliveryStatus,
+        deliveryRate: calculateDeliveryRate(sent, failed),
+        usedAiCount,
+        fallbackCount,
+      }
+    })
+  )
+
+  const todayTotals = campaignSummaries.reduce(
+    (accumulator, item) => ({
+      eligibleCustomers: accumulator.eligibleCustomers + item.eligibleCustomers,
+      deliveriesCreated: accumulator.deliveriesCreated + item.deliveriesCreated,
+      deliveriesSent: accumulator.deliveriesSent + item.deliveriesSent,
+      deliveriesFailed: accumulator.deliveriesFailed + item.deliveriesFailed,
+      deliveriesSkipped: accumulator.deliveriesSkipped + item.deliveriesSkipped,
+      deliveryRate: null,
+    }),
+    {
+      eligibleCustomers: 0,
+      deliveriesCreated: 0,
+      deliveriesSent: 0,
+      deliveriesFailed: 0,
+      deliveriesSkipped: 0,
+      deliveryRate: null as number | null,
+    }
+  )
+  todayTotals.deliveryRate = calculateDeliveryRate(todayTotals.deliveriesSent, todayTotals.deliveriesFailed)
+
+  const activeConfigs = campaignSummaries.filter((summary) => summary.active).length
+  const enabled = isCampaignAutomationEnabled()
+  const status: CampaignAutomationManagementData['status'] = !enabled || activeConfigs === 0
+    ? 'inactive'
+    : todayRun?.status === CampaignAutomationRunStatus.FAILED
+      ? 'attention'
+      : 'active'
+  const statusLabel = status === 'active'
+    ? 'Ativa'
+    : status === 'attention'
+      ? 'Atenção'
+      : 'Inativa'
+  const statusDescription = status === 'active'
+    ? 'A rotina diaria esta habilitada e pronta para relacionamento automatico.'
+    : status === 'attention'
+      ? 'A ultima execucao de hoje falhou e merece revisao antes da proxima janela.'
+      : 'A automacao nao esta habilitada para disparos diarios agora.'
+
+  const latestRunTotals = latestRun ? extractRunTotalsFromSummary(latestRun.summary) : null
+  const earliestSentAtByCustomerId = new Map<string, Date>()
+  recentSentDeliveries.forEach((delivery) => {
+    if (!delivery.sentAt) {
+      return
+    }
+
+    const current = earliestSentAtByCustomerId.get(delivery.customerId)
+    if (!current || delivery.sentAt < current) {
+      earliestSentAtByCustomerId.set(delivery.customerId, delivery.sentAt)
+    }
+  })
+
+  const impactedCustomerIds = Array.from(earliestSentAtByCustomerId.keys())
+  const impactWindowStart = new Date(referenceDate.getTime() - 30 * 24 * 60 * 60 * 1000)
+  const [responseEvents, rebookedAppointments] = impactedCustomerIds.length > 0
+    ? await Promise.all([
+        prisma.messagingEvent.findMany({
+          where: {
+            barbershopId: input.barbershopId,
+            customerId: { in: impactedCustomerIds },
+            direction: MessagingDirection.INBOUND,
+            createdAt: { gte: impactWindowStart },
+          },
+          select: {
+            customerId: true,
+            createdAt: true,
+          },
+        }),
+        prisma.appointment.findMany({
+          where: {
+            barbershopId: input.barbershopId,
+            customerId: { in: impactedCustomerIds },
+            source: AppointmentSource.WHATSAPP,
+            createdAt: { gte: impactWindowStart },
+          },
+          select: {
+            customerId: true,
+            createdAt: true,
+          },
+        }),
+      ])
+    : [[], []] as const
+
+  const respondedCustomers = new Set<string>()
+  responseEvents.forEach((event) => {
+    if (!event.customerId) {
+      return
+    }
+
+    const firstCampaignSentAt = earliestSentAtByCustomerId.get(event.customerId)
+    if (firstCampaignSentAt && event.createdAt >= firstCampaignSentAt) {
+      respondedCustomers.add(event.customerId)
+    }
+  })
+
+  const rebookedCustomers = new Set<string>()
+  rebookedAppointments.forEach((appointment) => {
+    const firstCampaignSentAt = earliestSentAtByCustomerId.get(appointment.customerId)
+    if (firstCampaignSentAt && appointment.createdAt >= firstCampaignSentAt) {
+      rebookedCustomers.add(appointment.customerId)
+    }
+  })
+
+  return {
+    enabled,
+    status,
+    statusLabel,
+    statusDescription,
+    executionTimeLabel: '09:00',
+    localDateIso,
+    timezone,
+    lastRun: latestRun
+      ? {
+          localDateIso: latestRun.localDateIso,
+          status: latestRun.status,
+          startedAt: latestRun.startedAt,
+          completedAt: latestRun.completedAt,
+          deliveriesSent: latestRunTotals?.deliveriesSent ?? 0,
+          deliveriesFailed: latestRunTotals?.deliveriesFailed ?? 0,
+          deliveriesSkipped: latestRunTotals?.deliveriesSkipped ?? 0,
+        }
+      : null,
+    nextWindow: buildNextAutomationWindow({
+      localDateIso,
+      dueToday,
+      alreadyRanToday: Boolean(todayRun),
+    }),
+    todayTotals,
+    campaignSummaries,
+    recentDeliveries: recentDeliveries.map((delivery) => ({
+      id: delivery.id,
+      customerName: delivery.customer.name,
+      campaignType: delivery.campaignType,
+      benefitDescription: delivery.benefitDescription,
+      status: delivery.status,
+      sentAt: delivery.sentAt,
+      createdAt: delivery.createdAt,
+      usedAi: delivery.usedAi,
+      usedFallback: !delivery.usedAi && Boolean(delivery.generatedMessage ?? delivery.fallbackMessage),
+    })),
+    estimatedImpact: {
+      windowDays: 30,
+      respondedCustomers: respondedCustomers.size,
+      rebookedCustomers: rebookedCustomers.size,
+    },
   }
 }
 

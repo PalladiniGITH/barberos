@@ -394,7 +394,7 @@ export function buildBusinessAnalystPrompt(context: BusinessInsightsContext, det
   const serializedPayload = JSON.stringify(payload)
 
   return [
-    'Voce e o analista de negocio da BarberOS.',
+    'Voce e o analista de negocio da BarberMain.',
     'Use apenas o JSON enviado.',
     'Escreva para dono de barbearia com linguagem curta, clara e acionavel.',
     'Nao invente dados. Nao use texto generico. Nao misture tenants.',
@@ -443,7 +443,7 @@ export async function generateOpenAIBusinessReport(params: {
         text: {
           format: {
             type: 'json_schema',
-            name: 'barberos_business_analyst',
+            name: 'barbermain_business_analyst',
             strict: true,
             schema: OPENAI_RESPONSE_JSON_SCHEMA,
           },

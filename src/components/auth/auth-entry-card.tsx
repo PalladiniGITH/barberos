@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { signIn } from 'next-auth/react'
 import { ArrowRight, Loader2, LockKeyhole, Scissors } from 'lucide-react'
 import { AUTHENTICATED_HOME_PATH } from '@/lib/auth-routes'
+import { PRODUCT_NAME, PRODUCT_POSITIONING } from '@/lib/branding'
 
 interface AuthEntryCardProps {
   callbackUrl: string
@@ -53,14 +54,13 @@ export function AuthEntryCard({
         <section className="premium-shell p-8 sm:p-10 lg:p-12">
           <div className="spotlight-chip">
             <Scissors className="h-3.5 w-3.5" />
-            BarberOS
+            {PRODUCT_NAME}
           </div>
           <h1 className="spotlight-title max-w-xl">
             Operacao, agenda e inteligencia para a rotina da barbearia.
           </h1>
           <p className="spotlight-copy max-w-2xl">
-            Entre para acompanhar a agenda, ajustar a operacao do time e manter os agendamentos
-            centralizados sem sair do fluxo do dia.
+            {PRODUCT_POSITIONING} Entre para acompanhar agenda, equipe e relacionamento sem sair do fluxo do dia.
           </p>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-3">

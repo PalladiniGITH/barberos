@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { assertAdministrativeRole, requireSession } from '@/lib/auth'
+import { PRODUCT_NAME } from '@/lib/branding'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency } from '@/lib/utils'
 import { PageHeader } from '@/components/layout/page-header'
@@ -107,7 +108,7 @@ export default async function InsumosPage() {
             <div>
               <h2 className="text-xl font-semibold text-foreground">Base de insumos</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                O objetivo aqui é mostrar que a precificação do BarberOS tem fundamento de custo, não chute.
+                O objetivo aqui é mostrar que a precificação do {PRODUCT_NAME} tem fundamento de custo, não chute.
               </p>
             </div>
             <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">

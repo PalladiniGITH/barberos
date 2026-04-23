@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { assertAdministrativeRole, requireSession } from '@/lib/auth'
+import { PRODUCT_NAME } from '@/lib/branding'
 import { prisma } from '@/lib/prisma'
 import {
   CHALLENGE_TYPE_LABELS,
@@ -383,7 +384,7 @@ export default async function DesafiosPage() {
             <div className="mt-4 space-y-3 text-sm text-muted-foreground">
               <p className="inline-flex items-start gap-2">
                 <Target className="mt-0.5 h-4 w-4 text-primary" />
-                Mostra que o BarberOS não cuida só de lançamento, mas também de motivação comercial.
+                Mostra que o {PRODUCT_NAME} não cuida só de lançamento, mas também de motivação comercial.
               </p>
               <p className="inline-flex items-start gap-2">
                 <Users className="mt-0.5 h-4 w-4 text-primary" />

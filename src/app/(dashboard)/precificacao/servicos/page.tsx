@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { assertAdministrativeRole, requireSession } from '@/lib/auth'
+import { PRODUCT_NAME } from '@/lib/branding'
 import { prisma } from '@/lib/prisma'
 import { cn, formatCurrency, formatPercent } from '@/lib/utils'
 import { PageHeader } from '@/components/layout/page-header'
@@ -301,7 +302,7 @@ export default async function ServicosPage() {
                   O que vende aqui
                 </p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Esta página mostra que o BarberOS não só registra receita. Ele ajuda a decidir preço, margem e mix de serviços.
+                  Esta página mostra que o {PRODUCT_NAME} não só registra receita. Ele ajuda a decidir preço, margem e mix de serviços.
                 </p>
               </div>
 

@@ -1246,7 +1246,7 @@ function buildInterpreterPrompt(input: WhatsAppInterpreterInput) {
   const summary = input.conversationSummary
 
   return [
-    'Voce interpreta mensagens de WhatsApp para um agente guiado de agendamento da BarberOS.',
+    'Voce interpreta mensagens de WhatsApp para um agente guiado de agendamento da BarberMain.',
     'Voce nunca cria agendamento, nunca inventa horario e nunca decide barbeiro sozinho.',
     'Sua funcao e somente interpretar a mensagem de forma estruturada.',
     `Barbearia: ${input.barbershopName}.`,
@@ -1393,7 +1393,7 @@ async function classifyContextualConfirmationWithOpenAI(input: {
       text: {
         format: {
           type: 'json_schema',
-          name: 'barberos_contextual_confirmation',
+          name: 'barbermain_contextual_confirmation',
           strict: true,
           schema: CONTEXTUAL_CONFIRMATION_JSON_SCHEMA,
         },
@@ -1553,7 +1553,7 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
         text: {
           format: {
             type: 'json_schema',
-            name: 'barberos_whatsapp_intent',
+            name: 'barbermain_whatsapp_intent',
             strict: true,
             schema: INTENT_JSON_SCHEMA,
           },

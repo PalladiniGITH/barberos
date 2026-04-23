@@ -19,9 +19,11 @@ import type { BusinessInsightHref, BusinessIntelligenceReport } from '@/lib/busi
 import { getBusinessAnalystReport } from '@/lib/business-analyst'
 import { buildBarbershopHealthSnapshot } from '@/lib/barbershop-health'
 import { getBarberDashboardData } from '@/lib/barber-dashboard'
+import { getCampaignAutomationManagementData } from '@/lib/campaign-automation'
 import { findSessionProfessional } from '@/lib/professionals/session-professional'
 import { BarberHomePanel } from '@/components/dashboard/barber-home-panel'
 import { BarbershopHealthPanel } from '@/components/dashboard/barbershop-health-panel'
+import { CampaignAutomationPanel } from '@/components/dashboard/campaign-automation-panel'
 import { ProfessionalRanking } from '@/components/dashboard/professional-ranking'
 import { RevenueChart } from '@/components/dashboard/revenue-chart'
 import { DashboardInsightsPreview } from '@/components/inteligencia/insight-card'
@@ -421,12 +423,17 @@ export default async function DashboardPage({ searchParams }: Props) {
     return <BarberHomePanel data={barberDashboardData} />
   }
 
-  const intelligenceReport = await getBusinessAnalystReport({
-    barbershopId: session.user.barbershopId,
-    month,
-    year,
-    viewerRole: session.user.role,
-  })
+  const [intelligenceReport, campaignAutomation] = await Promise.all([
+    getBusinessAnalystReport({
+      barbershopId: session.user.barbershopId,
+      month,
+      year,
+      viewerRole: session.user.role,
+    }),
+    getCampaignAutomationManagementData({
+      barbershopId: session.user.barbershopId,
+    }),
+  ])
   const data = buildDashboardData(intelligenceReport)
   const barbershopHealth = buildBarbershopHealthSnapshot(intelligenceReport.context.customers)
 
@@ -602,6 +609,8 @@ export default async function DashboardPage({ searchParams }: Props) {
       </section>
 
       <BarbershopHealthPanel health={barbershopHealth} />
+
+      <CampaignAutomationPanel data={campaignAutomation} />
 
       {primaryAlert && <AlertBanner alert={primaryAlert} />}
 

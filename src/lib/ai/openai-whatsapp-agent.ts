@@ -1135,7 +1135,7 @@ async function classifyContextualConfirmationWithOpenAI(input: {
       text: {
         format: {
           type: 'json_schema',
-          name: 'barberos_contextual_confirmation',
+          name: 'barbermain_contextual_confirmation',
           strict: true,
           schema: CONTEXTUAL_CONFIRMATION_SCHEMA,
         },
@@ -2819,7 +2819,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
         text: {
           format: {
             type: 'json_schema',
-            name: 'barberos_whatsapp_agent_turn',
+            name: 'barbermain_whatsapp_agent_turn',
             strict: true,
             schema: AGENT_OUTPUT_SCHEMA,
           },

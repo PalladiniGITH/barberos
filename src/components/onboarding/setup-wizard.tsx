@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { completeOnboarding } from '@/actions/onboarding'
+import { PRODUCT_NAME } from '@/lib/branding'
 import { cn } from '@/lib/utils'
 
 const schema = z.object({
@@ -142,7 +143,7 @@ export function SetupWizard({
       return
     }
 
-    toast.success('Barbearia configurada! Agora o BarberOS pode entregar valor de verdade.')
+    toast.success(`Barbearia configurada! Agora o ${PRODUCT_NAME} pode entregar valor de verdade.`)
     router.push('/dashboard')
     router.refresh()
   }
@@ -502,7 +503,7 @@ export function SetupWizard({
               <div className="md:col-span-2 rounded-2xl border border-border/70 bg-[rgba(30,41,59,0.72)] p-4">
                 <p className="text-sm font-semibold text-foreground">Feche o setup já com direção comercial</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Em vez de só registrar movimento, o BarberOS vai mostrar se {currentMonthLabel.toLowerCase()} está no caminho certo.
+                  Em vez de só registrar movimento, o {PRODUCT_NAME} vai mostrar se {currentMonthLabel.toLowerCase()} está no caminho certo.
                 </p>
               </div>
 

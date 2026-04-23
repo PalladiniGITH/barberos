@@ -21,6 +21,7 @@ import {
   Wallet,
   Zap,
 } from 'lucide-react'
+import { PRODUCT_MONOGRAM, PRODUCT_NAME } from '@/lib/branding'
 import { isBarberRole } from '@/lib/auth-routes'
 import { cn } from '@/lib/utils'
 import { useNavigationFeedback } from '@/components/layout/navigation-feedback'
@@ -537,10 +538,10 @@ export function Sidebar({
           <Link
             href="/dashboard"
             onClick={() => startNavigation('/dashboard')}
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[0.95rem] bg-[linear-gradient(135deg,rgba(124,58,237,0.2),rgba(15,23,42,0.96))] text-violet-100 shadow-[0_18px_34px_-24px_rgba(2,6,23,0.82)]"
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[0.95rem] border border-[rgba(124,58,237,0.28)] bg-[radial-gradient(circle_at_30%_20%,rgba(168,85,247,0.34),transparent_42%),linear-gradient(135deg,rgba(124,58,237,0.28),rgba(15,23,42,0.96))] text-[11px] font-semibold tracking-[0.16em] text-violet-50 shadow-[0_18px_34px_-24px_rgba(2,6,23,0.82)]"
             title={barberView ? 'Meu painel' : 'Painel do negocio'}
           >
-            <Scissors className="h-4 w-4" />
+            {PRODUCT_MONOGRAM}
           </Link>
 
           <div
@@ -549,9 +550,9 @@ export function Sidebar({
               expanded ? 'max-w-full translate-x-0 opacity-100' : 'max-w-0 -translate-x-2 opacity-0'
             )}
           >
-            <p className="truncate text-sm font-semibold text-slate-50">BarberOS</p>
+            <p className="truncate text-sm font-semibold tracking-tight text-slate-50">{PRODUCT_NAME}</p>
             <p className="truncate text-xs text-slate-500">
-              {barberView ? 'Painel do profissional' : 'Operacao diaria da barbearia'}
+              {barberView ? 'Painel do profissional' : 'Gestao premium da barbearia'}
             </p>
           </div>
         </div>

@@ -3,6 +3,7 @@
 import { Clock3, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { formatPeriodLabel } from '@/lib/utils'
+import { PRODUCT_NAME } from '@/lib/branding'
 import { AccountMenu } from '@/components/layout/account-menu'
 
 export interface HeaderSessionUser {
@@ -128,7 +129,7 @@ function getPageMeta(pathname: string, role?: string | null) {
   }
 
   return {
-    breadcrumb: 'BarberOS',
+    breadcrumb: PRODUCT_NAME,
     title: 'Operacao',
     helper: 'Acompanhe a barbearia em um painel mais claro e confiavel.',
   }

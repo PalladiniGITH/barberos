@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { assertAdministrativeRole, requireSession } from '@/lib/auth'
 import { SetupWizard } from '@/components/onboarding/setup-wizard'
 import { getOnboardingState } from '@/lib/onboarding'
+import { PRODUCT_NAME } from '@/lib/branding'
 import { prisma } from '@/lib/prisma'
 import { formatMonthYear } from '@/lib/utils'
 
@@ -70,7 +71,7 @@ export default async function SetupPage() {
       <div className="mx-auto flex max-w-7xl flex-col gap-4">
         <div className="max-w-3xl">
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-primary/80">
-            Onboarding BarberOS
+            Onboarding {PRODUCT_NAME}
           </p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
             Configure o essencial e entregue valor logo no primeiro acesso
