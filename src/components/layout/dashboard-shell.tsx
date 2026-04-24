@@ -10,7 +10,7 @@ import {
 } from '@/components/layout/navigation-feedback'
 import { Sidebar } from '@/components/layout/sidebar'
 
-const SIDEBAR_STORAGE_KEY = 'barbermain:sidebar-state'
+const SIDEBAR_STORAGE_KEY = 'barberex:sidebar-state'
 
 function isFocusRoute(pathname: string) {
   return pathname.startsWith('/agendamentos') || pathname.startsWith('/inteligencia')

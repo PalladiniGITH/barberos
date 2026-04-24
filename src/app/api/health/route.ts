@@ -5,7 +5,7 @@ export const runtime = 'nodejs'
 export async function GET() {
   return NextResponse.json({
     ok: true,
-    service: 'barbermain-web',
+    service: 'barberex-web',
     uptimeSeconds: Math.round(process.uptime()),
     timestamp: new Date().toISOString(),
   })

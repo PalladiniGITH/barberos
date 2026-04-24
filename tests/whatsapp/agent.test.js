@@ -655,8 +655,7 @@ test('erro transitório de disponibilidade vira fallback neutro de infraestrutur
   })
 
   assert.equal(override.nextAction, 'ASK_CLARIFICATION')
-  assert.match(override.replyText, /instabilidade/i)
-  assert.match(override.replyText, /Vou tentar novamente/i)
+  assert.equal(override.replyText, 'Nao consegui verificar os horarios agora, pode tentar novamente daqui a pouco?')
 })
 
 test('preferredPeriod EVENING libera a busca de disponibilidade sem exigir horario exato', () => {
@@ -849,16 +848,32 @@ test('preserva o slot quando o cliente escolhe um horario exato antes da confirm
   assert.equal(memory.selectedSlot?.timeLabel, '16:00')
 })
 
-test('trata respostas afirmativas amplas como confirmacao real no momento certo', () => {
-  const affirmativeReplies = ['sim', 'ss', 'isso', 'isso mesmo', 'desejo', 'quero', 'pode marcar', 'confirmar', 'fechado', 'ok', 'blz', 'aham', 'uhum']
+test('aceita apenas confirmacoes explicitas fortes como fechamento real', () => {
+  const affirmativeReplies = [
+    'confirmo',
+    'confirmar',
+    'pode marcar',
+    'pode confirmar',
+    'pode agendar',
+    'sim pode marcar',
+    'sim pode confirmar',
+    'quero confirmar',
+    'fechado',
+  ]
 
   affirmativeReplies.forEach((reply) => {
     assert.equal(agentTesting.isExplicitConfirmation(reply), true)
   })
 })
 
+test('mensagens vagas nao contam como confirmacao final do agendamento', () => {
+  ;['sim', 'ss', 'isso', 'ok', 'ok tente', 'blz', 'beleza', 'pode tentar', 'tenta ai', 'aham', 'uhum'].forEach((reply) => {
+    assert.equal(agentTesting.isExplicitConfirmation(reply), false, reply)
+  })
+})
+
 test('confirmacoes contextuais curtas fecham corretamente em WAITING_CONFIRMATION', () => {
-  ;['isso', 'isso mesmo', 'pode', 'pode sim', 'fechado', 'blz', 'beleza', 'certo', 'aham', 'uhum', 'ok', 'ok sim', 'ss'].forEach((message) => {
+  ;['confirmo', 'confirmar', 'pode confirmar', 'pode marcar', 'pode agendar', 'sim pode confirmar', 'fechado'].forEach((message) => {
     const memory = createConfirmationReadyMemory()
 
     assert.equal(
@@ -874,7 +889,7 @@ test('confirmacoes contextuais curtas fecham corretamente em WAITING_CONFIRMATIO
 })
 
 test('fora de WAITING_CONFIRMATION uma concordancia curta nao vira confirmacao de agendamento', () => {
-  ;['isso', 'isso mesmo', 'pode', 'pode sim', 'fechado', 'blz', 'beleza', 'certo', 'aham', 'uhum', 'ok', 'ok sim', 'ss'].forEach((message) => {
+  ;['confirmo', 'confirmar', 'pode confirmar', 'pode marcar', 'pode agendar', 'sim pode confirmar', 'fechado'].forEach((message) => {
     const memory = createConfirmationReadyMemory()
     memory.state = 'WAITING_TIME'
 
@@ -890,11 +905,12 @@ test('fora de WAITING_CONFIRMATION uma concordancia curta nao vira confirmacao d
   })
 })
 
-test('caminho de contextual confirmation heuristic aceita as expressoes curtas reais no contexto correto', () => {
-  ;['isso', 'isso mesmo', 'pode', 'pode sim', 'fechado', 'blz', 'beleza', 'certo', 'aham', 'uhum', 'ok', 'ok sim', 'ss'].forEach((message) => {
+test('heuristica contextual so aceita confirmacoes explicitas com slot realmente apresentado', () => {
+  ;['confirmo', 'confirmar', 'pode confirmar', 'pode marcar', 'pode agendar', 'sim pode confirmar', 'fechado'].forEach((message) => {
     const result = agentTesting.resolveContextualConfirmationHeuristic({
       memory: createConfirmationReadyMemory(),
       inboundText: message,
+      lastAssistantText: 'Encontrei este horario para Corte Classic:\n\n- Data: quinta-feira, 16/04\n- Horario: 17:30\n- Barbeiro: Rafael Costa\n\nQuer confirmar esse agendamento?',
     })
 
     assert.equal(result.accepted, true, message)
@@ -905,22 +921,24 @@ test('caminho de contextual confirmation heuristic aceita as expressoes curtas r
 })
 
 test('caminho de llm confirmation classification so arma para concordancias curtas sem correcao explicita', () => {
-  ;['isso', 'pode', 'fechado', 'blz', 'ok', 'ss'].forEach((message) => {
+  ;['confirmo', 'pode confirmar', 'pode marcar', 'pode agendar', 'fechado'].forEach((message) => {
     assert.equal(
       agentTesting.shouldUseContextualConfirmationClassifier({
         memory: createConfirmationReadyMemory(),
         inboundText: message,
+        lastAssistantText: 'Encontrei este horario para Corte Classic:\n\n- Data: quinta-feira, 16/04\n- Horario: 17:30\n- Barbeiro: Rafael Costa\n\nQuer confirmar esse agendamento?',
       }),
       true,
       message
     )
   })
 
-  ;['isso 14:30', 'pode ser com o Matheus', 'ok amanha', 'fechado 16h', 'ss 14:30', 'ss com o Matheus'].forEach((message) => {
+  ;['ok', 'blz', 'beleza', 'ok tente', 'tenta ai', 'pode tentar', 'confirmo 14:30', 'pode confirmar amanha'].forEach((message) => {
     assert.equal(
       agentTesting.shouldUseContextualConfirmationClassifier({
         memory: createConfirmationReadyMemory(),
         inboundText: message,
+        lastAssistantText: 'Encontrei este horario para Corte Classic:\n\n- Data: quinta-feira, 16/04\n- Horario: 17:30\n- Barbeiro: Rafael Costa\n\nQuer confirmar esse agendamento?',
       }),
       false,
       message
@@ -930,8 +948,8 @@ test('caminho de llm confirmation classification so arma para concordancias curt
 
 test('horario explicito vence confirmacao generica na mesma frase', async () => {
   const samples = [
-    ['pode ser 14:30', '14:30'],
-    ['sim 15h', '15:00'],
+    ['confirmo 14:30', '14:30'],
+    ['pode confirmar 15h', '15:00'],
     ['ok 16:00', '16:00'],
   ]
 
@@ -992,7 +1010,7 @@ test('mudanca de barbeiro vence confirmacao curta na mesma frase', async () => {
 
 test('mudanca de data vence confirmacao curta na mesma frase', async () => {
   const intent = await interpretWhatsAppMessage({
-    message: 'sim amanha',
+    message: 'pode confirmar amanha',
     barbershopName: 'Linha Nobre',
     barbershopTimezone: 'America/Sao_Paulo',
     conversationState: 'WAITING_CONFIRMATION',
@@ -1018,12 +1036,12 @@ test('mudanca de data vence confirmacao curta na mesma frase', async () => {
 
 test('correcoes explicitas vencem a confirmacao curta e nao reaproveitam slot antigo', async () => {
   const samples = [
-    ['isso 14:30', 'TIME'],
+    ['confirmo 14:30', 'TIME'],
     ['pode ser com o Matheus', 'PROFESSIONAL'],
-    ['ok amanha', 'DATE'],
+    ['pode confirmar amanha', 'DATE'],
     ['fechado 16h', 'TIME'],
-    ['ss 14:30', 'TIME'],
-    ['ss com o Matheus', 'PROFESSIONAL'],
+    ['confirmo 14:30', 'TIME'],
+    ['confirmo com o Matheus', 'PROFESSIONAL'],
   ]
 
   for (const [message, correctionTarget] of samples) {
@@ -1063,7 +1081,7 @@ test('correcoes explicitas vencem a confirmacao curta e nao reaproveitam slot an
 })
 
 test('confirmacoes curtas nao passam sem slot real ou com barbeiro indefinido', () => {
-  ;['isso', 'pode', 'fechado', 'ok sim', 'ss'].forEach((message) => {
+  ;['confirmo', 'pode confirmar', 'pode marcar', 'sim pode confirmar', 'fechado'].forEach((message) => {
     const noSlotMemory = createConfirmationReadyMemory()
     noSlotMemory.selectedSlot = null
 
@@ -1076,6 +1094,7 @@ test('confirmacoes curtas nao passam sem slot real ou com barbeiro indefinido', 
       agentTesting.resolveContextualConfirmationHeuristic({
         memory: noSlotMemory,
         inboundText: message,
+        lastAssistantText: 'Encontrei este horario para Corte Classic:\n\n- Data: quinta-feira, 16/04\n- Horario: 17:30\n- Barbeiro: Rafael Costa\n\nQuer confirmar esse agendamento?',
       }).accepted,
       false,
       `noSlot ${message}`
@@ -1085,6 +1104,7 @@ test('confirmacoes curtas nao passam sem slot real ou com barbeiro indefinido', 
       agentTesting.resolveContextualConfirmationHeuristic({
         memory: noProfessionalMemory,
         inboundText: message,
+        lastAssistantText: 'Encontrei este horario para Corte Classic:\n\n- Data: quinta-feira, 16/04\n- Horario: 17:30\n- Barbeiro: Rafael Costa\n\nQuer confirmar esse agendamento?',
       }).accepted,
       false,
       `noProfessional ${message}`
@@ -1094,7 +1114,7 @@ test('confirmacoes curtas nao passam sem slot real ou com barbeiro indefinido', 
       agentTesting.shouldUseDeterministicConfirmationShortcut({
         memory: noSlotMemory,
         inboundText: message,
-        lastAssistantText: 'Posso confirmar Corte Classic para quinta-feira, 16/04 as 17:30 com Rafael Costa?',
+        lastAssistantText: 'Encontrei este horario para Corte Classic:\n\n- Data: quinta-feira, 16/04\n- Horario: 17:30\n- Barbeiro: Rafael Costa\n\nQuer confirmar esse agendamento?',
       }),
       false,
       `noSlot shortcut ${message}`
@@ -1121,12 +1141,12 @@ test('atalho deterministico nao confirma slot antigo quando a resposta traz novo
     endAtIso: '2026-04-16T11:35:00.000Z',
   }
 
-  assert.equal(agentTesting.isExplicitConfirmation('pode ser 14:30'), true)
-  assert.equal(agentTesting.isPureExplicitConfirmation('pode ser 14:30'), false)
+  assert.equal(agentTesting.isExplicitConfirmation('confirmo 14:30'), true)
+  assert.equal(agentTesting.isPureExplicitConfirmation('confirmo 14:30'), false)
   assert.equal(
     agentTesting.shouldUseDeterministicConfirmationShortcut({
       memory,
-      inboundText: 'pode ser 14:30',
+      inboundText: 'confirmo 14:30',
       lastAssistantText: 'Posso confirmar quinta-feira, 16/04 as 08:00 com Lucas Ribeiro?',
     }),
     false
@@ -1370,7 +1390,7 @@ test('bloqueia linguagem de sucesso antes da persistencia real do agendamento', 
   })
 
   assert.doesNotMatch(reply, /Agendamento confirmado/i)
-  assert.match(reply, /Posso confirmar/i)
+  assert.match(reply, /Quer confirmar esse agendamento/i)
 })
 
 test('atalho deterministico fecha a confirmacao quando o cliente responde afirmativamente', () => {
@@ -1394,10 +1414,23 @@ test('atalho deterministico fecha a confirmacao quando o cliente responde afirma
   assert.equal(
     agentTesting.shouldUseDeterministicConfirmationShortcut({
       memory,
-      inboundText: 'pode',
-      lastAssistantText: 'Posso confirmar esse horario para voce?',
+      inboundText: 'pode marcar',
+      lastAssistantText: 'Encontrei este horario para Corte Classic:\n\n- Data: domingo, 13/04\n- Horario: 15:00\n- Barbeiro: Rafael Costa\n\nQuer confirmar esse agendamento?',
     }),
     true
+  )
+})
+
+test('atalho deterministico nao confirma quando o slot nao foi apresentado claramente ao cliente', () => {
+  const memory = createConfirmationReadyMemory()
+
+  assert.equal(
+    agentTesting.shouldUseDeterministicConfirmationShortcut({
+      memory,
+      inboundText: 'confirmo',
+      lastAssistantText: 'Posso confirmar esse horario para voce?',
+    }),
+    false
   )
 })
 
@@ -1443,6 +1476,42 @@ test('erro de search_availability por servico inexistente volta para a lista rea
   assert.equal(override.nextAction, 'ASK_SERVICE')
   assert.match(override.replyText, /Corte Classic/)
   assert.match(override.replyText, /Barba/)
+})
+
+test('falha critica de disponibilidade limpa slot promovido e nao deixa o fluxo em confirmacao', () => {
+  const memory = createConfirmationReadyMemory()
+  memory.offeredSlots = [memory.selectedSlot]
+
+  const override = agentTesting.resolveToolFailureOverride({
+    toolTrace: [
+      {
+        name: 'confirm_booking',
+        arguments: {},
+        result: {
+          status: 'error',
+          reason: 'availability_infrastructure_error',
+        },
+      },
+    ],
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    preferredProfessionalName: null,
+    serviceNames: SERVICES.map((service) => service.name),
+    nowContext: createAgentInput().nowContext,
+  })
+
+  const nextState = agentTesting.inferConversationState(
+    override.nextAction,
+    memory,
+    createAgentInput().nowContext
+  )
+
+  assert.equal(override.nextAction, 'ASK_CLARIFICATION')
+  assert.equal(override.replyText, 'Nao consegui verificar os horarios agora, pode tentar novamente daqui a pouco?')
+  assert.equal(memory.selectedSlot, null)
+  assert.deepEqual(memory.offeredSlots, [])
+  assert.equal(nextState, 'WAITING_TIME')
 })
 
 test('fluxo com progresso util nao volta para IDLE quando ainda nao existe slot real', () => {

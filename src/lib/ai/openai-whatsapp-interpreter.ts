@@ -244,6 +244,38 @@ function normalizeText(value: string) {
     .trim()
 }
 
+function normalizeIntentPhrase(value: string) {
+  return normalizeText(value).replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function isExplicitConfirmationMessage(message: string) {
+  const normalized = normalizeIntentPhrase(message)
+  const explicitPhrases = [
+    'confirmo',
+    'confirmar',
+    'confirma',
+    'confirmado',
+    'fechar',
+    'fechado',
+    'pode confirmar',
+    'pode marcar',
+    'pode agendar',
+    'pode fechar',
+    'sim pode confirmar',
+    'sim pode marcar',
+    'sim pode agendar',
+    'sim pode fechar',
+    'quero confirmar',
+    'quero marcar',
+    'quero agendar',
+    'desejo confirmar',
+    'desejo marcar',
+    'desejo agendar',
+  ]
+
+  return explicitPhrases.some((phrase) => normalized === phrase || normalized.startsWith(`${phrase} `))
+}
+
 const NORMALIZED_NAME_STOPWORDS = new Set(NAME_STOPWORDS.map((term) => normalizeText(term)))
 
 function tokenizeNormalized(value: string) {
@@ -872,6 +904,29 @@ function includesAnyPhrase(normalized: string, phrases: string[]) {
   return phrases.some((phrase) => normalized.includes(phrase))
 }
 
+const STRICT_CONTEXTUAL_CONFIRMATION_PHRASES = [
+  'sim pode confirmar',
+  'sim pode marcar',
+  'sim pode agendar',
+  'sim pode fechar',
+  'pode confirmar',
+  'pode marcar',
+  'pode agendar',
+  'pode fechar',
+  'quero confirmar',
+  'quero marcar',
+  'quero agendar',
+  'desejo confirmar',
+  'desejo marcar',
+  'desejo agendar',
+  'confirmo',
+  'confirmar',
+  'confirma',
+  'confirmado',
+  'fechar',
+  'fechado',
+]
+
 function hasExplicitConfirmationCorrectionCue(message: string) {
   const normalized = normalizeText(message)
 
@@ -883,8 +938,26 @@ function hasExplicitConfirmationCorrectionCue(message: string) {
 }
 
 function detectContextualConfirmationMessage(message: string) {
-  const normalized = normalizeText(message)
-  return includesAnyPhrase(normalized, CONTEXTUAL_CONFIRMATION_PHRASES)
+  const normalized = normalizeIntentPhrase(message)
+  return includesAnyPhrase(normalized, STRICT_CONTEXTUAL_CONFIRMATION_PHRASES)
+}
+
+function hasPresentedConfirmationSlot(summary: WhatsAppInterpreterInput['conversationSummary']) {
+  if (!summary.lastAssistantMessage || !summary.requestedTimeLabel) {
+    return false
+  }
+
+  const normalizedAssistant = normalizeText(summary.lastAssistantMessage)
+  const hasPrompt =
+    /\b(posso confirmar|quer confirmar esse agendamento|quer que eu confirme|me confirma|posso fechar|posso agendar)\b/.test(
+      normalizedAssistant
+    )
+  const hasTime = normalizedAssistant.includes(normalizeText(summary.requestedTimeLabel))
+  const hasProfessional = summary.selectedProfessionalName
+    ? normalizedAssistant.includes(normalizeText(summary.selectedProfessionalName))
+    : Boolean(summary.allowAnyProfessional)
+
+  return hasPrompt && hasTime && hasProfessional
 }
 
 export function detectAcknowledgementMessage(message: string) {
@@ -969,7 +1042,8 @@ function inferIntent(
   exactTime?: string | null
 ) {
   const normalized = normalizeText(message)
-  const confirmationPattern = /\b(sim|ss|isso|isso mesmo|desejo|quero|confirmo|confirmar|confirmado|confirma|fechado|pode ser|pode|pode sim|perfeito|ok|blz|beleza|certo|correto|bora|uhum|aham|isso ai|ta|pode marcar|pode agendar)\b/
+  const explicitConfirmation = isExplicitConfirmationMessage(message)
+  const slotWasPresented = hasPresentedConfirmationSlot(conversationSummary)
 
   if (detectExistingBookingQuestion({
     message,
@@ -982,7 +1056,7 @@ function inferIntent(
     return 'ACKNOWLEDGEMENT' as const
   }
 
-  if (exactTime && confirmationPattern.test(normalized)) {
+  if (exactTime && explicitConfirmation) {
     return conversationState === 'WAITING_CONFIRMATION'
       ? 'CHANGE_REQUEST' as const
       : 'BOOK_APPOINTMENT' as const
@@ -990,7 +1064,7 @@ function inferIntent(
 
   if (
     conversationState === 'WAITING_CONFIRMATION'
-    && confirmationPattern.test(normalized)
+    && explicitConfirmation
     && hasExplicitConfirmationCorrectionCue(message)
   ) {
     return 'CHANGE_REQUEST' as const
@@ -998,7 +1072,8 @@ function inferIntent(
 
   if (
     conversationState === 'WAITING_CONFIRMATION'
-    && detectContextualConfirmationMessage(message)
+    && explicitConfirmation
+    && slotWasPresented
     && !hasExplicitConfirmationCorrectionCue(message)
   ) {
     return 'CONFIRM' as const
@@ -1006,14 +1081,15 @@ function inferIntent(
 
   if (
     conversationState === 'WAITING_CONFIRMATION'
-    && confirmationPattern.test(normalized)
+    && detectContextualConfirmationMessage(message)
+    && slotWasPresented
     && !hasExplicitConfirmationCorrectionCue(message)
   ) {
     return 'CONFIRM' as const
   }
 
   if (
-    /\b(sim|ss|confirmo|confirmar|fechado|pode ser|perfeito|ok|beleza|confirmado|confirma)\b/.test(normalized)
+    explicitConfirmation
     && !hasExplicitConfirmationCorrectionCue(message)
   ) {
     return 'CONFIRM' as const
@@ -1218,13 +1294,22 @@ function buildFallbackIntent(input: WhatsAppInterpreterInput): WhatsAppIntent {
     })
   }
 
+  const inferredIntent = inferIntent(
+    input.message,
+    input.conversationState,
+    input.conversationSummary,
+    timePreference.exactTime
+  )
+  const resolvedIntent =
+    correctionTarget !== 'NONE'
+    && inferredIntent !== 'CHECK_EXISTING_BOOKING'
+    && inferredIntent !== 'DECLINE'
+    && inferredIntent !== 'ACKNOWLEDGEMENT'
+      ? 'CHANGE_REQUEST' as const
+      : inferredIntent
+
   return {
-    intent: inferIntent(
-      input.message,
-      input.conversationState,
-      input.conversationSummary,
-      timePreference.exactTime
-    ),
+    intent: resolvedIntent,
     serviceName,
     mentionedName,
     preferredPeriod: derivePreferredPeriod(timePreference.timePreference),
@@ -1246,7 +1331,7 @@ function buildInterpreterPrompt(input: WhatsAppInterpreterInput) {
   const summary = input.conversationSummary
 
   return [
-    'Voce interpreta mensagens de WhatsApp para um agente guiado de agendamento da BarberMain.',
+    'Voce interpreta mensagens de WhatsApp para um agente guiado de agendamento da BarberEX.',
     'Voce nunca cria agendamento, nunca inventa horario e nunca decide barbeiro sozinho.',
     'Sua funcao e somente interpretar a mensagem de forma estruturada.',
     `Barbearia: ${input.barbershopName}.`,
@@ -1277,6 +1362,7 @@ function buildInterpreterPrompt(input: WhatsAppInterpreterInput) {
     '- greetingOnly=true apenas quando a mensagem for basicamente saudacao sem pedido concreto.',
     '- restartConversation=true apenas quando o cliente realmente quiser recomecar.',
     '- intent deve ser BOOK_APPOINTMENT, CHECK_EXISTING_BOOKING, ACKNOWLEDGEMENT, CONFIRM, DECLINE, CHANGE_REQUEST ou UNKNOWN.',
+    '- Em WAITING_CONFIRMATION, so use intent=CONFIRM quando a mensagem trouxer confirmacao explicita como "confirmo", "pode marcar", "pode confirmar" ou "pode agendar". Nao trate "ok", "blz", "beleza", "tenta ai" ou emoji sozinho como confirmacao final.',
     `Mensagem do cliente: """${input.message}"""`,
   ].join('\n')
 }
@@ -1332,7 +1418,8 @@ function shouldUseContextualConfirmationClassifier(input: WhatsAppInterpreterInp
     )
     && detectContextualConfirmationMessage(input.message)
     && !hasExplicitConfirmationCorrectionCue(input.message)
-    && normalizeText(input.message).length <= 24
+    && hasPresentedConfirmationSlot(input.conversationSummary)
+    && normalizeIntentPhrase(input.message).length <= 32
   )
 }
 
@@ -1393,7 +1480,7 @@ async function classifyContextualConfirmationWithOpenAI(input: {
       text: {
         format: {
           type: 'json_schema',
-          name: 'barbermain_contextual_confirmation',
+          name: 'barberex_contextual_confirmation',
           strict: true,
           schema: CONTEXTUAL_CONFIRMATION_JSON_SCHEMA,
         },
@@ -1553,7 +1640,7 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
         text: {
           format: {
             type: 'json_schema',
-            name: 'barbermain_whatsapp_intent',
+            name: 'barberex_whatsapp_intent',
             strict: true,
             schema: INTENT_JSON_SCHEMA,
           },

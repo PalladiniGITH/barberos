@@ -875,7 +875,7 @@ async function generateCampaignMessageWithAI(input: {
         text: {
           format: {
             type: 'json_schema',
-            name: 'barbermain_campaign_message',
+            name: 'barberex_campaign_message',
             strict: true,
             schema: CAMPAIGN_MESSAGE_JSON_SCHEMA,
           },

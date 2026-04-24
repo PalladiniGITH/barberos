@@ -13,7 +13,7 @@ function withEvolutionEnv() {
   process.env.EVOLUTION_API_KEY = 'test-api-key'
   process.env.EVOLUTION_INSTANCE = 'linha-nobre'
   process.env.EVOLUTION_WEBHOOK_SECRET = 'test-webhook-secret'
-  process.env.PUBLIC_APP_URL = 'https://barberos.example.com'
+  process.env.PUBLIC_APP_URL = 'https://barberex.example.com'
 }
 
 test('normalizeEvolutionPhoneNumber adds Brazil country code when the record is local only', () => {

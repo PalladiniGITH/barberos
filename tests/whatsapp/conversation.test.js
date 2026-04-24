@@ -511,22 +511,28 @@ test('encerramentos naturais como "ok obrigado", "nenhum" e "nao quero" saem do 
   })
 })
 
-test('respostas afirmativas amplas sao aceitas para fechamento deterministico', () => {
-  const affirmativeReplies = ['sim', 's', 'ss', 'isso', 'isso mesmo', 'ok', 'ok sim', 'pode', 'pode sim', 'blz', 'beleza', 'certo', 'aham', 'uhum', 'confirmar', 'quero', 'desejo', 'fechado']
+test('so confirmacoes explicitas fortes entram no fechamento deterministico', () => {
+  const affirmativeReplies = ['confirmo', 'confirmar', 'pode confirmar', 'pode marcar', 'pode agendar', 'sim pode confirmar', 'sim pode marcar', 'quero confirmar', 'fechado']
 
   affirmativeReplies.forEach((reply) => {
     assert.equal(conversationTesting.isAffirmativeConfirmationMessage(reply), true)
   })
 })
 
-test('caminho de deterministic confirmation accepted aceita as expressoes curtas reais', () => {
-  ;['isso', 'isso mesmo', 'pode', 'pode sim', 'fechado', 'blz', 'beleza', 'certo', 'aham', 'uhum', 'ok', 'ok sim', 'ss'].forEach((message) => {
+test('mensagens vagas nao contam como confirmacao final no fluxo legado', () => {
+  ;['sim', 'ss', 'isso', 'ok', 'ok tente', 'blz', 'beleza', 'pode tentar', 'tenta ai', 'aham', 'uhum'].forEach((message) => {
+    assert.equal(conversationTesting.isAffirmativeConfirmationMessage(message), false, message)
+  })
+})
+
+test('caminho de deterministic confirmation accepted exige frases fortes e explicitas', () => {
+  ;['confirmo', 'confirmar', 'pode confirmar', 'pode marcar', 'pode agendar', 'sim pode confirmar', 'fechado'].forEach((message) => {
     assert.equal(conversationTesting.shouldTreatAsStoredSlotConfirmation(message), true, message)
   })
 })
 
 test('caminho de deterministic confirmation blocked barra correcoes explicitas junto da concordancia', () => {
-  ;['isso 14:30', 'pode ser com o Matheus', 'ok amanha', 'fechado 16h', 'ss 14:30', 'ss com o Matheus'].forEach((message) => {
+  ;['confirmo 14:30', 'pode confirmar com o Matheus', 'pode confirmar amanha', 'fechado 16h', 'confirmo 14:30', 'confirmo com o Matheus'].forEach((message) => {
     assert.equal(conversationTesting.isAffirmativeConfirmationMessage(message), true, message)
     assert.equal(conversationTesting.shouldTreatAsStoredSlotConfirmation(message), false, message)
   })

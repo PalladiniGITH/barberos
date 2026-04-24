@@ -90,6 +90,44 @@
     background: rgba(255, 255, 255, 0.025);
   }
 
+  @keyframes barberex-loader-scissor {
+    0%,
+    100% {
+      transform: translateX(-12px) rotate(-10deg) scale(0.98);
+      opacity: 0.84;
+    }
+    50% {
+      transform: translateX(12px) rotate(10deg) scale(1.04);
+      opacity: 1;
+    }
+  }
+
+  @keyframes barberex-loader-trace {
+    0% {
+      transform: translateX(-140%) scaleX(0.55);
+      opacity: 0.16;
+    }
+    45% {
+      opacity: 0.96;
+    }
+    100% {
+      transform: translateX(240%) scaleX(0.92);
+      opacity: 0.12;
+    }
+  }
+
+  @keyframes barberex-loader-glow {
+    0%,
+    100% {
+      opacity: 0.3;
+      transform: scale(0.94);
+    }
+    50% {
+      opacity: 0.86;
+      transform: scale(1.04);
+    }
+  }
+
   ::-webkit-scrollbar-thumb {
     background: rgba(124, 58, 237, 0.38);
     border-radius: 999px;
@@ -332,6 +370,19 @@
       linear-gradient(90deg, rgba(91, 33, 182, 0), rgba(91, 33, 182, 0.95), rgba(167, 139, 250, 0.72), rgba(91, 33, 182, 0));
     box-shadow: 0 0 18px rgba(91, 33, 182, 0.24);
     animation: nav-progress 1.05s ease-in-out infinite;
+  }
+
+  .barberex-loader-scissor {
+    animation: barberex-loader-scissor 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    transform-origin: center;
+  }
+
+  .barberex-loader-trace {
+    animation: barberex-loader-trace 1.6s ease-in-out infinite;
+  }
+
+  .barberex-loader-glow {
+    animation: barberex-loader-glow 1.9s ease-in-out infinite;
   }
 
   .surface-inverse {

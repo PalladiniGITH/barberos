@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
+import { BarberExLoading } from '@/components/branding/barberex-loading'
 import { cn } from '@/lib/utils'
 
 interface NavigationFeedbackContextValue {
@@ -72,6 +73,15 @@ export function NavigationFeedbackProvider({
         )}
       >
         <div className="nav-progress-bar h-full w-[42%]" />
+      </div>
+      <div
+        aria-hidden="true"
+        className={cn(
+          'pointer-events-none fixed right-4 top-4 z-[69] transition-all duration-200 sm:right-6',
+          pending ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
+        )}
+      >
+        <BarberExLoading compact />
       </div>
     </NavigationFeedbackContext.Provider>
   )

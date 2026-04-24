@@ -15,6 +15,7 @@ const sora = Sora({
 })
 
 export const metadata: Metadata = {
+  applicationName: PRODUCT_NAME,
   title: { default: PRODUCT_NAME, template: `%s | ${PRODUCT_NAME}` },
   description: PRODUCT_TAGLINE,
 }

@@ -186,6 +186,10 @@ function normalizeText(value: string) {
     .trim()
 }
 
+function normalizeIntentPhrase(value: string) {
+  return normalizeText(value).replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
 function normalizeOptionalText(value?: string | null) {
   const normalized = value?.trim()
   return normalized ? normalized : null
@@ -204,9 +208,31 @@ function shouldResetConversationOnGreeting(input: {
 }
 
 function isAffirmativeConfirmationMessage(message: string) {
-  return /\b(sim|s|ss|isso|isso mesmo|pode|pode sim|pode confirmar|pode marcar|pode agendar|confirmo|confirmar|quero|desejo|fechado|ok|blz|beleza|certo|correto|bora|uhum|aham|isso ai|ta)\b/.test(
-    normalizeText(message)
-  )
+  const normalized = normalizeIntentPhrase(message)
+  const explicitPhrases = [
+    'confirmo',
+    'confirmar',
+    'confirma',
+    'confirmado',
+    'fechar',
+    'fechado',
+    'pode confirmar',
+    'pode marcar',
+    'pode agendar',
+    'pode fechar',
+    'sim pode confirmar',
+    'sim pode marcar',
+    'sim pode agendar',
+    'sim pode fechar',
+    'quero confirmar',
+    'quero marcar',
+    'quero agendar',
+    'desejo confirmar',
+    'desejo marcar',
+    'desejo agendar',
+  ]
+
+  return explicitPhrases.some((phrase) => normalized === phrase || normalized.startsWith(`${phrase} `))
 }
 
 function hasExplicitConfirmationCorrectionCue(message: string) {
@@ -221,6 +247,41 @@ function hasExplicitConfirmationCorrectionCue(message: string) {
 
 function shouldTreatAsStoredSlotConfirmation(message: string) {
   return isAffirmativeConfirmationMessage(message) && !hasExplicitConfirmationCorrectionCue(message)
+}
+
+function hasPresentedConversationSlotText(input: {
+  text?: string | null
+  slot: ConversationSlot | null
+  serviceName?: string | null
+}) {
+  if (!input.text || !input.slot) {
+    return false
+  }
+
+  const normalizedText = normalizeText(input.text)
+  const hasTime = normalizedText.includes(normalizeText(input.slot.timeLabel))
+  const hasProfessional = normalizedText.includes(normalizeText(input.slot.professionalName))
+  const hasService = !input.serviceName || normalizedText.includes(normalizeText(input.serviceName))
+
+  return hasTime && hasProfessional && hasService
+}
+
+function wasConversationSlotPresentedToCustomer(input: {
+  lastAssistantText?: string | null
+  slot: ConversationSlot | null
+  serviceName?: string | null
+}) {
+  return Boolean(
+    input.lastAssistantText
+    && /\b(posso confirmar|quer confirmar esse agendamento|quer que eu confirme|me confirma|posso fechar|posso agendar)\b/.test(
+      normalizeText(input.lastAssistantText)
+    )
+    && hasPresentedConversationSlotText({
+      text: input.lastAssistantText,
+      slot: input.slot,
+      serviceName: input.serviceName,
+    })
+  )
 }
 
 function isExactTimeLabel(value: string | null | undefined) {
@@ -840,7 +901,15 @@ function hasExplicitFlexibleTimeRequest(message: string) {
 }
 
 function buildConfirmationMessage(slot: ConversationSlot, serviceName: string, timezone: string) {
-  return `Posso confirmar ${serviceName} para ${formatDayLabel(slot.dateIso, timezone).toLowerCase()} as ${slot.timeLabel} com ${slot.professionalName}?`
+  return [
+    `Encontrei este horario para ${serviceName}:`,
+    '',
+    `- Data: ${formatDayLabel(slot.dateIso, timezone)}`,
+    `- Horario: ${slot.timeLabel}`,
+    `- Barbeiro: ${slot.professionalName}`,
+    '',
+    'Quer confirmar esse agendamento?',
+  ].join('\n')
 }
 
 function buildSuccessMessage(slot: ConversationSlot, serviceName: string, timezone: string) {
@@ -950,7 +1019,7 @@ async function emitAvailabilityInfrastructureFallback(input: {
   source: string
 }) {
   const responseText =
-    'Tive uma instabilidade aqui para consultar os horarios. Vou tentar novamente.'
+    'Nao consegui verificar os horarios agora, pode tentar novamente daqui a pouco?'
 
   console.warn('[availability] fallback emitted to customer', {
     conversationId: input.conversationId,
@@ -1663,8 +1732,8 @@ async function offerFreshSlots(input: {
       return emitAvailabilityInfrastructureFallback({
         conversationId: input.conversationId,
         baseUpdate: input.baseUpdate,
-        fallbackState: input.conversationStep === 'WAITING_CONFIRMATION' ? 'WAITING_CONFIRMATION' : 'WAITING_TIME',
-        fallbackFlow: input.conversationStep === 'WAITING_CONFIRMATION' ? 'await_confirmation' : 'collect_period',
+        fallbackState: 'WAITING_TIME',
+        fallbackFlow: 'collect_period',
         usedAI: input.usedAI,
         error,
         source: 'offer_fresh_slots',
@@ -1895,11 +1964,21 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       Boolean(draftForInterpreter.selectedProfessionalId)
       || draftForInterpreter.allowAnyProfessional
     )
+    && wasConversationSlotPresentedToCustomer({
+      lastAssistantText: conversation.lastAssistantText,
+      slot: draftForInterpreter.selectedStoredSlot,
+      serviceName: draftForInterpreter.selectedServiceName,
+    })
 
   if (
     effectiveState === 'WAITING_CONFIRMATION'
     && draftForInterpreter.selectedStoredSlot
     && draftForInterpreter.selectedServiceId
+    && wasConversationSlotPresentedToCustomer({
+      lastAssistantText: conversation.lastAssistantText,
+      slot: draftForInterpreter.selectedStoredSlot,
+      serviceName: draftForInterpreter.selectedServiceName,
+    })
     && !shouldTreatAsStoredSlotConfirmation(inboundText)
     && isAffirmativeConfirmationMessage(inboundText)
   ) {
@@ -1971,8 +2050,8 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
               : null,
             requestedTimeLabel: draftForInterpreter.requestedTimeLabel,
           },
-          fallbackState: 'WAITING_CONFIRMATION',
-          fallbackFlow: 'await_confirmation',
+          fallbackState: 'WAITING_TIME',
+          fallbackFlow: 'collect_period',
           usedAI: false,
           error,
           source: 'deterministic_confirmation_guard',
@@ -3330,8 +3409,8 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
         return emitAvailabilityInfrastructureFallback({
           conversationId: conversation.id,
           baseUpdate,
-          fallbackState: 'WAITING_CONFIRMATION',
-          fallbackFlow: 'await_confirmation',
+          fallbackState: 'WAITING_TIME',
+          fallbackFlow: 'collect_period',
           usedAI,
           error,
           source: 'stored_slot_revalidation',
@@ -3478,7 +3557,13 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     })
   }
 
-  if (effectiveState !== 'WAITING_CONFIRMATION' || interpreted.intent !== 'CONFIRM') {
+  const slotWasPresentedForLegacyConfirmation = wasConversationSlotPresentedToCustomer({
+    lastAssistantText: conversation.lastAssistantText,
+    slot: slotForConfirmation,
+    serviceName: draft.selectedServiceName,
+  })
+
+  if (effectiveState !== 'WAITING_CONFIRMATION' || interpreted.intent !== 'CONFIRM' || !slotWasPresentedForLegacyConfirmation) {
     const responseText = withLeadIn(
       buildConfirmationMessage(slotForConfirmation, draft.selectedServiceName, timezone),
       responseLeadIn
