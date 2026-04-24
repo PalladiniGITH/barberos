@@ -209,7 +209,17 @@ function shouldResetConversationOnGreeting(input: {
 
 function isAffirmativeConfirmationMessage(message: string) {
   const normalized = normalizeIntentPhrase(message)
-  const explicitPhrases = [
+  const exactConfirmationPhrases = [
+    'sim',
+    's',
+    'pode',
+    'pode sim',
+    'quero',
+    'isso',
+    'esse',
+    'esse mesmo',
+  ]
+  const actionConfirmationPhrases = [
     'confirmo',
     'confirmar',
     'confirma',
@@ -232,7 +242,8 @@ function isAffirmativeConfirmationMessage(message: string) {
     'desejo agendar',
   ]
 
-  return explicitPhrases.some((phrase) => normalized === phrase || normalized.startsWith(`${phrase} `))
+  return exactConfirmationPhrases.includes(normalized)
+    || actionConfirmationPhrases.some((phrase) => normalized === phrase || normalized.startsWith(`${phrase} `))
 }
 
 function hasExplicitConfirmationCorrectionCue(message: string) {
@@ -281,6 +292,18 @@ function wasConversationSlotPresentedToCustomer(input: {
       slot: input.slot,
       serviceName: input.serviceName,
     })
+  )
+}
+
+function lastAssistantOfferedConversationSlotChoices(lastAssistantText?: string | null) {
+  if (!lastAssistantText) {
+    return false
+  }
+
+  const normalized = normalizeText(lastAssistantText)
+  return (
+    /\b(qual voce prefere|qual você prefere|qual horario voce prefere|qual horário você prefere|qual deles voce prefere)\b/.test(normalized)
+    || /\b(tenho estes horarios disponiveis|tenho estas opcoes|tenho essas opcoes|posso te passar os mais proximos)\b/.test(normalized)
   )
 }
 
@@ -900,16 +923,30 @@ function hasExplicitFlexibleTimeRequest(message: string) {
   return /\b(qualquer horario|qualquer horário|qualquer um serve|sem preferencia de horario|sem preferencia de horário|nao tenho preferencia de horario|não tenho preferência de horário|nao tenho preferencia|não tenho preferência|me mostra os horarios|me mostra os horários|me passa os horarios|me passa os horários|quais horarios|quais horários|pode me passar as opcoes|pode me passar as opções|quero ver as opcoes|quero ver as opções)\b/.test(normalized)
 }
 
-function buildConfirmationMessage(slot: ConversationSlot, serviceName: string, timezone: string) {
+function buildConfirmationMessage(
+  slot: ConversationSlot,
+  serviceName: string,
+  timezone: string,
+  mode: 'found' | 'selection' = 'found'
+) {
+  const header = mode === 'selection'
+    ? 'Perfeito, vou deixar assim para confirmacao:'
+    : `Encontrei este horario para ${serviceName}:`
+
   return [
-    `Encontrei este horario para ${serviceName}:`,
+    header,
     '',
+    `- Servico: ${serviceName}`,
     `- Data: ${formatDayLabel(slot.dateIso, timezone)}`,
     `- Horario: ${slot.timeLabel}`,
     `- Barbeiro: ${slot.professionalName}`,
     '',
     'Quer confirmar esse agendamento?',
   ].join('\n')
+}
+
+function buildConfirmationReminderMessage() {
+  return 'Para confirmar, me responda: pode marcar.'
 }
 
 function buildSuccessMessage(slot: ConversationSlot, serviceName: string, timezone: string) {
@@ -1440,7 +1477,19 @@ function pickOfferedSlot(input: {
   }
 
   const normalizedMessage = normalizeText(input.message)
-  return input.offeredSlots.find((slot) => normalizeText(slot.timeLabel) === normalizedMessage) ?? null
+  const timeMatch = input.offeredSlots.find((slot) => normalizeText(slot.timeLabel) === normalizedMessage)
+  if (timeMatch) {
+    return timeMatch
+  }
+
+  return input.offeredSlots.find((slot) => {
+    const professionalTokens = nameTokens(slot.professionalName)
+    return professionalTokens.some((token) =>
+      normalizedMessage === token
+      || normalizedMessage.startsWith(`${token} `)
+      || normalizedMessage.includes(` ${token}`)
+    )
+  }) ?? null
 }
 
 function buildExactTimeUnavailableMessage(input: {
@@ -3564,8 +3613,20 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   })
 
   if (effectiveState !== 'WAITING_CONFIRMATION' || interpreted.intent !== 'CONFIRM' || !slotWasPresentedForLegacyConfirmation) {
+    const shouldShowConfirmationReminder =
+      effectiveState === 'WAITING_CONFIRMATION'
+      && slotWasPresentedForLegacyConfirmation
+      && interpreted.intent !== 'CHANGE_REQUEST'
+      && interpreted.intent !== 'DECLINE'
     const responseText = withLeadIn(
-      buildConfirmationMessage(slotForConfirmation, draft.selectedServiceName, timezone),
+      shouldShowConfirmationReminder
+        ? buildConfirmationReminderMessage()
+        : buildConfirmationMessage(
+            slotForConfirmation,
+            draft.selectedServiceName,
+            timezone,
+            lastAssistantOfferedConversationSlotChoices(conversation.lastAssistantText) ? 'selection' : 'found'
+          ),
       responseLeadIn
     )
 
@@ -3746,6 +3807,7 @@ export const __testing = {
   buildAcknowledgementResponse,
   buildBookingStatusFollowUp,
   buildCompactNearbySlotSummary,
+  buildConfirmationMessage,
   buildEmptyConversationDraft,
   buildExactTimeUnavailableMessage,
   buildExactTimeFallbackResponse,
@@ -3765,6 +3827,7 @@ export const __testing = {
   isConversationContextReliable,
   parseExistingBookingQuery,
   parseRequestedDateFromExistingBookingQuestion,
+  pickOfferedSlot,
   isShortGreetingMessage,
   referencesPreferredProfessional,
   resolveContextualProfessionalPreference,

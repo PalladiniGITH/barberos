@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState, type ComponentType, type FocusEvent, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -298,7 +298,7 @@ function resolveActiveHref(items: SidebarItem[], currentPath: string) {
   return matches[0]?.href ?? null
 }
 
-function SidebarLink({
+const SidebarLink = memo(function SidebarLink({
   item,
   expanded,
   active,
@@ -331,12 +331,12 @@ function SidebarLink({
     <div
       className={cn('min-w-0', isTopLevel ? 'space-y-1.5' : '')}
       onMouseEnter={() => {
-        if (isTopLevel) {
+        if (isTopLevel && expanded) {
           onPreview(item.children ? item.href : null)
         }
       }}
       onMouseLeave={() => {
-        if (isTopLevel) {
+        if (isTopLevel && expanded) {
           onPreview(null)
         }
       }}
@@ -347,7 +347,7 @@ function SidebarLink({
         aria-current={active ? 'page' : undefined}
         onClick={() => onNavigate(item.href)}
         className={cn(
-          'group relative isolate flex min-w-0 items-center gap-3 border transition-all duration-200',
+          'group relative isolate flex min-w-0 items-center gap-3 border transition-[background-color,border-color,color,box-shadow,opacity,transform] duration-150 ease-out',
           compact
             ? 'mx-auto h-[3.35rem] w-[3.35rem] justify-center rounded-[1rem] border-transparent bg-transparent p-0 shadow-none overflow-visible'
             : 'min-h-[3.55rem] w-full rounded-[1.1rem] px-2.5 py-2.5 overflow-hidden',
@@ -373,7 +373,7 @@ function SidebarLink({
         )}
         <span
           className={cn(
-            'relative z-10 flex flex-shrink-0 items-center justify-center border transition-all duration-200',
+            'relative z-10 flex flex-shrink-0 items-center justify-center border transition-[border-color,background-color,color,box-shadow,opacity,transform] duration-150 ease-out',
             iconSizeClass,
             active
               ? cn(
@@ -386,7 +386,7 @@ function SidebarLink({
         >
           <span
             className={cn(
-              'absolute inset-[1px] transition-opacity duration-200',
+              'absolute inset-[1px] transition-opacity duration-150 ease-out',
               compact
                 ? 'rounded-[calc(0.95rem-1px)]'
                 : level === 0
@@ -399,7 +399,7 @@ function SidebarLink({
           />
           <item.icon
             className={cn(
-              'relative transition-transform duration-200',
+              'relative transition-transform duration-150 ease-out',
               compact ? 'h-[1.02rem] w-[1.02rem]' : level === 0 ? 'h-[1.02rem] w-[1.02rem]' : 'h-[0.95rem] w-[0.95rem]',
               loading ? 'scale-95' : ''
             )}
@@ -408,7 +408,7 @@ function SidebarLink({
 
         <div
           className={cn(
-            'min-w-0 flex-1 transition-[opacity,transform,max-width] duration-200',
+            'min-w-0 flex-1 transition-[opacity,transform,max-width] duration-150 ease-out',
             compact ? 'max-w-0 -translate-x-2 opacity-0' : 'max-w-full translate-x-0 opacity-100'
           )}
         >
@@ -427,7 +427,7 @@ function SidebarLink({
             {item.children && (
               <ChevronRight
                 className={cn(
-                  'h-4 w-4 flex-shrink-0 text-slate-500 transition-transform duration-200',
+                  'h-4 w-4 flex-shrink-0 text-slate-500 transition-transform duration-150 ease-out',
                   childrenVisible ? 'rotate-90 text-slate-300' : ''
                 )}
               />
@@ -439,7 +439,7 @@ function SidebarLink({
       {item.children && expanded && (
         <div
           className={cn(
-            'grid transition-[grid-template-rows,opacity,transform] duration-200',
+            'grid transition-[grid-template-rows,opacity,transform] duration-150 ease-out',
             childrenVisible ? 'grid-rows-[1fr] translate-y-0 opacity-100' : 'grid-rows-[0fr] -translate-y-1 opacity-0'
           )}
         >
@@ -450,7 +450,7 @@ function SidebarLink({
       )}
     </div>
   )
-}
+})
 
 export function Sidebar({
   fallbackPath,
@@ -473,8 +473,36 @@ export function Sidebar({
   const sidebarItems = barberView ? barberSidebarItems : defaultSidebarItems
   const currentSectionLabels = barberView ? barberSectionLabels : sectionLabels
   const expanded = pinned || hovered
-  const activeTopLevelHref = resolveActiveHref(sidebarItems, pathname)
+  const activeTopLevelHref = useMemo(() => resolveActiveHref(sidebarItems, pathname), [pathname, sidebarItems])
   const openModuleHref = expanded ? previewModuleHref ?? activeTopLevelHref : null
+
+  const handlePreview = useCallback((href: string | null) => {
+    setPreviewModuleHref((current) => current === href ? current : href)
+  }, [])
+
+  const handleNavigate = useCallback((href: string) => {
+    startNavigation(href)
+  }, [startNavigation])
+
+  const handleMouseEnter = useCallback(() => {
+    setHovered((current) => current ? current : true)
+  }, [])
+
+  const handleMouseLeave = useCallback(() => {
+    setHovered((current) => current ? false : current)
+    setPreviewModuleHref(null)
+  }, [])
+
+  const handleFocusCapture = useCallback(() => {
+    setHovered((current) => current ? current : true)
+  }, [])
+
+  const handleBlurCapture = useCallback((event: FocusEvent<HTMLElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setHovered(false)
+      setPreviewModuleHref(null)
+    }
+  }, [])
 
   useEffect(() => {
     setPreviewModuleHref(null)
@@ -504,8 +532,8 @@ export function Sidebar({
           level={level}
           childrenVisible={childrenVisible}
           loading={targetHref === item.href}
-          onNavigate={startNavigation}
-          onPreview={setPreviewModuleHref}
+          onNavigate={handleNavigate}
+          onPreview={handlePreview}
         >
           {item.children ? renderItems(item.children, level + 1) : null}
         </SidebarLink>
@@ -515,23 +543,16 @@ export function Sidebar({
 
   return (
     <aside
-      onMouseEnter={() => setHovered(true)}
-      onFocusCapture={() => setHovered(true)}
-      onBlurCapture={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-          setHovered(false)
-          setPreviewModuleHref(null)
-        }
-      }}
-      onMouseLeave={() => {
-        setHovered(false)
-        setPreviewModuleHref(null)
-      }}
+      onMouseEnter={handleMouseEnter}
+      onFocusCapture={handleFocusCapture}
+      onBlurCapture={handleBlurCapture}
+      onMouseLeave={handleMouseLeave}
       className={cn(
-        'hidden h-full overflow-hidden border-r border-[rgba(255,255,255,0.05)] bg-[linear-gradient(180deg,rgba(10,15,28,0.97),rgba(11,18,32,0.95))] text-slate-100 shadow-[18px_0_40px_-34px_rgba(2,6,23,0.92)] transition-[width] duration-300 ease-out lg:flex',
+        'hidden h-full overflow-hidden border-r border-[rgba(255,255,255,0.05)] bg-[linear-gradient(180deg,rgba(10,15,28,0.97),rgba(11,18,32,0.95))] text-slate-100 shadow-[18px_0_40px_-34px_rgba(2,6,23,0.92)] transition-[width] duration-200 ease-out lg:flex',
         expanded ? 'w-[312px]' : 'w-[96px]',
         focusMode && !expanded ? 'opacity-95' : ''
       )}
+      style={{ willChange: 'width' }}
     >
       <div className={cn('flex h-full min-h-0 min-w-0 flex-1 flex-col py-4', expanded ? 'px-3' : 'px-2')}>
         <div className={cn('flex min-h-[56px] items-center gap-3 rounded-[1rem]', expanded ? 'overflow-hidden px-2.5' : 'justify-center overflow-visible px-0')}>
@@ -546,7 +567,7 @@ export function Sidebar({
 
           <div
             className={cn(
-              'min-w-0 transition-[opacity,transform,max-width] duration-200',
+              'min-w-0 transition-[opacity,transform,max-width] duration-150 ease-out',
               expanded ? 'max-w-full translate-x-0 opacity-100' : 'max-w-0 -translate-x-2 opacity-0'
             )}
           >
@@ -570,7 +591,7 @@ export function Sidebar({
                 <section key={section.section} className="space-y-2">
                   <div
                     className={cn(
-                      'px-3 text-[10px] font-medium uppercase tracking-[0.2em] text-slate-600 transition-[opacity,transform,height] duration-200',
+                      'px-3 text-[10px] font-medium uppercase tracking-[0.2em] text-slate-600 transition-[opacity,transform,height] duration-150 ease-out',
                       expanded ? 'h-auto translate-x-0 opacity-100' : 'h-0 -translate-x-2 overflow-hidden opacity-0'
                     )}
                   >
@@ -597,7 +618,7 @@ export function Sidebar({
             <PanelLeft className="h-4 w-4 flex-shrink-0" />
             <span
               className={cn(
-                'truncate transition-[opacity,transform,max-width] duration-200',
+                'truncate transition-[opacity,transform,max-width] duration-150 ease-out',
                 expanded ? 'max-w-full translate-x-0 opacity-100' : 'max-w-0 -translate-x-2 opacity-0'
               )}
             >

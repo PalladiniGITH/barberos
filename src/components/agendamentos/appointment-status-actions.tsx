@@ -16,7 +16,6 @@ import { toast } from 'sonner'
 import { updateAppointmentStatus } from '@/actions/agendamentos'
 import { AppointmentModal, type AppointmentFormValue } from '@/components/agendamentos/appointment-modal'
 import type {
-  ScheduleToolbarCustomer,
   ScheduleToolbarProfessional,
   ScheduleToolbarService,
 } from '@/lib/agendamentos'
@@ -26,7 +25,6 @@ interface AppointmentStatusActionsProps {
   appointment: AppointmentFormValue
   professionals: ScheduleToolbarProfessional[]
   services: ScheduleToolbarService[]
-  recentCustomers: ScheduleToolbarCustomer[]
   compact?: boolean
 }
 
@@ -85,7 +83,6 @@ export function AppointmentStatusActions({
   appointment,
   professionals,
   services,
-  recentCustomers,
   compact = false,
 }: AppointmentStatusActionsProps) {
   const router = useRouter()
@@ -120,7 +117,6 @@ export function AppointmentStatusActions({
           defaultDate={appointment.date}
           professionals={professionals}
           services={services}
-          recentCustomers={recentCustomers}
           defaultProfessionalId={appointment.professionalId}
           triggerMode="icon"
         />
@@ -209,7 +205,6 @@ export function AppointmentStatusActions({
                 defaultDate={appointment.date}
                 professionals={professionals}
                 services={services}
-                recentCustomers={recentCustomers}
                 defaultProfessionalId={appointment.professionalId}
                 triggerMode="secondary"
               />

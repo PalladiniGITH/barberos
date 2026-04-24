@@ -14,7 +14,6 @@ import {
   Plus,
   Scissors,
   Search,
-  Sparkles,
   UserRound,
   X,
 } from 'lucide-react'
@@ -25,7 +24,6 @@ import {
   updateAppointment,
 } from '@/actions/agendamentos'
 import type {
-  ScheduleToolbarCustomer,
   ScheduleToolbarProfessional,
   ScheduleToolbarService,
 } from '@/lib/agendamentos'
@@ -93,7 +91,6 @@ interface CustomerSearchResult {
 interface AppointmentModalProps {
   professionals: ScheduleToolbarProfessional[]
   services: ScheduleToolbarService[]
-  recentCustomers: ScheduleToolbarCustomer[]
   defaultDate: string
   defaultTime?: string
   defaultProfessionalId?: string | null
@@ -128,7 +125,6 @@ function Field({
 export function AppointmentModal({
   professionals,
   services,
-  recentCustomers,
   defaultDate,
   defaultTime = '09:00',
   defaultProfessionalId = null,
@@ -286,7 +282,7 @@ export function AppointmentModal({
     && resolvedServicePrice.price !== selectedService.price
   )
 
-  function applyCustomerSelection(customer: CustomerSearchResult | ScheduleToolbarCustomer) {
+  function applyCustomerSelection(customer: CustomerSearchResult) {
     setValue('customerId', customer.id)
     setValue('customerName', customer.name)
     setValue('customerPhone', customer.phone ?? '')
@@ -435,25 +431,6 @@ export function AppointmentModal({
                           </button>
                         ))}
                       </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-primary" />
-                      <p className="text-sm font-semibold text-foreground">Clientes recentes</p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      {recentCustomers.map((customer) => (
-                        <button
-                          key={customer.id}
-                          type="button"
-                          onClick={() => applyCustomerSelection(customer)}
-                          className="inline-flex max-w-full items-center gap-2 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)]"
-                        >
-                          <UserRound className="h-3 w-3 flex-shrink-0 text-primary" />
-                          <span className="truncate">{customer.name}</span>
-                        </button>
-                      ))}
                     </div>
                   </section>
 

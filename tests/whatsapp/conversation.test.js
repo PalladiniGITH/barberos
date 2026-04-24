@@ -226,6 +226,57 @@ test('sem barbeiro definido a conversa pergunta preferencia antes de sugerir hor
   assert.doesNotMatch(reply, /09:30|09:45/)
 })
 
+test('resposta com nome do barbeiro seleciona a opcao ja apresentada sem depender de nova busca textual de horario', () => {
+  const slot = conversationTesting.pickOfferedSlot({
+    offeredSlots: [
+      {
+        key: 'pro-lucas:2026-04-27T14:00:00.000Z',
+        professionalId: 'pro-lucas',
+        professionalName: 'Lucas Ribeiro',
+        dateIso: '2026-04-27',
+        timeLabel: '11:00',
+        startAtIso: '2026-04-27T14:00:00.000Z',
+        endAtIso: '2026-04-27T14:45:00.000Z',
+      },
+      {
+        key: 'pro-matheus:2026-04-27T14:00:00.000Z',
+        professionalId: 'pro-matheus',
+        professionalName: 'Matheus Lima',
+        dateIso: '2026-04-27',
+        timeLabel: '11:00',
+        startAtIso: '2026-04-27T14:00:00.000Z',
+        endAtIso: '2026-04-27T14:45:00.000Z',
+      },
+    ],
+    selectedOptionNumber: null,
+    exactTime: null,
+    message: 'Lucas',
+  })
+
+  assert.equal(slot?.professionalName, 'Lucas Ribeiro')
+})
+
+test('resumo de confirmacao de uma opcao ja apresentada nao usa linguagem de nova descoberta', () => {
+  const reply = conversationTesting.buildConfirmationMessage(
+    {
+      key: 'pro-lucas:2026-04-27T14:00:00.000Z',
+      professionalId: 'pro-lucas',
+      professionalName: 'Lucas Ribeiro',
+      dateIso: '2026-04-27',
+      timeLabel: '11:00',
+      startAtIso: '2026-04-27T14:00:00.000Z',
+      endAtIso: '2026-04-27T14:45:00.000Z',
+    },
+    'Pigmentacao Natural',
+    'America/Sao_Paulo',
+    'selection'
+  )
+
+  assert.match(reply, /vou deixar assim para confirmacao/i)
+  assert.match(reply, /Pigmentacao Natural/i)
+  assert.doesNotMatch(reply, /Encontrei este horario/i)
+})
+
 test('lista de servicos fica formatada em multiplas linhas com bullets', () => {
   const reply = conversationTesting.buildServiceQuestion([
     'Barba Terapia',
@@ -512,7 +563,7 @@ test('encerramentos naturais como "ok obrigado", "nenhum" e "nao quero" saem do 
 })
 
 test('so confirmacoes explicitas fortes entram no fechamento deterministico', () => {
-  const affirmativeReplies = ['confirmo', 'confirmar', 'pode confirmar', 'pode marcar', 'pode agendar', 'sim pode confirmar', 'sim pode marcar', 'quero confirmar', 'fechado']
+  const affirmativeReplies = ['sim', 's', 'pode', 'pode sim', 'quero', 'isso', 'esse', 'esse mesmo', 'confirmo', 'confirmar', 'pode confirmar', 'pode marcar', 'pode agendar', 'sim pode confirmar', 'sim pode marcar', 'quero confirmar', 'fechado']
 
   affirmativeReplies.forEach((reply) => {
     assert.equal(conversationTesting.isAffirmativeConfirmationMessage(reply), true)
@@ -520,13 +571,13 @@ test('so confirmacoes explicitas fortes entram no fechamento deterministico', ()
 })
 
 test('mensagens vagas nao contam como confirmacao final no fluxo legado', () => {
-  ;['sim', 'ss', 'isso', 'ok', 'ok tente', 'blz', 'beleza', 'pode tentar', 'tenta ai', 'aham', 'uhum'].forEach((message) => {
+  ;['ok', 'ok tente', 'blz', 'beleza', 'pode tentar', 'tenta ai', 'aham', 'uhum', 'talvez'].forEach((message) => {
     assert.equal(conversationTesting.isAffirmativeConfirmationMessage(message), false, message)
   })
 })
 
 test('caminho de deterministic confirmation accepted exige frases fortes e explicitas', () => {
-  ;['confirmo', 'confirmar', 'pode confirmar', 'pode marcar', 'pode agendar', 'sim pode confirmar', 'fechado'].forEach((message) => {
+  ;['sim', 's', 'pode', 'pode sim', 'quero', 'isso', 'esse', 'esse mesmo', 'confirmo', 'confirmar', 'pode confirmar', 'pode marcar', 'pode agendar', 'sim pode confirmar', 'fechado'].forEach((message) => {
     assert.equal(conversationTesting.shouldTreatAsStoredSlotConfirmation(message), true, message)
   })
 })

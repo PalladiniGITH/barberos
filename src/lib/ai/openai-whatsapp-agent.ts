@@ -845,6 +845,45 @@ function isExplicitConfirmation(message: string) {
   return explicitPhrases.some((phrase) => normalized === phrase || normalized.startsWith(`${phrase} `))
 }
 
+function isContextualPositiveConfirmation(message: string) {
+  const normalized = normalizeIntentPhrase(message)
+  const exactContextualPhrases = [
+    'sim',
+    's',
+    'pode',
+    'pode sim',
+    'quero',
+    'isso',
+    'esse',
+    'esse mesmo',
+  ]
+  const actionContextualPhrases = [
+    'confirmo',
+    'confirmar',
+    'confirma',
+    'confirmado',
+    'pode confirmar',
+    'pode marcar',
+    'pode agendar',
+    'pode fechar',
+    'sim pode confirmar',
+    'sim pode marcar',
+    'sim pode agendar',
+    'sim pode fechar',
+    'quero confirmar',
+    'quero marcar',
+    'quero agendar',
+    'desejo confirmar',
+    'desejo marcar',
+    'desejo agendar',
+    'fechar',
+    'fechado',
+  ]
+
+  return exactContextualPhrases.includes(normalized)
+    || actionContextualPhrases.some((phrase) => normalized === phrase || normalized.startsWith(`${phrase} `))
+}
+
 function hasExplicitConfirmationCorrectionCue(message: string) {
   const normalized = normalizeText(message)
 
@@ -862,14 +901,17 @@ function resolveContextualConfirmationHeuristic(input: {
 }) {
   const normalized = normalizeIntentPhrase(input.inboundText)
   const matchedToken = [
+    'esse mesmo',
     'sim pode confirmar',
     'sim pode marcar',
     'sim pode agendar',
     'sim pode fechar',
+    'pode sim',
     'pode confirmar',
     'pode marcar',
     'pode agendar',
     'pode fechar',
+    'quero',
     'quero confirmar',
     'quero marcar',
     'quero agendar',
@@ -889,13 +931,15 @@ function resolveContextualConfirmationHeuristic(input: {
     && Boolean(input.memory.selectedSlot)
     && Boolean(input.memory.selectedServiceId)
     && (Boolean(input.memory.selectedProfessionalId) || input.memory.allowAnyProfessional)
+    && Boolean(input.memory.requestedDateIso)
+    && Boolean(input.memory.requestedTimeLabel)
     && wasSelectedSlotPresentedToCustomer({
       lastAssistantText: input.lastAssistantText,
       memory: input.memory,
     })
 
   const hasCorrectionCue = hasExplicitConfirmationCorrectionCue(input.inboundText)
-  const isAffirmative = isExplicitConfirmation(input.inboundText)
+  const isAffirmative = isContextualPositiveConfirmation(input.inboundText)
 
   const accepted = hasRequiredContext && isAffirmative && !hasCorrectionCue
 
@@ -931,6 +975,18 @@ function hasPresentedSelectedSlotText(
     || normalizedText.includes(normalizeText(memory.selectedServiceName))
 
   return hasTime && hasProfessional && hasService
+}
+
+function lastAssistantOfferedSlotChoices(lastAssistantText?: string | null) {
+  if (!lastAssistantText) {
+    return false
+  }
+
+  const normalized = normalizeText(lastAssistantText)
+  return (
+    /\b(qual voce prefere|qual você prefere|qual horario voce prefere|qual horário você prefere|qual deles voce prefere)\b/.test(normalized)
+    || /\b(tenho estes horarios disponiveis|tenho estas opcoes|tenho essas opcoes|posso te passar os mais proximos)\b/.test(normalized)
+  )
 }
 
 function wasSelectedSlotPresentedToCustomer(input: {
@@ -1159,7 +1215,7 @@ function shouldUseContextualConfirmationClassifier(input: {
     return false
   }
 
-  return normalized.length <= 32 && isExplicitConfirmation(input.inboundText)
+  return normalized.length <= 32 && isContextualPositiveConfirmation(input.inboundText)
 }
 
 function sanitizeContextualConfirmationPayload(payload: unknown) {
@@ -1247,12 +1303,17 @@ function buildServiceQuestionFromNames(serviceNames: string[]) {
 function buildPresentedSlotConfirmationMessage(input: {
   serviceName: string | null
   slot: WhatsAppBookingSlot
+  mode?: 'found' | 'selection'
 }) {
   const serviceLabel = input.serviceName ?? 'o servico solicitado'
+  const header = input.mode === 'selection'
+    ? 'Perfeito, vou deixar assim para confirmacao:'
+    : `Encontrei este horario para ${serviceLabel}:`
 
   return [
-    `Encontrei este horario para ${serviceLabel}:`,
+    header,
     '',
+    `- Servico: ${serviceLabel}`,
     `- Data: ${formatDayLabelFromIsoDate(input.slot.dateIso)}`,
     `- Horario: ${input.slot.timeLabel}`,
     `- Barbeiro: ${input.slot.professionalName}`,
@@ -1309,11 +1370,17 @@ function shouldUseDeterministicConfirmationShortcut(input: {
   inboundText: string
   lastAssistantText?: string | null
 }) {
+  const hasResolvedTime = Boolean(input.memory.requestedTimeLabel || input.memory.selectedSlot?.timeLabel)
+
   if (
     input.memory.state !== 'WAITING_CONFIRMATION'
     || !input.memory.selectedServiceId
     || !input.memory.selectedSlot
-    || !isPureExplicitConfirmation(input.inboundText)
+    || (!input.memory.selectedProfessionalId && !input.memory.allowAnyProfessional)
+    || !input.memory.requestedDateIso
+    || !hasResolvedTime
+    || !isContextualPositiveConfirmation(input.inboundText)
+    || hasExplicitConfirmationCorrectionCue(input.inboundText)
   ) {
     return false
   }
@@ -1322,6 +1389,10 @@ function shouldUseDeterministicConfirmationShortcut(input: {
     lastAssistantText: input.lastAssistantText,
     memory: input.memory,
   })
+}
+
+function buildConfirmationReminderMessage() {
+  return 'Para confirmar, me responda: pode marcar.'
 }
 
 function sanitizeReplyTextAgainstProfessionalVocative(input: {
@@ -1387,6 +1458,7 @@ function sanitizePrematureConfirmationReply(input: {
   nextAction: WhatsAppAgentNextAction
   shouldCreateAppointment: boolean
   memory: WorkingMemory
+  lastAssistantText?: string | null
   customerName: string
   barbershopName: string
   preferredProfessionalName?: string | null
@@ -1397,6 +1469,10 @@ function sanitizePrematureConfirmationReply(input: {
     return input.replyText
   }
 
+  const shouldUseSelectionSummaryCopy =
+    input.nextAction === 'ASK_CONFIRMATION'
+    && Boolean(input.memory.selectedSlot)
+    && lastAssistantOfferedSlotChoices(input.lastAssistantText)
   const hasFinalConfirmationLanguage = containsFinalConfirmationLanguage(input.replyText)
   const hasConfirmationPromptLanguage = containsConfirmationPromptLanguage(input.replyText)
   const hasPrematureAvailabilityPromise = containsPrematureAvailabilityPromiseLanguage(input.replyText)
@@ -1415,6 +1491,7 @@ function sanitizePrematureConfirmationReply(input: {
     && !hasConfirmationPromptLanguage
     && !(hasPrematureAvailabilityPromise && shouldAvoidAvailabilityPromise)
     && !shouldRebuildConfirmationPrompt
+    && !shouldUseSelectionSummaryCopy
   ) {
     return input.replyText
   }
@@ -1424,6 +1501,10 @@ function sanitizePrematureConfirmationReply(input: {
     && input.nextAction === 'ASK_CONFIRMATION'
     && canAskForBookingConfirmation(input.memory)
     && !shouldRebuildConfirmationPrompt
+    && !wasSelectedSlotPresentedToCustomer({
+      lastAssistantText: input.lastAssistantText,
+      memory: input.memory,
+    })
   ) {
     return input.replyText
   }
@@ -1431,6 +1512,7 @@ function sanitizePrematureConfirmationReply(input: {
   return buildGuardrailReplyText({
     nextAction: input.nextAction,
     memory: input.memory,
+    lastAssistantText: input.lastAssistantText,
     customerName: input.customerName,
     barbershopName: input.barbershopName,
     preferredProfessionalName: input.preferredProfessionalName ?? null,
@@ -1544,6 +1626,56 @@ function findProfessionalCandidates(professionals: WhatsAppAgentInput['professio
       professionalTokens.some((professionalToken) => professionalToken === token || professionalToken.startsWith(token))
     )
   })
+}
+
+function matchesOfferedSlotProfessionalSelection(input: {
+  slot: WhatsAppBookingSlot
+  message: string
+  professionalName?: string | null
+}) {
+  const normalizedMessage = normalizeIntentPhrase(input.message)
+  const normalizedProfessionalName = input.professionalName ? normalizeIntentPhrase(input.professionalName) : ''
+
+  if (normalizedProfessionalName && normalizeIntentPhrase(input.slot.professionalName).includes(normalizedProfessionalName)) {
+    return true
+  }
+
+  return nameTokens(input.slot.professionalName).some((token) =>
+    normalizedMessage === token
+    || normalizedMessage.startsWith(`${token} `)
+    || normalizedMessage.includes(` ${token}`)
+  )
+}
+
+function pickPresentedOfferedSlot(input: {
+  offeredSlots: WhatsAppBookingSlot[]
+  selectedOptionNumber: number | null
+  requestedTime?: string | null
+  professionalName?: string | null
+  message: string
+}) {
+  if (input.selectedOptionNumber && input.selectedOptionNumber >= 1 && input.selectedOptionNumber <= input.offeredSlots.length) {
+    return input.offeredSlots[input.selectedOptionNumber - 1] ?? null
+  }
+
+  if (input.requestedTime) {
+    const requestedTimeMatch = input.offeredSlots.find((slot) => slot.timeLabel === input.requestedTime)
+    if (requestedTimeMatch) {
+      return requestedTimeMatch
+    }
+  }
+
+  const normalizedMessage = normalizeIntentPhrase(input.message)
+  const labelMatch = input.offeredSlots.find((slot) => normalizeIntentPhrase(slot.timeLabel) === normalizedMessage)
+  if (labelMatch) {
+    return labelMatch
+  }
+
+  return input.offeredSlots.find((slot) => matchesOfferedSlotProfessionalSelection({
+    slot,
+    message: input.message,
+    professionalName: input.professionalName,
+  })) ?? null
 }
 
 function applyCorrectionTargetToMemory(memory: WorkingMemory, correctionTarget: string) {
@@ -1874,6 +2006,7 @@ function buildFallbackStructuredOutput(input: {
 function buildGuardrailReplyText(input: {
   nextAction: WhatsAppAgentNextAction
   memory: WorkingMemory
+  lastAssistantText?: string | null
   customerName: string
   barbershopName: string
   preferredProfessionalName?: string | null
@@ -1931,9 +2064,17 @@ function buildGuardrailReplyText(input: {
   }
 
   if (input.nextAction === 'ASK_CONFIRMATION' && input.memory.selectedSlot && input.memory.selectedServiceName) {
+    if (wasSelectedSlotPresentedToCustomer({
+      lastAssistantText: input.lastAssistantText,
+      memory: input.memory,
+    }) && !lastAssistantOfferedSlotChoices(input.lastAssistantText)) {
+      return buildConfirmationReminderMessage()
+    }
+
     return buildPresentedSlotConfirmationMessage({
       serviceName: input.memory.selectedServiceName,
       slot: input.memory.selectedSlot,
+      mode: lastAssistantOfferedSlotChoices(input.lastAssistantText) ? 'selection' : 'found',
     })
   }
 
@@ -2387,13 +2528,22 @@ async function executeAgentTool(input: {
     }
 
     const selectedOptionNumber = typeof args.selectedOptionNumber === 'number' ? args.selectedOptionNumber : null
-    if (selectedOptionNumber && selectedOptionNumber >= 1 && selectedOptionNumber <= memory.offeredSlots.length) {
-      memory.selectedSlot = memory.offeredSlots[selectedOptionNumber - 1] ?? null
-    } else if (
+    const selectedPresentedSlot = pickPresentedOfferedSlot({
+      offeredSlots: memory.offeredSlots,
+      selectedOptionNumber,
+      requestedTime: typeof args.requestedTime === 'string' ? args.requestedTime : null,
+      professionalName: typeof args.professionalName === 'string' ? args.professionalName : null,
+      message: agentInput.inboundText,
+    })
+    if (selectedPresentedSlot) {
+      memory.selectedSlot = selectedPresentedSlot
+    }
+
+    if (!memory.selectedSlot && (
       typeof args.requestedTime === 'string'
       && args.requestedTime
       && memory.requestedDateIso
-    ) {
+    )) {
       if (!memory.selectedServiceId) {
         return {
           status: 'error',
@@ -2504,8 +2654,14 @@ async function executeAgentTool(input: {
       }
     }
 
-    if (selectedOptionNumber && selectedOptionNumber >= 1 && selectedOptionNumber <= memory.offeredSlots.length) {
-      memory.selectedSlot = memory.offeredSlots[selectedOptionNumber - 1] ?? null
+    const selectedPresentedSlot = pickPresentedOfferedSlot({
+      offeredSlots: memory.offeredSlots,
+      selectedOptionNumber,
+      requestedTime,
+      message: agentInput.inboundText,
+    })
+    if (selectedPresentedSlot) {
+      memory.selectedSlot = selectedPresentedSlot
     }
 
     if (!memory.selectedSlot && requestedTime && memory.requestedDateIso) {
@@ -2650,6 +2806,50 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     barbershopId: input.barbershop.id,
     customerId: input.customer.id,
   })
+
+  const canUseImmediateDeterministicConfirmation =
+    shouldUseDeterministicConfirmationShortcut({
+      memory,
+      inboundText: input.inboundText,
+      lastAssistantText: input.conversation.lastAssistantText,
+    })
+
+  if (canUseImmediateDeterministicConfirmation) {
+    const responseText =
+      'Perfeito. Vou concluir esse agendamento no sistema agora para voce.'
+
+    memory.conversationSummary = buildRuntimeSummary(memory)
+
+    console.info('[whatsapp-agent] immediate deterministic confirmation shortcut', {
+      customerId: input.customer.id,
+      conversationId: input.conversation.id,
+      selectedServiceId: memory.selectedServiceId,
+      selectedSlot: memory.selectedSlot,
+      inboundText: input.inboundText,
+    })
+
+    return {
+      responseText,
+      flow: 'appointment_created',
+      conversationState: 'WAITING_CONFIRMATION',
+      shouldCreateAppointment: true,
+      memory,
+      structured: {
+        intent: 'CONFIRM',
+        correctionTarget: 'NONE',
+        mentionedName: null,
+        preferredPeriod: null,
+        requestedDate: memory.requestedDateIso,
+        requestedTime: memory.selectedSlot?.timeLabel ?? memory.requestedTimeLabel,
+        confidence: 0.99,
+        nextAction: 'CONFIRM_BOOKING',
+        replyText: responseText,
+        summary: memory.conversationSummary,
+      },
+      toolTrace: [],
+      usedAI: false,
+    }
+  }
 
   const fallbackIntent = await interpretWhatsAppMessage({
     message: input.inboundText,
@@ -3058,16 +3258,21 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
       )
     }
 
-    const explicitConfirmation = isPureExplicitConfirmation(input.inboundText)
+    const contextualPositiveConfirmation = isContextualPositiveConfirmation(input.inboundText)
     const slotWasPresentedForConfirmation = wasSelectedSlotPresentedToCustomer({
       lastAssistantText: input.conversation.lastAssistantText,
       memory,
     })
+    const hasResolvedTime = Boolean(memory.requestedTimeLabel || memory.selectedSlot?.timeLabel)
     const shouldCreateAppointment =
-      explicitConfirmation
+      contextualPositiveConfirmation
+      && !hasExplicitConfirmationCorrectionCue(input.inboundText)
       && memory.state === 'WAITING_CONFIRMATION'
       && Boolean(memory.selectedServiceId)
       && Boolean(memory.selectedSlot)
+      && (Boolean(memory.selectedProfessionalId) || memory.allowAnyProfessional)
+      && Boolean(memory.requestedDateIso)
+      && hasResolvedTime
       && slotWasPresentedForConfirmation
 
     let toolFailureOverride = resolveToolFailureOverride({
@@ -3106,6 +3311,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
       ? buildGuardrailReplyText({
           nextAction: normalizedNextAction,
           memory,
+          lastAssistantText: input.conversation.lastAssistantText,
           customerName: input.customer.name,
           barbershopName: input.barbershop.name,
           preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
@@ -3125,6 +3331,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
       nextAction: normalizedNextAction,
       shouldCreateAppointment,
       memory,
+      lastAssistantText: input.conversation.lastAssistantText,
       customerName: input.customer.name,
       barbershopName: input.barbershop.name,
       preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
@@ -3192,4 +3399,6 @@ export const __testing = {
   sanitizeReplyTextAgainstProfessionalVocative,
   sanitizePrematureConfirmationReply,
   shouldUseDeterministicConfirmationShortcut,
+  buildPresentedSlotConfirmationMessage,
+  pickPresentedOfferedSlot,
 }

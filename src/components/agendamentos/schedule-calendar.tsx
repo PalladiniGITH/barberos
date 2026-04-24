@@ -386,7 +386,6 @@ function AppointmentDetailsDialog({
                   appointment={buildAppointmentFormValue(appointment)}
                   professionals={professionals}
                   services={services}
-                  recentCustomers={recentCustomers}
                 />
               </div>
             </div>
@@ -1044,7 +1043,6 @@ export function ScheduleCalendar({
         defaultProfessionalId={appointmentModalState.defaultProfessionalId}
         professionals={professionals}
         services={services}
-        recentCustomers={recentCustomers}
       />
 
       {activeAppointment && (

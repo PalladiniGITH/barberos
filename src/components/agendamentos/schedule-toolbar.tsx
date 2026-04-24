@@ -161,7 +161,6 @@ export function ScheduleToolbar({
               defaultProfessionalId={selectedProfessionalId}
               professionals={professionals}
               services={services}
-              recentCustomers={recentCustomers}
             />
           </div>
         </div>

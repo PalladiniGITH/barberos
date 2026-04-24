@@ -900,6 +900,75 @@ const CONTEXTUAL_CONFIRMATION_PHRASES = [
   'tá',
 ]
 
+const WAITING_CONFIRMATION_CONTEXTUAL_PHRASES = [
+  'sim',
+  's',
+  'ss',
+  'isso',
+  'isso mesmo',
+  'esse',
+  'esse mesmo',
+  'pode',
+  'pode sim',
+  'quero',
+  'confirmo',
+  'confirmar',
+  'confirma',
+  'confirmado',
+  'pode confirmar',
+  'pode marcar',
+  'pode agendar',
+  'pode fechar',
+  'sim pode confirmar',
+  'sim pode marcar',
+  'sim pode agendar',
+  'sim pode fechar',
+  'quero confirmar',
+  'quero marcar',
+  'quero agendar',
+  'desejo confirmar',
+  'desejo marcar',
+  'desejo agendar',
+  'fechar',
+  'fechado',
+]
+
+const WAITING_CONFIRMATION_CONTEXTUAL_EXACT_PHRASES = [
+  'sim',
+  's',
+  'ss',
+  'isso',
+  'isso mesmo',
+  'esse',
+  'esse mesmo',
+  'pode',
+  'pode sim',
+  'quero',
+]
+
+const WAITING_CONFIRMATION_CONTEXTUAL_ACTION_PHRASES = [
+  'confirmo',
+  'confirmar',
+  'confirma',
+  'confirmado',
+  'pode confirmar',
+  'pode marcar',
+  'pode agendar',
+  'pode fechar',
+  'sim pode confirmar',
+  'sim pode marcar',
+  'sim pode agendar',
+  'sim pode fechar',
+  'quero confirmar',
+  'quero marcar',
+  'quero agendar',
+  'desejo confirmar',
+  'desejo marcar',
+  'desejo agendar',
+  'fechar',
+  'fechado',
+]
+
 function includesAnyPhrase(normalized: string, phrases: string[]) {
   return phrases.some((phrase) => normalized.includes(phrase))
 }
@@ -939,7 +1008,8 @@ function hasExplicitConfirmationCorrectionCue(message: string) {
 
 function detectContextualConfirmationMessage(message: string) {
   const normalized = normalizeIntentPhrase(message)
-  return includesAnyPhrase(normalized, STRICT_CONTEXTUAL_CONFIRMATION_PHRASES)
+  return WAITING_CONFIRMATION_CONTEXTUAL_EXACT_PHRASES.includes(normalized)
+    || WAITING_CONFIRMATION_CONTEXTUAL_ACTION_PHRASES.some((phrase) => normalized === phrase || normalized.startsWith(`${phrase} `))
 }
 
 function hasPresentedConfirmationSlot(summary: WhatsAppInterpreterInput['conversationSummary']) {
