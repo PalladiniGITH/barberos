@@ -205,8 +205,12 @@ export function resolveWeekdayIsoDateInWeek(input: {
 export function resolveRelativeWeekdayIsoDate(input: {
   referenceDateIso: string
   weekdayIndex: number
-  relation: 'NEXT_OCCURRENCE' | 'NEXT_WEEK' | 'WEEK_AFTER_NEXT'
+  relation: 'THIS_OR_NEXT_OCCURRENCE' | 'NEXT_OCCURRENCE' | 'NEXT_WEEK' | 'WEEK_AFTER_NEXT'
 }) {
+  if (input.relation === 'THIS_OR_NEXT_OCCURRENCE') {
+    return thisOrNextWeekdayIsoDate(input.referenceDateIso, input.weekdayIndex)
+  }
+
   if (input.relation === 'NEXT_OCCURRENCE') {
     return nextWeekdayIsoDate(input.referenceDateIso, input.weekdayIndex)
   }
@@ -215,6 +219,25 @@ export function resolveRelativeWeekdayIsoDate(input: {
     referenceDateIso: input.referenceDateIso,
     weekdayIndex: input.weekdayIndex,
     weekOffset: input.relation === 'WEEK_AFTER_NEXT' ? 2 : 1,
+  })
+}
+
+export function thisOrNextWeekdayIsoDate(baseIsoDate: string, weekdayIndex: number) {
+  const [year, month, day] = baseIsoDate.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
+  const currentWeekday = date.getUTCDay()
+  let delta = weekdayIndex - currentWeekday
+
+  if (delta < 0) {
+    delta += 7
+  }
+
+  date.setUTCDate(date.getUTCDate() + delta)
+
+  return formatIsoDateParts({
+    year: date.getUTCFullYear(),
+    month: date.getUTCMonth() + 1,
+    day: date.getUTCDate(),
   })
 }
 
@@ -235,6 +258,11 @@ export function nextWeekdayIsoDate(baseIsoDate: string, weekdayIndex: number) {
     month: date.getUTCMonth() + 1,
     day: date.getUTCDate(),
   })
+}
+
+export function getWeekdayIndexFromIsoDate(dateIso: string) {
+  const [year, month, day] = dateIso.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0)).getUTCDay()
 }
 
 export function buildDateAnchorUtc(dateIso: string) {

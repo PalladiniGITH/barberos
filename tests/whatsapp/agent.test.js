@@ -1,7 +1,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
-const { interpretWhatsAppMessage } = require('@/lib/ai/openai-whatsapp-interpreter')
+const { detectRelativeDateExpression, interpretWhatsAppMessage } = require('@/lib/ai/openai-whatsapp-interpreter')
 const { __testing: agentTesting } = require('@/lib/ai/openai-whatsapp-agent')
 
 const SERVICES = [
@@ -94,6 +94,13 @@ function getConversationSummaryFromMemory(memory) {
 }
 
 async function interpretMessage(message, memory) {
+  return interpretMessageAt(message, memory, {
+    todayIsoDate: '2026-04-13',
+    currentLocalDateTime: '2026-04-13 10:30',
+  })
+}
+
+async function interpretMessageAt(message, memory, input) {
   return interpretWhatsAppMessage({
     message,
     barbershopName: 'Linha Nobre',
@@ -102,8 +109,8 @@ async function interpretMessage(message, memory) {
     offeredSlotCount: memory.offeredSlots.length,
     services: SERVICES.map((service) => ({ name: service.name })),
     professionals: PROFESSIONALS.map((professional) => ({ name: professional.name })),
-    todayIsoDate: '2026-04-13',
-    currentLocalDateTime: '2026-04-13 10:30',
+    todayIsoDate: input.todayIsoDate,
+    currentLocalDateTime: input.currentLocalDateTime,
     conversationSummary: getConversationSummaryFromMemory(memory),
   })
 }
@@ -280,6 +287,78 @@ test('data relativa entendida no turno segue o fluxo normal e nao volta para ASK
     assert.equal(memory.requestedDateIso, expectedDateIso, message)
     assert.notEqual(nextAction, 'ASK_DATE', message)
   }
+})
+
+test('dias da semana e datas relativas resolvem corretamente a partir de 2026-04-24 no timezone da barbearia', async () => {
+  const cases = [
+    ['hoje', '2026-04-24'],
+    ['amanha', '2026-04-25'],
+    ['segunda', '2026-04-27'],
+    ['terca', '2026-04-28'],
+    ['terca feira', '2026-04-28'],
+    ['proxima terca', '2026-04-28'],
+    ['terca que vem', '2026-04-28'],
+    ['quarta', '2026-04-29'],
+  ]
+
+  for (const [message, expectedDateIso] of cases) {
+    const memory = agentTesting.buildInitialMemory(createAgentInput())
+    memory.state = 'WAITING_DATE'
+
+    const interpreted = await interpretMessageAt(message, memory, {
+      todayIsoDate: '2026-04-24',
+      currentLocalDateTime: '2026-04-24 10:30',
+    })
+
+    assert.equal(interpreted.requestedDateIso, expectedDateIso, message)
+  }
+})
+
+test('weekday simples no mesmo dia considera hoje, mas proxima terca e terca que vem apontam para a semana seguinte', async () => {
+  const cases = [
+    ['hoje', '2026-04-28'],
+    ['terca', '2026-04-28'],
+    ['terca feira', '2026-04-28'],
+    ['proxima terca', '2026-05-05'],
+    ['terca que vem', '2026-05-05'],
+  ]
+
+  for (const [message, expectedDateIso] of cases) {
+    const memory = agentTesting.buildInitialMemory(createAgentInput())
+    memory.state = 'WAITING_DATE'
+
+    const interpreted = await interpretMessageAt(message, memory, {
+      todayIsoDate: '2026-04-28',
+      currentLocalDateTime: '2026-04-28 10:30',
+    })
+
+    assert.equal(interpreted.requestedDateIso, expectedDateIso, message)
+  }
+})
+
+test('weekday simples tambem e tratado como expressao relativa deterministica para blindar a resposta do agente', () => {
+  assert.equal(detectRelativeDateExpression('terca feira'), true)
+  assert.equal(detectRelativeDateExpression('quarta'), true)
+})
+
+test('guardrail usa a data resolvida do backend ao responder sobre dia da semana', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.selectedServiceId = 'svc-barba'
+  memory.selectedServiceName = 'Barba'
+  memory.requestedDateIso = '2026-04-28'
+
+  const reply = agentTesting.buildGuardrailReplyText({
+    nextAction: 'ASK_PROFESSIONAL',
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    preferredProfessionalName: null,
+    serviceNames: SERVICES.map((service) => service.name),
+    nowContext: createAgentInput().nowContext,
+  })
+
+  assert.match(reply, /28\/04/)
+  assert.doesNotMatch(reply, /29\/04/)
 })
 
 test('frases naturais de noite promovem EVENING de forma deterministica', async () => {

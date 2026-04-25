@@ -9,6 +9,7 @@ import {
 } from '@/lib/agendamentos/whatsapp-booking'
 import { AvailabilityInfrastructureError } from '@/lib/agendamentos/availability'
 import {
+  detectRelativeDateExpression,
   detectShortPeriodPhrase,
   extractExplicitTimeFromMessage,
   interpretWhatsAppMessage,
@@ -1905,6 +1906,7 @@ function buildToolPhasePrompt(input: {
     'Pergunte o horario especifico como etapa principal. Use manha/tarde/noite so como fallback quando o cliente trouxer isso espontaneamente.',
     'Nao busque horarios nem confirme slot antes de existir barbeiro definido, barbeiro preferencial valido ou allowAnyProfessional explicito.',
     'Antes de consultar disponibilidade real, trate servico, barbeiro, data e horario como intencao do cliente. Use linguagem como "entendi" e "vou verificar", nunca "ja tenho", "reservei", "ficou marcado" ou "confirmado".',
+    'Se o backend ja tiver requestedDateIso, use exatamente essa data e o dia da semana real correspondente. Nunca recalcule dia/data por texto livre.',
     'So considere confirmacao final depois de apresentar um slot claro ao cliente com data, horario e barbeiro e receber confirmacao explicita como "confirmo", "pode marcar", "pode confirmar" ou "pode agendar".',
     'Mensagens vagas como "ok", "blz", "beleza", "tenta ai", "pode tentar" ou emoji sozinho nunca sao confirmacao final.',
     'Se o cliente responder apenas com um nome de barbeiro, trate isso como escolha de profissional.',
@@ -1945,6 +1947,7 @@ function buildFinalPrompt(input: {
     'Pergunte o horario especifico como etapa principal e nao use periodo como pergunta padrao.',
     'Se faltar definicao de barbeiro, pergunte preferencia antes de buscar ou confirmar horario.',
     'Antes de consultar a agenda real, responda com linguagem de intencao como "entendi" e "vou verificar". Nunca diga "ja tenho", "reservei", "ficou marcado" ou "confirmado" antes da consulta real.',
+    'Se o backend ja tiver requestedDateIso, use exatamente essa data e o dia da semana real correspondente. Nunca recalcule dia/data por texto livre.',
     'So finalize o agendamento depois de apresentar um slot claro com data, horario e barbeiro e receber confirmacao explicita como "confirmo", "pode marcar", "pode confirmar" ou "pode agendar".',
     'Nao trate "ok", "blz", "beleza", "tenta ai", "pode tentar" ou emoji sozinho como confirmacao final.',
     'Se o cliente responder apenas com um nome de barbeiro, trate isso como escolha de profissional e nao como vocativo.',
@@ -3307,6 +3310,20 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
       shouldCreateAppointment,
       input.nowContext
     )
+    const deterministicDateGuardrailReply = !toolFailureOverride
+      && memory.requestedDateIso
+      && detectRelativeDateExpression(input.inboundText)
+      ? buildGuardrailReplyText({
+          nextAction: normalizedNextAction,
+          memory,
+          lastAssistantText: input.conversation.lastAssistantText,
+          customerName: input.customer.name,
+          barbershopName: input.barbershop.name,
+          preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
+          serviceNames: input.services.map((service) => service.name),
+          nowContext: input.nowContext,
+        })
+      : null
     const guardedReplyText = !toolFailureOverride && normalizedNextAction !== structuredDraft.nextAction
       ? buildGuardrailReplyText({
           nextAction: normalizedNextAction,
@@ -3320,7 +3337,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
         })
       : null
     const sanitizedReplyText = sanitizeReplyTextAgainstProfessionalVocative({
-      replyText: toolFailureOverride?.replyText ?? guardedReplyText ?? structuredDraft.replyText,
+      replyText: toolFailureOverride?.replyText ?? deterministicDateGuardrailReply ?? guardedReplyText ?? structuredDraft.replyText,
       customerName: input.customer.name,
       selectedProfessionalName: memory.selectedProfessionalName,
       mentionedName: structuredDraft.mentionedName,

@@ -2,6 +2,7 @@ import 'server-only'
 
 import { z } from 'zod'
 import {
+  getWeekdayIndexFromIsoDate,
   resolveRelativeWeekdayIsoDate,
   shiftIsoDate,
   shiftIsoDateByMonths,
@@ -559,6 +560,7 @@ export function detectRelativeDateExpression(message: string) {
     || WEEKDAY_WEEK_AFTER_NEXT_PATTERN.test(normalized)
     || NEXT_WEEKDAY_PATTERN.test(normalized)
     || WEEKDAY_QUE_VEM_PATTERN.test(normalized)
+    || findNormalizedWeekdayIndex(normalized) !== null
   )
 }
 
@@ -613,8 +615,49 @@ function parseRelativeDate(message: string, todayIsoDate: string) {
     return resolveRelativeWeekdayIsoDate({
       referenceDateIso: todayIsoDate,
       weekdayIndex,
-      relation: inferRelativeWeekdayRelation(normalized) ?? 'NEXT_OCCURRENCE',
+      relation: inferRelativeWeekdayRelation(normalized) ?? 'THIS_OR_NEXT_OCCURRENCE',
     })
+  }
+
+  return null
+}
+
+function resolveMentionedWeekdayDateIso(message: string, todayIsoDate: string) {
+  const normalized = normalizeText(message)
+  const weekdayIndex = findNormalizedWeekdayIndex(normalized)
+
+  if (weekdayIndex === null) {
+    return null
+  }
+
+  return resolveRelativeWeekdayIsoDate({
+    referenceDateIso: todayIsoDate,
+    weekdayIndex,
+    relation: inferRelativeWeekdayRelation(normalized) ?? 'THIS_OR_NEXT_OCCURRENCE',
+  })
+}
+
+function ensureResolvedDateConsistency(input: {
+  message: string
+  requestedDateIso: string | null
+  todayIsoDate: string
+}) {
+  if (!input.requestedDateIso) {
+    return null
+  }
+
+  const mentionedWeekdayIndex = findNormalizedWeekdayIndex(input.message)
+  if (mentionedWeekdayIndex === null) {
+    return input.requestedDateIso
+  }
+
+  if (getWeekdayIndexFromIsoDate(input.requestedDateIso) === mentionedWeekdayIndex) {
+    return input.requestedDateIso
+  }
+
+  const recalculatedDateIso = resolveMentionedWeekdayDateIso(input.message, input.todayIsoDate)
+  if (recalculatedDateIso && getWeekdayIndexFromIsoDate(recalculatedDateIso) === mentionedWeekdayIndex) {
+    return recalculatedDateIso
   }
 
   return null
@@ -1422,8 +1465,10 @@ function buildInterpreterPrompt(input: WhatsAppInterpreterInput) {
     '- Palavras como quero, marcar, agendar, hoje, amanha, manha, tarde, noite e horario nunca sao nomes.',
     '- Se a mensagem vier so com um nome valido de barbeiro, trate isso como escolha de profissional.',
     '- requestedDateIso deve ser yyyy-mm-dd apenas quando a data estiver clara.',
+    '- Se o backend deterministicamente identificar uma data relativa ou dia da semana, essa data prevalece; nao recalcule nem sobrescreva requestedDateIso por conta propria.',
     '- Para "hoje", "amanha" e "depois de amanha", use a data local da barbearia.',
     '- Expressoes como "daqui 15 dias", "daqui 2 semanas", "daqui 1 mes", "quinta da semana que vem", "proxima quinta" e "domingo da outra semana" tambem devem virar requestedDateIso coerente.',
+    '- O dia da semana precisa bater com a data calculada. Se o cliente disser "terca-feira", requestedDateIso precisa cair em uma terca real.',
     '- preferredPeriod deve ser MORNING, AFTERNOON, EVENING ou null.',
     '- timePreference deve ser EXACT, MORNING, AFTERNOON, LATE_AFTERNOON, EVENING ou NONE.',
     '- exactTime so deve ser preenchido quando o horario exato estiver explicito.',
@@ -1448,7 +1493,7 @@ function mergeWithFallback(parsed: z.infer<typeof IntentSchema>, fallback: Whats
     serviceName: parsed.serviceName ?? fallback.serviceName,
     mentionedName: parsed.mentionedName ?? fallback.mentionedName,
     preferredPeriod,
-    requestedDateIso: parsed.requestedDateIso ?? fallback.requestedDateIso,
+    requestedDateIso: fallback.requestedDateIso ?? parsed.requestedDateIso,
     exactTime: parsed.exactTime ?? fallback.exactTime,
     timePreference: mergedTimePreference,
     selectedOptionNumber: parsed.selectedOptionNumber ?? fallback.selectedOptionNumber,
@@ -1755,10 +1800,26 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
     }
 
     const merged = mergeWithFallback(parsed.data, fallback)
+    const resolvedRequestedDateIso = ensureResolvedDateConsistency({
+      message: input.message,
+      requestedDateIso: merged.requestedDateIso,
+      todayIsoDate: input.todayIsoDate,
+    })
+
+    if (merged.requestedDateIso && resolvedRequestedDateIso && merged.requestedDateIso !== resolvedRequestedDateIso) {
+      console.info('[whatsapp-agent] weekday/date consistency corrected', {
+        message: input.message,
+        previousRequestedDateIso: merged.requestedDateIso,
+        resolvedRequestedDateIso,
+        todayIsoDate: input.todayIsoDate,
+        timezone: input.barbershopTimezone,
+      })
+    }
 
     return prioritizeExplicitTimeOverConfirmation({
       interpreted: {
       ...merged,
+      requestedDateIso: resolvedRequestedDateIso,
       mentionedName: sanitizeMentionedNameCandidate(merged.mentionedName, input.professionals, true),
       preferredPeriod: merged.preferredPeriod ?? derivePreferredPeriod(merged.timePreference),
       },

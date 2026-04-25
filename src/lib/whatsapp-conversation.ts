@@ -33,6 +33,7 @@ import {
   getTodayIsoInTimezone,
   nextWeekdayIsoDate,
   resolveBusinessTimezone,
+  thisOrNextWeekdayIsoDate,
 } from '@/lib/timezone'
 import { resolveCustomerPreferredProfessional } from '@/lib/customers/preferred-professional'
 
@@ -466,7 +467,11 @@ function parseRequestedDateFromExistingBookingQuestion(input: {
       return getWeekdayIsoWithinWeek(referenceDateIso, weekdayIndex)
     }
 
-    return nextWeekdayIsoDate(todayIso, weekdayIndex)
+    if (/\b(proxim[ao]\s+|que\s+vem)\b/.test(normalized)) {
+      return nextWeekdayIsoDate(todayIso, weekdayIndex)
+    }
+
+    return thisOrNextWeekdayIsoDate(todayIso, weekdayIndex)
   }
 
   if (followUpPattern.test(normalized) && input.previousQuery?.requestedDateIso) {
