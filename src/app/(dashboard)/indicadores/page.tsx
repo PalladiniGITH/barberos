@@ -224,7 +224,7 @@ export default async function IndicadoresPage({ searchParams }: Props) {
               {formatCurrency(current.revenue)}
             </h2>
             <p className="mt-3 text-sm leading-6 text-slate-300">
-              {monthLabel} aparece aqui como um retrato estratégico do negócio: faturamento, margem, ticket e custo operacional em uma linguagem que o dono entende rápido.
+              {monthLabel} aparece aqui como uma leitura executiva do negócio: faturamento, margem, ticket e custo operacional em um único painel.
             </p>
           </div>
 
@@ -304,7 +304,7 @@ export default async function IndicadoresPage({ searchParams }: Props) {
         <section className="dashboard-panel p-6">
           <h2 className="text-lg font-semibold text-foreground">Insights executivos</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Leitura simples, com cara de produto, para mostrar valor logo na apresentação.
+            Resumo objetivo para acompanhar desempenho, margem e pressão de custo ao longo do período.
           </p>
 
           <div className="mt-5 grid gap-3 md:grid-cols-3">
@@ -336,26 +336,26 @@ export default async function IndicadoresPage({ searchParams }: Props) {
                 <p className="text-sm font-semibold text-foreground">Margem média de 6 meses</p>
                 <p className="mt-2 text-2xl font-semibold text-foreground">{formatPercent(averageMargin, 0)}</p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Boa referência para posicionar a conversa de lucro sem depender de benchmark externo agora.
+                  Faixa útil para comparar estabilidade de margem ao longo dos últimos meses.
                 </p>
               </div>
             </div>
           </section>
 
           <section className="dashboard-panel p-6">
-            <h2 className="text-lg font-semibold text-foreground">Por que isso vende</h2>
+            <h2 className="text-lg font-semibold text-foreground">Como interpretar</h2>
             <div className="mt-4 space-y-3 text-sm text-muted-foreground">
               <p className="inline-flex items-start gap-2">
                 <Wallet className="mt-0.5 h-4 w-4 text-primary" />
-                Tira o sistema do lugar de cadastro e coloca no lugar de leitura de negócio.
+                Use faturamento, lucro e ticket para entender o ritmo comercial do período.
               </p>
               <p className="inline-flex items-start gap-2">
                 <TrendingDown className="mt-0.5 h-4 w-4 text-primary" />
-                Mostra custo operacional e margem de um jeito que dono entende rápido.
+                Compare margem e despesas para identificar pressão operacional com rapidez.
               </p>
               <p className="inline-flex items-start gap-2">
                 <Target className="mt-0.5 h-4 w-4 text-primary" />
-                Abre caminho para benchmark e alertas mais fortes sem overengineering agora.
+                Acompanhe tendências do mês e pontos de atenção antes de ajustar preço, custo ou meta.
               </p>
             </div>
           </section>

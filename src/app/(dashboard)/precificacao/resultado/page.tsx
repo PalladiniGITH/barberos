@@ -98,7 +98,7 @@ export default async function ResultadoPage() {
     <div className="page-section mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
         title="Resultado da precificação"
-        description="Consolidação de margem e resultado para mostrar o que o catálogo realmente entrega ao caixa."
+        description="Consolidação de margem, custo e resultado para acompanhar o retorno real do catálogo."
       />
 
       <SectionTabs
@@ -137,7 +137,7 @@ export default async function ResultadoPage() {
               {formatCurrency(estimatedResult)}
             </h2>
             <p className="mt-3 text-sm leading-6 text-slate-300">
-              Esta visão fecha a conversa de preço com margem estimada, custo total e retorno por hora de catálogo.
+              Consolide margem estimada, custo total e retorno por hora para revisar a rentabilidade do catálogo.
             </p>
           </div>
 
@@ -187,7 +187,7 @@ export default async function ResultadoPage() {
             <div>
               <h2 className="text-xl font-semibold text-foreground">Resultado por serviço</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                A tabela ajuda a defender preço, revisar comissão e ajustar a conversa com o dono.
+                Compare preço, custo e margem para revisar comissão, mix e rentabilidade dos serviços.
               </p>
             </div>
             {bestService && (
@@ -206,7 +206,7 @@ export default async function ResultadoPage() {
                 <div>
                   <p className="text-lg font-semibold text-foreground">Nenhum serviço cadastrado ainda</p>
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                    Assim que o catálogo entrar, esta tela mostra o resultado consolidado sem depender de números externos.
+                    Assim que o catálogo entrar, esta tela consolida resultado, custo e margem de forma comparável entre serviços.
                   </p>
                 </div>
               </div>

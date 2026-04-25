@@ -314,7 +314,7 @@ export default async function ConfiguracoesPage() {
         <div className="dashboard-panel p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Servicos + insumos</p>
           <p className="mt-3 text-3xl font-semibold text-foreground">{serviceCount + supplyCount}</p>
-          <p className="mt-2 text-sm text-muted-foreground">Estrutura ja suficiente para vender o modulo de margem.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Base operacional já configurada para precificação, custo e margem.</p>
         </div>
 
         <div className="dashboard-panel p-5">
@@ -330,11 +330,11 @@ export default async function ConfiguracoesPage() {
             <div>
               <h2 className="text-xl font-semibold text-foreground">Perfil da barbearia</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Um resumo da conta para a apresentacao parecer operacao real, nao ambiente improvisado.
+                Resumo da conta, da estrutura operacional e dos módulos já configurados na barbearia.
               </p>
             </div>
             <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-              Conta pronta para apresentar
+              Conta configurada
             </span>
           </div>
 

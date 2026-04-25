@@ -7,7 +7,6 @@ import {
   toggleServiceStatusFromForm,
 } from '@/actions/catalogo'
 import { assertAdministrativeRole, requireSession } from '@/lib/auth'
-import { PRODUCT_NAME } from '@/lib/branding'
 import { prisma } from '@/lib/prisma'
 import { cn, formatCurrency, formatPercent } from '@/lib/utils'
 import { PageHeader } from '@/components/layout/page-header'
@@ -198,7 +197,7 @@ export default async function ServicosPage() {
         <div className="dashboard-panel p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Preço médio</p>
           <p className="mt-3 text-3xl font-semibold text-foreground">{formatCurrency(averagePrice)}</p>
-          <p className="mt-2 text-sm text-muted-foreground">Boa referência para posicionamento comercial do salão.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Faixa útil para revisar posicionamento e consistência do catálogo.</p>
         </div>
 
         <div className="dashboard-panel p-5">
@@ -220,11 +219,11 @@ export default async function ServicosPage() {
             <div>
               <h2 className="text-xl font-semibold text-foreground">Serviços com leitura de margem</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                A apresentação fica muito mais forte quando o sistema mostra quanto cada serviço realmente deixa no caixa.
+                Compare preço, custo e margem para ajustar o catálogo com base em rentabilidade real.
               </p>
             </div>
             <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-              Pronto para demo
+              Leitura operacional
             </span>
           </div>
 
@@ -269,25 +268,26 @@ export default async function ServicosPage() {
                     />
                   </label>
                 </div>
-                <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_240px]">
+                <label className={cn(catalogLabelClassName, 'min-w-0')}>
+                  Descrição / observações
                   <textarea
                     name="description"
                     placeholder="Descricao curta para recepcao e operacao"
-                    className={cn(catalogFieldClassName, 'min-h-20 resize-y')}
+                    className={cn(catalogFieldClassName, 'min-h-24 max-w-full resize-y leading-6')}
                   />
-                  <label className={catalogLabelClassName}>
-                    Categoria
-                    <select
-                      name="categoryId"
-                      className={catalogFieldClassName}
-                    >
-                      <option value="">Sem categoria</option>
-                      {serviceCategories.filter((category) => category.active).map((category) => (
-                        <option key={category.id} value={category.id}>{category.name}</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
+                </label>
+                <label className={cn(catalogLabelClassName, 'min-w-0 max-w-[320px]')}>
+                  Categoria
+                  <select
+                    name="categoryId"
+                    className={catalogFieldClassName}
+                  >
+                    <option value="">Sem categoria</option>
+                    {serviceCategories.filter((category) => category.active).map((category) => (
+                      <option key={category.id} value={category.id}>{category.name}</option>
+                    ))}
+                  </select>
+                </label>
                 <div className="min-w-0 overflow-hidden">
                   <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Composicao de insumos</p>
                   <ServiceInputFields supplies={supplies} />
@@ -313,7 +313,7 @@ export default async function ServicosPage() {
                 <div>
                   <p className="text-lg font-semibold text-foreground">Catálogo ainda não configurado</p>
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                    Esta tela já está pronta para vender uma ideia forte: precificação com margem real. Enquanto o cadastro completo não entra, estes exemplos já sustentam a narrativa da demo.
+                    Quando o catálogo estiver vazio, use estes exemplos para visualizar preço, duração e margem esperada de cada serviço.
                   </p>
                 </div>
               </div>
@@ -445,32 +445,42 @@ export default async function ServicosPage() {
                   </div>
 
                   {canManageCatalog && (
-                    <details className="mt-5 overflow-hidden rounded-2xl border border-border/70 bg-background/45 p-4">
-                      <summary className="cursor-pointer text-sm font-semibold text-foreground">Editar cadastro do servico</summary>
+                  <details className="mt-5 overflow-hidden rounded-2xl border border-border/70 bg-background/45 p-4">
+                    <summary className="cursor-pointer text-sm font-semibold text-foreground">Editar cadastro do servico</summary>
                       <form action={saveServiceFromForm} className="mt-4 min-w-0 space-y-4">
                         <input type="hidden" name="id" value={service.id} />
                         <input type="hidden" name="active" value={service.active ? 'true' : 'false'} />
                         <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)_minmax(0,0.7fr)]">
-                          <input name="name" defaultValue={service.name} required className={catalogFieldClassName} />
-                          <input name="price" defaultValue={Number(service.price).toString()} required inputMode="decimal" className={catalogFieldClassName} />
-                          <input name="duration" defaultValue={service.duration.toString()} required inputMode="numeric" className={catalogFieldClassName} />
+                          <label className={catalogLabelClassName}>
+                            Nome
+                            <input name="name" defaultValue={service.name} required className={catalogFieldClassName} />
+                          </label>
+                          <label className={catalogLabelClassName}>
+                            Preço
+                            <input name="price" defaultValue={Number(service.price).toString()} required inputMode="decimal" className={catalogFieldClassName} />
+                          </label>
+                          <label className={catalogLabelClassName}>
+                            Duração
+                            <input name="duration" defaultValue={service.duration.toString()} required inputMode="numeric" className={catalogFieldClassName} />
+                          </label>
                         </div>
-                        <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_240px]">
+                        <label className={cn(catalogLabelClassName, 'min-w-0')}>
+                          Descrição / observações
                           <textarea
                             name="description"
                             defaultValue={service.description ?? ''}
-                            className={cn(catalogFieldClassName, 'min-h-20 resize-y')}
+                            className={cn(catalogFieldClassName, 'min-h-24 max-w-full resize-y leading-6')}
                           />
-                          <label className={catalogLabelClassName}>
-                            Categoria
-                            <select name="categoryId" defaultValue={service.categoryId ?? ''} className={catalogFieldClassName}>
-                              <option value="">Sem categoria</option>
-                              {serviceCategories.filter((category) => category.active || category.id === service.categoryId).map((category) => (
-                                <option key={category.id} value={category.id}>{category.name}{category.active ? '' : ' (inativa)'}</option>
-                              ))}
-                            </select>
-                          </label>
-                        </div>
+                        </label>
+                        <label className={cn(catalogLabelClassName, 'min-w-0 max-w-[320px]')}>
+                          Categoria
+                          <select name="categoryId" defaultValue={service.categoryId ?? ''} className={catalogFieldClassName}>
+                            <option value="">Sem categoria</option>
+                            {serviceCategories.filter((category) => category.active || category.id === service.categoryId).map((category) => (
+                              <option key={category.id} value={category.id}>{category.name}{category.active ? '' : ' (inativa)'}</option>
+                            ))}
+                          </select>
+                        </label>
                         <div className="min-w-0 overflow-hidden">
                           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Composicao de insumos</p>
                           <ServiceInputFields supplies={supplies} existingInputs={service.serviceInputs} />
@@ -547,12 +557,12 @@ export default async function ServicosPage() {
                 <p className="text-sm font-semibold text-emerald-700">{bestService.name}</p>
                 <p className="mt-3 text-3xl font-semibold text-foreground">{formatPercent(bestService.marginPercent, 0)}</p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Melhor leitura de margem no catálogo atual. Ótimo argumento para mostrar inteligência comercial do sistema.
+                  Serviço com melhor margem no catálogo atual, útil para orientar posicionamento e mix de venda.
                 </p>
               </div>
             ) : (
               <div className="mt-4 rounded-2xl border border-dashed border-border bg-secondary/20 p-5 text-sm text-muted-foreground">
-                Assim que os serviços forem cadastrados, o módulo aponta quais são mais rentáveis e quais precisam de revisão.
+                Assim que os serviços forem cadastrados, esta área destaca os itens mais rentáveis e os que pedem revisão.
               </div>
             )}
           </section>
@@ -563,30 +573,30 @@ export default async function ServicosPage() {
               <div className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
                 <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                   <Wallet className="h-4 w-4 text-primary" />
-                  O que vende aqui
+                  Resumo operacional
                 </p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Esta página mostra que o {PRODUCT_NAME} não só registra receita. Ele ajuda a decidir preço, margem e mix de serviços.
+                  Use esta visão para entender preço, margem e papel de cada serviço no catálogo.
                 </p>
               </div>
 
               <div className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
                 <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                   <TrendingUp className="h-4 w-4 text-primary" />
-                  Próximo ganho simples
+                  Oportunidade de ajuste
                 </p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Com o cadastro completo, esta área pode virar uma calculadora de preço ideal em poucos cliques.
+                  Revise serviços com margem comprimida para ajustar preço, comissão ou composição de insumos.
                 </p>
               </div>
 
               <div className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
                 <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                   <Receipt className="h-4 w-4 text-primary" />
-                  Navegação conectada
+                  Leitura integrada
                 </p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Preço, insumo, comissão e meta passam a conversar com o restante do sistema em uma demo só.
+                  Preço, insumos e comissão ficam alinhados para apoiar decisões comerciais e operacionais.
                 </p>
               </div>
             </div>

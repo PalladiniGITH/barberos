@@ -167,7 +167,7 @@ export function SetupWizard({
             Coloque a barbearia no ar em minutos
           </h1>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            A ideia aqui não é preencher cadastro. É sair deste setup com uma dashboard que já faz sentido para vender.
+            Complete os pontos essenciais para começar a operar com agenda, equipe e visão inicial do negócio.
           </p>
         </div>
 
