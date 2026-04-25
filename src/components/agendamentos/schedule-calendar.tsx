@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import * as Popover from '@radix-ui/react-popover'
 import {
@@ -405,6 +405,7 @@ function ScheduleAppointmentCard({
   onPointerDown,
   onOpenAppointment,
   onOpenBlock,
+  registerPreviewCloser,
 }: {
   item: PositionedAppointment
   view: ScheduleView
@@ -414,8 +415,12 @@ function ScheduleAppointmentCard({
   onPointerDown: (event: React.PointerEvent<HTMLButtonElement>, item: PositionedAppointment) => void
   onOpenAppointment: (item: PositionedAppointment) => void
   onOpenBlock: (item: PositionedAppointment) => void
+  registerPreviewCloser: (closer: () => void) => () => void
 }) {
   const [previewOpen, setPreviewOpen] = useState(false)
+  const closePreview = useCallback(() => {
+    setPreviewOpen(false)
+  }, [])
   const top = getAppointmentTop(item.startMinutesOfDay, dayStartMinutes, schedulePxPerMinute)
   const height = Math.max(item.durationMinutes * schedulePxPerMinute, item.itemType === 'BLOCK' ? 56 : view === 'barber' ? 84 : 92)
   const width = getEventWidth(item.laneCount)
@@ -423,16 +428,19 @@ function ScheduleAppointmentCard({
   const compact = item.laneCount > 1 || height < 96
   const statusMeta = getAppointmentStatusMeta(item)
 
+  useEffect(() => registerPreviewCloser(closePreview), [closePreview, registerPreviewCloser])
+
   return (
-    <Popover.Root open={previewOpen} onOpenChange={setPreviewOpen}>
+    <Popover.Root modal={false} open={previewOpen} onOpenChange={setPreviewOpen}>
       <Popover.Trigger asChild>
         <button
           type="button"
           onPointerDown={(event) => onPointerDown(event, item)}
+          onWheelCapture={closePreview}
           onMouseEnter={() => setPreviewOpen(true)}
           onMouseLeave={() => setPreviewOpen(false)}
           onClick={() => {
-            setPreviewOpen(false)
+            closePreview()
             if (item.itemType === 'BLOCK') {
               onOpenBlock(item)
             } else {
@@ -506,9 +514,11 @@ function ScheduleAppointmentCard({
           side={view === 'barber' ? 'right' : 'top'}
           align="start"
           sideOffset={12}
-          onMouseEnter={() => setPreviewOpen(true)}
-          onMouseLeave={() => setPreviewOpen(false)}
-          className="z-50 w-[320px] rounded-[1.3rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.98),rgba(15,17,21,0.98))] p-4 text-foreground shadow-[0_36px_90px_-44px_rgba(2,6,23,0.82)]"
+          onOpenAutoFocus={(event) => event.preventDefault()}
+          onCloseAutoFocus={(event) => event.preventDefault()}
+          onEscapeKeyDown={closePreview}
+          onWheelCapture={closePreview}
+          className="pointer-events-none z-50 w-[320px] select-none rounded-[1.3rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.98),rgba(15,17,21,0.98))] p-4 text-foreground shadow-[0_36px_90px_-44px_rgba(2,6,23,0.82)]"
         >
           <ScheduleItemPreview item={item} />
           <Popover.Arrow className="fill-white" />
@@ -530,7 +540,9 @@ export function ScheduleCalendar({
   services,
   recentCustomers,
 }: ScheduleCalendarProps) {
+  const calendarRootRef = useRef<HTMLDivElement | null>(null)
   const columnRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const hoverPreviewClosersRef = useRef(new Set<() => void>())
   const [pointerSelection, setPointerSelection] = useState<PointerSelectionState | null>(null)
   const [committedSelection, setCommittedSelection] = useState<CommittedSelection | null>(null)
   const [dragState, setDragState] = useState<DragState | null>(null)
@@ -556,6 +568,20 @@ export function ScheduleCalendar({
     const lastHour = hours[hours.length - 1] ?? '20:00'
     return timeLabelToMinutes(lastHour) + 60
   }, [hours])
+
+  const registerPreviewCloser = useCallback((closer: () => void) => {
+    hoverPreviewClosersRef.current.add(closer)
+
+    return () => {
+      hoverPreviewClosersRef.current.delete(closer)
+    }
+  }, [])
+
+  const dismissHoverPreviews = useCallback(() => {
+    hoverPreviewClosersRef.current.forEach((closePreview) => {
+      closePreview()
+    })
+  }, [])
 
   function clearCurrentSelection() {
     setPointerSelection(null)
@@ -740,9 +766,41 @@ export function ScheduleCalendar({
     schedulePxPerMinute,
   ])
 
+  useEffect(() => {
+    function shouldDismissFromEventTarget(target: EventTarget | null) {
+      const root = calendarRootRef.current
+
+      if (!root || !(target instanceof Node)) {
+        return false
+      }
+
+      if (root.contains(target)) {
+        return true
+      }
+
+      return target instanceof Element || target instanceof Document
+        ? target.contains(root)
+        : false
+    }
+
+    function handleHoverInterrupt(event: Event) {
+      if (shouldDismissFromEventTarget(event.target)) {
+        dismissHoverPreviews()
+      }
+    }
+
+    window.addEventListener('wheel', handleHoverInterrupt, { capture: true, passive: true })
+    window.addEventListener('scroll', handleHoverInterrupt, { capture: true, passive: true })
+
+    return () => {
+      window.removeEventListener('wheel', handleHoverInterrupt, true)
+      window.removeEventListener('scroll', handleHoverInterrupt, true)
+    }
+  }, [dismissHoverPreviews])
+
   return (
     <>
-      <div className="overflow-x-auto pb-1">
+      <div ref={calendarRootRef} onWheelCapture={dismissHoverPreviews} className="overflow-x-auto pb-1">
         <div className="px-4 py-5 sm:px-6" style={{ minWidth: `${calendarMinWidth}px` }}>
           <div
             className="grid gap-3"
@@ -857,6 +915,7 @@ export function ScheduleCalendar({
                           selectedProfessionalId={selectedProfessionalId}
                           schedulePxPerMinute={schedulePxPerMinute}
                           dayStartMinutes={dayStartMinutes}
+                          registerPreviewCloser={registerPreviewCloser}
                           onPointerDown={(event, currentItem) => {
                             event.preventDefault()
                             event.stopPropagation()
