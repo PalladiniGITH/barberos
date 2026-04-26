@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { ArrowLeft, Bot, CalendarClock, MessageSquareMore, RadioTower, Users } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
 import { type PlatformBarbershopDetailData } from '@/lib/platform-admin'
-import { BARBERSHOP_SUBSCRIPTION_STATUS_LABELS, ROLE_LABELS, formatCurrency } from '@/lib/utils'
+import { BARBERSHOP_SUBSCRIPTION_STATUS_LABELS, ROLE_LABELS, formatCurrency, formatUsdCurrency } from '@/lib/utils'
 import { formatDateInTimezone, formatDateTimeInTimezone } from '@/lib/timezone'
 
 function DetailCard({
@@ -37,9 +37,17 @@ export function PlatformBarbershopDetail({
 }: {
   data: PlatformBarbershopDetailData
 }) {
-  const aiCostLabel = data.totals.aiEstimatedCostCents !== null
-    ? formatCurrency(data.totals.aiEstimatedCostCents / 100)
-    : 'Sem precificacao'
+  const usdBrlRateLabel = data.pricing.usdBrlRate !== null
+    ? data.pricing.usdBrlRate.toFixed(2).replace('.', ',')
+    : null
+  const aiCostLabel = data.totals.aiEstimatedCostUsd !== null
+    ? formatUsdCurrency(data.totals.aiEstimatedCostUsd)
+    : 'Modelo sem preco'
+  const aiCostHelper = data.totals.aiEstimatedCostUsd !== null
+    ? data.totals.aiEstimatedCostBrl !== null && usdBrlRateLabel
+      ? `~ ${formatCurrency(data.totals.aiEstimatedCostBrl)} com dolar a ${usdBrlRateLabel}.`
+      : 'Estimativa em USD calculada pelo ledger de uso.'
+    : 'Modelos sem preco configurado permanecem sem custo estimado.'
 
   return (
     <div className="space-y-6">
@@ -112,7 +120,7 @@ export function PlatformBarbershopDetail({
         <DetailCard label="Agenda no mes" value={String(data.totals.appointmentsThisMonth)} helper="Agendamentos contabilizados no mes corrente." icon={CalendarClock} />
         <DetailCard label="WhatsApp no mes" value={String(data.totals.whatsappMessagesThisMonth)} helper="Mensagens registradas no fluxo de mensageria." icon={MessageSquareMore} />
         <DetailCard label="Tokens IA no mes" value={new Intl.NumberFormat('pt-BR').format(data.totals.aiTokensThisMonth)} helper="Consumo agregado do tenant nos fluxos de IA instrumentados." icon={Bot} />
-        <DetailCard label="Custo IA" value={aiCostLabel} helper={data.totals.aiEstimatedCostCents !== null ? 'Estimativa agregada a partir do ledger de uso.' : 'Sem tabela de preco configurada para transformar tokens em custo.'} icon={Bot} />
+        <DetailCard label="Custo IA" value={aiCostLabel} helper={aiCostHelper} icon={Bot} />
         <DetailCard label="Automacoes recentes" value={String(data.totals.automationsThisMonth)} helper="Ultimas execucoes de campanha automatica carregadas nesta leitura." icon={RadioTower} />
         <DetailCard label="Profissionais" value={String(data.totals.professionals)} helper="Equipe operacional vinculada a esse tenant." icon={Users} />
       </section>
@@ -175,8 +183,8 @@ export function PlatformBarbershopDetail({
                 <p className="mt-1">
                   {data.integrations.automationActiveConfigs} configuracoes ativas
                   {data.integrations.automationLastRunAt
-                    ? ` • ultima execucao em ${formatDateTimeInTimezone(data.integrations.automationLastRunAt, data.barbershop.timezone)}`
-                    : ' • sem execucao recente'}
+                    ? ` - ultima execucao em ${formatDateTimeInTimezone(data.integrations.automationLastRunAt, data.barbershop.timezone)}`
+                    : ' - sem execucao recente'}
                 </p>
               </div>
               <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
@@ -232,16 +240,37 @@ export function PlatformBarbershopDetail({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="text-sm font-semibold text-foreground">{item.source}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{item.requests} requests • {new Intl.NumberFormat('pt-BR').format(item.totalTokens)} tokens</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {item.requests} registros - {new Intl.NumberFormat('pt-BR').format(item.totalTokens)} tokens
+                      {item.cachedInputTokens > 0 ? ` - ${new Intl.NumberFormat('pt-BR').format(item.cachedInputTokens)} em cache` : ''}
+                    </p>
                   </div>
                   <div className="text-right text-xs text-muted-foreground">
-                    <p>{item.estimatedCostCents !== null ? formatCurrency(item.estimatedCostCents / 100) : 'Sem custo estimado'}</p>
+                    <p>
+                      {item.estimatedCostUsd !== null
+                        ? formatUsdCurrency(item.estimatedCostUsd)
+                        : item.unpricedRequests > 0
+                          ? 'Modelo sem preco configurado'
+                          : 'Sem custo estimado'}
+                    </p>
+                    {item.estimatedCostBrl !== null && (
+                      <p>~ {formatCurrency(item.estimatedCostBrl)}</p>
+                    )}
                     <p>{item.lastUsedAt ? formatDateTimeInTimezone(item.lastUsedAt, data.barbershop.timezone) : 'Sem uso recente'}</p>
                   </div>
                 </div>
+                {item.unpricedRequests > 0 && (
+                  <p className="mt-2 text-[11px] text-amber-200">
+                    {item.unpricedRequests} registro{item.unpricedRequests > 1 ? 's' : ''} com modelo sem preco configurado.
+                  </p>
+                )}
               </article>
             ))}
           </div>
+          <p className="mt-4 text-xs leading-5 text-muted-foreground">
+            Custo estimado com base na tabela configurada em codigo ({data.pricing.version}).
+            {usdBrlRateLabel ? ` Conversao em BRL usando dolar a ${usdBrlRateLabel}.` : ' Conversao em BRL indisponivel sem OPENAI_USD_BRL_RATE.'}
+          </p>
         </div>
 
         <div className="rounded-[1.35rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(20,23,34,0.98),rgba(15,17,21,0.98))] p-4 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.92)]">
@@ -255,13 +284,20 @@ export function PlatformBarbershopDetail({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="text-sm font-semibold text-foreground">{item.source}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{item.model ?? 'modelo nao informado'} • {item.totalTokens ? `${new Intl.NumberFormat('pt-BR').format(item.totalTokens)} tokens` : 'sem tokens'}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {item.model ?? 'modelo nao informado'} - {item.totalTokens ? `${new Intl.NumberFormat('pt-BR').format(item.totalTokens)} tokens` : 'sem tokens'}
+                    </p>
                   </div>
                   <div className="text-right text-xs text-muted-foreground">
-                    <p>{item.status}</p>
+                    <p>{item.estimatedCostUsd !== null ? formatUsdCurrency(item.estimatedCostUsd) : item.model ? 'Modelo sem preco' : item.status}</p>
                     <p>{formatDateTimeInTimezone(item.createdAt, data.barbershop.timezone)}</p>
                   </div>
                 </div>
+                {item.pricingVersion && (
+                  <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
+                    Pricing {item.pricingVersion}
+                  </p>
+                )}
                 {item.errorMessage && (
                   <p className="mt-2 text-xs leading-5 text-rose-200">{item.errorMessage}</p>
                 )}
@@ -273,7 +309,7 @@ export function PlatformBarbershopDetail({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="text-sm font-semibold text-foreground">Campanha {item.localDateIso}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{item.status} • inicio {formatDateTimeInTimezone(item.startedAt, data.barbershop.timezone)}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{item.status} - inicio {formatDateTimeInTimezone(item.startedAt, data.barbershop.timezone)}</p>
                   </div>
                   <div className="text-right text-xs text-muted-foreground">
                     <p>{item.completedAt ? formatDateTimeInTimezone(item.completedAt, data.barbershop.timezone) : 'Em andamento'}</p>

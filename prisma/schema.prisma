@@ -863,10 +863,14 @@ model AiChatUsageLog {
   source       AiChatUsageSource @default(INTERNAL_ASSISTANT)
   model        String?
   inputTokens  Int?
+  cachedInputTokens Int?
   outputTokens Int?
   totalTokens  Int?
   status       AiUsageStatus    @default(SUCCESS)
   estimatedCostCents Int?
+  estimatedCostUsd Decimal?     @db.Decimal(12, 6)
+  pricingVersion String?
+  pricingSourceUpdatedAt DateTime?
   errorMessage String?
   metadataJson Json?
   createdAt    DateTime         @default(now())

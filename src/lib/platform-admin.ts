@@ -1,6 +1,13 @@
 import 'server-only'
 
 import type { AiChatUsageSource, BarbershopSubscriptionStatus, Prisma } from '@prisma/client'
+import {
+  OPENAI_PRICING_SOURCE_UPDATED_AT,
+  OPENAI_PRICING_VERSION,
+  convertUsdToBrl,
+  getConfiguredOpenAIModelNames,
+  getOpenAiUsdBrlRate,
+} from '@/lib/ai/openai-pricing'
 import { assertPlatformRoleAllowed } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatDateTimeInTimezone, resolveBusinessTimezone } from '@/lib/timezone'
@@ -20,6 +27,12 @@ export interface PlatformOverviewFilters {
 }
 
 export interface PlatformOverviewData {
+  pricing: {
+    version: string
+    sourceUpdatedAt: Date
+    pricedModels: string[]
+    usdBrlRate: number | null
+  }
   filters: {
     search: string
     status: string
@@ -33,6 +46,8 @@ export interface PlatformOverviewData {
     whatsappMessagesThisMonth: number
     aiTokensThisMonth: number
     aiEstimatedCostCents: number | null
+    aiEstimatedCostUsd: number | null
+    aiEstimatedCostBrl: number | null
     automationsToday: number
     recentErrors: number
   }
@@ -49,6 +64,9 @@ export interface PlatformOverviewData {
     whatsappMessagesThisMonth: number
     aiTokensThisMonth: number
     aiEstimatedCostCents: number | null
+    aiEstimatedCostUsd: number | null
+    aiEstimatedCostBrl: number | null
+    aiUnpricedRequests: number
     lastActivityAt: Date | null
     lastActivityLabel: string | null
   }>
@@ -64,6 +82,12 @@ export interface PlatformOverviewData {
 }
 
 export interface PlatformBarbershopDetailData {
+  pricing: {
+    version: string
+    sourceUpdatedAt: Date
+    pricedModels: string[]
+    usdBrlRate: number | null
+  }
   barbershop: {
     id: string
     name: string
@@ -87,6 +111,8 @@ export interface PlatformBarbershopDetailData {
     whatsappMessagesThisMonth: number
     aiTokensThisMonth: number
     aiEstimatedCostCents: number | null
+    aiEstimatedCostUsd: number | null
+    aiEstimatedCostBrl: number | null
     automationsThisMonth: number
   }
   users: Array<{
@@ -102,9 +128,13 @@ export interface PlatformBarbershopDetailData {
     source: AiChatUsageSource
     requests: number
     inputTokens: number
+    cachedInputTokens: number
     outputTokens: number
     totalTokens: number
     estimatedCostCents: number | null
+    estimatedCostUsd: number | null
+    estimatedCostBrl: number | null
+    unpricedRequests: number
     lastUsedAt: Date | null
   }>
   integrations: {
@@ -127,6 +157,9 @@ export interface PlatformBarbershopDetailData {
     model: string | null
     status: string
     totalTokens: number | null
+    estimatedCostCents: number | null
+    estimatedCostUsd: number | null
+    pricingVersion: string | null
     errorMessage: string | null
     createdAt: Date
   }>
@@ -140,6 +173,24 @@ export interface PlatformBarbershopDetailData {
 
 function normalizeText(value?: string | null) {
   return typeof value === 'string' ? value.trim() : ''
+}
+
+function normalizeNumericValue(value: Prisma.Decimal | number | null | undefined) {
+  if (value === null || value === undefined) {
+    return null
+  }
+
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function buildPlatformPricingMeta() {
+  return {
+    version: OPENAI_PRICING_VERSION,
+    sourceUpdatedAt: OPENAI_PRICING_SOURCE_UPDATED_AT,
+    pricedModels: getConfiguredOpenAIModelNames(),
+    usdBrlRate: getOpenAiUsdBrlRate(),
+  }
 }
 
 function getDateWindows(referenceDate = new Date()) {
@@ -257,6 +308,7 @@ export async function getPlatformOverviewData(
 
   const where = buildBarbershopWhere(filters)
   const { startOfMonth, startOfDay, sevenDaysAgo } = getDateWindows()
+  const pricing = buildPlatformPricingMeta()
 
   const [
     barbershops,
@@ -264,6 +316,7 @@ export async function getPlatformOverviewData(
     appointmentGroups,
     messagingGroups,
     aiUsageGroups,
+    unpricedAiUsageGroups,
     appointmentActivity,
     messagingActivity,
     aiActivity,
@@ -333,6 +386,25 @@ export async function getPlatformOverviewData(
       _sum: {
         totalTokens: true,
         estimatedCostCents: true,
+        estimatedCostUsd: true,
+      },
+    }),
+    prisma.aiChatUsageLog.groupBy({
+      by: ['barbershopId'],
+      where: {
+        createdAt: {
+          gte: startOfMonth,
+        },
+        model: {
+          not: null,
+        },
+        totalTokens: {
+          gt: 0,
+        },
+        estimatedCostUsd: null,
+      },
+      _count: {
+        _all: true,
       },
     }),
     prisma.appointment.groupBy({
@@ -447,8 +519,12 @@ export async function getPlatformOverviewData(
     {
       totalTokens: group._sum.totalTokens ?? 0,
       estimatedCostCents: group._sum.estimatedCostCents ?? null,
+      estimatedCostUsd: normalizeNumericValue(group._sum.estimatedCostUsd),
     },
   ]))
+  const unpricedAiUsageByBarbershop = new Map(
+    unpricedAiUsageGroups.map((group) => [group.barbershopId, group._count._all])
+  )
   const appointmentActivityByBarbershop = new Map(appointmentActivity.map((item) => [item.barbershopId, item._max.updatedAt ?? null]))
   const messagingActivityByBarbershop = new Map(messagingActivity.map((item) => [item.barbershopId, item._max.createdAt ?? null]))
   const aiActivityByBarbershop = new Map(aiActivity.map((item) => [item.barbershopId, item._max.createdAt ?? null]))
@@ -463,6 +539,7 @@ export async function getPlatformOverviewData(
       automationActivityByBarbershop.get(barbershop.id),
     ])
     const aiUsage = aiUsageByBarbershop.get(barbershop.id)
+    const aiEstimatedCostUsd = aiUsage?.estimatedCostUsd ?? null
 
     return {
       id: barbershop.id,
@@ -477,6 +554,9 @@ export async function getPlatformOverviewData(
       whatsappMessagesThisMonth: messagesByBarbershop.get(barbershop.id) ?? 0,
       aiTokensThisMonth: aiUsage?.totalTokens ?? 0,
       aiEstimatedCostCents: aiUsage?.estimatedCostCents ?? null,
+      aiEstimatedCostUsd,
+      aiEstimatedCostBrl: convertUsdToBrl(aiEstimatedCostUsd, pricing.usdBrlRate),
+      aiUnpricedRequests: unpricedAiUsageByBarbershop.get(barbershop.id) ?? 0,
       lastActivityAt,
       lastActivityLabel: lastActivityAt ? formatDateTimeInTimezone(lastActivityAt, timezone) : null,
     }
@@ -528,6 +608,7 @@ export async function getPlatformOverviewData(
   })
 
   return {
+    pricing,
     filters: {
       search: normalizeText(filters.search),
       status: normalizeText(filters.status),
@@ -546,6 +627,14 @@ export async function getPlatformOverviewData(
         const values = rows.map((item) => item.aiEstimatedCostCents).filter((value): value is number => typeof value === 'number')
         return values.length > 0 ? sumNullable(values) : null
       })(),
+      aiEstimatedCostUsd: (() => {
+        const values = rows.map((item) => item.aiEstimatedCostUsd).filter((value): value is number => typeof value === 'number')
+        return values.length > 0 ? sumNullable(values) : null
+      })(),
+      aiEstimatedCostBrl: (() => {
+        const values = rows.map((item) => item.aiEstimatedCostBrl).filter((value): value is number => typeof value === 'number')
+        return values.length > 0 ? sumNullable(values) : null
+      })(),
       automationsToday: automationToday,
       recentErrors: recentErrors.length,
     },
@@ -561,6 +650,7 @@ export async function getPlatformBarbershopDetailData(
   assertPlatformRoleAllowed(session.platformRole)
 
   const { startOfMonth, sevenDaysAgo } = getDateWindows()
+  const pricing = buildPlatformPricingMeta()
   const barbershop = await prisma.barbershop.findUnique({
     where: { id: barbershopId },
     select: {
@@ -597,6 +687,7 @@ export async function getPlatformBarbershopDetailData(
     appointmentsThisMonth,
     whatsappMessagesThisMonth,
     aiUsageBySource,
+    unpricedAiUsageBySource,
     recentUsage,
     recentAutomations,
     automationsThisMonthCount,
@@ -652,12 +743,33 @@ export async function getPlatformBarbershopDetailData(
       },
       _sum: {
         inputTokens: true,
+        cachedInputTokens: true,
         outputTokens: true,
         totalTokens: true,
         estimatedCostCents: true,
+        estimatedCostUsd: true,
       },
       _max: {
         createdAt: true,
+      },
+    }),
+    prisma.aiChatUsageLog.groupBy({
+      by: ['source'],
+      where: {
+        barbershopId,
+        createdAt: {
+          gte: startOfMonth,
+        },
+        model: {
+          not: null,
+        },
+        totalTokens: {
+          gt: 0,
+        },
+        estimatedCostUsd: null,
+      },
+      _count: {
+        _all: true,
       },
     }),
     prisma.aiChatUsageLog.findMany({
@@ -674,6 +786,9 @@ export async function getPlatformBarbershopDetailData(
         model: true,
         status: true,
         totalTokens: true,
+        estimatedCostCents: true,
+        estimatedCostUsd: true,
+        pricingVersion: true,
         errorMessage: true,
         createdAt: true,
       },
@@ -802,13 +917,18 @@ export async function getPlatformBarbershopDetailData(
     (accumulator, item) => ({
       totalTokens: accumulator.totalTokens + (item._sum.totalTokens ?? 0),
       estimatedCostCents: accumulator.estimatedCostCents + (item._sum.estimatedCostCents ?? 0),
+      estimatedCostUsd: accumulator.estimatedCostUsd + (normalizeNumericValue(item._sum.estimatedCostUsd) ?? 0),
     }),
     {
       totalTokens: 0,
       estimatedCostCents: 0,
+      estimatedCostUsd: 0,
     }
   )
-  const hasEstimatedAiCost = aiUsageBySource.some((item) => typeof item._sum.estimatedCostCents === 'number')
+  const hasEstimatedAiCost = aiUsageBySource.some((item) => normalizeNumericValue(item._sum.estimatedCostUsd) !== null)
+  const unpricedAiUsageBySourceMap = new Map(
+    unpricedAiUsageBySource.map((item) => [item.source, item._count._all])
+  )
 
   const recentErrors = [
     ...failedAiUsage.map((item) => ({
@@ -843,6 +963,7 @@ export async function getPlatformBarbershopDetailData(
   })
 
   return {
+    pricing,
     barbershop: {
       id: barbershop.id,
       name: barbershop.name,
@@ -866,6 +987,10 @@ export async function getPlatformBarbershopDetailData(
       whatsappMessagesThisMonth,
       aiTokensThisMonth: aiTotals.totalTokens,
       aiEstimatedCostCents: hasEstimatedAiCost ? aiTotals.estimatedCostCents : null,
+      aiEstimatedCostUsd: hasEstimatedAiCost ? aiTotals.estimatedCostUsd : null,
+      aiEstimatedCostBrl: hasEstimatedAiCost
+        ? convertUsdToBrl(aiTotals.estimatedCostUsd, pricing.usdBrlRate)
+        : null,
       automationsThisMonth: automationsThisMonthCount,
     },
     users: users.map((user) => ({
@@ -881,9 +1006,13 @@ export async function getPlatformBarbershopDetailData(
       source: item.source,
       requests: item._count._all,
       inputTokens: item._sum.inputTokens ?? 0,
+      cachedInputTokens: item._sum.cachedInputTokens ?? 0,
       outputTokens: item._sum.outputTokens ?? 0,
       totalTokens: item._sum.totalTokens ?? 0,
       estimatedCostCents: item._sum.estimatedCostCents ?? null,
+      estimatedCostUsd: normalizeNumericValue(item._sum.estimatedCostUsd),
+      estimatedCostBrl: convertUsdToBrl(normalizeNumericValue(item._sum.estimatedCostUsd), pricing.usdBrlRate),
+      unpricedRequests: unpricedAiUsageBySourceMap.get(item.source) ?? 0,
       lastUsedAt: item._max.createdAt ?? null,
     })),
     integrations: {
@@ -893,7 +1022,18 @@ export async function getPlatformBarbershopDetailData(
       aiLastUsageAt: aiLastUsage?.createdAt ?? null,
     },
     recentAutomations,
-    recentUsage,
+    recentUsage: recentUsage.map((item) => ({
+      id: item.id,
+      source: item.source,
+      model: item.model,
+      status: item.status,
+      totalTokens: item.totalTokens,
+      estimatedCostCents: item.estimatedCostCents,
+      estimatedCostUsd: normalizeNumericValue(item.estimatedCostUsd),
+      pricingVersion: item.pricingVersion,
+      errorMessage: item.errorMessage,
+      createdAt: item.createdAt,
+    })),
     recentErrors,
   }
 }

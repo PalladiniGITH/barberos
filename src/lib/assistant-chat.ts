@@ -350,12 +350,13 @@ export async function sendAiAssistantPrompt(input: {
     ? {
         answer: blockedResponse,
         failureReason: 'disabled' as const,
-        model: null,
-        promptVersion: 'scope-block.v1',
-        inputTokens: null,
-        outputTokens: null,
-        totalTokens: null,
-      }
+      model: null,
+      promptVersion: 'scope-block.v1',
+      inputTokens: null,
+      cachedInputTokens: null,
+      outputTokens: null,
+      totalTokens: null,
+    }
     : await generateInternalAssistantAnswer({
         scopeLabel: scope.scopeLabel,
         context: contextEnvelope.compactContext,
@@ -396,6 +397,7 @@ export async function sendAiAssistantPrompt(input: {
       source: 'INTERNAL_ASSISTANT',
       model: aiAttempt.model,
       inputTokens: aiAttempt.inputTokens,
+      cachedInputTokens: aiAttempt.cachedInputTokens,
       outputTokens: aiAttempt.outputTokens,
       totalTokens: aiAttempt.totalTokens,
       status: aiAttempt.answer ? 'SUCCESS' : 'FALLBACK',

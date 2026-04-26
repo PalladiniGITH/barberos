@@ -9,6 +9,7 @@ import {
   shiftIsoDateByWeeks,
 } from '@/lib/timezone'
 import { recordAiUsage } from '@/lib/ai/usage-log'
+import { extractOpenAIUsage } from '@/lib/ai/openai-usage'
 
 const DEFAULT_OPENAI_MODEL = 'gpt-4.1-mini'
 const DEFAULT_TIMEOUT_MS = 15000
@@ -436,35 +437,6 @@ function extractResponseText(payload: unknown) {
   })
 
   return chunks.join('\n').trim()
-}
-
-function extractUsage(payload: unknown) {
-  if (!payload || typeof payload !== 'object') {
-    return {
-      inputTokens: null,
-      outputTokens: null,
-      totalTokens: null,
-    }
-  }
-
-  const usage = (payload as {
-    usage?: {
-      input_tokens?: unknown
-      output_tokens?: unknown
-      total_tokens?: unknown
-    }
-  }).usage
-
-  const normalize = (value: unknown) => {
-    const parsed = Number(value)
-    return Number.isFinite(parsed) ? parsed : null
-  }
-
-  return {
-    inputTokens: normalize(usage?.input_tokens),
-    outputTokens: normalize(usage?.output_tokens),
-    totalTokens: normalize(usage?.total_tokens),
-  }
 }
 
 function formatIsoTime(hours: number, minutes: number) {
@@ -1653,13 +1625,14 @@ async function classifyContextualConfirmationWithOpenAI(input: {
 
   const payload = await response.json()
   const outputText = extractResponseText(payload)
-  const usage = extractUsage(payload)
+  const usage = extractOpenAIUsage(payload)
   if (!outputText) {
     await recordAiUsage({
       barbershopId: input.interpreterInput.barbershopId,
       source: 'DATE_INTERPRETER',
       model: input.config.model,
       inputTokens: usage.inputTokens,
+      cachedInputTokens: usage.cachedInputTokens,
       outputTokens: usage.outputTokens,
       totalTokens: usage.totalTokens,
       status: 'FALLBACK',
@@ -1681,6 +1654,7 @@ async function classifyContextualConfirmationWithOpenAI(input: {
       source: 'DATE_INTERPRETER',
       model: input.config.model,
       inputTokens: usage.inputTokens,
+      cachedInputTokens: usage.cachedInputTokens,
       outputTokens: usage.outputTokens,
       totalTokens: usage.totalTokens,
       status: 'FALLBACK',
@@ -1704,6 +1678,7 @@ async function classifyContextualConfirmationWithOpenAI(input: {
       source: 'DATE_INTERPRETER',
       model: input.config.model,
       inputTokens: usage.inputTokens,
+      cachedInputTokens: usage.cachedInputTokens,
       outputTokens: usage.outputTokens,
       totalTokens: usage.totalTokens,
       status: 'FALLBACK',
@@ -1720,6 +1695,7 @@ async function classifyContextualConfirmationWithOpenAI(input: {
     source: 'DATE_INTERPRETER',
     model: input.config.model,
     inputTokens: usage.inputTokens,
+    cachedInputTokens: usage.cachedInputTokens,
     outputTokens: usage.outputTokens,
     totalTokens: usage.totalTokens,
     status: 'SUCCESS',
@@ -1888,13 +1864,14 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
 
     const payload = await response.json()
     const outputText = extractResponseText(payload)
-    const usage = extractUsage(payload)
+    const usage = extractOpenAIUsage(payload)
     if (!outputText) {
       await recordAiUsage({
         barbershopId: input.barbershopId,
         source: 'DATE_INTERPRETER',
         model: config.model,
         inputTokens: usage.inputTokens,
+        cachedInputTokens: usage.cachedInputTokens,
         outputTokens: usage.outputTokens,
         totalTokens: usage.totalTokens,
         status: 'FALLBACK',
@@ -1920,6 +1897,7 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
         source: 'DATE_INTERPRETER',
         model: config.model,
         inputTokens: usage.inputTokens,
+        cachedInputTokens: usage.cachedInputTokens,
         outputTokens: usage.outputTokens,
         totalTokens: usage.totalTokens,
         status: 'FALLBACK',
@@ -1960,6 +1938,7 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
       source: 'DATE_INTERPRETER',
       model: config.model,
       inputTokens: usage.inputTokens,
+      cachedInputTokens: usage.cachedInputTokens,
       outputTokens: usage.outputTokens,
       totalTokens: usage.totalTokens,
       status: 'SUCCESS',

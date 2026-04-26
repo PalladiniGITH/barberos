@@ -1,19 +1,11 @@
 import 'server-only'
 
-import type { AiChatUsageSource, AiUsageStatus, Prisma } from '@prisma/client'
+import { Prisma, type AiChatUsageSource, type AiUsageStatus } from '@prisma/client'
+import { estimateOpenAIUsageCost } from '@/lib/ai/openai-pricing'
 import { prisma } from '@/lib/prisma'
 
 function normalizeOptionalNumber(value: number | null | undefined) {
   return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.round(value)) : null
-}
-
-function estimateAiUsageCostCents(input: {
-  model: string | null | undefined
-  inputTokens: number | null | undefined
-  outputTokens: number | null | undefined
-}) {
-  void input
-  return null
 }
 
 export async function recordAiUsage(input: {
@@ -23,6 +15,7 @@ export async function recordAiUsage(input: {
   source: AiChatUsageSource
   model?: string | null
   inputTokens?: number | null
+  cachedInputTokens?: number | null
   outputTokens?: number | null
   totalTokens?: number | null
   status?: AiUsageStatus
@@ -30,6 +23,17 @@ export async function recordAiUsage(input: {
   metadataJson?: Prisma.InputJsonValue | null
 }) {
   try {
+    const normalizedInputTokens = normalizeOptionalNumber(input.inputTokens)
+    const normalizedCachedInputTokens = normalizeOptionalNumber(input.cachedInputTokens)
+    const normalizedOutputTokens = normalizeOptionalNumber(input.outputTokens)
+    const normalizedTotalTokens = normalizeOptionalNumber(input.totalTokens)
+    const pricingEstimate = estimateOpenAIUsageCost({
+      model: input.model,
+      inputTokens: normalizedInputTokens,
+      cachedInputTokens: normalizedCachedInputTokens,
+      outputTokens: normalizedOutputTokens,
+    })
+
     await prisma.aiChatUsageLog.create({
       data: {
         barbershopId: input.barbershopId,
@@ -37,15 +41,17 @@ export async function recordAiUsage(input: {
         threadId: input.threadId ?? null,
         source: input.source,
         model: input.model ?? null,
-        inputTokens: normalizeOptionalNumber(input.inputTokens),
-        outputTokens: normalizeOptionalNumber(input.outputTokens),
-        totalTokens: normalizeOptionalNumber(input.totalTokens),
+        inputTokens: normalizedInputTokens,
+        cachedInputTokens: normalizedCachedInputTokens,
+        outputTokens: normalizedOutputTokens,
+        totalTokens: normalizedTotalTokens,
         status: input.status ?? 'SUCCESS',
-        estimatedCostCents: estimateAiUsageCostCents({
-          model: input.model,
-          inputTokens: input.inputTokens,
-          outputTokens: input.outputTokens,
-        }),
+        estimatedCostCents: pricingEstimate.estimatedCostCents,
+        estimatedCostUsd: pricingEstimate.estimatedCostUsd !== null
+          ? new Prisma.Decimal(pricingEstimate.estimatedCostUsd.toFixed(6))
+          : null,
+        pricingVersion: input.model ? pricingEstimate.pricingVersion : null,
+        pricingSourceUpdatedAt: input.model ? pricingEstimate.pricingSourceUpdatedAt : null,
         errorMessage: input.errorMessage?.slice(0, 500) ?? null,
         metadataJson: input.metadataJson ?? undefined,
       },

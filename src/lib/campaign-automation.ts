@@ -23,6 +23,7 @@ import {
   sendTextMessage,
 } from '@/lib/integrations/evolution'
 import { recordAiUsage } from '@/lib/ai/usage-log'
+import { extractOpenAIUsage } from '@/lib/ai/openai-usage'
 import { prisma } from '@/lib/prisma'
 import {
   formatIsoDateInTimezone,
@@ -838,35 +839,6 @@ function extractResponseText(payload: unknown) {
   return parts.length > 0 ? parts.join('\n').trim() : null
 }
 
-function extractUsage(payload: unknown) {
-  if (!payload || typeof payload !== 'object') {
-    return {
-      inputTokens: null,
-      outputTokens: null,
-      totalTokens: null,
-    }
-  }
-
-  const usage = (payload as {
-    usage?: {
-      input_tokens?: unknown
-      output_tokens?: unknown
-      total_tokens?: unknown
-    }
-  }).usage
-
-  const normalize = (value: unknown) => {
-    const parsed = Number(value)
-    return Number.isFinite(parsed) ? parsed : null
-  }
-
-  return {
-    inputTokens: normalize(usage?.input_tokens),
-    outputTokens: normalize(usage?.output_tokens),
-    totalTokens: normalize(usage?.total_tokens),
-  }
-}
-
 async function generateCampaignMessageWithAI(input: {
   campaignType: CampaignAutomationType
   customerName: string
@@ -878,6 +850,7 @@ async function generateCampaignMessageWithAI(input: {
   failureReason: OpenAIFailureReason | null
   model: string | null
   inputTokens: number | null
+  cachedInputTokens: number | null
   outputTokens: number | null
   totalTokens: number | null
 }> {
@@ -888,6 +861,7 @@ async function generateCampaignMessageWithAI(input: {
       failureReason: 'disabled',
       model: null,
       inputTokens: null,
+      cachedInputTokens: null,
       outputTokens: null,
       totalTokens: null,
     }
@@ -932,6 +906,7 @@ async function generateCampaignMessageWithAI(input: {
         failureReason: 'bad_status',
         model: config.model,
         inputTokens: null,
+        cachedInputTokens: null,
         outputTokens: null,
         totalTokens: null,
       }
@@ -939,7 +914,7 @@ async function generateCampaignMessageWithAI(input: {
 
     const payload = await response.json()
     const outputText = extractResponseText(payload)
-    const usage = extractUsage(payload)
+    const usage = extractOpenAIUsage(payload)
 
     if (!outputText) {
       return {
@@ -947,6 +922,7 @@ async function generateCampaignMessageWithAI(input: {
         failureReason: 'invalid_payload',
         model: config.model,
         inputTokens: usage.inputTokens,
+        cachedInputTokens: usage.cachedInputTokens,
         outputTokens: usage.outputTokens,
         totalTokens: usage.totalTokens,
       }
@@ -962,6 +938,7 @@ async function generateCampaignMessageWithAI(input: {
         failureReason: 'invalid_json',
         model: config.model,
         inputTokens: usage.inputTokens,
+        cachedInputTokens: usage.cachedInputTokens,
         outputTokens: usage.outputTokens,
         totalTokens: usage.totalTokens,
       }
@@ -974,6 +951,7 @@ async function generateCampaignMessageWithAI(input: {
         failureReason: 'invalid_schema',
         model: config.model,
         inputTokens: usage.inputTokens,
+        cachedInputTokens: usage.cachedInputTokens,
         outputTokens: usage.outputTokens,
         totalTokens: usage.totalTokens,
       }
@@ -984,6 +962,7 @@ async function generateCampaignMessageWithAI(input: {
       failureReason: null,
       model: config.model,
       inputTokens: usage.inputTokens,
+      cachedInputTokens: usage.cachedInputTokens,
       outputTokens: usage.outputTokens,
       totalTokens: usage.totalTokens,
     }
@@ -994,6 +973,7 @@ async function generateCampaignMessageWithAI(input: {
         failureReason: 'timeout',
         model: config.model,
         inputTokens: null,
+        cachedInputTokens: null,
         outputTokens: null,
         totalTokens: null,
       }
@@ -1004,6 +984,7 @@ async function generateCampaignMessageWithAI(input: {
       failureReason: 'request_failed',
       model: config.model,
       inputTokens: null,
+      cachedInputTokens: null,
       outputTokens: null,
       totalTokens: null,
     }
@@ -1297,6 +1278,7 @@ async function prepareDeliveryMessage(input: {
     source: 'CAMPAIGN_AUTOMATION',
     model: aiAttempt.model,
     inputTokens: aiAttempt.inputTokens,
+    cachedInputTokens: aiAttempt.cachedInputTokens,
     outputTokens: aiAttempt.outputTokens,
     totalTokens: aiAttempt.totalTokens,
     status: aiAttempt.message ? 'SUCCESS' : 'FALLBACK',

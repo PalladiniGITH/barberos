@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { ArrowUpRight, Bot, Building2, MessageSquareMore, RadioTower, TriangleAlert } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
 import { type PlatformOverviewData } from '@/lib/platform-admin'
-import { BARBERSHOP_SUBSCRIPTION_STATUS_LABELS, formatCurrency } from '@/lib/utils'
+import { BARBERSHOP_SUBSCRIPTION_STATUS_LABELS, formatCurrency, formatUsdCurrency } from '@/lib/utils'
 
 function SummaryCard({
   label,
@@ -67,9 +67,17 @@ export function PlatformOverview({
 }: {
   data: PlatformOverviewData
 }) {
-  const aiCostLabel = data.cards.aiEstimatedCostCents !== null
-    ? formatCurrency(data.cards.aiEstimatedCostCents / 100)
-    : 'Sem precificacao'
+  const usdBrlRateLabel = data.pricing.usdBrlRate !== null
+    ? data.pricing.usdBrlRate.toFixed(2).replace('.', ',')
+    : null
+  const aiCostLabel = data.cards.aiEstimatedCostUsd !== null
+    ? formatUsdCurrency(data.cards.aiEstimatedCostUsd)
+    : 'Modelo sem preco'
+  const aiCostHelper = data.cards.aiEstimatedCostUsd !== null
+    ? data.cards.aiEstimatedCostBrl !== null && usdBrlRateLabel
+      ? `~ ${formatCurrency(data.cards.aiEstimatedCostBrl)} com dolar a ${usdBrlRateLabel}.`
+      : 'Estimativa em USD com base na tabela configurada em codigo.'
+    : 'Quando um modelo nao estiver na tabela, o custo estimado permanece indisponivel.'
 
   return (
     <div className="space-y-6">
@@ -112,7 +120,7 @@ export function PlatformOverview({
         <SummaryCard
           label="Custo IA estimado"
           value={aiCostLabel}
-          helper={data.cards.aiEstimatedCostCents !== null ? 'Estimativa calculada a partir do ledger de uso.' : 'Ative uma tabela de preco de IA para destravar a estimativa financeira.'}
+          helper={aiCostHelper}
           icon={Bot}
         />
         <SummaryCard
@@ -223,8 +231,22 @@ export function PlatformOverview({
                       {new Intl.NumberFormat('pt-BR').format(barbershop.aiTokensThisMonth)} tokens
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {barbershop.aiEstimatedCostCents !== null ? formatCurrency(barbershop.aiEstimatedCostCents / 100) : 'Sem custo estimado'}
+                      {barbershop.aiEstimatedCostUsd !== null
+                        ? formatUsdCurrency(barbershop.aiEstimatedCostUsd)
+                        : barbershop.aiUnpricedRequests > 0
+                          ? 'Modelo sem preco configurado'
+                          : 'Sem custo estimado'}
                     </p>
+                    {barbershop.aiEstimatedCostBrl !== null && (
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        ~ {formatCurrency(barbershop.aiEstimatedCostBrl)}
+                      </p>
+                    )}
+                    {barbershop.aiUnpricedRequests > 0 && (
+                      <p className="mt-1 text-[11px] text-amber-200">
+                        {barbershop.aiUnpricedRequests} registro{barbershop.aiUnpricedRequests > 1 ? 's' : ''} com modelo sem preco
+                      </p>
+                    )}
                   </td>
                   <td className="px-3 py-4 text-sm text-muted-foreground">
                     {barbershop.lastActivityLabel ?? 'Sem atividade recente'}
@@ -249,6 +271,11 @@ export function PlatformOverview({
             </div>
           )}
         </div>
+
+        <p className="mt-4 text-xs leading-5 text-muted-foreground">
+          Custo estimado com base na tabela configurada em codigo ({data.pricing.version}).
+          {usdBrlRateLabel ? ` Conversao em BRL usando dolar a ${usdBrlRateLabel}.` : ' Conversao em BRL indisponivel sem OPENAI_USD_BRL_RATE.'}
+        </p>
       </section>
 
       <section className="rounded-[1.35rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(20,23,34,0.98),rgba(15,17,21,0.98))] p-4 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.92)]">

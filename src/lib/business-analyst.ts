@@ -290,6 +290,7 @@ async function persistCompletedCacheRecord(input: {
   model: string | null
   failureReason: string | null
   inputTokens: number | null
+  cachedInputTokens?: number | null
   outputTokens: number | null
   totalTokens: number | null
 }) {
@@ -477,6 +478,7 @@ export async function getBusinessAnalystReport(params: {
       model: aiAttempt.model,
       failureReason: aiAttempt.failureReason,
       inputTokens: aiAttempt.inputTokens,
+      cachedInputTokens: aiAttempt.cachedInputTokens,
       outputTokens: aiAttempt.outputTokens,
       totalTokens: aiAttempt.totalTokens,
     })
@@ -486,6 +488,7 @@ export async function getBusinessAnalystReport(params: {
       source: 'BUSINESS_ANALYST',
       model: aiAttempt.model,
       inputTokens: aiAttempt.inputTokens,
+      cachedInputTokens: aiAttempt.cachedInputTokens,
       outputTokens: aiAttempt.outputTokens,
       totalTokens: aiAttempt.totalTokens,
       status: aiAttempt.report ? 'SUCCESS' : 'FALLBACK',

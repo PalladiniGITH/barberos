@@ -1,5 +1,7 @@
 import 'server-only'
 
+import { extractOpenAIUsage } from '@/lib/ai/openai-usage'
+
 const DEFAULT_OPENAI_MODEL = 'gpt-5.4-mini'
 const DEFAULT_TIMEOUT_MS = 12000
 const MIN_TIMEOUT_MS = 1000
@@ -27,6 +29,7 @@ export interface InternalAssistantAttempt {
   model: string | null
   promptVersion: string
   inputTokens: number | null
+  cachedInputTokens: number | null
   outputTokens: number | null
   totalTokens: number | null
 }
@@ -91,35 +94,6 @@ function extractResponseText(payload: unknown) {
   return chunks.join('\n').trim()
 }
 
-function extractUsage(payload: unknown) {
-  if (!payload || typeof payload !== 'object') {
-    return {
-      inputTokens: null,
-      outputTokens: null,
-      totalTokens: null,
-    }
-  }
-
-  const usage = (payload as {
-    usage?: {
-      input_tokens?: unknown
-      output_tokens?: unknown
-      total_tokens?: unknown
-    }
-  }).usage
-
-  const normalize = (value: unknown) => {
-    const parsed = Number(value)
-    return Number.isFinite(parsed) ? parsed : null
-  }
-
-  return {
-    inputTokens: normalize(usage?.input_tokens),
-    outputTokens: normalize(usage?.output_tokens),
-    totalTokens: normalize(usage?.total_tokens),
-  }
-}
-
 function isAbortError(error: unknown) {
   return error instanceof Error && error.name === 'AbortError'
 }
@@ -165,6 +139,7 @@ export async function generateInternalAssistantAnswer(input: {
       model: null,
       promptVersion: INTERNAL_ASSISTANT_PROMPT_VERSION,
       inputTokens: null,
+      cachedInputTokens: null,
       outputTokens: null,
       totalTokens: null,
     }
@@ -202,6 +177,7 @@ export async function generateInternalAssistantAnswer(input: {
         model: config.model,
         promptVersion: INTERNAL_ASSISTANT_PROMPT_VERSION,
         inputTokens: null,
+        cachedInputTokens: null,
         outputTokens: null,
         totalTokens: null,
       }
@@ -209,7 +185,7 @@ export async function generateInternalAssistantAnswer(input: {
 
     const payload = await response.json()
     const answer = extractResponseText(payload)
-    const usage = extractUsage(payload)
+    const usage = extractOpenAIUsage(payload)
 
     if (!answer) {
       return {
@@ -218,6 +194,7 @@ export async function generateInternalAssistantAnswer(input: {
         model: config.model,
         promptVersion: INTERNAL_ASSISTANT_PROMPT_VERSION,
         inputTokens: usage.inputTokens,
+        cachedInputTokens: usage.cachedInputTokens,
         outputTokens: usage.outputTokens,
         totalTokens: usage.totalTokens,
       }
@@ -229,6 +206,7 @@ export async function generateInternalAssistantAnswer(input: {
       model: config.model,
       promptVersion: INTERNAL_ASSISTANT_PROMPT_VERSION,
       inputTokens: usage.inputTokens,
+      cachedInputTokens: usage.cachedInputTokens,
       outputTokens: usage.outputTokens,
       totalTokens: usage.totalTokens,
     }
@@ -239,6 +217,7 @@ export async function generateInternalAssistantAnswer(input: {
       model: config.model,
       promptVersion: INTERNAL_ASSISTANT_PROMPT_VERSION,
       inputTokens: null,
+      cachedInputTokens: null,
       outputTokens: null,
       totalTokens: null,
     }

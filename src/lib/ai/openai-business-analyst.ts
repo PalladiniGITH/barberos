@@ -11,6 +11,7 @@ import {
   type BusinessInsightsContext,
   type BusinessIntelligenceReport,
 } from '@/lib/business-insights'
+import { extractOpenAIUsage } from '@/lib/ai/openai-usage'
 import { formatCurrency, formatPercent } from '@/lib/utils'
 
 const DEFAULT_OPENAI_MODEL = 'gpt-5.4-mini'
@@ -40,6 +41,7 @@ export interface OpenAIBusinessReportAttempt {
   model: string | null
   promptVersion: string
   inputTokens: number | null
+  cachedInputTokens: number | null
   outputTokens: number | null
   totalTokens: number | null
 }
@@ -357,35 +359,6 @@ function extractResponseText(payload: unknown) {
   return chunks.join('\n').trim()
 }
 
-function extractUsage(payload: unknown) {
-  if (!payload || typeof payload !== 'object') {
-    return {
-      inputTokens: null,
-      outputTokens: null,
-      totalTokens: null,
-    }
-  }
-
-  const usage = (payload as {
-    usage?: {
-      input_tokens?: unknown
-      output_tokens?: unknown
-      total_tokens?: unknown
-    }
-  }).usage
-
-  const normalize = (value: unknown) => {
-    const parsed = Number(value)
-    return Number.isFinite(parsed) ? parsed : null
-  }
-
-  return {
-    inputTokens: normalize(usage?.input_tokens),
-    outputTokens: normalize(usage?.output_tokens),
-    totalTokens: normalize(usage?.total_tokens),
-  }
-}
-
 function normalizeAIInsights(parsed: z.infer<typeof AIResponseSchema>, context: BusinessInsightsContext): BusinessIntelligenceReport {
   const normalizedInsights: BusinessInsight[] = parsed.insights.map((insight, index) => ({
     id: `ai-${insight.type}-${index + 1}`,
@@ -455,6 +428,7 @@ export async function generateOpenAIBusinessReport(params: {
       model: null,
       promptVersion: BUSINESS_ANALYST_PROMPT_VERSION,
       inputTokens: null,
+      cachedInputTokens: null,
       outputTokens: null,
       totalTokens: null,
     }
@@ -501,6 +475,7 @@ export async function generateOpenAIBusinessReport(params: {
         model: config.model,
         promptVersion: BUSINESS_ANALYST_PROMPT_VERSION,
         inputTokens: null,
+        cachedInputTokens: null,
         outputTokens: null,
         totalTokens: null,
       }
@@ -508,7 +483,7 @@ export async function generateOpenAIBusinessReport(params: {
 
     const payload = await response.json()
     const outputText = extractResponseText(payload)
-    const usage = extractUsage(payload)
+    const usage = extractOpenAIUsage(payload)
 
     if (!outputText) {
       logOpenAIFallback('invalid_payload', 'OpenAI returned no output_text.')
@@ -518,6 +493,7 @@ export async function generateOpenAIBusinessReport(params: {
         model: config.model,
         promptVersion: BUSINESS_ANALYST_PROMPT_VERSION,
         inputTokens: usage.inputTokens,
+        cachedInputTokens: usage.cachedInputTokens,
         outputTokens: usage.outputTokens,
         totalTokens: usage.totalTokens,
       }
@@ -535,6 +511,7 @@ export async function generateOpenAIBusinessReport(params: {
         model: config.model,
         promptVersion: BUSINESS_ANALYST_PROMPT_VERSION,
         inputTokens: usage.inputTokens,
+        cachedInputTokens: usage.cachedInputTokens,
         outputTokens: usage.outputTokens,
         totalTokens: usage.totalTokens,
       }
@@ -553,6 +530,7 @@ export async function generateOpenAIBusinessReport(params: {
         model: config.model,
         promptVersion: BUSINESS_ANALYST_PROMPT_VERSION,
         inputTokens: usage.inputTokens,
+        cachedInputTokens: usage.cachedInputTokens,
         outputTokens: usage.outputTokens,
         totalTokens: usage.totalTokens,
       }
@@ -564,6 +542,7 @@ export async function generateOpenAIBusinessReport(params: {
       model: config.model,
       promptVersion: BUSINESS_ANALYST_PROMPT_VERSION,
       inputTokens: usage.inputTokens,
+      cachedInputTokens: usage.cachedInputTokens,
       outputTokens: usage.outputTokens,
       totalTokens: usage.totalTokens,
     }
@@ -576,6 +555,7 @@ export async function generateOpenAIBusinessReport(params: {
         model: config.model,
         promptVersion: BUSINESS_ANALYST_PROMPT_VERSION,
         inputTokens: null,
+        cachedInputTokens: null,
         outputTokens: null,
         totalTokens: null,
       }
@@ -588,6 +568,7 @@ export async function generateOpenAIBusinessReport(params: {
       model: config.model,
       promptVersion: BUSINESS_ANALYST_PROMPT_VERSION,
       inputTokens: null,
+      cachedInputTokens: null,
       outputTokens: null,
       totalTokens: null,
     }

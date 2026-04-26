@@ -13,6 +13,12 @@ export function formatCurrency(value: number | string | undefined | null): strin
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num)
 }
 
+export function formatUsdCurrency(value: number | string | undefined | null): string {
+  if (value === null || value === undefined) return 'US$ 0,00'
+  const num = typeof value === 'string' ? parseFloat(value) : value
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'USD' }).format(num)
+}
+
 export function formatPercent(value: number, decimals = 1): string {
   return `${value.toFixed(decimals)}%`
 }
