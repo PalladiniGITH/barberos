@@ -44,3 +44,24 @@ export interface AiAssistantWorkspaceView {
   selectedThread: AiChatThreadDetailView | null
   threadSummaries: AiChatThreadSummaryView[]
 }
+
+export type AiAssistantSendReason = 'EMPTY_INPUT' | 'SHORT_INPUT' | 'TOO_LONG' | 'NORMAL'
+
+export interface AiAssistantSendSuccessResult {
+  ok: true
+  thread: AiChatThreadDetailView
+  threadSummary: AiChatThreadSummaryView
+  userMessage: AiChatMessageView | null
+  assistantMessage: AiChatMessageView | null
+  skippedOpenAi: boolean
+  reason: AiAssistantSendReason
+}
+
+export interface AiAssistantSendFailureResult {
+  ok: false
+  errorCode: 'ASSISTANT_FAILED'
+  message: string
+  threadId: string | null
+}
+
+export type AiAssistantSendResult = AiAssistantSendSuccessResult | AiAssistantSendFailureResult

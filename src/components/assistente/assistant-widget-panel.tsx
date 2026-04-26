@@ -263,12 +263,17 @@ export function AssistantWidgetPanel() {
             pathname,
           })
 
+          if (!result.ok) {
+            setInlineErrorMessage(result.message)
+            return
+          }
+
           setSelectedThread(result.thread)
           replaceThreadSummary(result.threadSummary)
           resetTransientConversation()
         } catch (error) {
-          setInlineErrorMessage('Nao foi possivel responder agora. Tente novamente em instantes.')
-          toast.error(error instanceof Error ? error.message : 'Nao foi possivel falar com o assistente agora.')
+          setInlineErrorMessage('Nao consegui responder agora. Tente novamente em instantes.')
+          toast.error('Nao foi possivel falar com o BarberEX IA agora.')
         }
       })()
     })
@@ -495,7 +500,7 @@ export function AssistantWidgetPanel() {
                     <div className="max-w-[88%] rounded-[1.1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-4 py-3 text-sm text-muted-foreground">
                       <div className="flex items-center gap-2">
                         <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                        Pensando com base nos dados disponiveis...
+                        BarberEX IA esta analisando...
                       </div>
                     </div>
                   </div>

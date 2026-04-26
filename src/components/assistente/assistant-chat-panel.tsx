@@ -63,6 +63,7 @@ export function AssistantChatPanel({ workspace }: Props) {
   const [threadSummaries, setThreadSummaries] = useState<AiChatThreadSummaryView[]>(workspace.threadSummaries)
   const [selectedThread, setSelectedThread] = useState<AiChatThreadDetailView | null>(workspace.selectedThread)
   const [draft, setDraft] = useState('')
+  const [inlineErrorMessage, setInlineErrorMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const latestAssistantMessage = useMemo(
@@ -91,9 +92,15 @@ export function AssistantChatPanel({ workspace }: Props) {
           question,
         })
 
+        if (!result.ok) {
+          setInlineErrorMessage(result.message)
+          return
+        }
+
         setSelectedThread(result.thread)
         replaceThreadSummary(result.threadSummary)
         setDraft('')
+        setInlineErrorMessage(null)
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'Nao foi possivel falar com o BarberEX IA agora.')
       }
@@ -219,6 +226,14 @@ export function AssistantChatPanel({ workspace }: Props) {
               {selectedThread.messages.map((message) => (
                 <MessageBubble key={message.id} message={message} />
               ))}
+              {inlineErrorMessage && (
+                <div className="flex justify-start">
+                  <div className="max-w-[88%] rounded-[1.1rem] border border-[rgba(220,38,38,0.24)] bg-[rgba(220,38,38,0.08)] px-4 py-3 text-sm text-slate-100">
+                    <p className="font-medium">Nao foi possivel responder agora.</p>
+                    <p className="mt-1 text-xs leading-6 text-rose-100/90">{inlineErrorMessage}</p>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex h-full min-h-[300px] items-center justify-center">

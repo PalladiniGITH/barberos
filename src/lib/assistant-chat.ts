@@ -3,6 +3,11 @@ import 'server-only'
 import type { AiChatMessage, AiChatRoleScope, AiChatThread } from '@prisma/client'
 import { Prisma } from '@prisma/client'
 import { AuthorizationError } from '@/lib/auth'
+import {
+  buildAssistantFailureResult,
+  buildAssistantValidationReply,
+  validateAssistantQuestion,
+} from '@/lib/assistant-chat-guards'
 import { resolveAssistantScreenContext } from '@/lib/assistant-screen-context'
 import {
   buildAiAssistantContext,
@@ -10,6 +15,7 @@ import {
   resolveAssistantScopeForSession,
 } from '@/lib/assistant-chat-context'
 import type {
+  AiAssistantSendResult,
   AiAssistantWorkspaceView,
   AiChatMessageView,
   AiChatThreadDetailView,
@@ -18,7 +24,7 @@ import type {
 import { generateInternalAssistantAnswer } from '@/lib/ai/internal-assistant'
 import { recordAiUsage } from '@/lib/ai/usage-log'
 import { prisma } from '@/lib/prisma'
-import { formatDateInTimezone, formatDateTimeInTimezone, resolveBusinessTimezone } from '@/lib/timezone'
+import { formatDateTimeInTimezone, resolveBusinessTimezone } from '@/lib/timezone'
 
 const MAX_THREAD_MESSAGES = 40
 const MAX_HISTORY_MESSAGES = 6
@@ -32,20 +38,39 @@ interface AssistantSessionIdentity {
   email?: string | null
 }
 
-function normalizeQuestion(value: string) {
-  return value.replace(/\s+/g, ' ').trim()
+function logAssistantWidgetEvent(stage: string, input: Record<string, unknown>) {
+  console.info(`[assistant-widget] ${stage}`, input)
+}
+
+function logAssistantWidgetError(stage: string, input: Record<string, unknown>, error: unknown) {
+  const details = error instanceof Error
+    ? {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      }
+    : {
+        name: 'UnknownError',
+        message: String(error),
+        stack: null,
+      }
+
+  console.error(`[assistant-widget] ${stage}`, {
+    ...input,
+    error: details,
+  })
 }
 
 function buildUnauthorizedResponse(scope: AiChatRoleScope) {
   if (scope === 'PROFESSIONAL') {
-    return 'Eu posso ajudar apenas com sua agenda, meta, atendimentos, comissão e clientes ligados ao seu trabalho. Dados globais da barbearia e da equipe ficam fora do seu escopo.'
+    return 'Eu posso ajudar apenas com sua agenda, meta, atendimentos, comissao e clientes ligados ao seu trabalho. Dados globais da barbearia e da equipe ficam fora do seu escopo.'
   }
 
   if (scope === 'FINANCIAL') {
-    return 'Neste perfil eu fico restrito à leitura financeira e indicadores globais permitidos. Dados operacionais sensíveis da equipe ou clientes nominais não entram neste escopo.'
+    return 'Neste perfil eu fico restrito a leitura financeira e indicadores globais permitidos. Dados operacionais sensiveis da equipe ou clientes nominais nao entram neste escopo.'
   }
 
-  return 'Não posso atender esse pedido com o escopo atual.'
+  return 'Nao posso atender esse pedido com o escopo atual.'
 }
 
 function detectProtectedQuestion(scope: AiChatRoleScope, question: string) {
@@ -63,7 +88,7 @@ function detectProtectedQuestion(scope: AiChatRoleScope, question: string) {
   ]
 
   if (genericSensitivePatterns.some((pattern) => normalized.includes(pattern))) {
-    return 'Não posso expor regras internas, prompts, segredos ou payloads do sistema.'
+    return 'Nao posso expor regras internas, prompts, segredos ou payloads do sistema.'
   }
 
   if (scope === 'PROFESSIONAL') {
@@ -87,7 +112,7 @@ function detectProtectedQuestion(scope: AiChatRoleScope, question: string) {
   if (scope === 'FINANCIAL') {
     const blockedPatterns = [
       'agenda de',
-      'agenda amanhã',
+      'agenda amanha',
       'qual barbeiro performou melhor',
       'ranking da equipe',
       'clientes em risco',
@@ -138,10 +163,13 @@ function readMessageMetadata(value: Prisma.JsonValue | null) {
   }
 }
 
-function serializeMessage(message: Pick<
-  AiChatMessage,
-  'id' | 'role' | 'content' | 'createdAt' | 'model' | 'inputTokens' | 'outputTokens' | 'totalTokens' | 'metadataJson'
->, timezone: string): AiChatMessageView {
+function serializeMessage(
+  message: Pick<
+    AiChatMessage,
+    'id' | 'role' | 'content' | 'createdAt' | 'model' | 'inputTokens' | 'outputTokens' | 'totalTokens' | 'metadataJson'
+  >,
+  timezone: string
+): AiChatMessageView {
   return {
     id: message.id,
     role: message.role,
@@ -158,10 +186,12 @@ function serializeMessage(message: Pick<
 
 function serializeThreadDetail(
   thread: AiChatThread & {
-    messages: Array<Pick<
-      AiChatMessage,
-      'id' | 'role' | 'content' | 'createdAt' | 'model' | 'inputTokens' | 'outputTokens' | 'totalTokens' | 'metadataJson'
-    >>
+    messages: Array<
+      Pick<
+        AiChatMessage,
+        'id' | 'role' | 'content' | 'createdAt' | 'model' | 'inputTokens' | 'outputTokens' | 'totalTokens' | 'metadataJson'
+      >
+    >
   },
   timezone: string
 ): AiChatThreadDetailView {
@@ -191,6 +221,26 @@ async function getThreadForUser(input: {
       },
     },
   })
+}
+
+function buildThreadSummaryFromHydratedThread(
+  thread: Awaited<ReturnType<typeof getThreadForUser>>,
+  timezone: string
+) {
+  if (!thread) {
+    return null
+  }
+
+  return serializeThreadSummary(
+    {
+      ...thread,
+      messages: thread.messages.slice(-1).map((message) => ({
+        content: message.content,
+        createdAt: message.createdAt,
+      })),
+    },
+    timezone
+  )
 }
 
 export async function loadAiAssistantWorkspace(
@@ -263,7 +313,7 @@ export async function loadAiChatThread(
   })
 
   if (!thread) {
-    throw new AuthorizationError('Conversa não encontrada para este usuário.')
+    throw new AuthorizationError('Conversa nao encontrada para este usuario.')
   }
 
   return serializeThreadDetail(thread, timezone)
@@ -274,187 +324,314 @@ export async function sendAiAssistantPrompt(input: {
   threadId?: string | null
   question: string
   pathname?: string | null
-}): Promise<{
-  thread: AiChatThreadDetailView
-  threadSummary: AiChatThreadSummaryView
-}> {
-  const question = normalizeQuestion(input.question)
-
-  if (question.length < 4) {
-    throw new Error('Escreva uma pergunta um pouco mais completa para o assistente responder.')
-  }
-
-  if (question.length > MAX_QUESTION_LENGTH) {
-    throw new Error(`Use no máximo ${MAX_QUESTION_LENGTH} caracteres por pergunta.`)
-  }
-
-  const contextEnvelope = await buildAiAssistantContext(input.session)
-  const scope = contextEnvelope.scope
-  const screenContext = resolveAssistantScreenContext(input.pathname, scope.roleScope)
-  const barbershop = await prisma.barbershop.findUnique({
-    where: { id: input.session.barbershopId },
-    select: { timezone: true },
-  })
-  const timezone = resolveBusinessTimezone(barbershop?.timezone)
-
-  const blockedResponse = detectProtectedQuestion(scope.roleScope, question)
-
-  let thread = input.threadId
-    ? await prisma.aiChatThread.findFirst({
-        where: {
-          id: input.threadId,
-          userId: input.session.userId,
-          barbershopId: input.session.barbershopId,
-        },
-      })
-    : null
-
-  if (!thread) {
-    thread = await prisma.aiChatThread.create({
-      data: {
-        barbershopId: input.session.barbershopId,
-        userId: input.session.userId,
-        roleScope: scope.roleScope,
-        title: buildAiAssistantThreadTitle(question),
-      },
-    })
-  }
-
-  await prisma.aiChatMessage.create({
-    data: {
-      threadId: thread.id,
-      role: 'USER',
-      content: question,
-      metadataJson: {
-        scopeLabel: scope.scopeLabel,
-        screenContextKey: screenContext.key,
-        screenContextLabel: screenContext.label,
-        screenPathname: screenContext.pathname,
-      },
-    },
-  })
-
-  const historyMessages = await prisma.aiChatMessage.findMany({
-    where: { threadId: thread.id },
-    orderBy: { createdAt: 'desc' },
-    take: MAX_HISTORY_MESSAGES,
-    select: {
-      role: true,
-      content: true,
-    },
-  })
-
-  const history = historyMessages
-    .reverse()
-    .filter((message) => message.role === 'USER' || message.role === 'ASSISTANT')
-    .map((message) => ({
-      role: message.role,
-      content: message.content.slice(0, 500),
-    })) as Array<{ role: 'USER' | 'ASSISTANT'; content: string }>
-
-  const aiAttempt = blockedResponse
-    ? {
-        answer: blockedResponse,
-        failureReason: 'disabled' as const,
-      model: null,
-      promptVersion: 'scope-block.v1',
-      inputTokens: null,
-      cachedInputTokens: null,
-      outputTokens: null,
-      totalTokens: null,
-    }
-    : await generateInternalAssistantAnswer({
-        scopeLabel: scope.scopeLabel,
-        context: contextEnvelope.compactContext,
-        history,
-        question,
-        screenContext: {
-          key: screenContext.key,
-          label: screenContext.label,
-          subtitle: screenContext.subtitle,
-          pathname: screenContext.pathname,
-        },
-      })
-
-  const answer = aiAttempt.answer?.trim() || contextEnvelope.fallbackAnswer
-  const statusNote = blockedResponse
-    ? 'Pedido fora do escopo liberado para este perfil'
-    : aiAttempt.answer
-      ? 'Resposta baseada no contexto atual do sistema'
-      : 'Análise automática temporariamente indisponível'
-
-  await prisma.aiChatMessage.create({
-    data: {
-      threadId: thread.id,
-      role: 'ASSISTANT',
-      content: answer,
-      model: aiAttempt.model,
-      inputTokens: aiAttempt.inputTokens,
-      outputTokens: aiAttempt.outputTokens,
-      totalTokens: aiAttempt.totalTokens,
-      metadataJson: {
-        scopeLabel: scope.scopeLabel,
-        statusNote,
-        dataFreshnessLabel: contextEnvelope.dataFreshnessLabel,
-        promptVersion: aiAttempt.promptVersion,
-        screenContextKey: screenContext.key,
-        screenContextLabel: screenContext.label,
-        screenPathname: screenContext.pathname,
-      },
-    },
-  })
-
-  if (!blockedResponse) {
-    await recordAiUsage({
-      barbershopId: input.session.barbershopId,
-      userId: input.session.userId,
-      threadId: thread.id,
-      source: 'INTERNAL_ASSISTANT',
-      model: aiAttempt.model,
-      inputTokens: aiAttempt.inputTokens,
-      cachedInputTokens: aiAttempt.cachedInputTokens,
-      outputTokens: aiAttempt.outputTokens,
-      totalTokens: aiAttempt.totalTokens,
-      status: aiAttempt.answer ? 'SUCCESS' : 'FALLBACK',
-      errorMessage: aiAttempt.failureReason,
-      metadataJson: {
-        threadId: thread.id,
-        promptVersion: aiAttempt.promptVersion,
-        scope: scope.roleScope,
-        screenContextKey: screenContext.key,
-        screenContextLabel: screenContext.label,
-      },
-    })
-  }
-
-  await prisma.aiChatThread.update({
-    where: { id: thread.id },
-    data: {
-      title: thread.title || buildAiAssistantThreadTitle(question),
-    },
-  })
-
-  const hydratedThread = await getThreadForUser({
-    threadId: thread.id,
+}): Promise<AiAssistantSendResult> {
+  const validation = validateAssistantQuestion(input.question, MAX_QUESTION_LENGTH)
+  const logContext = {
     userId: input.session.userId,
     barbershopId: input.session.barbershopId,
-  })
-
-  if (!hydratedThread) {
-    throw new Error('Não foi possível recarregar a conversa do assistente.')
+    role: input.session.role ?? null,
+    threadId: input.threadId ?? null,
+    pathname: input.pathname ?? null,
+    questionLength: validation.normalizedQuestion.length,
   }
 
-  return {
-    thread: serializeThreadDetail(hydratedThread, timezone),
-    threadSummary: serializeThreadSummary(
-      {
-        ...hydratedThread,
-        messages: hydratedThread.messages.slice(-1).map((message) => ({
-          content: message.content,
-          createdAt: message.createdAt,
-        })),
+  logAssistantWidgetEvent('send started', logContext)
+
+  let thread: Pick<AiChatThread, 'id' | 'title' | 'roleScope'> | null = null
+
+  try {
+    const contextEnvelope = await buildAiAssistantContext(input.session)
+    const scope = contextEnvelope.scope
+    const screenContext = resolveAssistantScreenContext(input.pathname, scope.roleScope)
+    const barbershop = await prisma.barbershop.findUnique({
+      where: { id: input.session.barbershopId },
+      select: { timezone: true },
+    })
+    const timezone = resolveBusinessTimezone(barbershop?.timezone)
+
+    logAssistantWidgetEvent('context resolved', {
+      ...logContext,
+      scope: scope.roleScope,
+      screenContextKey: screenContext.key,
+      screenContextLabel: screenContext.label,
+      validationReason: validation.reason,
+    })
+
+    thread = input.threadId
+      ? await prisma.aiChatThread.findFirst({
+          where: {
+            id: input.threadId,
+            userId: input.session.userId,
+            barbershopId: input.session.barbershopId,
+          },
+          select: {
+            id: true,
+            title: true,
+            roleScope: true,
+          },
+        })
+      : null
+
+    if (!thread) {
+      thread = await prisma.aiChatThread.create({
+        data: {
+          barbershopId: input.session.barbershopId,
+          userId: input.session.userId,
+          roleScope: scope.roleScope,
+          title: buildAiAssistantThreadTitle(validation.normalizedQuestion || 'Nova conversa'),
+        },
+        select: {
+          id: true,
+          title: true,
+          roleScope: true,
+        },
+      })
+    }
+
+    logAssistantWidgetEvent('thread resolved', {
+      ...logContext,
+      threadId: thread.id,
+      createdThread: input.threadId !== thread.id,
+    })
+
+    const userMessageRecord = validation.normalizedQuestion
+      ? await prisma.aiChatMessage.create({
+          data: {
+            threadId: thread.id,
+            role: 'USER',
+            content: validation.normalizedQuestion,
+            metadataJson: {
+              scopeLabel: scope.scopeLabel,
+              screenContextKey: screenContext.key,
+              screenContextLabel: screenContext.label,
+              screenPathname: screenContext.pathname,
+            },
+          },
+        })
+      : null
+
+    if (userMessageRecord) {
+      logAssistantWidgetEvent('user message persisted', {
+        ...logContext,
+        threadId: thread.id,
+        messageId: userMessageRecord.id,
+      })
+    }
+
+    if (validation.shouldSkipOpenAi) {
+      const validationReason = validation.reason === 'NORMAL' ? 'SHORT_INPUT' : validation.reason
+      const assistantValidationMessage = await prisma.aiChatMessage.create({
+        data: {
+          threadId: thread.id,
+          role: 'ASSISTANT',
+          content: buildAssistantValidationReply({
+            originalQuestion: validation.normalizedQuestion || input.question,
+            reason: validationReason,
+            suggestions: contextEnvelope.suggestions,
+          }),
+          metadataJson: {
+            scopeLabel: scope.scopeLabel,
+            statusNote: 'Orientacao inicial sem chamada de IA',
+            dataFreshnessLabel: contextEnvelope.dataFreshnessLabel,
+            screenContextKey: screenContext.key,
+            screenContextLabel: screenContext.label,
+            screenPathname: screenContext.pathname,
+          },
+        },
+      })
+
+      logAssistantWidgetEvent('short input handled', {
+        ...logContext,
+        threadId: thread.id,
+        validationReason,
+      })
+
+      await prisma.aiChatThread.update({
+        where: { id: thread.id },
+        data: {
+          title: thread.title || buildAiAssistantThreadTitle(validation.normalizedQuestion || 'Nova conversa'),
+        },
+      })
+
+      const hydratedThread = await getThreadForUser({
+        threadId: thread.id,
+        userId: input.session.userId,
+        barbershopId: input.session.barbershopId,
+      })
+      const threadSummary = buildThreadSummaryFromHydratedThread(hydratedThread, timezone)
+
+      if (!hydratedThread || !threadSummary) {
+        return buildAssistantFailureResult(undefined, thread.id)
+      }
+
+      return {
+        ok: true,
+        thread: serializeThreadDetail(hydratedThread, timezone),
+        threadSummary,
+        userMessage: userMessageRecord ? serializeMessage(userMessageRecord, timezone) : null,
+        assistantMessage: serializeMessage(assistantValidationMessage, timezone),
+        skippedOpenAi: true,
+        reason: validationReason,
+      }
+    }
+
+    const blockedResponse = detectProtectedQuestion(scope.roleScope, validation.normalizedQuestion)
+
+    const historyMessages = await prisma.aiChatMessage.findMany({
+      where: { threadId: thread.id },
+      orderBy: { createdAt: 'desc' },
+      take: MAX_HISTORY_MESSAGES,
+      select: {
+        role: true,
+        content: true,
       },
-      timezone
-    ),
+    })
+
+    const history = historyMessages
+      .reverse()
+      .filter((message) => message.role === 'USER' || message.role === 'ASSISTANT')
+      .map((message) => ({
+        role: message.role,
+        content: message.content.slice(0, 500),
+      })) as Array<{ role: 'USER' | 'ASSISTANT'; content: string }>
+
+    if (!blockedResponse) {
+      logAssistantWidgetEvent('openai started', {
+        ...logContext,
+        threadId: thread.id,
+        scope: scope.roleScope,
+        screenContextKey: screenContext.key,
+      })
+    }
+
+    const aiAttempt = blockedResponse
+      ? {
+          answer: blockedResponse,
+          failureReason: 'disabled' as const,
+          model: null,
+          promptVersion: 'scope-block.v1',
+          inputTokens: null,
+          cachedInputTokens: null,
+          outputTokens: null,
+          totalTokens: null,
+        }
+      : await generateInternalAssistantAnswer({
+          scopeLabel: scope.scopeLabel,
+          context: contextEnvelope.compactContext,
+          history,
+          question: validation.normalizedQuestion,
+          screenContext: {
+            key: screenContext.key,
+            label: screenContext.label,
+            subtitle: screenContext.subtitle,
+            pathname: screenContext.pathname,
+          },
+        })
+
+    logAssistantWidgetEvent('openai completed', {
+      ...logContext,
+      threadId: thread.id,
+      skippedOpenAi: Boolean(blockedResponse),
+      failureReason: aiAttempt.failureReason,
+      model: aiAttempt.model,
+      totalTokens: aiAttempt.totalTokens,
+    })
+
+    const answer = aiAttempt.answer?.trim() || contextEnvelope.fallbackAnswer
+    const statusNote = blockedResponse
+      ? 'Pedido fora do escopo liberado para este perfil'
+      : aiAttempt.answer
+        ? 'Resposta baseada no contexto atual do sistema'
+        : 'Analise automatica temporariamente indisponivel'
+
+    const assistantMessageRecord = await prisma.aiChatMessage.create({
+      data: {
+        threadId: thread.id,
+        role: 'ASSISTANT',
+        content: answer,
+        model: aiAttempt.model,
+        inputTokens: aiAttempt.inputTokens,
+        outputTokens: aiAttempt.outputTokens,
+        totalTokens: aiAttempt.totalTokens,
+        metadataJson: {
+          scopeLabel: scope.scopeLabel,
+          statusNote,
+          dataFreshnessLabel: contextEnvelope.dataFreshnessLabel,
+          promptVersion: aiAttempt.promptVersion,
+          screenContextKey: screenContext.key,
+          screenContextLabel: screenContext.label,
+          screenPathname: screenContext.pathname,
+        },
+      },
+    })
+
+    if (!blockedResponse) {
+      await recordAiUsage({
+        barbershopId: input.session.barbershopId,
+        userId: input.session.userId,
+        threadId: thread.id,
+        source: 'INTERNAL_ASSISTANT',
+        model: aiAttempt.model,
+        inputTokens: aiAttempt.inputTokens,
+        cachedInputTokens: aiAttempt.cachedInputTokens,
+        outputTokens: aiAttempt.outputTokens,
+        totalTokens: aiAttempt.totalTokens,
+        status: aiAttempt.answer ? 'SUCCESS' : 'FALLBACK',
+        errorMessage: aiAttempt.failureReason,
+        metadataJson: {
+          threadId: thread.id,
+          promptVersion: aiAttempt.promptVersion,
+          scope: scope.roleScope,
+          screenContextKey: screenContext.key,
+          screenContextLabel: screenContext.label,
+        },
+      })
+
+      logAssistantWidgetEvent('usage logged', {
+        ...logContext,
+        threadId: thread.id,
+        model: aiAttempt.model,
+        totalTokens: aiAttempt.totalTokens,
+      })
+    }
+
+    await prisma.aiChatThread.update({
+      where: { id: thread.id },
+      data: {
+        title: thread.title || buildAiAssistantThreadTitle(validation.normalizedQuestion),
+      },
+    })
+
+    const hydratedThread = await getThreadForUser({
+      threadId: thread.id,
+      userId: input.session.userId,
+      barbershopId: input.session.barbershopId,
+    })
+    const threadSummary = buildThreadSummaryFromHydratedThread(hydratedThread, timezone)
+
+    if (!hydratedThread || !threadSummary) {
+      return buildAssistantFailureResult(undefined, thread.id)
+    }
+
+    return {
+      ok: true,
+      thread: serializeThreadDetail(hydratedThread, timezone),
+      threadSummary,
+      userMessage: userMessageRecord ? serializeMessage(userMessageRecord, timezone) : null,
+      assistantMessage: serializeMessage(assistantMessageRecord, timezone),
+      skippedOpenAi: Boolean(blockedResponse),
+      reason: 'NORMAL',
+    }
+  } catch (error) {
+    logAssistantWidgetError(
+      'send failed',
+      {
+        ...logContext,
+        threadId: thread?.id ?? input.threadId ?? null,
+      },
+      error
+    )
+
+    return buildAssistantFailureResult(undefined, thread?.id ?? input.threadId ?? null)
   }
 }
