@@ -10,6 +10,7 @@ export interface HeaderSessionUser {
   name?: string | null
   email?: string | null
   role?: string | null
+  platformRole?: string | null
   barbershopName?: string | null
   barbershopSlug?: string | null
 }
@@ -24,6 +25,22 @@ interface HeaderProps {
 }
 
 function getPageMeta(pathname: string, role?: string | null) {
+  if (pathname === '/internal') {
+    return {
+      breadcrumb: 'BarberEX Admin',
+      title: 'Operacao SaaS',
+      helper: 'Tenants, uso de IA, WhatsApp, automacoes e sinais da plataforma em uma unica leitura.',
+    }
+  }
+
+  if (pathname.startsWith('/internal/barbershops/')) {
+    return {
+      breadcrumb: 'BarberEX Admin',
+      title: 'Tenant em detalhe',
+      helper: 'Saude operacional, uso de IA, equipe, automacoes e sinais recentes dessa barbearia.',
+    }
+  }
+
   if (pathname === '/dashboard') {
     if (role === 'BARBER') {
       return {
@@ -235,6 +252,7 @@ export function Header({
               name: sessionUser.name,
               email: sessionUser.email,
               role: sessionUser.role,
+              platformRole: sessionUser.platformRole,
               barbershopName: sessionUser.barbershopName,
             }}
           />

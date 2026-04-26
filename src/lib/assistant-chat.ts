@@ -15,6 +15,7 @@ import type {
   AiChatThreadSummaryView,
 } from '@/lib/ai/assistant-chat-types'
 import { generateInternalAssistantAnswer } from '@/lib/ai/internal-assistant'
+import { recordAiUsage } from '@/lib/ai/usage-log'
 import { prisma } from '@/lib/prisma'
 import { formatDateInTimezone, formatDateTimeInTimezone, resolveBusinessTimezone } from '@/lib/timezone'
 
@@ -387,17 +388,25 @@ export async function sendAiAssistantPrompt(input: {
     },
   })
 
-  await prisma.aiChatUsageLog.create({
-    data: {
+  if (!blockedResponse) {
+    await recordAiUsage({
       barbershopId: input.session.barbershopId,
       userId: input.session.userId,
       threadId: thread.id,
+      source: 'INTERNAL_ASSISTANT',
       model: aiAttempt.model,
       inputTokens: aiAttempt.inputTokens,
       outputTokens: aiAttempt.outputTokens,
       totalTokens: aiAttempt.totalTokens,
-    },
-  })
+      status: aiAttempt.answer ? 'SUCCESS' : 'FALLBACK',
+      errorMessage: aiAttempt.failureReason,
+      metadataJson: {
+        threadId: thread.id,
+        promptVersion: aiAttempt.promptVersion,
+        scope: scope.roleScope,
+      },
+    })
+  }
 
   await prisma.aiChatThread.update({
     where: { id: thread.id },

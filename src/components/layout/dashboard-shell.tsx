@@ -21,6 +21,7 @@ interface DashboardShellProps {
   currentPath: string
   currentSearch: string
   user: HeaderSessionUser
+  homeHref?: string
 }
 
 export function DashboardShell({
@@ -28,10 +29,11 @@ export function DashboardShell({
   currentPath,
   currentSearch,
   user,
+  homeHref = '/dashboard',
 }: DashboardShellProps) {
   return (
     <NavigationFeedbackProvider fallbackPath={currentPath} fallbackSearch={currentSearch}>
-      <DashboardShellFrame currentPath={currentPath} currentSearch={currentSearch} user={user}>
+      <DashboardShellFrame currentPath={currentPath} currentSearch={currentSearch} user={user} homeHref={homeHref}>
         {children}
       </DashboardShellFrame>
     </NavigationFeedbackProvider>
@@ -43,6 +45,7 @@ function DashboardShellFrame({
   currentPath,
   currentSearch,
   user,
+  homeHref = '/dashboard',
 }: DashboardShellProps) {
   const pathname = usePathname() ?? currentPath
   const focusMode = isFocusRoute(pathname)
@@ -72,6 +75,8 @@ function DashboardShellFrame({
         pinned={sidebarPinned}
         focusMode={focusMode}
         role={user.role}
+        platformRole={user.platformRole}
+        homeHref={homeHref}
         onPinnedChange={handleSidebarPinnedChange}
       />
 

@@ -4,7 +4,13 @@ import { PrismaAdapter } from '@auth/prisma-adapter'
 import bcrypt from 'bcryptjs'
 import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
-import { AUTH_ENTRY_PATH, normalizeAppRole, type AppRole } from '@/lib/auth-routes'
+import {
+  AUTH_ENTRY_PATH,
+  normalizeAppRole,
+  normalizePlatformRole,
+  type AppRole,
+  type PlatformRole,
+} from '@/lib/auth-routes'
 
 const withStableCache: typeof cache = typeof cache === 'function'
   ? cache
@@ -56,6 +62,7 @@ export const authOptions: NextAuthOptions = {
           name: user.name,
           email: user.email,
           role: user.role,
+          platformRole: user.platformRole,
           barbershopId: user.barbershopId,
           barbershopName: user.barbershop.name,
           barbershopSlug: user.barbershop.slug,
@@ -68,6 +75,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id
         token.role = (user as any).role
+        token.platformRole = (user as any).platformRole
         token.barbershopId = (user as any).barbershopId
         token.barbershopName = (user as any).barbershopName
         token.barbershopSlug = (user as any).barbershopSlug
@@ -78,6 +86,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id as string
         session.user.role = token.role as string
+        session.user.platformRole = token.platformRole as string
         session.user.barbershopId = token.barbershopId as string
         session.user.barbershopName = token.barbershopName as string
         session.user.barbershopSlug = token.barbershopSlug as string
@@ -122,6 +131,26 @@ export function assertAdministrativeRole(
   message = 'Sem permissao para acessar dados administrativos.'
 ) {
   return assertRoleAllowed(role, ['OWNER', 'MANAGER', 'FINANCIAL'], message)
+}
+
+export function assertPlatformRoleAllowed(
+  platformRole: string | null | undefined,
+  allowedRoles: PlatformRole[] = ['PLATFORM_ADMIN', 'PLATFORM_OWNER'],
+  message = 'Sem permissao para acessar a operacao interna da plataforma.'
+) {
+  const normalizedRole = normalizePlatformRole(platformRole)
+
+  if (!normalizedRole || normalizedRole === 'NONE' || !allowedRoles.includes(normalizedRole)) {
+    throw new AuthorizationError(message)
+  }
+
+  return normalizedRole
+}
+
+export async function requirePlatformSession() {
+  const session = await requireSession()
+  assertPlatformRoleAllowed(session.user.platformRole)
+  return session
 }
 
 /**

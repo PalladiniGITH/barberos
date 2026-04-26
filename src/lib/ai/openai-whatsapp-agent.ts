@@ -20,6 +20,7 @@ import {
   getCurrentBusinessPeriod,
   type BusinessPeriod,
 } from '@/lib/timezone'
+import { recordAiUsage } from '@/lib/ai/usage-log'
 
 const DEFAULT_OPENAI_MODEL = 'gpt-4.1-mini'
 const DEFAULT_TIMEOUT_MS = 20000
@@ -1088,11 +1089,43 @@ function extractOpenAiErrorMessage(data: unknown, fallbackText: string) {
   return fallbackText.slice(0, 500) || 'unknown_error'
 }
 
+function extractUsage(payload: unknown) {
+  if (!payload || typeof payload !== 'object') {
+    return {
+      inputTokens: null,
+      outputTokens: null,
+      totalTokens: null,
+    }
+  }
+
+  const usage = (payload as {
+    usage?: {
+      input_tokens?: unknown
+      output_tokens?: unknown
+      total_tokens?: unknown
+    }
+  }).usage
+
+  const normalize = (value: unknown) => {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  return {
+    inputTokens: normalize(usage?.input_tokens),
+    outputTokens: normalize(usage?.output_tokens),
+    totalTokens: normalize(usage?.total_tokens),
+  }
+}
+
 async function callResponsesApi(
   config: OpenAIConfig,
   payload: Record<string, unknown>,
   signal: AbortSignal,
-  requestName: string
+  requestName: string,
+  usageContext: {
+    barbershopId: string
+  }
 ) {
   const response = await fetch(OPENAI_RESPONSES_URL, {
     method: 'POST',
@@ -1117,6 +1150,17 @@ async function callResponsesApi(
   if (!response.ok) {
     const errorMessage = extractOpenAiErrorMessage(data, text)
 
+    await recordAiUsage({
+      barbershopId: usageContext.barbershopId,
+      source: 'WHATSAPP_AGENT',
+      model: config.model,
+      status: 'FAILED',
+      errorMessage,
+      metadataJson: {
+        requestName,
+      },
+    })
+
     console.error('[whatsapp-agent] openai error', {
       requestName,
       status: response.status,
@@ -1126,6 +1170,21 @@ async function callResponsesApi(
 
     throw new Error(`OpenAI Responses API ${response.status}: ${errorMessage}`)
   }
+
+  const usage = extractUsage(data)
+
+  await recordAiUsage({
+    barbershopId: usageContext.barbershopId,
+    source: 'WHATSAPP_AGENT',
+    model: config.model,
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    totalTokens: usage.totalTokens,
+    status: 'SUCCESS',
+    metadataJson: {
+      requestName,
+    },
+  })
 
   return data as ResponsePayload
 }
@@ -1236,6 +1295,7 @@ function sanitizeContextualConfirmationPayload(payload: unknown) {
 
 async function classifyContextualConfirmationWithOpenAI(input: {
   config: OpenAIConfig
+  barbershopId: string
   memory: WorkingMemory
   inboundText: string
   lastAssistantText?: string | null
@@ -1264,10 +1324,13 @@ async function classifyContextualConfirmationWithOpenAI(input: {
           schema: CONTEXTUAL_CONFIRMATION_SCHEMA,
         },
       },
-    },
-    input.signal,
-    'contextual_confirmation'
-  )
+      },
+      input.signal,
+      'contextual_confirmation',
+      {
+        barbershopId: input.barbershopId,
+      }
+    )
 
   const outputText = extractResponseText(response)
   if (!outputText) {
@@ -2855,6 +2918,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
   }
 
   const fallbackIntent = await interpretWhatsAppMessage({
+    barbershopId: input.barbershop.id,
     message: input.inboundText,
     barbershopName: input.barbershop.name,
     barbershopTimezone: input.barbershop.timezone,
@@ -2963,6 +3027,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     try {
       llmContextualConfirmation = await classifyContextualConfirmationWithOpenAI({
         config,
+        barbershopId: input.barbershop.id,
         memory,
         inboundText: input.inboundText,
         lastAssistantText: input.conversation.lastAssistantText,
@@ -3078,7 +3143,10 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
         }),
       },
       controller.signal,
-      'tool_phase'
+      'tool_phase',
+      {
+        barbershopId: input.barbershop.id,
+      }
     )
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
@@ -3130,7 +3198,10 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
           input: toolOutputs,
         },
         controller.signal,
-        'tool_round'
+        'tool_round',
+        {
+          barbershopId: input.barbershop.id,
+        }
       )
     }
 
@@ -3155,7 +3226,10 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
         },
       },
       controller.signal,
-      'final_schema'
+      'final_schema',
+      {
+        barbershopId: input.barbershop.id,
+      }
     )
 
     const finalText = extractResponseText(finalResponse)

@@ -88,6 +88,8 @@ export const ROLE_LABELS: Record<string, string> = {
   MANAGER: 'Gerente',
   BARBER: 'Barbeiro',
   FINANCIAL: 'Financeiro',
+  PLATFORM_ADMIN: 'Admin da plataforma',
+  PLATFORM_OWNER: 'Owner da plataforma',
 }
 
 export const APPOINTMENT_STATUS_LABELS: Record<string, string> = {
@@ -112,6 +114,14 @@ export const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
   ACTIVE: 'Ativa',
   PAUSED: 'Pausada',
   CANCELLED: 'Cancelada',
+}
+
+export const BARBERSHOP_SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
+  TRIAL: 'Trial',
+  ACTIVE: 'Ativa',
+  PAST_DUE: 'Em atraso',
+  BLOCKED: 'Bloqueada',
+  CANCELED: 'Cancelada',
 }
 
 export const APPOINTMENT_BILLING_MODEL_LABELS: Record<string, string> = {

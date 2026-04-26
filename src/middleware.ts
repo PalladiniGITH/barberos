@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { AUTHENTICATED_HOME_PATH, canRoleAccessPath } from '@/lib/auth-routes'
 
 const PROTECTED_PATHS = [
+  '/internal',
   '/dashboard',
   '/agendamentos',
   '/assistente',
@@ -22,8 +23,11 @@ export default withAuth(
   function middleware(req) {
     const pathname = req.nextUrl.pathname
     const role = typeof req.nextauth.token?.role === 'string' ? req.nextauth.token.role : null
+    const platformRole = typeof req.nextauth.token?.platformRole === 'string'
+      ? req.nextauth.token.platformRole
+      : null
 
-    if (role && !canRoleAccessPath(role, pathname)) {
+    if ((role || platformRole) && !canRoleAccessPath(role, pathname, platformRole)) {
       const redirectUrl = req.nextUrl.clone()
       redirectUrl.pathname = AUTHENTICATED_HOME_PATH
       redirectUrl.search = ''
@@ -58,6 +62,8 @@ export default withAuth(
 export const config = {
   matcher: [
     '/dashboard',
+    '/internal',
+    '/internal/:path*',
     '/agendamentos',
     '/agendamentos/:path*',
     '/assistente',

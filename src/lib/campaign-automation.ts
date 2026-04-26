@@ -22,6 +22,7 @@ import {
   normalizeEvolutionPhoneNumber,
   sendTextMessage,
 } from '@/lib/integrations/evolution'
+import { recordAiUsage } from '@/lib/ai/usage-log'
 import { prisma } from '@/lib/prisma'
 import {
   formatIsoDateInTimezone,
@@ -837,18 +838,58 @@ function extractResponseText(payload: unknown) {
   return parts.length > 0 ? parts.join('\n').trim() : null
 }
 
+function extractUsage(payload: unknown) {
+  if (!payload || typeof payload !== 'object') {
+    return {
+      inputTokens: null,
+      outputTokens: null,
+      totalTokens: null,
+    }
+  }
+
+  const usage = (payload as {
+    usage?: {
+      input_tokens?: unknown
+      output_tokens?: unknown
+      total_tokens?: unknown
+    }
+  }).usage
+
+  const normalize = (value: unknown) => {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  return {
+    inputTokens: normalize(usage?.input_tokens),
+    outputTokens: normalize(usage?.output_tokens),
+    totalTokens: normalize(usage?.total_tokens),
+  }
+}
+
 async function generateCampaignMessageWithAI(input: {
   campaignType: CampaignAutomationType
   customerName: string
   barbershopName: string
   benefitDescription: string | null
   fallbackMessage: string
-}): Promise<{ message: string | null; failureReason: OpenAIFailureReason | null }> {
+}): Promise<{
+  message: string | null
+  failureReason: OpenAIFailureReason | null
+  model: string | null
+  inputTokens: number | null
+  outputTokens: number | null
+  totalTokens: number | null
+}> {
   const config = getOpenAIMessageConfig()
   if (!config) {
     return {
       message: null,
       failureReason: 'disabled',
+      model: null,
+      inputTokens: null,
+      outputTokens: null,
+      totalTokens: null,
     }
   }
 
@@ -889,16 +930,25 @@ async function generateCampaignMessageWithAI(input: {
       return {
         message: null,
         failureReason: 'bad_status',
+        model: config.model,
+        inputTokens: null,
+        outputTokens: null,
+        totalTokens: null,
       }
     }
 
     const payload = await response.json()
     const outputText = extractResponseText(payload)
+    const usage = extractUsage(payload)
 
     if (!outputText) {
       return {
         message: null,
         failureReason: 'invalid_payload',
+        model: config.model,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        totalTokens: usage.totalTokens,
       }
     }
 
@@ -910,6 +960,10 @@ async function generateCampaignMessageWithAI(input: {
       return {
         message: null,
         failureReason: 'invalid_json',
+        model: config.model,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        totalTokens: usage.totalTokens,
       }
     }
 
@@ -918,24 +972,40 @@ async function generateCampaignMessageWithAI(input: {
       return {
         message: null,
         failureReason: 'invalid_schema',
+        model: config.model,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        totalTokens: usage.totalTokens,
       }
     }
 
     return {
       message: parsed.data.message.trim(),
       failureReason: null,
+      model: config.model,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      totalTokens: usage.totalTokens,
     }
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
       return {
         message: null,
         failureReason: 'timeout',
+        model: config.model,
+        inputTokens: null,
+        outputTokens: null,
+        totalTokens: null,
       }
     }
 
     return {
       message: null,
       failureReason: 'request_failed',
+      model: config.model,
+      inputTokens: null,
+      outputTokens: null,
+      totalTokens: null,
     }
   } finally {
     clearTimeout(timeout)
@@ -1197,6 +1267,7 @@ async function createAutomationMessagingEvent(input: {
 async function prepareDeliveryMessage(input: {
   config: CampaignAutomationConfig
   customer: CampaignCustomerSnapshot
+  barbershopId: string
   barbershopName: string
 }): Promise<DeliveryPreparation> {
   const normalizedPhone = normalizeEvolutionPhoneNumber(input.customer.phone)
@@ -1219,6 +1290,21 @@ async function prepareDeliveryMessage(input: {
     barbershopName: input.barbershopName,
     benefitDescription: input.config.benefitDescription ?? null,
     fallbackMessage,
+  })
+
+  await recordAiUsage({
+    barbershopId: input.barbershopId,
+    source: 'CAMPAIGN_AUTOMATION',
+    model: aiAttempt.model,
+    inputTokens: aiAttempt.inputTokens,
+    outputTokens: aiAttempt.outputTokens,
+    totalTokens: aiAttempt.totalTokens,
+    status: aiAttempt.message ? 'SUCCESS' : 'FALLBACK',
+    errorMessage: aiAttempt.failureReason,
+    metadataJson: {
+      campaignType: input.config.campaignType,
+      customerId: input.customer.id,
+    },
   })
 
   return {
@@ -1286,6 +1372,7 @@ async function processCampaignType(input: {
       prepared = await prepareDeliveryMessage({
         config: input.config,
         customer,
+        barbershopId: input.barbershop.id,
         barbershopName: input.barbershop.name,
       })
     } catch (error) {

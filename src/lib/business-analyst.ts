@@ -24,6 +24,7 @@ import {
   generateOpenAIBusinessReport,
   isOpenAIBusinessAnalystEnabled,
 } from '@/lib/ai/openai-business-analyst'
+import { recordAiUsage } from '@/lib/ai/usage-log'
 
 const CACHE_WAIT_ATTEMPTS = 12
 const CACHE_WAIT_DELAY_MS = 150
@@ -480,6 +481,23 @@ export async function getBusinessAnalystReport(params: {
       totalTokens: aiAttempt.totalTokens,
     })
 
+    await recordAiUsage({
+      barbershopId: params.barbershopId,
+      source: 'BUSINESS_ANALYST',
+      model: aiAttempt.model,
+      inputTokens: aiAttempt.inputTokens,
+      outputTokens: aiAttempt.outputTokens,
+      totalTokens: aiAttempt.totalTokens,
+      status: aiAttempt.report ? 'SUCCESS' : 'FALLBACK',
+      errorMessage: aiAttempt.failureReason,
+      metadataJson: {
+        scopeKey,
+        localDateIso: saved.localDateIso,
+        periodKey: saved.periodKey,
+        promptVersion: aiAttempt.promptVersion,
+      },
+    })
+
     logCacheEvent('stored', {
       barbershopId: params.barbershopId,
       localDateIso: saved.localDateIso,
@@ -501,6 +519,19 @@ export async function getBusinessAnalystReport(params: {
       expiresAt: window.expiresAt,
       timezone: window.timezone,
       error,
+    })
+
+    await recordAiUsage({
+      barbershopId: params.barbershopId,
+      source: 'BUSINESS_ANALYST',
+      status: 'FAILED',
+      errorMessage: error instanceof Error ? error.message : 'unknown_error',
+      metadataJson: {
+        scopeKey,
+        localDateIso: window.localDateIso,
+        periodKey: window.periodKey,
+        promptVersion: BUSINESS_ANALYST_PROMPT_VERSION,
+      },
     })
 
     throw error

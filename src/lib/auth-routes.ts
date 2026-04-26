@@ -3,6 +3,7 @@ export const AUTHENTICATED_HOME_PATH = '/dashboard'
 const NEXTAUTH_SIGNIN_PATH = '/api/auth/signin'
 
 export type AppRole = 'OWNER' | 'MANAGER' | 'BARBER' | 'FINANCIAL'
+export type PlatformRole = 'NONE' | 'PLATFORM_ADMIN' | 'PLATFORM_OWNER'
 
 const BARBER_ALLOWED_PATHS = [
   '/dashboard',
@@ -31,7 +32,28 @@ export function isBarberRole(value?: string | null): value is 'BARBER' {
   return normalizeAppRole(value) === 'BARBER'
 }
 
-export function canRoleAccessPath(role: string | null | undefined, pathname: string) {
+export function normalizePlatformRole(value?: string | null): PlatformRole | null {
+  if (value === 'NONE' || value === 'PLATFORM_ADMIN' || value === 'PLATFORM_OWNER') {
+    return value
+  }
+
+  return null
+}
+
+export function hasPlatformAccess(value?: string | null) {
+  const normalizedRole = normalizePlatformRole(value)
+  return normalizedRole === 'PLATFORM_ADMIN' || normalizedRole === 'PLATFORM_OWNER'
+}
+
+export function canRoleAccessPath(
+  role: string | null | undefined,
+  pathname: string,
+  platformRole?: string | null
+) {
+  if (pathname === '/internal' || pathname.startsWith('/internal/')) {
+    return hasPlatformAccess(platformRole)
+  }
+
   const normalizedRole = normalizeAppRole(role)
 
   if (!normalizedRole) {

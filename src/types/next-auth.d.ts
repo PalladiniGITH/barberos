@@ -9,6 +9,7 @@ declare module 'next-auth' {
       email: string
       image?: string
       role: string
+      platformRole: string
       barbershopId: string
       barbershopName: string
       barbershopSlug: string
@@ -20,6 +21,7 @@ declare module 'next-auth/jwt' {
   interface JWT {
     id: string
     role: string
+    platformRole: string
     barbershopId: string
     barbershopName: string
     barbershopSlug: string

@@ -8,6 +8,7 @@ import {
   shiftIsoDateByMonths,
   shiftIsoDateByWeeks,
 } from '@/lib/timezone'
+import { recordAiUsage } from '@/lib/ai/usage-log'
 
 const DEFAULT_OPENAI_MODEL = 'gpt-4.1-mini'
 const DEFAULT_TIMEOUT_MS = 15000
@@ -182,6 +183,7 @@ interface OpenAIConfig {
 }
 
 export interface WhatsAppInterpreterInput {
+  barbershopId: string
   message: string
   barbershopName: string
   barbershopTimezone: string
@@ -434,6 +436,35 @@ function extractResponseText(payload: unknown) {
   })
 
   return chunks.join('\n').trim()
+}
+
+function extractUsage(payload: unknown) {
+  if (!payload || typeof payload !== 'object') {
+    return {
+      inputTokens: null,
+      outputTokens: null,
+      totalTokens: null,
+    }
+  }
+
+  const usage = (payload as {
+    usage?: {
+      input_tokens?: unknown
+      output_tokens?: unknown
+      total_tokens?: unknown
+    }
+  }).usage
+
+  const normalize = (value: unknown) => {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  return {
+    inputTokens: normalize(usage?.input_tokens),
+    outputTokens: normalize(usage?.output_tokens),
+    totalTokens: normalize(usage?.total_tokens),
+  }
 }
 
 function formatIsoTime(hours: number, minutes: number) {
@@ -1606,17 +1637,61 @@ async function classifyContextualConfirmationWithOpenAI(input: {
   })
 
   if (!response.ok) {
+    await recordAiUsage({
+      barbershopId: input.interpreterInput.barbershopId,
+      source: 'DATE_INTERPRETER',
+      model: input.config.model,
+      status: 'FAILED',
+      errorMessage: `bad_status:${response.status}`,
+      metadataJson: {
+        stage: 'contextual_confirmation',
+      },
+    })
     console.warn('[whatsapp-interpreter/openai] contextual classifier bad_status', { status: response.status })
     return null
   }
 
   const payload = await response.json()
   const outputText = extractResponseText(payload)
+  const usage = extractUsage(payload)
   if (!outputText) {
+    await recordAiUsage({
+      barbershopId: input.interpreterInput.barbershopId,
+      source: 'DATE_INTERPRETER',
+      model: input.config.model,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      totalTokens: usage.totalTokens,
+      status: 'FALLBACK',
+      errorMessage: 'invalid_payload',
+      metadataJson: {
+        stage: 'contextual_confirmation',
+      },
+    })
     return null
   }
 
-  const parsed = sanitizeContextualConfirmationPayload(JSON.parse(outputText)) as ContextualConfirmationClassification | null
+  let parsed: ContextualConfirmationClassification | null = null
+
+  try {
+    parsed = sanitizeContextualConfirmationPayload(JSON.parse(outputText)) as ContextualConfirmationClassification | null
+  } catch {
+    await recordAiUsage({
+      barbershopId: input.interpreterInput.barbershopId,
+      source: 'DATE_INTERPRETER',
+      model: input.config.model,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      totalTokens: usage.totalTokens,
+      status: 'FALLBACK',
+      errorMessage: 'invalid_json',
+      metadataJson: {
+        stage: 'contextual_confirmation',
+      },
+    })
+    return null
+  }
+
   if (
     !parsed
     || typeof parsed.intent !== 'string'
@@ -1624,8 +1699,35 @@ async function classifyContextualConfirmationWithOpenAI(input: {
     || typeof parsed.shouldClose !== 'boolean'
     || typeof parsed.shouldConfirm !== 'boolean'
   ) {
+    await recordAiUsage({
+      barbershopId: input.interpreterInput.barbershopId,
+      source: 'DATE_INTERPRETER',
+      model: input.config.model,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      totalTokens: usage.totalTokens,
+      status: 'FALLBACK',
+      errorMessage: 'invalid_schema',
+      metadataJson: {
+        stage: 'contextual_confirmation',
+      },
+    })
     return null
   }
+
+  await recordAiUsage({
+    barbershopId: input.interpreterInput.barbershopId,
+    source: 'DATE_INTERPRETER',
+    model: input.config.model,
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    totalTokens: usage.totalTokens,
+    status: 'SUCCESS',
+    metadataJson: {
+      stage: 'contextual_confirmation',
+      intent: parsed.intent,
+    },
+  })
 
   return parsed
 }
@@ -1766,6 +1868,16 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
     })
 
     if (!response.ok) {
+      await recordAiUsage({
+        barbershopId: input.barbershopId,
+        source: 'DATE_INTERPRETER',
+        model: config.model,
+        status: 'FAILED',
+        errorMessage: `bad_status:${response.status}`,
+        metadataJson: {
+          stage: 'intent_parser',
+        },
+      })
       console.warn('[whatsapp-interpreter/openai] fallback bad_status', { status: response.status })
       return prioritizeExplicitTimeOverConfirmation({
         interpreted: fallback,
@@ -1776,7 +1888,21 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
 
     const payload = await response.json()
     const outputText = extractResponseText(payload)
+    const usage = extractUsage(payload)
     if (!outputText) {
+      await recordAiUsage({
+        barbershopId: input.barbershopId,
+        source: 'DATE_INTERPRETER',
+        model: config.model,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        totalTokens: usage.totalTokens,
+        status: 'FALLBACK',
+        errorMessage: 'empty_output',
+        metadataJson: {
+          stage: 'intent_parser',
+        },
+      })
       console.warn('[whatsapp-interpreter/openai] fallback empty_output')
       return prioritizeExplicitTimeOverConfirmation({
         interpreted: fallback,
@@ -1789,6 +1915,19 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
     const parsed = IntentSchema.safeParse(parsedJson)
 
     if (!parsed.success) {
+      await recordAiUsage({
+        barbershopId: input.barbershopId,
+        source: 'DATE_INTERPRETER',
+        model: config.model,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        totalTokens: usage.totalTokens,
+        status: 'FALLBACK',
+        errorMessage: 'invalid_schema',
+        metadataJson: {
+          stage: 'intent_parser',
+        },
+      })
       console.warn('[whatsapp-interpreter/openai] fallback invalid_schema', {
         issues: parsed.error.issues.map((issue) => `${issue.path.join('.') || 'root'}:${issue.message}`),
       })
@@ -1816,6 +1955,20 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
       })
     }
 
+    await recordAiUsage({
+      barbershopId: input.barbershopId,
+      source: 'DATE_INTERPRETER',
+      model: config.model,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      totalTokens: usage.totalTokens,
+      status: 'SUCCESS',
+      metadataJson: {
+        stage: 'intent_parser',
+        source: merged.source,
+      },
+    })
+
     return prioritizeExplicitTimeOverConfirmation({
       interpreted: {
       ...merged,
@@ -1827,6 +1980,16 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
       conversationSummary: input.conversationSummary,
     })
   } catch (error) {
+    await recordAiUsage({
+      barbershopId: input.barbershopId,
+      source: 'DATE_INTERPRETER',
+      model: config.model,
+      status: error instanceof Error && error.name === 'AbortError' ? 'FAILED' : 'FAILED',
+      errorMessage: error instanceof Error ? error.message : 'unknown_error',
+      metadataJson: {
+        stage: 'intent_parser',
+      },
+    })
     console.warn('[whatsapp-interpreter/openai] fallback request_failed', {
       error: error instanceof Error ? error.message : 'unknown_error',
     })

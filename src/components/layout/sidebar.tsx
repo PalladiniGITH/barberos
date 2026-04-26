@@ -13,6 +13,7 @@ import {
   PanelLeft,
   Scissors,
   Settings,
+  ShieldCheck,
   Target,
   TrendingDown,
   TrendingUp,
@@ -23,11 +24,11 @@ import {
   Zap,
 } from 'lucide-react'
 import { PRODUCT_MONOGRAM, PRODUCT_NAME } from '@/lib/branding'
-import { isBarberRole } from '@/lib/auth-routes'
+import { hasPlatformAccess, isBarberRole } from '@/lib/auth-routes'
 import { cn } from '@/lib/utils'
 import { useNavigationFeedback } from '@/components/layout/navigation-feedback'
 
-type NavSection = 'essencial' | 'modulos' | 'conta'
+type NavSection = 'plataforma' | 'essencial' | 'modulos' | 'conta'
 
 type SidebarItem = {
   href: string
@@ -267,15 +268,25 @@ const barberSidebarItems: SidebarItem[] = [
 ]
 
 const sectionLabels: Record<NavSection, string> = {
+  plataforma: 'BarberEX',
   essencial: 'Essencial',
   modulos: 'Modulos',
   conta: 'Conta',
 }
 
 const barberSectionLabels: Record<NavSection, string> = {
+  plataforma: 'BarberEX',
   essencial: 'Minha operacao',
   modulos: 'Modulos',
   conta: 'Conta',
+}
+
+const platformSidebarItem: SidebarItem = {
+  href: '/internal',
+  icon: ShieldCheck,
+  label: 'BarberEX Admin',
+  description: 'Tenants, IA, custos e saude operacional da plataforma.',
+  section: 'plataforma',
 }
 
 function matchesPath(item: Pick<SidebarItem, 'href' | 'exact'>, currentPath: string) {
@@ -472,12 +483,16 @@ export function Sidebar({
   pinned,
   focusMode,
   role,
+  platformRole,
+  homeHref = '/dashboard',
   onPinnedChange,
 }: {
   fallbackPath: string
   pinned: boolean
   focusMode: boolean
   role?: string | null
+  platformRole?: string | null
+  homeHref?: string
   onPinnedChange: (value: boolean) => void
 }) {
   const pathname = usePathname() ?? fallbackPath
@@ -485,7 +500,10 @@ export function Sidebar({
   const [hovered, setHovered] = useState(false)
   const [previewModuleHref, setPreviewModuleHref] = useState<string | null>(null)
   const barberView = isBarberRole(role)
-  const sidebarItems = barberView ? barberSidebarItems : defaultSidebarItems
+  const sidebarItems = useMemo(() => {
+    const baseItems = barberView ? barberSidebarItems : defaultSidebarItems
+    return hasPlatformAccess(platformRole) ? [platformSidebarItem, ...baseItems] : baseItems
+  }, [barberView, platformRole])
   const currentSectionLabels = barberView ? barberSectionLabels : sectionLabels
   const expanded = pinned || hovered
   const activeTopLevelHref = useMemo(() => resolveActiveHref(sidebarItems, pathname), [pathname, sidebarItems])
@@ -572,10 +590,10 @@ export function Sidebar({
       <div className={cn('flex h-full min-h-0 min-w-0 flex-1 flex-col py-4', expanded ? 'px-3' : 'px-2')}>
         <div className={cn('flex min-h-[56px] items-center gap-3 rounded-[1rem]', expanded ? 'overflow-hidden px-2.5' : 'justify-center overflow-visible px-0')}>
           <Link
-            href="/dashboard"
-            onClick={() => startNavigation('/dashboard')}
+            href={homeHref}
+            onClick={() => startNavigation(homeHref)}
             className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[0.95rem] border border-[rgba(124,58,237,0.28)] bg-[radial-gradient(circle_at_30%_20%,rgba(168,85,247,0.34),transparent_42%),linear-gradient(135deg,rgba(124,58,237,0.28),rgba(15,23,42,0.96))] text-[11px] font-semibold tracking-[0.16em] text-violet-50 shadow-[0_18px_34px_-24px_rgba(2,6,23,0.82)]"
-            title={barberView ? 'Meu painel' : 'Painel do negocio'}
+            title={homeHref === '/internal' ? 'Painel master da plataforma' : barberView ? 'Meu painel' : 'Painel do negocio'}
           >
             {PRODUCT_MONOGRAM}
           </Link>

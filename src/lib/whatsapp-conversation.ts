@@ -2712,6 +2712,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   }
 
   const interpreted = await interpretWhatsAppMessage({
+    barbershopId: input.barbershop.id,
     message: inboundText,
     barbershopName: input.barbershop.name,
     barbershopTimezone: timezone,

@@ -27,6 +27,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         name: session.user.name,
         email: session.user.email,
         role: session.user.role,
+        platformRole: session.user.platformRole,
         barbershopName: session.user.barbershopName,
         barbershopSlug: session.user.barbershopSlug,
       }}
