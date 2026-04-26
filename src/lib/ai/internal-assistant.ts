@@ -34,6 +34,13 @@ export interface InternalAssistantAttempt {
   totalTokens: number | null
 }
 
+interface InternalAssistantScreenContext {
+  key: string
+  label: string
+  subtitle: string
+  pathname: string
+}
+
 function readEnv(name: 'OPENAI_API_KEY' | 'OPENAI_MODEL' | 'OPENAI_TIMEOUT_MS') {
   const value = process.env[name]
   return typeof value === 'string' ? value.trim() : ''
@@ -103,6 +110,7 @@ function buildPrompt(input: {
   context: Record<string, unknown>
   history: Array<{ role: 'USER' | 'ASSISTANT'; content: string }>
   question: string
+  screenContext?: InternalAssistantScreenContext | null
 }) {
   return [
     'Voce e o Assistente BarberEX.',
@@ -114,6 +122,9 @@ function buildPrompt(input: {
     'Quando houver numeros no contexto, use-os de forma clara.',
     'Quando o dado nao existir no contexto, diga isso explicitamente.',
     `Escopo autorizado: ${input.scopeLabel}.`,
+    input.screenContext
+      ? `Tela atual: ${input.screenContext.label} (${input.screenContext.pathname}). Foco: ${input.screenContext.subtitle}.`
+      : 'Tela atual: contexto geral da barbearia.',
     `Historico recente: ${JSON.stringify(input.history)}`,
     `Contexto seguro: ${JSON.stringify(input.context)}`,
     `Pergunta atual: ${input.question}`,
@@ -129,6 +140,7 @@ export async function generateInternalAssistantAnswer(input: {
   context: Record<string, unknown>
   history: Array<{ role: 'USER' | 'ASSISTANT'; content: string }>
   question: string
+  screenContext?: InternalAssistantScreenContext | null
 }): Promise<InternalAssistantAttempt> {
   const config = getConfig()
 

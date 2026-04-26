@@ -3,6 +3,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { AssistantWidgetProvider } from '@/components/assistente/assistant-widget-provider'
+import { AssistantWidgetRoot } from '@/components/assistente/assistant-widget-root'
 import { Header, type HeaderSessionUser } from '@/components/layout/header'
 import {
   NavigationFeedbackProvider,
@@ -33,9 +35,11 @@ export function DashboardShell({
 }: DashboardShellProps) {
   return (
     <NavigationFeedbackProvider fallbackPath={currentPath} fallbackSearch={currentSearch}>
-      <DashboardShellFrame currentPath={currentPath} currentSearch={currentSearch} user={user} homeHref={homeHref}>
-        {children}
-      </DashboardShellFrame>
+      <AssistantWidgetProvider>
+        <DashboardShellFrame currentPath={currentPath} currentSearch={currentSearch} user={user} homeHref={homeHref}>
+          {children}
+        </DashboardShellFrame>
+      </AssistantWidgetProvider>
     </NavigationFeedbackProvider>
   )
 }
@@ -105,6 +109,8 @@ function DashboardShellFrame({
           </div>
         </main>
       </div>
+
+      <AssistantWidgetRoot />
     </div>
   )
 }

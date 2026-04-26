@@ -3,6 +3,7 @@ import 'server-only'
 import type { AiChatMessage, AiChatRoleScope, AiChatThread } from '@prisma/client'
 import { Prisma } from '@prisma/client'
 import { AuthorizationError } from '@/lib/auth'
+import { resolveAssistantScreenContext } from '@/lib/assistant-screen-context'
 import {
   buildAiAssistantContext,
   buildAiAssistantThreadTitle,
@@ -272,6 +273,7 @@ export async function sendAiAssistantPrompt(input: {
   session: AssistantSessionIdentity
   threadId?: string | null
   question: string
+  pathname?: string | null
 }): Promise<{
   thread: AiChatThreadDetailView
   threadSummary: AiChatThreadSummaryView
@@ -288,6 +290,7 @@ export async function sendAiAssistantPrompt(input: {
 
   const contextEnvelope = await buildAiAssistantContext(input.session)
   const scope = contextEnvelope.scope
+  const screenContext = resolveAssistantScreenContext(input.pathname, scope.roleScope)
   const barbershop = await prisma.barbershop.findUnique({
     where: { id: input.session.barbershopId },
     select: { timezone: true },
@@ -324,6 +327,9 @@ export async function sendAiAssistantPrompt(input: {
       content: question,
       metadataJson: {
         scopeLabel: scope.scopeLabel,
+        screenContextKey: screenContext.key,
+        screenContextLabel: screenContext.label,
+        screenPathname: screenContext.pathname,
       },
     },
   })
@@ -362,6 +368,12 @@ export async function sendAiAssistantPrompt(input: {
         context: contextEnvelope.compactContext,
         history,
         question,
+        screenContext: {
+          key: screenContext.key,
+          label: screenContext.label,
+          subtitle: screenContext.subtitle,
+          pathname: screenContext.pathname,
+        },
       })
 
   const answer = aiAttempt.answer?.trim() || contextEnvelope.fallbackAnswer
@@ -385,6 +397,9 @@ export async function sendAiAssistantPrompt(input: {
         statusNote,
         dataFreshnessLabel: contextEnvelope.dataFreshnessLabel,
         promptVersion: aiAttempt.promptVersion,
+        screenContextKey: screenContext.key,
+        screenContextLabel: screenContext.label,
+        screenPathname: screenContext.pathname,
       },
     },
   })
@@ -406,6 +421,8 @@ export async function sendAiAssistantPrompt(input: {
         threadId: thread.id,
         promptVersion: aiAttempt.promptVersion,
         scope: scope.roleScope,
+        screenContextKey: screenContext.key,
+        screenContextLabel: screenContext.label,
       },
     })
   }

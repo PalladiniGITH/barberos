@@ -1619,7 +1619,6 @@ function applyCorrectionTarget(draft: ConversationDraft, target: string) {
 
   if (target === 'DATE') {
     draft.requestedDateIso = null
-    draft.requestedTimeLabel = null
     clearDraftAvailability(draft)
     return
   }
@@ -2970,8 +2969,19 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     && !serviceChanged
     && !dateChanged
     && Boolean(baselineDraft.requestedTimeLabel)
+  const shouldPreserveRequestedTimeOnDateCorrection =
+    !hasNewTimePreference
+    && dateChanged
+    && !serviceChanged
+    && Boolean(baselineDraft.requestedTimeLabel)
 
-  if (!hasNewTimePreference && (serviceChanged || dateChanged)) {
+  if (!hasNewTimePreference && serviceChanged) {
+    draft.requestedTimeLabel = null
+    clearDraftAvailability(draft)
+  } else if (shouldPreserveRequestedTimeOnDateCorrection) {
+    draft.requestedTimeLabel = baselineDraft.requestedTimeLabel
+    clearDraftAvailability(draft)
+  } else if (!hasNewTimePreference && dateChanged) {
     draft.requestedTimeLabel = null
     clearDraftAvailability(draft)
   } else {
@@ -2990,6 +3000,17 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       requestedTimeAfter: draft.requestedTimeLabel,
       professionalBefore: baselineDraft.selectedProfessionalName,
       professionalAfter: draft.selectedProfessionalName,
+      correctionTarget: interpreted.correctionTarget,
+    })
+  }
+
+  if (shouldPreserveRequestedTimeOnDateCorrection) {
+    console.info('[whatsapp-conversation] date correction preserved requested time', {
+      customerId: input.customer.id,
+      requestedTimeBefore: baselineDraft.requestedTimeLabel,
+      requestedTimeAfter: draft.requestedTimeLabel,
+      requestedDateBefore: baselineDraft.requestedDateIso,
+      requestedDateAfter: draft.requestedDateIso,
       correctionTarget: interpreted.correctionTarget,
     })
   }
@@ -3834,6 +3855,7 @@ export const __testing = {
   parseExistingBookingQuery,
   parseRequestedDateFromExistingBookingQuestion,
   pickOfferedSlot,
+  applyCorrectionTarget,
   isShortGreetingMessage,
   referencesPreferredProfessional,
   resolveContextualProfessionalPreference,

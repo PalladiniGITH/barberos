@@ -9,6 +9,7 @@ import { getBusinessAnalystReport } from '@/lib/business-analyst'
 import { getCampaignAutomationManagementData } from '@/lib/campaign-automation'
 import { prisma } from '@/lib/prisma'
 import { findSessionProfessional } from '@/lib/professionals/session-professional'
+import { getAssistantBaseUiConfig } from '@/lib/assistant-screen-context'
 import {
   formatDateInTimezone,
   formatTimeInTimezone,
@@ -68,6 +69,8 @@ interface AssistantSessionIdentity {
 }
 
 function getRoleUiConfig(scope: AssistantChatScope) {
+  return getAssistantBaseUiConfig(scope)
+
   if (scope === 'PROFESSIONAL') {
     return {
       suggestions: [...PROFESSIONAL_SUGGESTIONS],

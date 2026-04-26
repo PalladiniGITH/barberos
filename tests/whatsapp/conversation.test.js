@@ -256,6 +256,25 @@ test('resposta com nome do barbeiro seleciona a opcao ja apresentada sem depende
   assert.equal(slot?.professionalName, 'Lucas Ribeiro')
 })
 
+test('correcao de data no fluxo legado preserva o horario ja escolhido para revalidacao', () => {
+  const draft = conversationTesting.buildEmptyConversationDraft()
+  draft.selectedServiceId = 'svc-pigmentacao'
+  draft.selectedServiceName = 'Pigmentacao Natural'
+  draft.selectedProfessionalId = 'pro-lucas'
+  draft.selectedProfessionalName = 'Lucas Ribeiro'
+  draft.requestedDateIso = '2026-04-29'
+  draft.requestedTimeLabel = '11:00'
+  draft.selectedStoredSlot = buildSlot()
+  draft.offeredSlots = [buildSlot()]
+
+  conversationTesting.applyCorrectionTarget(draft, 'DATE')
+
+  assert.equal(draft.requestedDateIso, null)
+  assert.equal(draft.requestedTimeLabel, '11:00')
+  assert.equal(draft.selectedStoredSlot, null)
+  assert.deepEqual(draft.offeredSlots, [])
+})
+
 test('resumo de confirmacao de uma opcao ja apresentada nao usa linguagem de nova descoberta', () => {
   const reply = conversationTesting.buildConfirmationMessage(
     {

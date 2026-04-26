@@ -2,7 +2,19 @@
 
 import { revalidatePath } from 'next/cache'
 import { requireSession } from '@/lib/auth'
-import { loadAiChatThread, sendAiAssistantPrompt } from '@/lib/assistant-chat'
+import { loadAiAssistantWorkspace, loadAiChatThread, sendAiAssistantPrompt } from '@/lib/assistant-chat'
+
+export async function loadAssistantWorkspace() {
+  const session = await requireSession()
+
+  return loadAiAssistantWorkspace({
+    userId: session.user.id,
+    barbershopId: session.user.barbershopId,
+    role: session.user.role,
+    name: session.user.name,
+    email: session.user.email,
+  })
+}
 
 export async function loadAssistantThread(threadId: string) {
   const session = await requireSession()
@@ -22,6 +34,7 @@ export async function loadAssistantThread(threadId: string) {
 export async function askAssistant(input: {
   threadId?: string | null
   question: string
+  pathname?: string | null
 }) {
   const session = await requireSession()
 
@@ -35,6 +48,7 @@ export async function askAssistant(input: {
     },
     threadId: input.threadId ?? null,
     question: input.question,
+    pathname: input.pathname ?? null,
   })
 
   revalidatePath('/assistente')

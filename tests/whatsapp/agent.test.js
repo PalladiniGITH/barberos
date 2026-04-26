@@ -341,6 +341,65 @@ test('weekday simples tambem e tratado como expressao relativa deterministica pa
   assert.equal(detectRelativeDateExpression('quarta'), true)
 })
 
+test('correcao com dia do mes isolado continua deterministica e nao depende da IA', async () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.state = 'WAITING_TIME'
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Pigmentacao Natural'
+  memory.requestedDateIso = '2026-04-29'
+  memory.requestedTimeLabel = '11:00'
+
+  const interpreted = await interpretWhatsAppMessage({
+    message: 'terca e dia 28',
+    barbershopName: 'Linha Nobre',
+    barbershopTimezone: 'America/Sao_Paulo',
+    conversationState: memory.state,
+    offeredSlotCount: 0,
+    services: SERVICES.map((service) => ({ name: service.name })),
+    professionals: PROFESSIONALS.map((professional) => ({ name: professional.name })),
+    todayIsoDate: '2026-04-25',
+    currentLocalDateTime: '2026-04-25 10:30',
+    conversationSummary: {
+      selectedServiceName: memory.selectedServiceName,
+      selectedProfessionalName: memory.selectedProfessionalName,
+      requestedDateIso: memory.requestedDateIso,
+      requestedTimeLabel: memory.requestedTimeLabel,
+      allowAnyProfessional: false,
+      lastCustomerMessage: 'terca feira',
+      lastAssistantMessage: 'Perfeito. Vou considerar Pigmentacao Natural para quarta-feira, 29/04. Que horas voce gostaria?',
+    },
+  })
+
+  assert.equal(interpreted.requestedDateIso, '2026-04-28')
+  assert.equal(interpreted.correctionTarget, 'DATE')
+})
+
+test('retry de disponibilidade em contexto ativo continua no fluxo de agendamento', async () => {
+  const interpreted = await interpretWhatsAppMessage({
+    message: 'veja de novo',
+    barbershopName: 'Linha Nobre',
+    barbershopTimezone: 'America/Sao_Paulo',
+    conversationState: 'WAITING_TIME',
+    offeredSlotCount: 0,
+    services: SERVICES.map((service) => ({ name: service.name })),
+    professionals: PROFESSIONALS.map((professional) => ({ name: professional.name })),
+    todayIsoDate: '2026-04-25',
+    currentLocalDateTime: '2026-04-25 10:30',
+    conversationSummary: {
+      selectedServiceName: 'Pigmentacao Natural',
+      selectedProfessionalName: 'Lucas Ribeiro',
+      requestedDateIso: '2026-04-28',
+      requestedTimeLabel: '11:00',
+      allowAnyProfessional: false,
+      lastCustomerMessage: 'terca e dia 28',
+      lastAssistantMessage: 'Nao consegui verificar os horarios agora, pode tentar novamente daqui a pouco?',
+    },
+  })
+
+  assert.equal(interpreted.intent, 'BOOK_APPOINTMENT')
+  assert.equal(interpreted.correctionTarget, 'NONE')
+})
+
 test('guardrail usa a data resolvida do backend ao responder sobre dia da semana', () => {
   const memory = agentTesting.buildInitialMemory(createAgentInput())
   memory.selectedServiceId = 'svc-barba'
@@ -359,6 +418,40 @@ test('guardrail usa a data resolvida do backend ao responder sobre dia da semana
 
   assert.match(reply, /28\/04/)
   assert.doesNotMatch(reply, /29\/04/)
+})
+
+test('resposta deterministica de horario passa a citar a data oficial resolvida pelo backend', () => {
+  const input = createAgentInput()
+  const memory = agentTesting.buildInitialMemory(input)
+  memory.selectedServiceId = 'svc-barba'
+  memory.selectedServiceName = 'Barba'
+  memory.selectedProfessionalId = 'pro-lucas'
+  memory.selectedProfessionalName = 'Lucas'
+  memory.requestedDateIso = '2026-04-28'
+
+  const reply = agentTesting.buildGuardrailReplyText({
+    nextAction: 'ASK_PERIOD',
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    timezone: 'America/Sao_Paulo',
+    nowContext: input.nowContext,
+  })
+
+  assert.match(reply, /28\/04/)
+  assert.doesNotMatch(reply, /29\/04/)
+  assert.match(reply, /Que horas voce gostaria|Me diz o horario/i)
+})
+
+test('data oficial do backend prevalece sobre a data sugerida pelo modelo na resposta final', () => {
+  const resolvedDate = agentTesting.resolveAuthoritativeRequestedDateIso({
+    modelRequestedDateIso: '2026-04-29',
+    fallbackRequestedDateIso: '2026-04-28',
+    promotedRequestedDateIso: '2026-04-28',
+    previousRequestedDateIso: '2026-04-28',
+  })
+
+  assert.equal(resolvedDate, '2026-04-28')
 })
 
 test('frases naturais de noite promovem EVENING de forma deterministica', async () => {
@@ -437,6 +530,25 @@ test('backend nao volta a pedir dia quando a data ja foi informada claramente', 
   )
 
   assert.equal(corrected, 'ASK_PERIOD')
+})
+
+test('backend nao volta a listar servicos quando o contexto ja tem servico e o modelo recua indevidamente', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.selectedProfessionalId = 'pro-lucas'
+  memory.selectedProfessionalName = 'Lucas'
+  memory.requestedDateIso = '2026-04-28'
+  memory.requestedTimeLabel = '11:00'
+
+  const corrected = agentTesting.enforceNextActionFromMemory(
+    'ASK_SERVICE',
+    memory,
+    false,
+    createAgentInput().nowContext
+  )
+
+  assert.notEqual(corrected, 'ASK_SERVICE')
 })
 
 test('validateMissingFields nao oferece manha quando ja e tarde e a data e hoje', () => {

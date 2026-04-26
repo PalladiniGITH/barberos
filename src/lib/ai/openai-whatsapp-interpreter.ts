@@ -57,6 +57,16 @@ const WEEKDAY_INDEX: Record<string, number> = {
   sábado: 6,
 }
 
+const WEEKDAY_LABELS_PT: Record<number, string> = {
+  0: 'domingo',
+  1: 'segunda-feira',
+  2: 'terça-feira',
+  3: 'quarta-feira',
+  4: 'quinta-feira',
+  5: 'sexta-feira',
+  6: 'sábado',
+}
+
 const NORMALIZED_WEEKDAY_INDEX = Object.entries(WEEKDAY_INDEX).reduce<Record<string, number>>((accumulator, [label, index]) => {
   accumulator[normalizeText(label)] = index
   return accumulator
@@ -79,6 +89,9 @@ const WEEKDAY_WEEK_AFTER_NEXT_PATTERN = new RegExp(
 )
 const NEXT_WEEKDAY_PATTERN = new RegExp(`\\bproxim[ao]\\s+(${WEEKDAY_PATTERN_SOURCE})\\b`)
 const WEEKDAY_QUE_VEM_PATTERN = new RegExp(`\\b(${WEEKDAY_PATTERN_SOURCE})\\s+que\\s+vem\\b`)
+const STANDALONE_DAY_OF_MONTH_PATTERN = /\bdia\s+(\d{1,2})\b/
+const AVAILABILITY_RETRY_PATTERN =
+  /\b(?:ve(?:ja|rifique)?|confere|tenta)(?:\s+isso)?\s+de\s+novo\b|\b(?:ve(?:ja|rifique)?|confere|tenta)\s+novo\b/
 
 const IntentSchema = z.object({
   intent: z.enum(['BOOK_APPOINTMENT', 'CHECK_EXISTING_BOOKING', 'ACKNOWLEDGEMENT', 'CONFIRM', 'DECLINE', 'CHANGE_REQUEST', 'UNKNOWN']),
@@ -512,6 +525,19 @@ function findNormalizedWeekdayIndex(message: string) {
   return matches.length > 0 ? matches[0][1] : null
 }
 
+export function getMentionedWeekdayIndex(message: string) {
+  return findNormalizedWeekdayIndex(message)
+}
+
+export function getMentionedWeekdayLabel(message: string) {
+  const weekdayIndex = getMentionedWeekdayIndex(message)
+  return weekdayIndex === null ? null : WEEKDAY_LABELS_PT[weekdayIndex] ?? null
+}
+
+export function detectAvailabilityRetryMessage(message: string) {
+  return AVAILABILITY_RETRY_PATTERN.test(normalizeText(message))
+}
+
 function parseRelativeAmountToken(value: string) {
   const normalized = normalizeText(value)
 
@@ -521,6 +547,31 @@ function parseRelativeAmountToken(value: string) {
 
   if (normalized === 'um' || normalized === 'uma') {
     return 1
+  }
+
+  return null
+}
+
+function resolveStandaloneDayOfMonthIsoDate(todayIsoDate: string, dayOfMonth: number) {
+  if (dayOfMonth < 1 || dayOfMonth > 31) {
+    return null
+  }
+
+  const [currentYear, currentMonth, currentDay] = todayIsoDate.split('-').map(Number)
+  const currentMonthDays = new Date(Date.UTC(currentYear, currentMonth, 0, 12, 0, 0)).getUTCDate()
+
+  if (dayOfMonth <= currentMonthDays && dayOfMonth >= currentDay) {
+    return `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(dayOfMonth).padStart(2, '0')}`
+  }
+
+  const nextMonthAnchor = new Date(Date.UTC(currentYear, currentMonth - 1, 1, 12, 0, 0))
+  nextMonthAnchor.setUTCMonth(nextMonthAnchor.getUTCMonth() + 1)
+  const nextYear = nextMonthAnchor.getUTCFullYear()
+  const nextMonth = nextMonthAnchor.getUTCMonth() + 1
+  const nextMonthDays = new Date(Date.UTC(nextYear, nextMonth, 0, 12, 0, 0)).getUTCDate()
+
+  if (dayOfMonth <= nextMonthDays) {
+    return `${nextYear}-${String(nextMonth).padStart(2, '0')}-${String(dayOfMonth).padStart(2, '0')}`
   }
 
   return null
@@ -610,6 +661,14 @@ function parseRelativeDate(message: string, todayIsoDate: string) {
 
     if (day >= 1 && day <= 31 && month >= 1 && month <= 12) {
       return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    }
+  }
+
+  const standaloneDayMatch = normalized.match(STANDALONE_DAY_OF_MONTH_PATTERN)
+  if (standaloneDayMatch) {
+    const resolvedStandaloneDay = resolveStandaloneDayOfMonthIsoDate(todayIsoDate, Number(standaloneDayMatch[1]))
+    if (resolvedStandaloneDay) {
+      return resolvedStandaloneDay
     }
   }
 
@@ -1160,12 +1219,25 @@ function inferIntent(
   const normalized = normalizeText(message)
   const explicitConfirmation = isExplicitConfirmationMessage(message)
   const slotWasPresented = hasPresentedConfirmationSlot(conversationSummary)
+  const retryAvailabilityRequested = detectAvailabilityRetryMessage(message)
 
   if (detectExistingBookingQuestion({
     message,
     conversationSummary,
   })) {
     return 'CHECK_EXISTING_BOOKING' as const
+  }
+
+  if (
+    retryAvailabilityRequested
+    && (
+      conversationState !== 'IDLE'
+      || Boolean(conversationSummary.selectedServiceName)
+      || Boolean(conversationSummary.requestedDateIso)
+      || Boolean(conversationSummary.requestedTimeLabel)
+    )
+  ) {
+    return 'BOOK_APPOINTMENT' as const
   }
 
   if (conversationState !== 'WAITING_CONFIRMATION' && detectAcknowledgementMessage(message)) {
@@ -1391,6 +1463,7 @@ function buildFallbackIntent(input: WhatsAppInterpreterInput): WhatsAppIntent {
     message: input.message,
     conversationState: input.conversationState,
   })
+  const retryAvailabilityRequested = detectAvailabilityRetryMessage(input.message)
 
   if (requestedDateIso && detectRelativeDateExpression(input.message)) {
     console.info('[whatsapp-agent] relative date interpreted', {
@@ -1417,12 +1490,22 @@ function buildFallbackIntent(input: WhatsAppInterpreterInput): WhatsAppIntent {
     timePreference.exactTime
   )
   const resolvedIntent =
-    correctionTarget !== 'NONE'
-    && inferredIntent !== 'CHECK_EXISTING_BOOKING'
-    && inferredIntent !== 'DECLINE'
-    && inferredIntent !== 'ACKNOWLEDGEMENT'
-      ? 'CHANGE_REQUEST' as const
-      : inferredIntent
+    retryAvailabilityRequested
+    && (
+      input.conversationState !== 'IDLE'
+      || Boolean(input.conversationSummary.selectedServiceName)
+      || Boolean(input.conversationSummary.requestedDateIso)
+      || Boolean(input.conversationSummary.requestedTimeLabel)
+    )
+      ? 'BOOK_APPOINTMENT' as const
+      : (
+        correctionTarget !== 'NONE'
+        && inferredIntent !== 'CHECK_EXISTING_BOOKING'
+        && inferredIntent !== 'DECLINE'
+        && inferredIntent !== 'ACKNOWLEDGEMENT'
+          ? 'CHANGE_REQUEST' as const
+          : inferredIntent
+      )
 
   return {
     intent: resolvedIntent,
@@ -1924,12 +2007,21 @@ export async function interpretWhatsAppMessage(input: WhatsAppInterpreterInput):
     })
 
     if (merged.requestedDateIso && resolvedRequestedDateIso && merged.requestedDateIso !== resolvedRequestedDateIso) {
-      console.info('[whatsapp-agent] weekday/date consistency corrected', {
-        message: input.message,
-        previousRequestedDateIso: merged.requestedDateIso,
-        resolvedRequestedDateIso,
-        todayIsoDate: input.todayIsoDate,
+      console.info('[whatsapp-date-guard] corrected', {
+        inboundText: input.message,
         timezone: input.barbershopTimezone,
+        nowLocalDate: input.todayIsoDate,
+        mentionedWeekday: getMentionedWeekdayLabel(input.message),
+        modelRequestedDate: parsed.data.requestedDateIso,
+        backendResolvedDate: fallback.requestedDateIso,
+        finalRequestedDateIso: resolvedRequestedDateIso,
+        finalWeekday:
+          resolvedRequestedDateIso
+            ? WEEKDAY_LABELS_PT[getWeekdayIndexFromIsoDate(resolvedRequestedDateIso)] ?? null
+            : null,
+        replyTextBeforeDateGuard: null,
+        replyTextAfterDateGuard: null,
+        dateConsistencyStatus: 'model_date_weekday_mismatch',
       })
     }
 

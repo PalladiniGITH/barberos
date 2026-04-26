@@ -9,15 +9,20 @@ import {
 } from '@/lib/agendamentos/whatsapp-booking'
 import { AvailabilityInfrastructureError } from '@/lib/agendamentos/availability'
 import {
+  detectAvailabilityRetryMessage,
   detectRelativeDateExpression,
   detectShortPeriodPhrase,
   extractExplicitTimeFromMessage,
+  getMentionedWeekdayIndex,
+  getMentionedWeekdayLabel,
   interpretWhatsAppMessage,
 } from '@/lib/ai/openai-whatsapp-interpreter'
 import {
   formatDayLabelFromIsoDate,
+  formatWeekdayFromIsoDate,
   getAvailableBusinessPeriodsForDate,
   getCurrentBusinessPeriod,
+  getWeekdayIndexFromIsoDate,
   type BusinessPeriod,
 } from '@/lib/timezone'
 import { recordAiUsage } from '@/lib/ai/usage-log'
@@ -753,6 +758,70 @@ function enforceNextActionFromMemory(
     }
   }
 
+  if (requestedAction === 'ASK_SERVICE' && !validation.missingFields.includes('service')) {
+    if (shouldCreateAppointment && canConfirmBooking) {
+      return 'CONFIRM_BOOKING'
+    }
+
+    if (validation.missingFields.includes('date')) {
+      return 'ASK_DATE'
+    }
+
+    if (validation.missingFields.includes('professional')) {
+      return 'ASK_PROFESSIONAL'
+    }
+
+    if (validation.missingFields.includes('period')) {
+      return 'ASK_PERIOD'
+    }
+
+    if (canConfirmBooking) {
+      return 'ASK_CONFIRMATION'
+    }
+
+    if (memory.offeredSlots.length > 0) {
+      return 'OFFER_SLOTS'
+    }
+
+    return hasExactTimeSelection(memory) ? 'ASK_CLARIFICATION' : requestedAction
+  }
+
+  if (requestedAction === 'ASK_PROFESSIONAL' && !validation.missingFields.includes('professional')) {
+    if (shouldCreateAppointment && canConfirmBooking) {
+      return 'CONFIRM_BOOKING'
+    }
+
+    if (validation.missingFields.includes('period')) {
+      return 'ASK_PERIOD'
+    }
+
+    if (canConfirmBooking) {
+      return 'ASK_CONFIRMATION'
+    }
+
+    if (memory.offeredSlots.length > 0) {
+      return 'OFFER_SLOTS'
+    }
+
+    return hasExactTimeSelection(memory) ? 'ASK_CLARIFICATION' : requestedAction
+  }
+
+  if (requestedAction === 'ASK_PERIOD' && !validation.missingFields.includes('period')) {
+    if (shouldCreateAppointment && canConfirmBooking) {
+      return 'CONFIRM_BOOKING'
+    }
+
+    if (canConfirmBooking) {
+      return 'ASK_CONFIRMATION'
+    }
+
+    if (memory.offeredSlots.length > 0) {
+      return 'OFFER_SLOTS'
+    }
+
+    return hasExactTimeSelection(memory) ? 'ASK_CLARIFICATION' : requestedAction
+  }
+
   if (validation.missingFields.includes('service')) {
     return 'ASK_SERVICE'
   }
@@ -1341,6 +1410,7 @@ function buildPresentedSlotConfirmationMessage(input: {
   serviceName: string | null
   slot: WhatsAppBookingSlot
   mode?: 'found' | 'selection'
+  timezone?: string | null
 }) {
   const serviceLabel = input.serviceName ?? 'o servico solicitado'
   const header = input.mode === 'selection'
@@ -1351,12 +1421,58 @@ function buildPresentedSlotConfirmationMessage(input: {
     header,
     '',
     `- Servico: ${serviceLabel}`,
-    `- Data: ${formatDayLabelFromIsoDate(input.slot.dateIso)}`,
+    `- Data: ${formatDayLabelFromIsoDate(input.slot.dateIso, input.timezone)}`,
     `- Horario: ${input.slot.timeLabel}`,
     `- Barbeiro: ${input.slot.professionalName}`,
     '',
     'Quer confirmar esse agendamento?',
   ].join('\n')
+}
+
+function resolveAuthoritativeRequestedDateIso(input: {
+  modelRequestedDateIso?: string | null
+  fallbackRequestedDateIso?: string | null
+  promotedRequestedDateIso?: string | null
+  previousRequestedDateIso?: string | null
+}) {
+  return input.fallbackRequestedDateIso
+    ?? input.promotedRequestedDateIso
+    ?? input.previousRequestedDateIso
+    ?? input.modelRequestedDateIso
+    ?? null
+}
+
+function shouldUseDeterministicScheduleReply(input: {
+  nextAction: WhatsAppAgentNextAction
+  memory: WorkingMemory
+  inboundText: string
+  replyText: string
+}) {
+  if (input.nextAction === 'ASK_CONFIRMATION' && Boolean(input.memory.selectedSlot)) {
+    return true
+  }
+
+  if (input.nextAction === 'OFFER_SLOTS' && input.memory.offeredSlots.length > 0) {
+    return true
+  }
+
+  if (
+    Boolean(input.memory.requestedDateIso)
+    && (
+      input.nextAction === 'ASK_PROFESSIONAL'
+      || input.nextAction === 'ASK_PERIOD'
+      || input.nextAction === 'ASK_DATE'
+    )
+  ) {
+    return true
+  }
+
+  return Boolean(
+    detectRelativeDateExpression(input.inboundText)
+    || detectAvailabilityRetryMessage(input.inboundText)
+    || containsConfirmationPromptLanguage(input.replyText)
+    || containsPrematureAvailabilityPromiseLanguage(input.replyText)
+  )
 }
 
 function hasExplicitPriceQuestion(message: string) {
@@ -1498,6 +1614,7 @@ function sanitizePrematureConfirmationReply(input: {
   lastAssistantText?: string | null
   customerName: string
   barbershopName: string
+  timezone?: string | null
   preferredProfessionalName?: string | null
   serviceNames: string[]
   nowContext: WhatsAppAgentInput['nowContext']
@@ -1552,6 +1669,7 @@ function sanitizePrematureConfirmationReply(input: {
     lastAssistantText: input.lastAssistantText,
     customerName: input.customerName,
     barbershopName: input.barbershopName,
+    timezone: input.timezone,
     preferredProfessionalName: input.preferredProfessionalName ?? null,
     serviceNames: input.serviceNames,
     nowContext: input.nowContext,
@@ -1947,6 +2065,7 @@ function buildToolPhasePrompt(input: {
     'Mensagens vagas como "ok", "blz", "beleza", "tenta ai", "pode tentar" ou emoji sozinho nunca sao confirmacao final.',
     'Se o cliente responder apenas com um nome de barbeiro, trate isso como escolha de profissional.',
     'Nao use o nome do barbeiro escolhido como vocativo do cliente na resposta.',
+    'Se o cliente disser "veja de novo", "verifica de novo", "confere de novo" ou "tenta de novo" e o backend ja tiver servico/data/contexto, reaproveite esse contexto e verifique disponibilidade novamente. Nao volte a listar servicos do zero.',
   ].join('\n')
 }
 
@@ -1987,6 +2106,7 @@ function buildFinalPrompt(input: {
     'So finalize o agendamento depois de apresentar um slot claro com data, horario e barbeiro e receber confirmacao explicita como "confirmo", "pode marcar", "pode confirmar" ou "pode agendar".',
     'Nao trate "ok", "blz", "beleza", "tenta ai", "pode tentar" ou emoji sozinho como confirmacao final.',
     'Se o cliente responder apenas com um nome de barbeiro, trate isso como escolha de profissional e nao como vocativo.',
+    'Se o cliente pedir para verificar de novo e o backend ja tiver contexto valido, mantenha esse contexto e responda a partir dele; nao reinicie o fluxo nem volte para a lista de servicos.',
   ].join('\n')
 }
 
@@ -1995,6 +2115,7 @@ function buildFallbackStructuredOutput(input: {
   memory: WorkingMemory
   customerName: string
   barbershopName: string
+  timezone?: string | null
   preferredProfessionalName?: string | null
   services: WhatsAppAgentInput['services']
   nowContext: WhatsAppAgentInput['nowContext']
@@ -2022,6 +2143,7 @@ function buildFallbackStructuredOutput(input: {
       memory: input.memory,
       customerName: input.customerName,
       barbershopName: input.barbershopName,
+      timezone: input.timezone,
       preferredProfessionalName: input.preferredProfessionalName ?? null,
       serviceNames: input.services.map((service) => service.name),
       nowContext: input.nowContext,
@@ -2048,6 +2170,7 @@ function buildGuardrailReplyText(input: {
   lastAssistantText?: string | null
   customerName: string
   barbershopName: string
+  timezone?: string | null
   preferredProfessionalName?: string | null
   serviceNames?: string[]
   nowContext?: WhatsAppAgentInput['nowContext']
@@ -2070,7 +2193,7 @@ function buildGuardrailReplyText(input: {
 
   if (input.nextAction === 'ASK_PROFESSIONAL') {
     if (input.memory.selectedServiceName && input.memory.requestedDateIso) {
-      const intentLead = `Entendi. Voce quer ${input.memory.selectedServiceName} para ${formatDayLabelFromIsoDate(input.memory.requestedDateIso).toLowerCase()}.`
+      const intentLead = `Entendi. Voce quer ${input.memory.selectedServiceName} para ${formatDayLabelFromIsoDate(input.memory.requestedDateIso, input.timezone).toLowerCase()}.`
 
       if (input.preferredProfessionalName) {
         return `${intentLead}\n\nQuer marcar com ${input.preferredProfessionalName} de novo ou prefere outro barbeiro?`
@@ -2095,6 +2218,15 @@ function buildGuardrailReplyText(input: {
       return 'Hoje ja passou do horario de atendimento. Quer que eu veja para amanha ou outro dia?'
     }
 
+    if (input.memory.selectedServiceName && input.memory.requestedDateIso) {
+      const dateLabel = formatDayLabelFromIsoDate(input.memory.requestedDateIso, input.timezone).toLowerCase()
+      const serviceLead = input.memory.selectedProfessionalName
+        ? `Perfeito. Vou considerar ${input.memory.selectedServiceName} para ${dateLabel} com ${input.memory.selectedProfessionalName}.`
+        : `Perfeito. Vou considerar ${input.memory.selectedServiceName} para ${dateLabel}.`
+
+      return `${serviceLead}\n\nQue horas voce gostaria? Me diz o horario que voce quer e eu verifico pra voce.`
+    }
+
     return 'Perfeito. Que horas voce gostaria? Me diz o horario que voce quer e eu verifico pra voce.'
   }
 
@@ -2114,13 +2246,18 @@ function buildGuardrailReplyText(input: {
       serviceName: input.memory.selectedServiceName,
       slot: input.memory.selectedSlot,
       mode: lastAssistantOfferedSlotChoices(input.lastAssistantText) ? 'selection' : 'found',
+      timezone: input.timezone,
     })
   }
 
   if (input.nextAction === 'OFFER_SLOTS' && input.memory.offeredSlots.length > 0) {
+    const anchorDateIso = input.memory.offeredSlots[0]?.dateIso ?? input.memory.requestedDateIso
+    const anchorDateLabel = anchorDateIso
+      ? formatDayLabelFromIsoDate(anchorDateIso, input.timezone)
+      : 'Nesse dia'
     const header = input.memory.selectedProfessionalName
-      ? `${input.memory.requestedDateIso ?? 'Nesse dia'} com ${input.memory.selectedProfessionalName} eu tenho estes horarios:`
-      : `${input.memory.requestedDateIso ?? 'Nesse dia'} eu tenho estes horarios:`
+      ? `${anchorDateLabel} com ${input.memory.selectedProfessionalName} eu tenho estes horarios:`
+      : `${anchorDateLabel} eu tenho estes horarios:`
     const lines = input.memory.offeredSlots
       .slice(0, 4)
       .map((slot) => `- ${slot.timeLabel} com ${slot.professionalName}`)
@@ -2169,6 +2306,7 @@ function resolveToolFailureOverride(input: {
   memory: WorkingMemory
   customerName: string
   barbershopName: string
+  timezone?: string | null
   preferredProfessionalName?: string | null
   serviceNames: string[]
   nowContext: WhatsAppAgentInput['nowContext']
@@ -2193,6 +2331,7 @@ function resolveToolFailureOverride(input: {
         memory: input.memory,
         customerName: input.customerName,
         barbershopName: input.barbershopName,
+        timezone: input.timezone,
         preferredProfessionalName: input.preferredProfessionalName ?? null,
         serviceNames: input.serviceNames,
         nowContext: input.nowContext,
@@ -2209,6 +2348,7 @@ function resolveToolFailureOverride(input: {
         memory: input.memory,
         customerName: input.customerName,
         barbershopName: input.barbershopName,
+        timezone: input.timezone,
         preferredProfessionalName: input.preferredProfessionalName ?? null,
         serviceNames: input.serviceNames,
         nowContext: input.nowContext,
@@ -2225,6 +2365,7 @@ function resolveToolFailureOverride(input: {
         memory: input.memory,
         customerName: input.customerName,
         barbershopName: input.barbershopName,
+        timezone: input.timezone,
         preferredProfessionalName: input.preferredProfessionalName ?? null,
         serviceNames: input.serviceNames,
         nowContext: input.nowContext,
@@ -2241,6 +2382,7 @@ function resolveToolFailureOverride(input: {
         memory: input.memory,
         customerName: input.customerName,
         barbershopName: input.barbershopName,
+        timezone: input.timezone,
         preferredProfessionalName: input.preferredProfessionalName ?? null,
         serviceNames: input.serviceNames,
         nowContext: input.nowContext,
@@ -3077,6 +3219,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     memory,
     customerName: input.customer.name,
     barbershopName: input.barbershop.name,
+    timezone: input.barbershop.timezone,
     preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
     services: input.services,
     nowContext: input.nowContext,
@@ -3213,6 +3356,12 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
 
     const rawStructured = JSON.parse(finalText) as AgentStructuredOutput
     const structuredDraft = sanitizeStructuredOutput(rawStructured, fallbackStructured)
+    const authoritativeRequestedDateIso = resolveAuthoritativeRequestedDateIso({
+      modelRequestedDateIso: structuredDraft.requestedDate,
+      fallbackRequestedDateIso: fallbackIntent.requestedDateIso,
+      promotedRequestedDateIso: memory.requestedDateIso,
+      previousRequestedDateIso: schedulingBeforeTurn.requestedDateIso,
+    })
 
     promoteIntentContextToMemory({
       memory,
@@ -3220,7 +3369,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
         ...fallbackIntent,
         mentionedName: structuredDraft.mentionedName,
         preferredPeriod: structuredDraft.preferredPeriod,
-        requestedDateIso: structuredDraft.requestedDate,
+        requestedDateIso: authoritativeRequestedDateIso,
         timePreference: structuredDraft.requestedTime && /^\d{2}:\d{2}$/.test(structuredDraft.requestedTime)
           ? 'EXACT'
           : (structuredDraft.preferredPeriod ?? fallbackIntent.timePreference),
@@ -3236,7 +3385,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     preservePromotedSchedulingContext({
       memory,
       snapshot: {
-        requestedDateIso: fallbackIntent.requestedDateIso ?? schedulingBeforeTurn.requestedDateIso,
+        requestedDateIso: authoritativeRequestedDateIso,
         requestedTimeLabel:
           fallbackIntent.exactTime
           ?? resolvePromotedTimeLabel({
@@ -3248,6 +3397,39 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
       },
       correctionTarget: structuredDraft.correctionTarget,
     })
+
+    const mentionedWeekdayIndex = getMentionedWeekdayIndex(input.inboundText)
+    if (
+      mentionedWeekdayIndex !== null
+      && memory.requestedDateIso
+      && getWeekdayIndexFromIsoDate(memory.requestedDateIso) !== mentionedWeekdayIndex
+    ) {
+      const correctedDateIso = authoritativeRequestedDateIso
+      if (
+        correctedDateIso
+        && getWeekdayIndexFromIsoDate(correctedDateIso) === mentionedWeekdayIndex
+      ) {
+        if (memory.selectedSlot && memory.selectedSlot.dateIso !== correctedDateIso) {
+          clearPromotedAvailability(memory)
+        }
+
+        memory.requestedDateIso = correctedDateIso
+
+        console.info('[whatsapp-date-guard] corrected', {
+          inboundText: input.inboundText,
+          timezone: input.barbershop.timezone,
+          nowLocalDate: input.nowContext.dateIso,
+          mentionedWeekday: getMentionedWeekdayLabel(input.inboundText),
+          modelRequestedDate: structuredDraft.requestedDate,
+          backendResolvedDate: authoritativeRequestedDateIso,
+          finalRequestedDateIso: memory.requestedDateIso,
+          finalWeekday: formatWeekdayFromIsoDate(memory.requestedDateIso, input.barbershop.timezone).toLowerCase(),
+          replyTextBeforeDateGuard: null,
+          replyTextAfterDateGuard: null,
+          dateConsistencyStatus: 'model_date_weekday_mismatch',
+        })
+      }
+    }
 
     const requestedConfirmationTime =
       structuredDraft.requestedTime && /^\d{2}:\d{2}$/.test(structuredDraft.requestedTime)
@@ -3300,6 +3482,10 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
       }
     }
 
+    if (memory.selectedSlot && memory.requestedDateIso !== memory.selectedSlot.dateIso) {
+      memory.requestedDateIso = memory.selectedSlot.dateIso
+    }
+
     if (structuredDraft.correctionTarget !== 'NONE') {
       appendCorrection(
         memory,
@@ -3330,6 +3516,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
       memory,
       customerName: input.customer.name,
       barbershopName: input.barbershop.name,
+      timezone: input.barbershop.timezone,
       preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
       serviceNames: input.services.map((service) => service.name),
       nowContext: input.nowContext,
@@ -3357,15 +3544,23 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
       shouldCreateAppointment,
       input.nowContext
     )
+    const replyTextBeforeDateGuard =
+      toolFailureOverride?.replyText
+      ?? structuredDraft.replyText
     const deterministicDateGuardrailReply = !toolFailureOverride
-      && memory.requestedDateIso
-      && detectRelativeDateExpression(input.inboundText)
+      && shouldUseDeterministicScheduleReply({
+        nextAction: normalizedNextAction,
+        memory,
+        inboundText: input.inboundText,
+        replyText: replyTextBeforeDateGuard,
+      })
       ? buildGuardrailReplyText({
           nextAction: normalizedNextAction,
           memory,
           lastAssistantText: input.conversation.lastAssistantText,
           customerName: input.customer.name,
           barbershopName: input.barbershop.name,
+          timezone: input.barbershop.timezone,
           preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
           serviceNames: input.services.map((service) => service.name),
           nowContext: input.nowContext,
@@ -3378,13 +3573,46 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
           lastAssistantText: input.conversation.lastAssistantText,
           customerName: input.customer.name,
           barbershopName: input.barbershop.name,
+          timezone: input.barbershop.timezone,
           preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
           serviceNames: input.services.map((service) => service.name),
           nowContext: input.nowContext,
         })
       : null
+    const replyTextAfterDateGuard =
+      deterministicDateGuardrailReply
+      ?? guardedReplyText
+      ?? replyTextBeforeDateGuard
+
+    const finalRequestedDateIso = memory.selectedSlot?.dateIso ?? memory.requestedDateIso ?? authoritativeRequestedDateIso
+    const finalWeekday = finalRequestedDateIso
+      ? formatWeekdayFromIsoDate(finalRequestedDateIso, input.barbershop.timezone).toLowerCase()
+      : null
+    const dateConsistencyStatus =
+      structuredDraft.requestedDate && authoritativeRequestedDateIso && structuredDraft.requestedDate !== authoritativeRequestedDateIso
+        ? 'model_date_ignored'
+        : deterministicDateGuardrailReply && deterministicDateGuardrailReply !== replyTextBeforeDateGuard
+          ? 'reply_rebuilt_from_backend_template'
+          : finalRequestedDateIso
+            ? 'trusted_backend_date'
+            : 'no_date_context'
+
+    console.info('[whatsapp-date-guard] evaluated', {
+      inboundText: input.inboundText,
+      timezone: input.barbershop.timezone,
+      nowLocalDate: input.nowContext.dateIso,
+      mentionedWeekday: getMentionedWeekdayLabel(input.inboundText),
+      modelRequestedDate: structuredDraft.requestedDate,
+      backendResolvedDate: authoritativeRequestedDateIso,
+      finalRequestedDateIso,
+      finalWeekday,
+      replyTextBeforeDateGuard,
+      replyTextAfterDateGuard,
+      dateConsistencyStatus,
+    })
+
     const sanitizedReplyText = sanitizeReplyTextAgainstProfessionalVocative({
-      replyText: toolFailureOverride?.replyText ?? deterministicDateGuardrailReply ?? guardedReplyText ?? structuredDraft.replyText,
+      replyText: replyTextAfterDateGuard,
       customerName: input.customer.name,
       selectedProfessionalName: memory.selectedProfessionalName,
       mentionedName: structuredDraft.mentionedName,
@@ -3398,12 +3626,14 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
       lastAssistantText: input.conversation.lastAssistantText,
       customerName: input.customer.name,
       barbershopName: input.barbershop.name,
+      timezone: input.barbershop.timezone,
       preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
       serviceNames: input.services.map((service) => service.name),
       nowContext: input.nowContext,
     })
     const structured = {
       ...structuredDraft,
+      requestedDate: finalRequestedDateIso,
       nextAction: normalizedNextAction,
       replyText: safeReplyText,
     } satisfies AgentStructuredOutput
@@ -3465,4 +3695,6 @@ export const __testing = {
   shouldUseDeterministicConfirmationShortcut,
   buildPresentedSlotConfirmationMessage,
   pickPresentedOfferedSlot,
+  resolveAuthoritativeRequestedDateIso,
+  shouldUseDeterministicScheduleReply,
 }
