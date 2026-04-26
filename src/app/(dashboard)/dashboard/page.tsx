@@ -198,16 +198,15 @@ function AlertBanner({ alert }: { alert: DashboardAlert }) {
 
   return (
     <section className={cn('dashboard-panel p-5', toneClass)}>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-start gap-3">
-          <span className={cn('mt-0.5 flex h-11 w-11 items-center justify-center rounded-2xl', iconClass)}>
-            <alert.icon className="h-5 w-5" />
-          </span>
-          <div>
-            <p className="page-kicker">Principal alerta do mes</p>
-            <h2 className="mt-2 text-lg font-semibold text-foreground">{alert.title}</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-7 text-muted-foreground">{alert.body}</p>
-          </div>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-start gap-3">
+            <span className={cn('mt-0.5 flex h-11 w-11 items-center justify-center rounded-2xl', iconClass)}>
+              <alert.icon className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">{alert.title}</h2>
+              <p className="mt-1 max-w-3xl text-sm leading-7 text-muted-foreground">{alert.body}</p>
+            </div>
         </div>
 
         <Link href={alert.href} className="action-button-primary self-start">
@@ -384,8 +383,7 @@ export default async function DashboardPage({ searchParams }: Props) {
           />
 
           <section className="dashboard-panel p-6">
-            <p className="page-kicker">Vinculo pendente</p>
-            <h2 className="mt-2 text-[1.4rem] font-semibold tracking-tight text-foreground">Seu usuario ainda nao esta ligado a um barbeiro ativo.</h2>
+            <h2 className="text-[1.4rem] font-semibold tracking-tight text-foreground">Seu usuario ainda nao esta ligado a um barbeiro ativo.</h2>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">
               Assim que a equipe conectar este login ao seu cadastro profissional, o dashboard passa a mostrar agenda, meta, produtos e comissao estimada automaticamente.
             </p>
@@ -410,8 +408,7 @@ export default async function DashboardPage({ searchParams }: Props) {
           />
 
           <section className="dashboard-panel p-6">
-            <p className="page-kicker">Painel indisponivel</p>
-            <h2 className="mt-2 text-[1.4rem] font-semibold tracking-tight text-foreground">Tivemos um problema ao consolidar seus indicadores.</h2>
+            <h2 className="text-[1.4rem] font-semibold tracking-tight text-foreground">Tivemos um problema ao consolidar seus indicadores.</h2>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">
               A agenda e o restante do sistema continuam acessiveis. Vale revisar o cadastro do barbeiro e as metas do periodo antes do deploy.
             </p>
@@ -481,18 +478,16 @@ export default async function DashboardPage({ searchParams }: Props) {
       <section className="dashboard-spotlight overflow-hidden p-5 sm:p-6">
         <div className="dashboard-hero-grid">
           <div>
-            <p className="spotlight-kicker">Radar operacional</p>
-            <h2 className="spotlight-title">{formatCurrency(data.totalRevenue)}</h2>
+            <h2 className="spotlight-title mt-0">{formatCurrency(data.totalRevenue)}</h2>
             <p className="spotlight-copy max-w-2xl">
               Faturamento acumulado em {data.monthLabel}, organizado para dar contexto rapido sobre margem, meta, ticket medio e pressao do periodo.
             </p>
 
-            <div className="mt-5 flex flex-wrap gap-2">
+            <div className="mt-5 flex flex-wrap items-center gap-3">
               <TrendBadge change={data.revenueChange} />
-              <span className="spotlight-chip">
-                {data.partialComparison ? 'Mesmo intervalo do mes anterior' : data.comparisonMonthLabel}
-              </span>
-              <span className="spotlight-chip">{data.totalAppointments} atendimentos no periodo</span>
+              <p className="text-sm text-slate-300">
+                {data.partialComparison ? 'Mesmo intervalo do mes anterior' : data.comparisonMonthLabel} · {data.totalAppointments} atendimentos no periodo
+              </p>
             </div>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -521,8 +516,7 @@ export default async function DashboardPage({ searchParams }: Props) {
           </div>
 
           <aside className="premium-rail p-4">
-            <p className="page-kicker">Pulso do mes</p>
-            <div className="mt-3 space-y-3">
+            <div className="space-y-3">
               <div className="rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 shadow-[0_16px_24px_-18px_rgba(2,6,23,0.5)]">
                 <p className="executive-label">Meta principal</p>
                 <p className="mt-3 text-[1.8rem] font-semibold tracking-tight text-foreground">
@@ -559,7 +553,7 @@ export default async function DashboardPage({ searchParams }: Props) {
               </div>
 
               <div className="rounded-[0.95rem] border border-[rgba(52,44,78,0.1)] bg-[rgba(91,33,182,0.05)] p-4">
-                <p className="executive-label">Leitura rapida</p>
+                <p className="text-sm font-semibold text-foreground">Resumo do periodo</p>
                 <div className="mt-3 space-y-3 text-sm">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Falta para meta</span>
@@ -621,8 +615,7 @@ export default async function DashboardPage({ searchParams }: Props) {
           <section className="premium-rail p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="page-kicker">Execucao da meta</p>
-                <h3 className="mt-2 text-[1.4rem] font-semibold tracking-tight text-foreground">Meta do mes</h3>
+                <h3 className="text-[1.4rem] font-semibold tracking-tight text-foreground">Meta do mes</h3>
                 <p className="mt-2 text-sm text-muted-foreground">{data.monthLabel}</p>
               </div>
             </div>
@@ -664,8 +657,7 @@ export default async function DashboardPage({ searchParams }: Props) {
           </section>
 
           <section className="dashboard-panel p-6">
-            <p className="page-kicker">Acoes rapidas</p>
-            <h3 className="mt-2 text-[1.3rem] font-semibold tracking-tight text-foreground">Proximos atalhos</h3>
+            <h3 className="text-[1.3rem] font-semibold tracking-tight text-foreground">Proximos atalhos</h3>
             <div className="mt-4 space-y-3">
               <Link href="/financeiro" className="action-button flex justify-between">
                 Abrir visao financeira
@@ -707,8 +699,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         <details className="disclosure-panel">
           <summary className="disclosure-summary">
             <div>
-              <p className="page-kicker">Leitura complementar</p>
-              <h3 className="mt-2 text-[1.35rem] font-semibold tracking-tight text-foreground">Comparativos e sinais secundarios</h3>
+              <h3 className="text-[1.35rem] font-semibold tracking-tight text-foreground">Comparativos e sinais secundarios</h3>
             </div>
             <span className="text-sm font-medium text-muted-foreground">Ver comparativos</span>
           </summary>

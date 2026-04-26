@@ -184,8 +184,7 @@ export function DashboardInsightsPreview({ report }: { report: BusinessIntellige
         <div className="p-6">
           <div className="mb-5 flex items-center justify-between gap-3">
             <div>
-              <p className="page-kicker">Prioridades do mes</p>
-              <p className="mt-2 text-base font-semibold text-foreground">
+              <p className="text-base font-semibold text-foreground">
                 Os sinais mais relevantes para agir sem perder tempo.
               </p>
             </div>

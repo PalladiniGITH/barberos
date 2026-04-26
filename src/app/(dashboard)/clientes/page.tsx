@@ -4,7 +4,6 @@ import { Suspense } from 'react'
 import {
   ArrowUpRight,
   BadgeDollarSign,
-  CalendarRange,
   ShieldAlert,
   Sparkles,
   Users,
@@ -199,19 +198,11 @@ export default async function ClientesPage({ searchParams }: Props) {
       <section className="dashboard-panel dashboard-spotlight px-5 py-5">
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_340px]">
           <div>
-            <div className="flex flex-wrap gap-2">
-              <span className="spotlight-chip">
-                <CalendarRange className="h-3.5 w-3.5 text-sky-200" />
-                {directory.summary.customers} clientes no recorte
-              </span>
-              <span className="spotlight-chip">
-                <Sparkles className="h-3.5 w-3.5 text-primary" />
-                {directory.summary.atRiskCustomers} em observacao
-              </span>
-            </div>
+            <p className="text-sm text-slate-300">
+              {directory.summary.customers} clientes no recorte · {directory.summary.atRiskCustomers} em observacao
+            </p>
 
-            <p className="spotlight-kicker mt-6">Base de relacionamento</p>
-            <h2 className="mt-3 text-3xl font-semibold text-white sm:text-[2.6rem]">
+            <h2 className="mt-4 text-3xl font-semibold text-white sm:text-[2.6rem]">
               Quem sustenta o caixa, quem consome operacao e onde agir primeiro.
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
@@ -311,8 +302,7 @@ export default async function ClientesPage({ searchParams }: Props) {
       <section className="dashboard-panel p-5 sm:p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <p className="page-kicker">Filtros operacionais</p>
-            <h2 className="mt-2 text-xl font-semibold text-foreground">Refine a carteira por barbeiro, frequencia e valor</h2>
+            <h2 className="text-xl font-semibold text-foreground">Refine a carteira por barbeiro, frequencia e valor</h2>
           </div>
 
           <div className="space-y-3">
@@ -398,8 +388,7 @@ export default async function ClientesPage({ searchParams }: Props) {
         <section className="dashboard-panel p-5 sm:p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="page-kicker">Carteira detalhada</p>
-              <h2 className="mt-2 text-xl font-semibold text-foreground">Lista executiva de clientes</h2>
+              <h2 className="text-xl font-semibold text-foreground">Lista executiva de clientes</h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 Nome, tipo, barbeiro dominante, recorrencia, receita, ticket, ultima visita e sinalizacao em uma unica leitura.
               </p>
@@ -493,8 +482,7 @@ export default async function ClientesPage({ searchParams }: Props) {
 
         <aside className="space-y-5">
           <section className="premium-rail">
-            <p className="page-kicker">Como ler esta base</p>
-            <h3 className="mt-2 text-lg font-semibold text-foreground">Metodologia do recorte</h3>
+            <h3 className="text-lg font-semibold text-foreground">Metodologia do recorte</h3>
             <div className="mt-4 space-y-3 text-sm text-muted-foreground">
               <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
                 <p className="font-semibold text-foreground">Receita real</p>
@@ -512,8 +500,7 @@ export default async function ClientesPage({ searchParams }: Props) {
           </section>
 
           <section className="premium-block">
-            <p className="page-kicker">Leitura rapida</p>
-            <h3 className="mt-2 text-lg font-semibold text-foreground">Sinais da carteira</h3>
+            <h3 className="text-lg font-semibold text-foreground">Sinais da carteira</h3>
 
             <div className="mt-4 space-y-3 text-sm text-muted-foreground">
               <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">

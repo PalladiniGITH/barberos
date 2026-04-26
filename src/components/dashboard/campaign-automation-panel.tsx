@@ -119,8 +119,7 @@ export function CampaignAutomationPanel({ data }: { data: CampaignAutomationMana
         <div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="page-kicker">Retencao automatica</p>
-              <h2 className="mt-2 text-[1.55rem] font-semibold tracking-tight text-foreground">
+              <h2 className="text-[1.55rem] font-semibold tracking-tight text-foreground">
                 Campanhas automaticas e relacionamento
               </h2>
               <p className="mt-2 max-w-3xl text-sm leading-7 text-muted-foreground">
@@ -195,7 +194,7 @@ export function CampaignAutomationPanel({ data }: { data: CampaignAutomationMana
                 </div>
 
                 <div className="mt-4 rounded-[0.9rem] border border-[rgba(255,255,255,0.07)] bg-[rgba(15,17,21,0.46)] p-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Beneficio</p>
+                  <p className="text-sm font-semibold text-foreground">Beneficio configurado</p>
                   <p className="mt-2 line-clamp-2 text-sm leading-6 text-foreground">
                     {campaign.benefitDescription ?? 'Sem beneficio configurado'}
                   </p>
@@ -208,8 +207,7 @@ export function CampaignAutomationPanel({ data }: { data: CampaignAutomationMana
         <aside className="premium-rail p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="page-kicker">Saude da rotina</p>
-              <h3 className="mt-2 text-[1.35rem] font-semibold tracking-tight text-foreground">Operacao assistida</h3>
+              <h3 className="text-[1.35rem] font-semibold tracking-tight text-foreground">Operacao assistida</h3>
             </div>
             <Bot className="h-5 w-5 text-primary" />
           </div>
@@ -256,8 +254,7 @@ export function CampaignAutomationPanel({ data }: { data: CampaignAutomationMana
       <div className="mt-5 overflow-hidden rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.035)]">
         <div className="flex items-center justify-between gap-3 border-b border-[rgba(255,255,255,0.07)] px-4 py-3">
           <div>
-            <p className="page-kicker">Ultimos envios</p>
-            <h3 className="mt-1 text-base font-semibold text-foreground">Clientes impactados recentemente</h3>
+            <h3 className="text-base font-semibold text-foreground">Clientes impactados recentemente</h3>
           </div>
           <Gift className="h-4 w-4 text-primary" />
         </div>

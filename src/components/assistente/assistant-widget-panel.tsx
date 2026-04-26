@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { usePathname } from 'next/navigation'
 import {
   BrainCircuit,
+  ChevronDown,
   Loader2,
   MessageSquarePlus,
   Minimize2,
@@ -33,6 +34,48 @@ function getScopeLabel(roleScope?: AiAssistantWorkspaceView['roleScope']) {
   return 'Escopo: gestao da barbearia'
 }
 
+function formatClientMessageTime(date: Date) {
+  return date.toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function buildOptimisticThreadTitle(question: string) {
+  const normalized = question.replace(/\s+/g, ' ').trim()
+
+  if (normalized.length <= 72) {
+    return normalized
+  }
+
+  return `${normalized.slice(0, 69).trimEnd()}...`
+}
+
+function buildOptimisticMessage(input: {
+  role: AiChatMessageView['role']
+  content: string
+  statusNote?: string | null
+}) {
+  const createdAt = new Date()
+
+  return {
+    id: `optimistic-${input.role.toLowerCase()}-${createdAt.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
+    role: input.role,
+    content: input.content,
+    createdAtIso: createdAt.toISOString(),
+    createdAtLabel: formatClientMessageTime(createdAt),
+    model: null,
+    inputTokens: null,
+    outputTokens: null,
+    totalTokens: null,
+    metadata: {
+      statusNote: input.statusNote ?? null,
+      dataFreshnessLabel: null,
+      scopeLabel: null,
+    },
+  } satisfies AiChatMessageView
+}
+
 function MessageBubble({ message }: { message: AiChatMessageView }) {
   const isUser = message.role === 'USER'
 
@@ -52,7 +95,7 @@ function MessageBubble({ message }: { message: AiChatMessageView }) {
           </p>
           <span className="text-[11px] text-muted-foreground">{message.createdAtLabel}</span>
         </div>
-        <p className="mt-2 whitespace-pre-line text-sm leading-7">{message.content}</p>
+        <p className="mt-2 whitespace-pre-line break-words text-sm leading-7">{message.content}</p>
         {!isUser && (
           <div className="mt-3 space-y-1 text-[11px] text-muted-foreground">
             {message.metadata.statusNote && <p>{message.metadata.statusNote}</p>}
@@ -72,6 +115,10 @@ export function AssistantWidgetPanel() {
   const [selectedThread, setSelectedThread] = useState<AiChatThreadDetailView | null>(null)
   const [draft, setDraft] = useState('')
   const [loadState, setLoadState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [showRecentThreads, setShowRecentThreads] = useState(true)
+  const [optimisticMessages, setOptimisticMessages] = useState<AiChatMessageView[]>([])
+  const [optimisticThreadTitle, setOptimisticThreadTitle] = useState<string | null>(null)
+  const [inlineErrorMessage, setInlineErrorMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const messagesViewportRef = useRef<HTMLDivElement | null>(null)
 
@@ -80,15 +127,25 @@ export function AssistantWidgetPanel() {
     () => resolveAssistantScreenContext(pathname, roleScope),
     [pathname, roleScope]
   )
-
   const latestAssistantMessage = useMemo(
     () => [...(selectedThread?.messages ?? [])].reverse().find((message) => message.role === 'ASSISTANT') ?? null,
     [selectedThread]
+  )
+  const conversationMessages = useMemo(
+    () => [...(selectedThread?.messages ?? []), ...optimisticMessages],
+    [optimisticMessages, selectedThread]
   )
 
   const helperDescription = screenContext.subtitle
   const helperSuggestions = screenContext.suggestions.length > 0 ? screenContext.suggestions : (workspace?.suggestions ?? [])
   const helperPlaceholder = screenContext.placeholder || workspace?.placeholder || 'Pergunte sobre a operacao da barbearia.'
+  const hasActiveConversation = Boolean(
+    selectedThread
+    || optimisticThreadTitle
+    || conversationMessages.length > 0
+    || inlineErrorMessage
+  )
+  const activeConversationTitle = selectedThread?.title ?? optimisticThreadTitle ?? 'Nova conversa'
 
   const loadWorkspace = useCallback(async () => {
     if (loadState === 'loading') {
@@ -102,6 +159,10 @@ export function AssistantWidgetPanel() {
       setWorkspace(result)
       setThreadSummaries(result.threadSummaries)
       setSelectedThread(result.selectedThread)
+      setShowRecentThreads(!(result.selectedThread && result.selectedThread.messages.length > 0))
+      setOptimisticMessages([])
+      setOptimisticThreadTitle(null)
+      setInlineErrorMessage(null)
       setLoadState('ready')
     } catch (error) {
       setLoadState('error')
@@ -129,7 +190,7 @@ export function AssistantWidgetPanel() {
       top: viewport.scrollHeight,
       behavior: 'smooth',
     })
-  }, [isOpen, selectedThread])
+  }, [conversationMessages, inlineErrorMessage, isOpen, isPending])
 
   function replaceThreadSummary(nextSummary: AiChatThreadSummaryView) {
     setThreadSummaries((current) => {
@@ -138,24 +199,37 @@ export function AssistantWidgetPanel() {
     })
   }
 
+  function resetTransientConversation() {
+    setOptimisticMessages([])
+    setOptimisticThreadTitle(null)
+    setInlineErrorMessage(null)
+  }
+
   function handleThreadSelect(threadId: string) {
     if (selectedThread?.id === threadId || isPending) {
       return
     }
 
-    startTransition(async () => {
-      try {
-        const thread = await loadAssistantThread(threadId)
-        setSelectedThread(thread)
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Nao foi possivel abrir essa conversa.')
-      }
+    setShowRecentThreads(false)
+    resetTransientConversation()
+
+    startTransition(() => {
+      void (async () => {
+        try {
+          const thread = await loadAssistantThread(threadId)
+          setSelectedThread(thread)
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : 'Nao foi possivel abrir essa conversa.')
+        }
+      })()
     })
   }
 
   function handleNewConversation() {
     setSelectedThread(null)
     setDraft('')
+    setShowRecentThreads(true)
+    resetTransientConversation()
   }
 
   function submitQuestion(rawQuestion: string) {
@@ -165,20 +239,38 @@ export function AssistantWidgetPanel() {
       return
     }
 
-    startTransition(async () => {
-      try {
-        const result = await askAssistant({
-          threadId: selectedThread?.id ?? null,
-          question,
-          pathname,
-        })
+    const userMessage = buildOptimisticMessage({
+      role: 'USER',
+      content: question,
+    })
 
-        setSelectedThread(result.thread)
-        replaceThreadSummary(result.threadSummary)
-        setDraft('')
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Nao foi possivel falar com o assistente agora.')
-      }
+    setInlineErrorMessage(null)
+    setShowRecentThreads(false)
+    setDraft('')
+
+    if (!selectedThread) {
+      setOptimisticThreadTitle(buildOptimisticThreadTitle(question))
+    }
+
+    setOptimisticMessages((current) => [...current, userMessage])
+
+    startTransition(() => {
+      void (async () => {
+        try {
+          const result = await askAssistant({
+            threadId: selectedThread?.id ?? null,
+            question,
+            pathname,
+          })
+
+          setSelectedThread(result.thread)
+          replaceThreadSummary(result.threadSummary)
+          resetTransientConversation()
+        } catch (error) {
+          setInlineErrorMessage('Nao foi possivel responder agora. Tente novamente em instantes.')
+          toast.error(error instanceof Error ? error.message : 'Nao foi possivel falar com o assistente agora.')
+        }
+      })()
     })
   }
 
@@ -216,16 +308,12 @@ export function AssistantWidgetPanel() {
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <BrainCircuit className="h-4 w-4 text-primary" />
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-violet-200/80">
-                  BarberEX IA
-                </p>
+                <h2 className="text-lg font-semibold tracking-tight text-foreground">BarberEX IA</h2>
               </div>
-              <h2 className="mt-3 text-lg font-semibold tracking-tight text-foreground">
+              <p className="mt-2 text-sm leading-6 text-foreground">
                 Pergunte sobre agenda, clientes, metas e numeros.
-              </h2>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                {helperDescription}
               </p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">{helperDescription}</p>
               <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 <span>{getScopeLabel(workspace?.roleScope)}</span>
                 <span className="text-slate-600">/</span>
@@ -265,16 +353,27 @@ export function AssistantWidgetPanel() {
 
         <div className="border-b border-[rgba(255,255,255,0.06)] px-4 py-3 sm:px-5">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-foreground">Conversas recentes</p>
+            <button
+              type="button"
+              onClick={() => setShowRecentThreads((current) => !current)}
+              className="inline-flex items-center gap-2 text-left text-sm font-semibold text-foreground transition-colors hover:text-white"
+              disabled={threadSummaries.length === 0}
+            >
+              <span>Conversas recentes</span>
+              {threadSummaries.length > 0 && (
+                <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform', showRecentThreads && 'rotate-180')} />
+              )}
+            </button>
             {threadSummaries.length > 0 && (
               <p className="text-xs text-slate-400">{threadSummaries.length} conversa{threadSummaries.length === 1 ? '' : 's'}</p>
             )}
           </div>
+
           {threadSummaries.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               Sua primeira pergunta abre uma nova conversa. Depois disso, o historico recente aparece aqui.
             </p>
-          ) : (
+          ) : showRecentThreads ? (
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hidden">
               {threadSummaries.map((thread) => (
                 <button
@@ -289,101 +388,144 @@ export function AssistantWidgetPanel() {
                   )}
                   disabled={isPending}
                 >
-                  <p className={cn(
-                    'truncate text-sm font-semibold',
-                    selectedThread?.id === thread.id ? 'text-slate-50' : 'text-slate-100'
-                  )}>
+                  <p
+                    className={cn(
+                      'truncate text-sm font-semibold',
+                      selectedThread?.id === thread.id ? 'text-slate-50' : 'text-slate-100'
+                    )}
+                  >
                     {thread.title}
                   </p>
                   {thread.lastMessagePreview ? (
-                    <p className={cn(
-                      'mt-2 line-clamp-2 text-xs leading-5',
-                      selectedThread?.id === thread.id ? 'text-slate-300' : 'text-slate-400'
-                    )}>
+                    <p
+                      className={cn(
+                        'mt-2 line-clamp-2 text-xs leading-5',
+                        selectedThread?.id === thread.id ? 'text-slate-300' : 'text-slate-400'
+                      )}
+                    >
                       {thread.lastMessagePreview}
                     </p>
                   ) : (
                     <p className="mt-2 text-xs leading-5 text-slate-500">Sem resposta registrada ainda.</p>
                   )}
-                  <p className={cn(
-                    'mt-3 text-[11px]',
-                    selectedThread?.id === thread.id ? 'text-slate-400' : 'text-slate-500'
-                  )}>
+                  <p
+                    className={cn(
+                      'mt-3 text-[11px]',
+                      selectedThread?.id === thread.id ? 'text-slate-400' : 'text-slate-500'
+                    )}
+                  >
                     {thread.updatedAtLabel}
                   </p>
                 </button>
               ))}
             </div>
-          )}
+          ) : hasActiveConversation ? (
+            <p className="text-xs text-muted-foreground">
+              O foco agora esta na conversa atual. Abra esta lista novamente quando quiser trocar de thread.
+            </p>
+          ) : null}
         </div>
 
-        <div ref={messagesViewportRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
-          {loadState === 'loading' && !workspace ? (
-            <div className="flex h-full min-h-[280px] items-center justify-center">
-              <div className="rounded-[1.4rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-5 py-4 text-center">
-                <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
-                <p className="mt-3 text-sm font-medium text-foreground">Carregando o contexto da tela atual</p>
-                <p className="mt-1 text-xs leading-6 text-muted-foreground">
-                  Estamos montando o contexto seguro do seu perfil.
-                </p>
-              </div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-4 sm:px-5">
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-foreground">{activeConversationTitle}</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {hasActiveConversation
+                  ? `${conversationMessages.length} mensagem${conversationMessages.length === 1 ? '' : 'ens'} nesta conversa.`
+                  : 'Escolha uma conversa recente ou envie uma pergunta para comecar.'}
+              </p>
             </div>
-          ) : loadState === 'error' && !workspace ? (
-            <div className="flex h-full min-h-[280px] items-center justify-center">
-              <div className="max-w-sm rounded-[1.4rem] border border-[rgba(220,38,38,0.18)] bg-[rgba(220,38,38,0.08)] px-5 py-4 text-center">
-                <p className="text-sm font-semibold text-foreground">Nao foi possivel abrir o BarberEX IA agora.</p>
-                <p className="mt-2 text-xs leading-6 text-muted-foreground">
-                  Tente novamente em instantes. O restante da tela continua funcionando normalmente.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => void loadWorkspace()}
-                  className="action-button mt-4"
-                >
-                  Tentar de novo
-                </button>
+            {hasActiveConversation && threadSummaries.length > 0 && !showRecentThreads && (
+              <button
+                type="button"
+                onClick={() => setShowRecentThreads(true)}
+                className="text-xs font-medium text-slate-400 transition-colors hover:text-slate-200"
+              >
+                Ver recentes
+              </button>
+            )}
+          </div>
+
+          <div
+            ref={messagesViewportRef}
+            className="min-h-0 flex-1 overflow-y-auto rounded-[1.3rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(15,18,27,0.88),rgba(12,14,20,0.94))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:p-4"
+          >
+            {loadState === 'loading' && !workspace ? (
+              <div className="flex h-full min-h-[320px] items-center justify-center">
+                <div className="rounded-[1.4rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-5 py-4 text-center">
+                  <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
+                  <p className="mt-3 text-sm font-medium text-foreground">Carregando o contexto da tela atual</p>
+                  <p className="mt-1 text-xs leading-6 text-muted-foreground">
+                    Estamos montando o contexto seguro do seu perfil.
+                  </p>
+                </div>
               </div>
-            </div>
-          ) : selectedThread?.messages.length ? (
-            <div className="space-y-4">
-              {selectedThread.messages.map((message) => (
-                <MessageBubble key={message.id} message={message} />
-              ))}
-              {isPending && (
-                <div className="flex justify-start">
-                  <div className="rounded-[1.1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-4 py-3 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                      Pensando com base nos dados disponiveis...
+            ) : loadState === 'error' && !workspace ? (
+              <div className="flex h-full min-h-[280px] items-center justify-center">
+                <div className="max-w-sm rounded-[1.4rem] border border-[rgba(220,38,38,0.18)] bg-[rgba(220,38,38,0.08)] px-5 py-4 text-center">
+                  <p className="text-sm font-semibold text-foreground">Nao foi possivel abrir o BarberEX IA agora.</p>
+                  <p className="mt-2 text-xs leading-6 text-muted-foreground">
+                    Tente novamente em instantes. O restante da tela continua funcionando normalmente.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void loadWorkspace()}
+                    className="action-button mt-4"
+                  >
+                    Tentar de novo
+                  </button>
+                </div>
+              </div>
+            ) : hasActiveConversation ? (
+              <div className="space-y-4">
+                {conversationMessages.map((message) => (
+                  <MessageBubble key={message.id} message={message} />
+                ))}
+                {inlineErrorMessage && (
+                  <div className="flex justify-start">
+                    <div className="max-w-[88%] rounded-[1.1rem] border border-[rgba(220,38,38,0.24)] bg-[rgba(220,38,38,0.08)] px-4 py-3 text-sm text-slate-100">
+                      <p className="font-medium">Nao foi possivel responder agora.</p>
+                      <p className="mt-1 text-xs leading-6 text-rose-100/90">{inlineErrorMessage}</p>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex h-full min-h-[280px] items-center justify-center">
-              <div className="w-full max-w-md rounded-[1.5rem] border border-dashed border-[rgba(124,58,237,0.18)] bg-[rgba(124,58,237,0.06)] p-5">
-                <p className="text-sm font-semibold text-foreground">Pergunte o que voce precisa decidir agora</p>
-                <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                  O BarberEX IA entende a tela atual, respeita o escopo do seu perfil e responde com base nos dados disponiveis do periodo.
-                </p>
+                )}
+                {isPending && (
+                  <div className="flex justify-start">
+                    <div className="max-w-[88%] rounded-[1.1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-4 py-3 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        Pensando com base nos dados disponiveis...
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex h-full min-h-[280px] items-center justify-center">
+                <div className="w-full max-w-md rounded-[1.5rem] border border-dashed border-[rgba(124,58,237,0.18)] bg-[rgba(124,58,237,0.06)] p-5">
+                  <p className="text-sm font-semibold text-foreground">Pergunte o que voce precisa decidir agora</p>
+                  <p className="mt-2 text-sm leading-7 text-muted-foreground">
+                    O BarberEX IA entende a tela atual, respeita o escopo do seu perfil e responde com base nos dados disponiveis do periodo.
+                  </p>
 
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {helperSuggestions.map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      type="button"
-                      onClick={() => submitQuestion(suggestion)}
-                      className="rounded-full border border-[rgba(124,58,237,0.18)] bg-[rgba(124,58,237,0.08)] px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-[rgba(124,58,237,0.14)]"
-                      disabled={isPending || loadState !== 'ready'}
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {helperSuggestions.map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        onClick={() => submitQuestion(suggestion)}
+                        className="rounded-full border border-[rgba(124,58,237,0.18)] bg-[rgba(124,58,237,0.08)] px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-[rgba(124,58,237,0.14)]"
+                        disabled={isPending || loadState !== 'ready'}
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         <footer className="border-t border-[rgba(255,255,255,0.08)] px-4 py-4 sm:px-5">

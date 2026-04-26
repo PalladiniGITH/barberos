@@ -1,4 +1,4 @@
-import { BrainCircuit, CalendarRange, CircleDollarSign, ScanSearch, Sparkles, Target } from 'lucide-react'
+import { BrainCircuit, CalendarRange, CircleDollarSign, ScanSearch, Target } from 'lucide-react'
 
 const steps = [
   {
@@ -34,15 +34,9 @@ export default function InteligenciaLoading() {
         <div className="dashboard-spotlight px-6 py-7 sm:px-7">
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_360px]">
             <div className="max-w-3xl">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="spotlight-chip">
-                  <BrainCircuit className="h-3.5 w-3.5" />
-                  Analisando o negocio
-                </span>
-                <span className="spotlight-chip">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Preparando prioridades
-                </span>
+              <div className="flex flex-wrap items-center gap-2 text-sm text-slate-300">
+                <BrainCircuit className="h-4 w-4 text-primary" />
+                <span>Analisando o negocio e preparando prioridades.</span>
               </div>
 
               <SkeletonBlock className="mt-6 h-11 w-full max-w-2xl bg-[rgba(255,255,255,0.08)]" />
@@ -50,7 +44,7 @@ export default function InteligenciaLoading() {
               <SkeletonBlock className="mt-2 h-4 w-full max-w-2xl bg-[rgba(255,255,255,0.08)]" />
 
               <div className="mt-6 rounded-[1.7rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.05)] p-5">
-                <p className="spotlight-kicker">Analise em andamento</p>
+                <p className="text-sm font-semibold text-foreground">Analise em andamento</p>
                 <div className="mt-4 grid gap-3">
                   {steps.map((step, index) => (
                     <div key={step.title} className="flex items-start gap-3 rounded-[1.35rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.05)] p-4">

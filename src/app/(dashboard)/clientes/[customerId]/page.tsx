@@ -227,8 +227,7 @@ export default async function ClienteProfilePage({ params, searchParams }: Props
       <section className="dashboard-panel dashboard-spotlight px-6 py-6">
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_340px]">
           <div>
-            <p className="spotlight-kicker">Perfil do cliente</p>
-            <h2 className="mt-3 text-3xl font-semibold text-white sm:text-[2.6rem]">
+            <h2 className="text-3xl font-semibold text-white sm:text-[2.6rem]">
               {profile.customer.type === 'SUBSCRIPTION'
                 ? 'Leitura completa da assinatura e do consumo operacional.'
                 : 'Leitura completa do cliente avulso e da contribuicao para o caixa.'}
@@ -312,8 +311,7 @@ export default async function ClienteProfilePage({ params, searchParams }: Props
           <section className="dashboard-panel p-5 sm:p-6">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="page-kicker">Resumo executivo</p>
-                <h2 className="mt-2 text-xl font-semibold text-foreground">Receita, margem, recorrencia e lifetime</h2>
+                <h2 className="text-xl font-semibold text-foreground">Receita, margem, recorrencia e lifetime</h2>
               </div>
               {profile.customer.subscriptionPrice && (
                 <ToneBadge label={`Plano ${formatCurrency(profile.customer.subscriptionPrice)}`} tone="positive" />
@@ -370,8 +368,7 @@ export default async function ClienteProfilePage({ params, searchParams }: Props
           <section className="dashboard-panel p-5 sm:p-6">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="page-kicker">Historico do periodo</p>
-                <h2 className="mt-2 text-xl font-semibold text-foreground">Atendimentos recentes</h2>
+                <h2 className="text-xl font-semibold text-foreground">Atendimentos recentes</h2>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
                   Visao completa do comportamento recente do cliente, com servico, barbeiro, cobranca e status.
                 </p>
@@ -412,8 +409,7 @@ export default async function ClienteProfilePage({ params, searchParams }: Props
 
         <aside className="space-y-5">
           <section className="premium-rail">
-            <p className="page-kicker">Comportamento recente</p>
-            <h3 className="mt-2 text-lg font-semibold text-foreground">Leituras prontas para gestao</h3>
+            <h3 className="text-lg font-semibold text-foreground">Leituras prontas para gestao</h3>
             <div className="mt-4 space-y-3">
               {profile.recentBehavior.map((message) => (
                 <div key={message} className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4 text-sm leading-6 text-muted-foreground">
@@ -424,8 +420,7 @@ export default async function ClienteProfilePage({ params, searchParams }: Props
           </section>
 
           <section className="premium-block">
-            <p className="page-kicker">Preferencias</p>
-            <h3 className="mt-2 text-lg font-semibold text-foreground">Servicos e barbeiros dominantes</h3>
+            <h3 className="text-lg font-semibold text-foreground">Servicos e barbeiros dominantes</h3>
 
             <div className="mt-4 space-y-4">
               <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
@@ -459,8 +454,7 @@ export default async function ClienteProfilePage({ params, searchParams }: Props
           </section>
 
           <section className="premium-block">
-            <p className="page-kicker">Metodo</p>
-            <h3 className="mt-2 text-lg font-semibold text-foreground">Como interpretar a analise</h3>
+            <h3 className="text-lg font-semibold text-foreground">Como interpretar a analise</h3>
 
             <div className="mt-4 space-y-3 text-sm text-muted-foreground">
               <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">

@@ -149,8 +149,7 @@ export function CustomerProfileEditModal({ customer, professionals }: Props) {
           <div className="relative flex h-full w-full max-w-2xl flex-col border-l border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.98),rgba(15,17,21,0.98))] shadow-[0_30px_70px_-30px_rgba(2,6,23,0.95)]">
             <div className="flex items-start justify-between gap-4 border-b border-[rgba(255,255,255,0.08)] px-6 py-5">
               <div>
-                <p className="page-kicker">Cadastro do cliente</p>
-                <h2 className="mt-2 text-xl font-semibold text-foreground">Editar dados e relacionamento</h2>
+                <h2 className="text-xl font-semibold text-foreground">Editar dados e relacionamento</h2>
                 <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
                   Atualize contato, perfil comercial, barbeiro preferido e bloqueio de campanhas sem sair da leitura analitica.
                 </p>

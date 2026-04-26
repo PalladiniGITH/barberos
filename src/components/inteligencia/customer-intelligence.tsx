@@ -188,8 +188,8 @@ function RankingList({
 }) {
   return (
     <section className="premium-block">
-      <p className="page-kicker">{title}</p>
-      <h3 className="mt-2 text-lg font-semibold text-foreground">{subtitle}</h3>
+      <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">{subtitle}</p>
 
       <div className="mt-4 space-y-3">
         {items.length > 0 ? items.map((customer) => (
@@ -302,8 +302,7 @@ export function CustomerIntelligenceSection({
       <section className="dashboard-panel p-5 sm:p-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <p className="page-kicker">Inteligencia de clientes</p>
-            <h2 className="mt-2 text-2xl font-semibold text-foreground">Rentabilidade, recorrencia e saude da assinatura</h2>
+            <h2 className="text-2xl font-semibold text-foreground">Rentabilidade, recorrencia e saude da assinatura</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
               Esta leitura cruza visitas, valor gerado, custo estimado e margem por cliente para mostrar quem sustenta o lucro e onde o plano precisa de ajuste.
             </p>
@@ -525,8 +524,7 @@ export function CustomerIntelligenceSection({
 
         <aside className="space-y-5">
           <section className="premium-rail">
-            <p className="page-kicker">Saude do plano</p>
-            <h3 className="mt-2 text-lg font-semibold text-foreground">Leitura da assinatura</h3>
+            <h3 className="text-lg font-semibold text-foreground">Leitura da assinatura</h3>
 
             <div className="mt-4 space-y-3">
               <div className="surface-soft-strong p-4">
@@ -579,8 +577,7 @@ export function CustomerIntelligenceSection({
           </section>
 
           <section className="premium-block">
-            <p className="page-kicker">Insights automaticos</p>
-            <h3 className="mt-2 text-lg font-semibold text-foreground">Leitura para decisao</h3>
+            <h3 className="text-lg font-semibold text-foreground">Leitura para decisao</h3>
 
             <div className="mt-4 space-y-3">
               {customerInsights.length > 0 ? customerInsights.map((insight) => (
@@ -597,8 +594,7 @@ export function CustomerIntelligenceSection({
           </section>
 
           <section className="premium-block">
-            <p className="page-kicker">Metodo de leitura</p>
-            <h3 className="mt-2 text-lg font-semibold text-foreground">Transparencia analitica</h3>
+            <h3 className="text-lg font-semibold text-foreground">Transparencia analitica</h3>
 
             <div className="mt-4 space-y-3 text-sm text-muted-foreground">
               <div className="surface-inverse rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
@@ -622,8 +618,7 @@ export function CustomerIntelligenceSection({
         <section className="dashboard-panel p-5 sm:p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="page-kicker">Operacao detalhada</p>
-              <h3 className="mt-2 text-xl font-semibold text-foreground">Tabela executiva de clientes</h3>
+              <h3 className="text-xl font-semibold text-foreground">Tabela executiva de clientes</h3>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 Valor gerado, custo estimado, margem, recorrencia e forma de consumo em um unico quadro.
               </p>
@@ -716,8 +711,7 @@ export function CustomerIntelligenceSection({
 
         <aside className="space-y-5">
           <section className="premium-rail">
-            <p className="page-kicker">Perguntas de gestao</p>
-            <h3 className="mt-2 text-lg font-semibold text-foreground">Respostas do recorte atual</h3>
+            <h3 className="text-lg font-semibold text-foreground">Respostas do recorte atual</h3>
 
             <div className="mt-4 space-y-3 text-sm text-muted-foreground">
               <div className="surface-inverse rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">

@@ -3,9 +3,9 @@
 import { useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import { signIn } from 'next-auth/react'
-import { ArrowRight, Loader2, LockKeyhole, Scissors } from 'lucide-react'
+import { ArrowRight, Loader2 } from 'lucide-react'
 import { AUTHENTICATED_HOME_PATH } from '@/lib/auth-routes'
-import { PRODUCT_NAME, PRODUCT_POSITIONING } from '@/lib/branding'
+import { PRODUCT_POSITIONING } from '@/lib/branding'
 
 interface AuthEntryCardProps {
   callbackUrl: string
@@ -52,11 +52,7 @@ export function AuthEntryCard({
     <main className="auth-shell min-h-screen px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl items-center gap-6 lg:grid-cols-[minmax(0,1.15fr)_440px]">
         <section className="premium-shell p-8 sm:p-10 lg:p-12">
-          <div className="spotlight-chip">
-            <Scissors className="h-3.5 w-3.5" />
-            {PRODUCT_NAME}
-          </div>
-          <h1 className="spotlight-title max-w-xl">
+          <h1 className="spotlight-title mt-0 max-w-xl">
             Operacao, agenda e inteligencia para a rotina da barbearia.
           </h1>
           <p className="spotlight-copy max-w-2xl">
@@ -65,28 +61,20 @@ export function AuthEntryCard({
 
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
             <div className="hero-stat-card">
-              <p className="executive-label">Agenda</p>
-              <p className="mt-2 text-lg font-semibold text-foreground">Bloqueios e remanejamentos no mesmo grid</p>
+              <p className="text-lg font-semibold text-foreground">Bloqueios e remanejamentos no mesmo grid</p>
             </div>
             <div className="hero-stat-card">
-              <p className="executive-label">Financeiro</p>
-              <p className="mt-2 text-lg font-semibold text-foreground">Indicadores e margem visiveis logo no primeiro acesso</p>
+              <p className="text-lg font-semibold text-foreground">Indicadores e margem visiveis logo no primeiro acesso</p>
             </div>
             <div className="hero-stat-card">
-              <p className="executive-label">WhatsApp</p>
-              <p className="mt-2 text-lg font-semibold text-foreground">Fluxo de agendamento alinhado com a operacao real</p>
+              <p className="text-lg font-semibold text-foreground">Fluxo de agendamento alinhado com a operacao real</p>
             </div>
           </div>
         </section>
 
         <section className="premium-block p-6 sm:p-8">
-          <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-300">
-            <LockKeyhole className="h-4 w-4 text-primary" />
-            Acesso seguro
-          </div>
-
           {isAuthenticated ? (
-            <div className="mt-6 space-y-4">
+            <div className="space-y-4">
               <h2 className="text-2xl font-semibold tracking-tight text-foreground">
                 {userName ? `Bem-vindo de volta, ${userName}.` : 'Sessao ativa.'}
               </h2>
@@ -99,7 +87,7 @@ export function AuthEntryCard({
               </Link>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <h2 className="text-2xl font-semibold tracking-tight text-foreground">
                   Entrar na plataforma

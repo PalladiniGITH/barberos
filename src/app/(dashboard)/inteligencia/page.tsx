@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import {
-  CalendarRange,
   CircleDollarSign,
   Target,
   TrendingDown,
@@ -118,27 +117,19 @@ export default async function InteligenciaPage({ searchParams }: Props) {
         <div className="dashboard-spotlight px-5 py-6 sm:px-6">
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_360px]">
             <div className="max-w-3xl">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="spotlight-chip">
-                  <CalendarRange className="h-3.5 w-3.5" />
-                  {context.period.label}
-                </span>
-                <span className="spotlight-chip">
-                  <CircleDollarSign className="h-3.5 w-3.5" />
-                  {context.period.partialComparison
-                    ? `Comparado ao mesmo ritmo de ${context.period.comparisonLabel}`
-                    : `Comparado a ${context.period.comparisonLabel}`}
-                </span>
-              </div>
+              <p className="text-sm text-slate-300">
+                {context.period.label} · {context.period.partialComparison
+                  ? `Comparado ao mesmo ritmo de ${context.period.comparisonLabel}`
+                  : `Comparado a ${context.period.comparisonLabel}`}
+              </p>
 
-              <p className="spotlight-kicker mt-6">Relatorio automatico do mes</p>
-              <h2 className="mt-3 max-w-2xl text-3xl font-semibold text-white sm:text-[2.7rem]">
+              <h2 className="mt-4 max-w-2xl text-3xl font-semibold text-white sm:text-[2.7rem]">
                 {report.summary.headline}
               </h2>
               <p className="spotlight-copy max-w-2xl">{report.summary.body}</p>
 
               <div className="mt-5 rounded-[1.7rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.05)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                <p className="spotlight-kicker">Prioridade agora</p>
+                <p className="text-sm font-semibold text-foreground">Prioridade agora</p>
                 <p className="mt-3 text-base leading-7 text-slate-100">{report.summary.focus}</p>
               </div>
             </div>
@@ -183,8 +174,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
             <section className="premium-block">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="page-kicker">Riscos e prioridades</p>
-                  <h3 className="mt-2 text-xl font-semibold text-foreground">Pontos de atencao do periodo</h3>
+                  <h3 className="text-xl font-semibold text-foreground">Pontos de atencao do periodo</h3>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
                     O que mais ameaca caixa, lucro, meta ou ritmo do mes agora.
                   </p>
@@ -213,8 +203,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
             <section className="premium-block">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="page-kicker">Alavancas do mes</p>
-                  <h3 className="mt-2 text-xl font-semibold text-foreground">Oportunidades de melhoria</h3>
+                  <h3 className="text-xl font-semibold text-foreground">Oportunidades de melhoria</h3>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
                     O que pode melhorar faturamento, ticket ou margem sem depender so de mais volume.
                   </p>
@@ -237,8 +226,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
               <details className="disclosure-panel">
                 <summary className="disclosure-summary">
                   <div>
-                    <p className="page-kicker">Comparativo</p>
-                    <h3 className="mt-2 text-lg font-semibold text-foreground">Leitura contra a base anterior</h3>
+                    <h3 className="text-lg font-semibold text-foreground">Leitura contra a base anterior</h3>
                   </div>
                   <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-xs font-semibold text-slate-300">
                     Abrir
@@ -277,13 +265,12 @@ export default async function InteligenciaPage({ searchParams }: Props) {
               </details>
 
               <section className="premium-rail">
-                <p className="page-kicker">Plano curto</p>
-                <h3 className="mt-2 text-lg font-semibold text-foreground">Prioridades de acao</h3>
+                <h3 className="text-lg font-semibold text-foreground">Prioridades de acao</h3>
                 <div className="mt-4 space-y-3">
                   {topRecommendations.map((insight, index) => (
                     <div key={insight.id} className="surface-inverse rounded-[1.25rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 shadow-[0_18px_34px_-26px_rgba(2,6,23,0.82)]">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                        {index + 1}. agir agora
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Prioridade {index + 1}
                       </p>
                       <p className="mt-2 text-sm font-semibold text-foreground">{insight.title}</p>
                       <p className="mt-1 text-sm leading-6 text-muted-foreground">{insight.recommendedAction}</p>
@@ -295,8 +282,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
               <details className="disclosure-panel">
                 <summary className="disclosure-summary">
                   <div>
-                    <p className="page-kicker">Acoes no produto</p>
-                    <h3 className="mt-2 text-lg font-semibold text-foreground">Saia da analise e execute</h3>
+                    <h3 className="text-lg font-semibold text-foreground">Saia da analise e execute</h3>
                   </div>
                   <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-xs font-semibold text-slate-300">
                     Abrir

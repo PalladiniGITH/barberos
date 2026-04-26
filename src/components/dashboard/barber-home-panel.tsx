@@ -48,19 +48,16 @@ export function BarberHomePanel({ data }: { data: BarberDashboardData }) {
       <section className="dashboard-spotlight overflow-hidden p-5 sm:p-6">
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_340px]">
           <div>
-            <p className="spotlight-kicker">Painel do barbeiro</p>
-            <h1 className="mt-3 text-[2.3rem] font-semibold tracking-tight text-foreground sm:text-[2.8rem]">
+            <h1 className="text-[2.3rem] font-semibold tracking-tight text-foreground sm:text-[2.8rem]">
               {data.professionalName}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">
               Sua agenda, seu ritmo e sua leitura de desempenho em um painel direto para o dia a dia.
             </p>
 
-            <div className="mt-5 flex flex-wrap gap-2">
-              <span className="spotlight-chip">{data.attendanceScopeLabel}</span>
-              <span className="spotlight-chip">{data.todayLabel}</span>
-              <span className="spotlight-chip">{data.upcomingToday.length} proximos atendimentos</span>
-            </div>
+            <p className="mt-4 text-sm text-slate-300">
+              {data.attendanceScopeLabel} · {data.todayLabel} · {data.upcomingToday.length} proximos atendimentos
+            </p>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <div className="hero-stat-card">
@@ -90,8 +87,7 @@ export function BarberHomePanel({ data }: { data: BarberDashboardData }) {
           </div>
 
           <aside className="premium-rail p-5">
-            <p className="page-kicker">Resultado do periodo</p>
-            <h2 className="mt-2 text-[1.45rem] font-semibold tracking-tight text-foreground">{data.periodLabel}</h2>
+            <h2 className="text-[1.45rem] font-semibold tracking-tight text-foreground">{data.periodLabel}</h2>
             <div className="mt-5 space-y-3">
               <div className="rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
                 <p className="executive-label">Faturamento gerado</p>
@@ -150,8 +146,7 @@ export function BarberHomePanel({ data }: { data: BarberDashboardData }) {
         <section className="dashboard-panel p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="page-kicker">Agenda do dia</p>
-              <h2 className="mt-2 text-[1.35rem] font-semibold tracking-tight text-foreground">Seus proximos horarios</h2>
+              <h2 className="text-[1.35rem] font-semibold tracking-tight text-foreground">Seus proximos horarios</h2>
             </div>
             <Link href="/agendamentos" className="surface-chip">
               Abrir agenda
@@ -189,8 +184,7 @@ export function BarberHomePanel({ data }: { data: BarberDashboardData }) {
           <section className="premium-rail p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="page-kicker">Desafio ativo</p>
-                <h2 className="mt-2 text-[1.3rem] font-semibold tracking-tight text-foreground">
+                <h2 className="text-[1.3rem] font-semibold tracking-tight text-foreground">
                   {data.activeChallenge?.title ?? 'Sem campanha ativa'}
                 </h2>
               </div>
@@ -222,7 +216,6 @@ export function BarberHomePanel({ data }: { data: BarberDashboardData }) {
           </section>
 
           <section className="dashboard-panel p-5">
-            <p className="page-kicker">Acoes rapidas</p>
             <div className="mt-4 space-y-3">
               <Link href="/agendamentos" className="action-button flex justify-between">
                 Abrir minha agenda

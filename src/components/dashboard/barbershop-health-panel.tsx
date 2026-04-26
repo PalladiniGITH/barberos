@@ -41,8 +41,7 @@ export function BarbershopHealthPanel({ health }: { health: BarbershopHealthSnap
     <section className={cn('dashboard-panel overflow-hidden p-5 sm:p-6', toneClass)}>
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_340px]">
         <div>
-          <p className="page-kicker">Saude da base</p>
-          <h2 className="mt-2 text-[1.5rem] font-semibold tracking-tight text-foreground">
+          <h2 className="text-[1.5rem] font-semibold tracking-tight text-foreground">
             {health.healthLabel}
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-7 text-muted-foreground">{health.summary}</p>

@@ -1,11 +1,7 @@
 import type { Metadata } from 'next'
 import {
-  CalendarClock,
   CheckCircle2,
   Clock3,
-  Minus,
-  PanelsTopLeft,
-  Sparkles,
   XCircle,
 } from 'lucide-react'
 import { requireSession } from '@/lib/auth'
@@ -166,8 +162,7 @@ export default async function AgendamentosPage({ searchParams }: Props) {
         />
 
         <section className="dashboard-panel p-6">
-          <p className="page-kicker">Vinculo pendente</p>
-          <h2 className="mt-2 text-[1.4rem] font-semibold tracking-tight text-foreground">
+          <h2 className="text-[1.4rem] font-semibold tracking-tight text-foreground">
             Seu usuario ainda nao esta ligado a um barbeiro ativo.
           </h2>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">
@@ -198,8 +193,7 @@ export default async function AgendamentosPage({ searchParams }: Props) {
         />
 
         <section className="dashboard-spotlight p-6">
-          <p className="spotlight-kicker">Base operacional pendente</p>
-          <h2 className="spotlight-title">Cadastre equipe e servicos para ativar a agenda.</h2>
+          <h2 className="spotlight-title mt-0">Cadastre equipe e servicos para ativar a agenda.</h2>
           <p className="spotlight-copy max-w-3xl">
             A grade usa barbeiro, duracao, conflitos, bloqueios e disponibilidade real. Sem essa base, a operacao fica pela metade.
           </p>
@@ -253,32 +247,16 @@ export default async function AgendamentosPage({ searchParams }: Props) {
       <section className="dashboard-spotlight overflow-hidden px-5 py-5">
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_360px]">
           <div>
-            <p className="spotlight-kicker">Operacao do dia</p>
-            <h2 className="mt-3 text-[2.5rem] font-semibold tracking-tight text-foreground sm:text-[2.9rem]">
+            <h2 className="text-[2.5rem] font-semibold tracking-tight text-foreground sm:text-[2.9rem]">
               {schedule.rangeLabel}
             </h2>
             <p className="mt-3 max-w-2xl text-[15px] leading-7 text-muted-foreground">
               Uma agenda central para encaixe, bloqueio, remarcacao e leitura do fluxo da casa sem ruido visual.
             </p>
 
-            <div className="mt-5 flex flex-wrap gap-2">
-              <span className="spotlight-chip">
-                <PanelsTopLeft className="h-3.5 w-3.5 text-primary" />
-                {schedule.view === 'barber' ? 'Grade por barbeiro' : 'Linha do dia'}
-              </span>
-              <span className="spotlight-chip">
-                <CalendarClock className="h-3.5 w-3.5 text-primary" />
-                {schedule.summary.scheduledCount} atendimentos
-              </span>
-              <span className="spotlight-chip">
-                <Minus className="h-3.5 w-3.5 text-primary" />
-                {schedule.summary.blockedCount} bloqueios
-              </span>
-              <span className="spotlight-chip">
-                <Sparkles className="h-3.5 w-3.5 text-primary" />
-                {whatsappBookings} via WhatsApp
-              </span>
-            </div>
+            <p className="mt-4 text-sm text-slate-300">
+              {schedule.view === 'barber' ? 'Grade por barbeiro' : 'Linha do dia'} · {schedule.summary.scheduledCount} atendimentos · {schedule.summary.blockedCount} bloqueios · {whatsappBookings} via WhatsApp
+            </p>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <div className="hero-stat-card">
@@ -300,8 +278,7 @@ export default async function AgendamentosPage({ searchParams }: Props) {
           </div>
 
           <aside className="premium-rail p-5">
-            <p className="page-kicker">{schedule.panel.mode === 'professional' ? 'Barbeiro' : 'Equipe'}</p>
-            <h3 className="mt-2 text-[1.5rem] font-semibold tracking-tight text-foreground">{schedule.panel.title}</h3>
+            <h3 className="text-[1.5rem] font-semibold tracking-tight text-foreground">{schedule.panel.title}</h3>
             <p className="mt-2 text-sm leading-7 text-muted-foreground">{schedule.panel.subtitle}</p>
 
             <div className="mt-5 space-y-3">
@@ -336,15 +313,12 @@ export default async function AgendamentosPage({ searchParams }: Props) {
         <section className="dashboard-panel overflow-hidden">
           <div className="flex flex-col gap-3 border-b border-[rgba(58,47,86,0.08)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div>
-              <p className="page-kicker">Grade interativa</p>
-              <h3 className="mt-2 text-[1.45rem] font-semibold tracking-tight text-foreground">Agenda em grid</h3>
+              <h3 className="text-[1.45rem] font-semibold tracking-tight text-foreground">Agenda em grid</h3>
               <p className="mt-2 max-w-3xl text-sm leading-7 text-muted-foreground">
                 Clique em um slot vazio para criar. Clique e arraste para escolher intervalo. Arraste um bloco existente para remarcar com seguranca.
               </p>
             </div>
-            <div className="rounded-[0.75rem] border border-[rgba(52,44,78,0.1)] bg-[rgba(91,33,182,0.05)] px-3 py-1.5 text-sm font-medium text-foreground">
-              Operacao visual com bloqueios e conflitos
-            </div>
+            <p className="text-sm text-muted-foreground">Bloqueios e conflitos visiveis na grade.</p>
           </div>
 
           <ScheduleCalendar
@@ -365,8 +339,7 @@ export default async function AgendamentosPage({ searchParams }: Props) {
           <section className="premium-block p-5">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="page-kicker">Fila do dia</p>
-                <h3 className="mt-2 text-[1.3rem] font-semibold tracking-tight text-foreground">Proximos atendimentos</h3>
+                <h3 className="text-[1.3rem] font-semibold tracking-tight text-foreground">Proximos atendimentos</h3>
               </div>
               <Clock3 className="h-5 w-5 text-muted-foreground" />
             </div>
@@ -401,8 +374,7 @@ export default async function AgendamentosPage({ searchParams }: Props) {
           <details className="disclosure-panel">
           <summary className="disclosure-summary">
             <div>
-              <p className="page-kicker">Status da agenda</p>
-              <h3 className="mt-2 text-[1.2rem] font-semibold tracking-tight text-foreground">Leitura rapida</h3>
+              <h3 className="text-[1.2rem] font-semibold tracking-tight text-foreground">Leitura rapida</h3>
             </div>
             <span className="text-sm font-medium text-muted-foreground">Ver resumo</span>
           </summary>

@@ -121,8 +121,7 @@ export function AssistantChatPanel({ workspace }: Props) {
         <div className="border-b border-[rgba(255,255,255,0.08)] px-5 py-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="page-kicker">Conversas recentes</p>
-              <h2 className="mt-2 text-lg font-semibold text-foreground">Historico recente</h2>
+              <h2 className="text-lg font-semibold text-foreground">Historico recente</h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 Cada conversa fica ligada ao seu perfil e ao escopo liberado para este acesso.
               </p>
@@ -175,14 +174,12 @@ export function AssistantChatPanel({ workspace }: Props) {
             <div>
               <div className="flex items-center gap-2">
                 <BrainCircuit className="h-4 w-4 text-primary" />
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-violet-200/80">
-                  BarberEX IA
-                </p>
+                <h2 className="text-xl font-semibold text-foreground">BarberEX IA</h2>
               </div>
 
-              <h2 className="mt-3 text-xl font-semibold text-foreground">
+              <p className="mt-3 text-base font-medium text-foreground">
                 {selectedThread?.title ?? 'Nova conversa com o BarberEX IA'}
-              </h2>
+              </p>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
                 {workspace.description}
               </p>
