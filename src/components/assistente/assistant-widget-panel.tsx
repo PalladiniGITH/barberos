@@ -86,7 +86,7 @@ function MessageBubble({ message }: { message: AiChatMessageView }) {
           'max-w-[88%] rounded-[1.2rem] border px-4 py-3 shadow-[0_18px_34px_-28px_rgba(2,6,23,0.72)]',
           isUser
             ? 'border-[rgba(124,58,237,0.24)] bg-[linear-gradient(180deg,rgba(124,58,237,0.18),rgba(91,33,182,0.12))] text-violet-50'
-            : 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-foreground'
+            : 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.05)] text-foreground'
         )}
       >
         <div className="flex items-center justify-between gap-4">
@@ -103,6 +103,61 @@ function MessageBubble({ message }: { message: AiChatMessageView }) {
           </div>
         )}
       </article>
+    </div>
+  )
+}
+
+function RecentThreadsList(input: {
+  threadSummaries: AiChatThreadSummaryView[]
+  selectedThreadId?: string | null
+  onSelect: (threadId: string) => void
+  disabled?: boolean
+  compact?: boolean
+}) {
+  const { threadSummaries, selectedThreadId, onSelect, disabled = false, compact = false } = input
+
+  if (threadSummaries.length === 0) {
+    return (
+      <p className="text-xs leading-6 text-muted-foreground">
+        Sua primeira pergunta abre uma nova conversa. Depois disso, o historico recente aparece aqui.
+      </p>
+    )
+  }
+
+  return (
+    <div className={cn('space-y-2', compact && 'max-h-44 overflow-y-auto pr-1')}>
+      {threadSummaries.map((thread) => {
+        const isActive = selectedThreadId === thread.id
+
+        return (
+          <button
+            key={thread.id}
+            type="button"
+            onClick={() => onSelect(thread.id)}
+            className={cn(
+              'w-full rounded-[1.05rem] border px-3.5 py-3 text-left transition-[border-color,background-color,transform] duration-150 ease-out hover:-translate-y-0.5',
+              isActive
+                ? 'border-[rgba(124,58,237,0.22)] bg-[linear-gradient(180deg,rgba(45,36,79,0.78),rgba(26,27,42,0.98))] shadow-[0_20px_40px_-30px_rgba(91,33,182,0.48)]'
+                : 'border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.035)] hover:border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.055)]'
+            )}
+            disabled={disabled}
+          >
+            <p className={cn('truncate text-sm font-semibold', isActive ? 'text-slate-50' : 'text-slate-100')}>
+              {thread.title}
+            </p>
+            {thread.lastMessagePreview ? (
+              <p className={cn('mt-2 line-clamp-2 text-xs leading-5', isActive ? 'text-slate-300' : 'text-slate-400')}>
+                {thread.lastMessagePreview}
+              </p>
+            ) : (
+              <p className="mt-2 text-xs leading-5 text-slate-500">Sem resposta registrada ainda.</p>
+            )}
+            <p className={cn('mt-3 text-[11px]', isActive ? 'text-slate-400' : 'text-slate-500')}>
+              {thread.updatedAtLabel}
+            </p>
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -207,10 +262,10 @@ export function AssistantWidgetPanel() {
 
   function handleThreadSelect(threadId: string) {
     if (selectedThread?.id === threadId || isPending) {
+      setShowRecentThreads(false)
       return
     }
 
-    setShowRecentThreads(false)
     resetTransientConversation()
 
     startTransition(() => {
@@ -218,6 +273,7 @@ export function AssistantWidgetPanel() {
         try {
           const thread = await loadAssistantThread(threadId)
           setSelectedThread(thread)
+          setShowRecentThreads(false)
         } catch (error) {
           toast.error(error instanceof Error ? error.message : 'Nao foi possivel abrir essa conversa.')
         }
@@ -308,7 +364,7 @@ export function AssistantWidgetPanel() {
           left: 'max(0.75rem, env(safe-area-inset-left))',
         }}
       >
-        <header className="border-b border-[rgba(255,255,255,0.08)] px-4 py-4 sm:px-5">
+        <header className="shrink-0 border-b border-[rgba(255,255,255,0.08)] px-4 py-4 sm:px-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -318,12 +374,9 @@ export function AssistantWidgetPanel() {
               <p className="mt-2 text-sm leading-6 text-foreground">
                 Pergunte sobre agenda, clientes, metas e numeros.
               </p>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">{helperDescription}</p>
-              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                <span>{getScopeLabel(workspace?.roleScope)}</span>
-                <span className="text-slate-600">/</span>
-                <span>{screenContext.label}</span>
-              </div>
+              <p className="mt-1 text-xs leading-6 text-muted-foreground">
+                {getScopeLabel(workspace?.roleScope)} / {screenContext.label}
+              </p>
             </div>
 
             <div className="flex items-center gap-2">
@@ -348,192 +401,175 @@ export function AssistantWidgetPanel() {
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span>{workspace?.dataWindowLabel ?? 'Carregando base do periodo...'}</span>
+          <div className="mt-3 text-xs leading-6 text-muted-foreground">
+            <p>{workspace?.dataWindowLabel ?? 'Carregando base do periodo...'}</p>
             {latestAssistantMessage?.metadata.dataFreshnessLabel && (
-              <span className="text-slate-500">{latestAssistantMessage.metadata.dataFreshnessLabel}</span>
+              <p>{latestAssistantMessage.metadata.dataFreshnessLabel}</p>
             )}
           </div>
         </header>
 
-        <div className="border-b border-[rgba(255,255,255,0.06)] px-4 py-3 sm:px-5">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setShowRecentThreads((current) => !current)}
-              className="inline-flex items-center gap-2 text-left text-sm font-semibold text-foreground transition-colors hover:text-white"
-              disabled={threadSummaries.length === 0}
-            >
-              <span>Conversas recentes</span>
-              {threadSummaries.length > 0 && (
-                <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform', showRecentThreads && 'rotate-180')} />
-              )}
-            </button>
-            {threadSummaries.length > 0 && (
-              <p className="text-xs text-slate-400">{threadSummaries.length} conversa{threadSummaries.length === 1 ? '' : 's'}</p>
-            )}
-          </div>
-
-          {threadSummaries.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              Sua primeira pergunta abre uma nova conversa. Depois disso, o historico recente aparece aqui.
-            </p>
-          ) : showRecentThreads ? (
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hidden">
-              {threadSummaries.map((thread) => (
-                <button
-                  key={thread.id}
-                  type="button"
-                  onClick={() => handleThreadSelect(thread.id)}
-                  className={cn(
-                    'min-w-[220px] flex-shrink-0 rounded-[1.05rem] border px-3.5 py-3 text-left transition-[border-color,background-color,transform] duration-150 ease-out hover:-translate-y-0.5',
-                    selectedThread?.id === thread.id
-                      ? 'border-[rgba(124,58,237,0.22)] bg-[linear-gradient(180deg,rgba(45,36,79,0.78),rgba(26,27,42,0.98))] shadow-[0_20px_40px_-30px_rgba(91,33,182,0.48)]'
-                      : 'border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.035)] hover:border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.055)]'
-                  )}
-                  disabled={isPending}
-                >
-                  <p
-                    className={cn(
-                      'truncate text-sm font-semibold',
-                      selectedThread?.id === thread.id ? 'text-slate-50' : 'text-slate-100'
-                    )}
-                  >
-                    {thread.title}
-                  </p>
-                  {thread.lastMessagePreview ? (
-                    <p
-                      className={cn(
-                        'mt-2 line-clamp-2 text-xs leading-5',
-                        selectedThread?.id === thread.id ? 'text-slate-300' : 'text-slate-400'
-                      )}
-                    >
-                      {thread.lastMessagePreview}
-                    </p>
-                  ) : (
-                    <p className="mt-2 text-xs leading-5 text-slate-500">Sem resposta registrada ainda.</p>
-                  )}
-                  <p
-                    className={cn(
-                      'mt-3 text-[11px]',
-                      selectedThread?.id === thread.id ? 'text-slate-400' : 'text-slate-500'
-                    )}
-                  >
-                    {thread.updatedAtLabel}
-                  </p>
-                </button>
-              ))}
-            </div>
-          ) : hasActiveConversation ? (
-            <p className="text-xs text-muted-foreground">
-              O foco agora esta na conversa atual. Abra esta lista novamente quando quiser trocar de thread.
-            </p>
-          ) : null}
-        </div>
-
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-4 sm:px-5">
-          <div className="mb-3 flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-foreground">{activeConversationTitle}</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                {hasActiveConversation
-                  ? `${conversationMessages.length} mensagem${conversationMessages.length === 1 ? '' : 'ens'} nesta conversa.`
-                  : 'Escolha uma conversa recente ou envie uma pergunta para comecar.'}
-              </p>
+          {loadState === 'loading' && !workspace ? (
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              <div className="rounded-[1.4rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-5 py-4 text-center">
+                <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
+                <p className="mt-3 text-sm font-medium text-foreground">Carregando o contexto da tela atual</p>
+                <p className="mt-1 text-xs leading-6 text-muted-foreground">
+                  Estamos montando o contexto seguro do seu perfil.
+                </p>
+              </div>
             </div>
-            {hasActiveConversation && threadSummaries.length > 0 && !showRecentThreads && (
-              <button
-                type="button"
-                onClick={() => setShowRecentThreads(true)}
-                className="text-xs font-medium text-slate-400 transition-colors hover:text-slate-200"
-              >
-                Ver recentes
-              </button>
-            )}
-          </div>
-
-          <div
-            ref={messagesViewportRef}
-            className="min-h-0 flex-1 overflow-y-auto rounded-[1.3rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(15,18,27,0.88),rgba(12,14,20,0.94))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:p-4"
-          >
-            {loadState === 'loading' && !workspace ? (
-              <div className="flex h-full min-h-[320px] items-center justify-center">
-                <div className="rounded-[1.4rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-5 py-4 text-center">
-                  <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
-                  <p className="mt-3 text-sm font-medium text-foreground">Carregando o contexto da tela atual</p>
-                  <p className="mt-1 text-xs leading-6 text-muted-foreground">
-                    Estamos montando o contexto seguro do seu perfil.
-                  </p>
-                </div>
+          ) : loadState === 'error' && !workspace ? (
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              <div className="max-w-sm rounded-[1.4rem] border border-[rgba(220,38,38,0.18)] bg-[rgba(220,38,38,0.08)] px-5 py-4 text-center">
+                <p className="text-sm font-semibold text-foreground">Nao foi possivel abrir o BarberEX IA agora.</p>
+                <p className="mt-2 text-xs leading-6 text-muted-foreground">
+                  Tente novamente em instantes. O restante da tela continua funcionando normalmente.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void loadWorkspace()}
+                  className="action-button mt-4"
+                >
+                  Tentar de novo
+                </button>
               </div>
-            ) : loadState === 'error' && !workspace ? (
-              <div className="flex h-full min-h-[280px] items-center justify-center">
-                <div className="max-w-sm rounded-[1.4rem] border border-[rgba(220,38,38,0.18)] bg-[rgba(220,38,38,0.08)] px-5 py-4 text-center">
-                  <p className="text-sm font-semibold text-foreground">Nao foi possivel abrir o BarberEX IA agora.</p>
-                  <p className="mt-2 text-xs leading-6 text-muted-foreground">
-                    Tente novamente em instantes. O restante da tela continua funcionando normalmente.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => void loadWorkspace()}
-                    className="action-button mt-4"
-                  >
-                    Tentar de novo
-                  </button>
-                </div>
-              </div>
-            ) : hasActiveConversation ? (
-              <div className="space-y-4">
-                {conversationMessages.map((message) => (
-                  <MessageBubble key={message.id} message={message} />
-                ))}
-                {inlineErrorMessage && (
-                  <div className="flex justify-start">
-                    <div className="max-w-[88%] rounded-[1.1rem] border border-[rgba(220,38,38,0.24)] bg-[rgba(220,38,38,0.08)] px-4 py-3 text-sm text-slate-100">
-                      <p className="font-medium">Nao foi possivel responder agora.</p>
-                      <p className="mt-1 text-xs leading-6 text-rose-100/90">{inlineErrorMessage}</p>
+            </div>
+          ) : (
+            <>
+              {hasActiveConversation ? (
+                <div className="mb-3 shrink-0 rounded-[1.05rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-3.5 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        Conversa atual
+                      </p>
+                      <p className="mt-1 truncate text-sm font-semibold text-foreground">{activeConversationTitle}</p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">{helperDescription}</p>
                     </div>
+                    {threadSummaries.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowRecentThreads((current) => !current)}
+                        className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-[rgba(255,255,255,0.06)]"
+                      >
+                        <span>{showRecentThreads ? 'Ocultar conversas' : 'Ver conversas'}</span>
+                        <ChevronDown className={cn('h-4 w-4 transition-transform', showRecentThreads && 'rotate-180')} />
+                      </button>
+                    )}
                   </div>
-                )}
-                {isPending && (
-                  <div className="flex justify-start">
-                    <div className="max-w-[88%] rounded-[1.1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-4 py-3 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                        BarberEX IA esta analisando...
+
+                  {showRecentThreads && (
+                    <div className="mt-3 border-t border-[rgba(255,255,255,0.06)] pt-3">
+                      <RecentThreadsList
+                        threadSummaries={threadSummaries}
+                        selectedThreadId={selectedThread?.id ?? null}
+                        onSelect={handleThreadSelect}
+                        disabled={isPending}
+                        compact
+                      />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="mb-3 shrink-0 rounded-[1.15rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-4 py-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Conversas recentes</p>
+                      <p className="mt-1 text-xs leading-6 text-muted-foreground">
+                        Abra uma conversa existente ou comece uma nova pergunta.
+                      </p>
+                    </div>
+                    {threadSummaries.length > 0 && (
+                      <p className="text-xs text-slate-400">{threadSummaries.length} conversa{threadSummaries.length === 1 ? '' : 's'}</p>
+                    )}
+                  </div>
+                  <div className="mt-3">
+                    <RecentThreadsList
+                      threadSummaries={threadSummaries}
+                      selectedThreadId={selectedThread?.id ?? null}
+                      onSelect={handleThreadSelect}
+                      disabled={isPending}
+                      compact
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="min-h-0 flex-1 overflow-hidden rounded-[1.3rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(15,18,27,0.9),rgba(12,14,20,0.96))] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                <div
+                  ref={messagesViewportRef}
+                  className="flex h-full min-h-0 flex-col overflow-y-auto px-3 py-3 sm:px-4 sm:py-4"
+                >
+                  {hasActiveConversation ? (
+                    <div className="space-y-4">
+                      {conversationMessages.length > 0 ? (
+                        conversationMessages.map((message) => (
+                          <MessageBubble key={message.id} message={message} />
+                        ))
+                      ) : (
+                        <div className="flex min-h-[220px] items-center justify-center">
+                          <div className="max-w-sm text-center">
+                            <p className="text-sm font-semibold text-foreground">Faca uma pergunta para comecar.</p>
+                            <p className="mt-2 text-sm leading-7 text-muted-foreground">
+                              A conversa atual aparece aqui, com seu historico e as proximas respostas do BarberEX IA.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {inlineErrorMessage && (
+                        <div className="flex justify-start">
+                          <div className="max-w-[88%] rounded-[1.1rem] border border-[rgba(220,38,38,0.24)] bg-[rgba(220,38,38,0.08)] px-4 py-3 text-sm text-slate-100">
+                            <p className="font-medium">Nao foi possivel responder agora.</p>
+                            <p className="mt-1 text-xs leading-6 text-rose-100/90">{inlineErrorMessage}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {isPending && (
+                        <div className="flex justify-start">
+                          <div className="max-w-[88%] rounded-[1.1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-4 py-3 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-2">
+                              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                              BarberEX IA esta analisando...
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex min-h-full items-center justify-center">
+                      <div className="w-full max-w-md rounded-[1.5rem] border border-dashed border-[rgba(124,58,237,0.18)] bg-[rgba(124,58,237,0.06)] p-5">
+                        <p className="text-sm font-semibold text-foreground">Pergunte o que voce precisa decidir agora</p>
+                        <p className="mt-2 text-sm leading-7 text-muted-foreground">
+                          O BarberEX IA entende a tela atual, respeita o escopo do seu perfil e responde com base nos dados disponiveis do periodo.
+                        </p>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {helperSuggestions.map((suggestion) => (
+                            <button
+                              key={suggestion}
+                              type="button"
+                              onClick={() => submitQuestion(suggestion)}
+                              className="rounded-full border border-[rgba(124,58,237,0.18)] bg-[rgba(124,58,237,0.08)] px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-[rgba(124,58,237,0.14)]"
+                              disabled={isPending || loadState !== 'ready'}
+                            >
+                              {suggestion}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex h-full min-h-[280px] items-center justify-center">
-                <div className="w-full max-w-md rounded-[1.5rem] border border-dashed border-[rgba(124,58,237,0.18)] bg-[rgba(124,58,237,0.06)] p-5">
-                  <p className="text-sm font-semibold text-foreground">Pergunte o que voce precisa decidir agora</p>
-                  <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                    O BarberEX IA entende a tela atual, respeita o escopo do seu perfil e responde com base nos dados disponiveis do periodo.
-                  </p>
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {helperSuggestions.map((suggestion) => (
-                      <button
-                        key={suggestion}
-                        type="button"
-                        onClick={() => submitQuestion(suggestion)}
-                        className="rounded-full border border-[rgba(124,58,237,0.18)] bg-[rgba(124,58,237,0.08)] px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-[rgba(124,58,237,0.14)]"
-                        disabled={isPending || loadState !== 'ready'}
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
+                  )}
                 </div>
               </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
 
-        <footer className="border-t border-[rgba(255,255,255,0.08)] px-4 py-4 sm:px-5">
+        <footer className="shrink-0 border-t border-[rgba(255,255,255,0.08)] px-4 py-4 sm:px-5">
           <form
             onSubmit={(event) => {
               event.preventDefault()
