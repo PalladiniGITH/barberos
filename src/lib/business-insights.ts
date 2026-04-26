@@ -305,6 +305,10 @@ export interface BusinessInsightSummary {
 
 export interface BusinessIntelligenceRuntimeState {
   userModeLabel: string
+  periodLabel?: string
+  updatedAtLabel?: string
+  nextRefreshLabel?: string
+  statusNote?: string
 }
 
 export interface BusinessIntelligenceReport {

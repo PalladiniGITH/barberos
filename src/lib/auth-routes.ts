@@ -7,6 +7,7 @@ export type AppRole = 'OWNER' | 'MANAGER' | 'BARBER' | 'FINANCIAL'
 const BARBER_ALLOWED_PATHS = [
   '/dashboard',
   '/agendamentos',
+  '/assistente',
   '/equipe/metas',
   '/equipe/desempenho',
   '/configuracoes',

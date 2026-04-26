@@ -9,6 +9,7 @@ import {
   CalendarClock,
   ChevronRight,
   LayoutDashboard,
+  MessageSquareText,
   PanelLeft,
   Scissors,
   Settings,
@@ -66,6 +67,13 @@ const defaultSidebarItems: SidebarItem[] = [
     icon: BrainCircuit,
     label: 'Inteligencia',
     description: 'Leitura automatica e insights.',
+    section: 'essencial',
+  },
+  {
+    href: '/assistente',
+    icon: MessageSquareText,
+    label: 'Assistente EX',
+    description: 'Perguntas e respostas com base nos dados da barbearia.',
     section: 'essencial',
   },
   {
@@ -226,6 +234,13 @@ const barberSidebarItems: SidebarItem[] = [
     icon: CalendarClock,
     label: 'Minha agenda',
     description: 'Seus horarios, encaixes e atendimentos.',
+    section: 'essencial',
+  },
+  {
+    href: '/assistente',
+    icon: MessageSquareText,
+    label: 'Assistente EX',
+    description: 'Seu copiloto para meta, agenda e vendas do periodo.',
     section: 'essencial',
   },
   {

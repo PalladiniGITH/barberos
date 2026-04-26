@@ -46,6 +46,9 @@ model Barbershop {
   campaignAutomationDeliveries CampaignAutomationDelivery[]
   messagingEvents              MessagingEvent[]
   whatsappConversations        WhatsappConversation[]
+  aiBusinessInsightCaches      AiBusinessInsightCache[]
+  aiChatThreads                AiChatThread[]
+  aiChatUsageLogs              AiChatUsageLog[]
 
   @@map("barbershops")
 }
@@ -70,6 +73,8 @@ model User {
 
   accounts Account[]
   sessions Session[]
+  aiChatThreads AiChatThread[]
+  aiChatUsageLogs AiChatUsageLog[]
 
   @@map("users")
 }
@@ -765,6 +770,123 @@ model CampaignAutomationDelivery {
   @@index([barbershopId, customerId, campaignType, createdAt])
   @@index([runId, campaignType, status])
   @@map("campaign_automation_deliveries")
+}
+
+model AiBusinessInsightCache {
+  id           String                       @id @default(cuid())
+  barbershopId String
+  barbershop   Barbershop                   @relation(fields: [barbershopId], references: [id])
+  localDateIso String
+  timezone     String
+  periodKey    AiBusinessInsightPeriodKey
+  source       AiBusinessInsightSource
+  scopeKey     String
+  inputHash    String
+  outputJson   Json?
+  model        String?
+  promptVersion String
+  inputTokens  Int?
+  outputTokens Int?
+  totalTokens  Int?
+  status       AiBusinessInsightCacheStatus @default(RUNNING)
+  failureReason String?
+  generatedAt  DateTime?
+  expiresAt    DateTime
+  createdAt    DateTime                     @default(now())
+  updatedAt    DateTime                     @updatedAt
+
+  @@unique([barbershopId, localDateIso, periodKey, source, scopeKey])
+  @@index([barbershopId, source, localDateIso, periodKey])
+  @@index([status, expiresAt])
+  @@map("ai_business_insight_cache")
+}
+
+model AiChatThread {
+  id           String          @id @default(cuid())
+  barbershopId String
+  barbershop   Barbershop      @relation(fields: [barbershopId], references: [id])
+  userId       String
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleScope    AiChatRoleScope
+  title        String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  messages  AiChatMessage[]
+  usageLogs AiChatUsageLog[]
+
+  @@index([barbershopId, updatedAt])
+  @@index([userId, updatedAt])
+  @@map("ai_chat_threads")
+}
+
+model AiChatMessage {
+  id         String           @id @default(cuid())
+  threadId    String
+  thread      AiChatThread     @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  role        AiChatMessageRole
+  content     String           @db.Text
+  metadataJson Json?
+  model       String?
+  inputTokens Int?
+  outputTokens Int?
+  totalTokens Int?
+  createdAt   DateTime         @default(now())
+
+  @@index([threadId, createdAt])
+  @@map("ai_chat_messages")
+}
+
+model AiChatUsageLog {
+  id           String           @id @default(cuid())
+  barbershopId String
+  barbershop   Barbershop       @relation(fields: [barbershopId], references: [id])
+  userId       String
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  threadId     String?
+  thread       AiChatThread?    @relation(fields: [threadId], references: [id], onDelete: SetNull)
+  source       AiChatUsageSource @default(INTERNAL_ASSISTANT)
+  model        String?
+  inputTokens  Int?
+  outputTokens Int?
+  totalTokens  Int?
+  createdAt    DateTime         @default(now())
+
+  @@index([barbershopId, createdAt])
+  @@index([userId, createdAt])
+  @@map("ai_chat_usage_logs")
+}
+
+enum AiChatRoleScope {
+  MANAGEMENT
+  FINANCIAL
+  PROFESSIONAL
+}
+
+enum AiChatMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum AiChatUsageSource {
+  INTERNAL_ASSISTANT
+}
+
+enum AiBusinessInsightPeriodKey {
+  MORNING
+  EVENING
+}
+
+enum AiBusinessInsightSource {
+  BUSINESS_ANALYST
+}
+
+enum AiBusinessInsightCacheStatus {
+  RUNNING
+  SUCCESS
+  FALLBACK
+  FAILED
 }
 
 enum CampaignAutomationType {

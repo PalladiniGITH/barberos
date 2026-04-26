@@ -18,6 +18,7 @@ const DEFAULT_TIMEOUT_MS = 15000
 const MIN_TIMEOUT_MS = 1000
 const MAX_TIMEOUT_MS = 20000
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses'
+export const BUSINESS_ANALYST_PROMPT_VERSION = '2026-04-25.windowed-cache.v1'
 
 interface OpenAIBusinessAnalystConfig {
   apiKey: string
@@ -36,6 +37,11 @@ export type OpenAIFailureReason =
 export interface OpenAIBusinessReportAttempt {
   report: BusinessIntelligenceReport | null
   failureReason: OpenAIFailureReason | null
+  model: string | null
+  promptVersion: string
+  inputTokens: number | null
+  outputTokens: number | null
+  totalTokens: number | null
 }
 
 const AIInsightSchema = z.object({
@@ -351,6 +357,35 @@ function extractResponseText(payload: unknown) {
   return chunks.join('\n').trim()
 }
 
+function extractUsage(payload: unknown) {
+  if (!payload || typeof payload !== 'object') {
+    return {
+      inputTokens: null,
+      outputTokens: null,
+      totalTokens: null,
+    }
+  }
+
+  const usage = (payload as {
+    usage?: {
+      input_tokens?: unknown
+      output_tokens?: unknown
+      total_tokens?: unknown
+    }
+  }).usage
+
+  const normalize = (value: unknown) => {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  return {
+    inputTokens: normalize(usage?.input_tokens),
+    outputTokens: normalize(usage?.output_tokens),
+    totalTokens: normalize(usage?.total_tokens),
+  }
+}
+
 function normalizeAIInsights(parsed: z.infer<typeof AIResponseSchema>, context: BusinessInsightsContext): BusinessIntelligenceReport {
   const normalizedInsights: BusinessInsight[] = parsed.insights.map((insight, index) => ({
     id: `ai-${insight.type}-${index + 1}`,
@@ -417,6 +452,11 @@ export async function generateOpenAIBusinessReport(params: {
     return {
       report: null,
       failureReason: null,
+      model: null,
+      promptVersion: BUSINESS_ANALYST_PROMPT_VERSION,
+      inputTokens: null,
+      outputTokens: null,
+      totalTokens: null,
     }
   }
 
@@ -458,17 +498,28 @@ export async function generateOpenAIBusinessReport(params: {
       return {
         report: null,
         failureReason: 'bad_status',
+        model: config.model,
+        promptVersion: BUSINESS_ANALYST_PROMPT_VERSION,
+        inputTokens: null,
+        outputTokens: null,
+        totalTokens: null,
       }
     }
 
     const payload = await response.json()
     const outputText = extractResponseText(payload)
+    const usage = extractUsage(payload)
 
     if (!outputText) {
       logOpenAIFallback('invalid_payload', 'OpenAI returned no output_text.')
       return {
         report: null,
         failureReason: 'invalid_payload',
+        model: config.model,
+        promptVersion: BUSINESS_ANALYST_PROMPT_VERSION,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        totalTokens: usage.totalTokens,
       }
     }
 
@@ -481,6 +532,11 @@ export async function generateOpenAIBusinessReport(params: {
       return {
         report: null,
         failureReason: 'invalid_json',
+        model: config.model,
+        promptVersion: BUSINESS_ANALYST_PROMPT_VERSION,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        totalTokens: usage.totalTokens,
       }
     }
 
@@ -494,12 +550,22 @@ export async function generateOpenAIBusinessReport(params: {
       return {
         report: null,
         failureReason: 'invalid_schema',
+        model: config.model,
+        promptVersion: BUSINESS_ANALYST_PROMPT_VERSION,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        totalTokens: usage.totalTokens,
       }
     }
 
     return {
       report: normalizeAIInsights(parsed.data, params.context),
       failureReason: null,
+      model: config.model,
+      promptVersion: BUSINESS_ANALYST_PROMPT_VERSION,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      totalTokens: usage.totalTokens,
     }
   } catch (error) {
     if (isAbortError(error)) {
@@ -507,6 +573,11 @@ export async function generateOpenAIBusinessReport(params: {
       return {
         report: null,
         failureReason: 'timeout',
+        model: config.model,
+        promptVersion: BUSINESS_ANALYST_PROMPT_VERSION,
+        inputTokens: null,
+        outputTokens: null,
+        totalTokens: null,
       }
     }
 
@@ -514,6 +585,11 @@ export async function generateOpenAIBusinessReport(params: {
     return {
       report: null,
       failureReason: 'request_failed',
+      model: config.model,
+      promptVersion: BUSINESS_ANALYST_PROMPT_VERSION,
+      inputTokens: null,
+      outputTokens: null,
+      totalTokens: null,
     }
   } finally {
     clearTimeout(timeout)

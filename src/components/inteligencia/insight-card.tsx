@@ -50,7 +50,7 @@ function getSeverityMeta(severity: BusinessInsight['severity']) {
 }
 
 export function IntelligenceModeBadge({ report }: { report: BusinessIntelligenceReport }) {
-  const isFallbackLocal = report.runtime.userModeLabel === 'Analise local ativa no momento'
+  const isFallbackLocal = report.runtime.statusNote === 'Análise automática temporariamente indisponível'
   const toneClass = report.mode === 'ai'
     ? 'border-[rgba(91,33,182,0.18)] bg-[rgba(91,33,182,0.12)] text-violet-100'
     : isFallbackLocal
@@ -62,6 +62,32 @@ export function IntelligenceModeBadge({ report }: { report: BusinessIntelligence
       <BrainCircuit className={cn('h-3.5 w-3.5', report.mode === 'ai' ? 'text-violet-100' : 'text-slate-300')} />
       {report.runtime.userModeLabel}
     </span>
+  )
+}
+
+export function IntelligenceRuntimeDetails({
+  report,
+  align = 'left',
+}: {
+  report: BusinessIntelligenceReport
+  align?: 'left' | 'right'
+}) {
+  const items = [
+    report.runtime.statusNote,
+    report.runtime.updatedAtLabel,
+    report.runtime.nextRefreshLabel,
+  ].filter(Boolean)
+
+  if (items.length === 0) {
+    return null
+  }
+
+  return (
+    <div className={cn('space-y-1 text-xs text-muted-foreground', align === 'right' && 'text-right')}>
+      {items.map((item) => (
+        <p key={item}>{item}</p>
+      ))}
+    </div>
   )
 }
 
@@ -139,6 +165,9 @@ export function DashboardInsightsPreview({ report }: { report: BusinessIntellige
               Analista do negocio
             </span>
             <IntelligenceModeBadge report={report} />
+          </div>
+          <div className="mt-3">
+            <IntelligenceRuntimeDetails report={report} />
           </div>
 
           <div className="mt-8">

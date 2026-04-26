@@ -12,7 +12,7 @@ import { requireSession } from '@/lib/auth'
 import { resolvePeriod } from '@/lib/period'
 import { getBusinessAnalystReport } from '@/lib/business-analyst'
 import { CustomerIntelligenceSection } from '@/components/inteligencia/customer-intelligence'
-import { InsightCard, IntelligenceModeBadge } from '@/components/inteligencia/insight-card'
+import { InsightCard, IntelligenceModeBadge, IntelligenceRuntimeDetails } from '@/components/inteligencia/insight-card'
 import { PageHeader } from '@/components/layout/page-header'
 import { PeriodSelector } from '@/components/shared/period-selector'
 import { cn, formatCurrency, formatPercent } from '@/lib/utils'
@@ -94,7 +94,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
         title="Inteligencia do negocio"
         description="Um relatorio automatico da barbearia: le caixa, meta, equipe, ticket e margem para dizer o que agir primeiro."
         action={(
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col items-end gap-2">
             <Suspense>
               <PeriodSelector
                 month={month}
@@ -106,7 +106,10 @@ export default async function InteligenciaPage({ searchParams }: Props) {
                 }}
               />
             </Suspense>
-            <IntelligenceModeBadge report={report} />
+            <div className="flex items-center gap-3">
+              <IntelligenceModeBadge report={report} />
+            </div>
+            <IntelligenceRuntimeDetails report={report} align="right" />
           </div>
         )}
       />

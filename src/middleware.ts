@@ -5,6 +5,7 @@ import { AUTHENTICATED_HOME_PATH, canRoleAccessPath } from '@/lib/auth-routes'
 const PROTECTED_PATHS = [
   '/dashboard',
   '/agendamentos',
+  '/assistente',
   '/clientes',
   '/inteligencia',
   '/financeiro',
@@ -59,6 +60,8 @@ export const config = {
     '/dashboard',
     '/agendamentos',
     '/agendamentos/:path*',
+    '/assistente',
+    '/assistente/:path*',
     '/clientes',
     '/clientes/:path*',
     '/inteligencia',
