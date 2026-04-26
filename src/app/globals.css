@@ -58,6 +58,40 @@
       linear-gradient(180deg, #11131a 0%, #0f1115 42%, #0f1115 100%);
   }
 
+  select {
+    color-scheme: dark;
+    color: hsl(var(--foreground));
+  }
+
+  select:not([multiple]) {
+    background-color: rgba(15, 17, 21, 0.9);
+  }
+
+  select option,
+  select optgroup {
+    color: hsl(var(--foreground));
+    background-color: rgb(17 19 26);
+  }
+
+  select option:checked,
+  select option:hover,
+  select option:focus,
+  select option:active {
+    color: hsl(var(--foreground));
+    background-color: rgb(44 34 78);
+  }
+
+  select option:disabled,
+  select optgroup:disabled {
+    color: rgba(226, 232, 240, 0.5);
+    background-color: rgb(24 26 34);
+  }
+
+  select:disabled {
+    color: rgba(226, 232, 240, 0.62);
+    background-color: rgba(255, 255, 255, 0.04);
+  }
+
   h1,
   h2,
   h3,
