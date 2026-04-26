@@ -38,8 +38,8 @@ const MANAGEMENT_BASE_UI: AssistantBaseUiConfig = {
     'Qual servico tem melhor margem?',
     'Como esta minha taxa de retorno?',
   ],
-  placeholder: 'Pergunte sobre faturamento, clientes, equipe, margem, campanhas e oportunidades.',
-  description: 'Leitura executiva da operacao com foco em decisoes praticas para a barbearia.',
+  placeholder: 'Pergunte sobre faturamento, agenda, clientes ou equipe...',
+  description: 'Pergunte sobre agenda, clientes, metas, margem e prioridades da operacao.',
 }
 
 const FINANCIAL_BASE_UI: AssistantBaseUiConfig = {
@@ -49,8 +49,8 @@ const FINANCIAL_BASE_UI: AssistantBaseUiConfig = {
     'Qual servico sustenta melhor o lucro?',
     'Qual tendencia financeira eu preciso acompanhar?',
   ],
-  placeholder: 'Pergunte sobre margem, despesas, tendencia e leitura financeira da barbearia.',
-  description: 'Leitura global com foco financeiro, margem, caixa e sinais do periodo.',
+  placeholder: 'Pergunte sobre caixa, despesas, margem e sinais financeiros do periodo...',
+  description: 'Pergunte sobre caixa, margem, despesas e sinais financeiros do periodo.',
 }
 
 const PROFESSIONAL_BASE_UI: AssistantBaseUiConfig = {
@@ -60,8 +60,8 @@ const PROFESSIONAL_BASE_UI: AssistantBaseUiConfig = {
     'Como esta minha agenda amanha?',
     'Quantos atendimentos faltam para minha meta?',
   ],
-  placeholder: 'Pergunte sobre sua meta, agenda, vendas ou proximos atendimentos.',
-  description: 'Respostas individuais com foco no seu desempenho, agenda e oportunidades de venda.',
+  placeholder: 'Pergunte sobre sua meta, agenda, vendas ou proximos atendimentos...',
+  description: 'Pergunte sobre sua agenda, sua meta e oportunidades praticas de venda.',
 }
 
 function normalizePathname(pathname?: string | null) {
@@ -127,7 +127,7 @@ function buildManagementScreenContext(key: AssistantScreenKey, pathname: string)
         pathname,
         visible: true,
         label: 'Agenda operacional',
-        subtitle: 'Use o copiloto para enxergar horarios ociosos, encaixes e oportunidades de agenda.',
+        subtitle: 'Pergunte sobre horarios ociosos, encaixes e oportunidades de agenda.',
         placeholder: 'Ex.: Onde tenho horarios ociosos hoje?',
         suggestions: [
           'Onde tenho horarios ociosos hoje?',
@@ -217,7 +217,7 @@ function buildManagementScreenContext(key: AssistantScreenKey, pathname: string)
         pathname,
         visible: true,
         label: 'Configuracoes da barbearia',
-        subtitle: 'Use o assistente para entender impactos operacionais das configuracoes atuais.',
+        subtitle: 'Pergunte sobre os impactos operacionais das configuracoes atuais.',
         placeholder: 'Ex.: O que vale revisar primeiro nas configuracoes?',
         suggestions: [
           'O que vale revisar primeiro nas configuracoes?',
@@ -231,8 +231,8 @@ function buildManagementScreenContext(key: AssistantScreenKey, pathname: string)
         key,
         pathname,
         visible: true,
-        label: 'Assistente EX',
-        subtitle: 'Seu copiloto para agenda, clientes, metas, margem e operacao da barbearia.',
+        label: 'BarberEX IA',
+        subtitle: 'Pergunte sobre agenda, clientes, metas e numeros da barbearia.',
         placeholder: MANAGEMENT_BASE_UI.placeholder,
         suggestions: MANAGEMENT_BASE_UI.suggestions,
       }
@@ -241,7 +241,7 @@ function buildManagementScreenContext(key: AssistantScreenKey, pathname: string)
         key,
         pathname,
         visible: true,
-        label: 'Operacao da barbearia',
+        label: 'BarberEX IA',
         subtitle: 'Pergunte sobre a tela atual e sobre os dados mais importantes do periodo.',
         placeholder: MANAGEMENT_BASE_UI.placeholder,
         suggestions: MANAGEMENT_BASE_UI.suggestions,
@@ -252,7 +252,7 @@ function buildManagementScreenContext(key: AssistantScreenKey, pathname: string)
         pathname,
         visible: false,
         label: 'Painel interno',
-        subtitle: 'O Assistente EX da barbearia nao fica disponivel no painel master da plataforma.',
+        subtitle: 'O BarberEX IA da barbearia nao fica disponivel no painel master da plataforma.',
         placeholder: MANAGEMENT_BASE_UI.placeholder,
         suggestions: [],
       }
@@ -266,7 +266,7 @@ function buildFinancialScreenContext(key: AssistantScreenKey, pathname: string):
         key,
         pathname,
         visible: true,
-        label: 'Escopo financeiro',
+        label: 'Financeiro',
         subtitle: 'Pergunte sobre caixa, margem, despesas e sinais financeiros do periodo.',
         placeholder: 'Ex.: Como esta minha margem este mes?',
         suggestions: [
@@ -282,8 +282,8 @@ function buildFinancialScreenContext(key: AssistantScreenKey, pathname: string):
         key,
         pathname,
         visible: true,
-        label: 'Leitura financeira',
-        subtitle: 'Use o copiloto para entender margem, tendencia e leitura financeira global.',
+        label: 'Financeiro',
+        subtitle: 'Pergunte sobre margem, tendencia e leitura financeira global.',
         placeholder: FINANCIAL_BASE_UI.placeholder,
         suggestions: FINANCIAL_BASE_UI.suggestions,
       }
@@ -293,7 +293,7 @@ function buildFinancialScreenContext(key: AssistantScreenKey, pathname: string):
         pathname,
         visible: false,
         label: 'Painel interno',
-        subtitle: 'O Assistente EX da barbearia nao fica disponivel no painel master da plataforma.',
+        subtitle: 'O BarberEX IA da barbearia nao fica disponivel no painel master da plataforma.',
         placeholder: FINANCIAL_BASE_UI.placeholder,
         suggestions: [],
       }
@@ -302,7 +302,7 @@ function buildFinancialScreenContext(key: AssistantScreenKey, pathname: string):
         key,
         pathname,
         visible: true,
-        label: 'Escopo financeiro',
+        label: 'Financeiro',
         subtitle: 'Seu perfil continua restrito a leitura financeira, mesmo fora do modulo financeiro.',
         placeholder: FINANCIAL_BASE_UI.placeholder,
         suggestions: FINANCIAL_BASE_UI.suggestions,
@@ -358,7 +358,7 @@ function buildProfessionalScreenContext(key: AssistantScreenKey, pathname: strin
         pathname,
         visible: true,
         label: 'Minha conta',
-        subtitle: 'Use o copiloto para entender melhor seu vinculo, acesso e rotina operacional.',
+        subtitle: 'Pergunte sobre seu vinculo, acesso e rotina operacional.',
         placeholder: 'Ex.: O que vale acompanhar no meu perfil agora?',
         suggestions: [
           'O que vale acompanhar no meu perfil agora?',
@@ -373,7 +373,7 @@ function buildProfessionalScreenContext(key: AssistantScreenKey, pathname: strin
         pathname,
         visible: false,
         label: 'Painel interno',
-        subtitle: 'O Assistente EX da barbearia nao fica disponivel no painel master da plataforma.',
+        subtitle: 'O BarberEX IA da barbearia nao fica disponivel no painel master da plataforma.',
         placeholder: PROFESSIONAL_BASE_UI.placeholder,
         suggestions: [],
       }

@@ -404,7 +404,7 @@ export default async function ClientesPage({ searchParams }: Props) {
                 Nome, tipo, barbeiro dominante, recorrencia, receita, ticket, ultima visita e sinalizacao em uma unica leitura.
               </p>
             </div>
-            <span className="surface-chip">{directory.rows.length} clientes</span>
+            <p className="text-sm text-muted-foreground">{directory.rows.length} clientes no recorte</p>
           </div>
 
           <div className="mt-5 overflow-x-auto">

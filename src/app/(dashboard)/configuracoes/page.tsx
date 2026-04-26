@@ -285,7 +285,7 @@ export default async function ConfiguracoesPage() {
     },
     {
       title: 'Saude do negocio',
-      helper: 'Leitura estrategica de crescimento, margem e consistencia.',
+      helper: 'Crescimento, margem e consistencia da operacao.',
       icon: Target,
       tone: 'bg-violet-500/10 text-violet-200',
     },

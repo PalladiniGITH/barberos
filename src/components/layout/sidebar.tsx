@@ -9,7 +9,6 @@ import {
   CalendarClock,
   ChevronRight,
   LayoutDashboard,
-  MessageSquareText,
   PanelLeft,
   Scissors,
   Settings,
@@ -26,7 +25,6 @@ import {
 import { PRODUCT_MONOGRAM, PRODUCT_NAME } from '@/lib/branding'
 import { hasPlatformAccess, isBarberRole } from '@/lib/auth-routes'
 import { cn } from '@/lib/utils'
-import { useAssistantWidget } from '@/components/assistente/assistant-widget-provider'
 import { useNavigationFeedback } from '@/components/layout/navigation-feedback'
 
 type NavSection = 'plataforma' | 'essencial' | 'modulos' | 'conta'
@@ -37,7 +35,6 @@ type SidebarItem = {
   label: string
   description: string
   section: NavSection
-  navKind?: 'link' | 'assistant'
   exact?: boolean
   children?: SidebarItem[]
 }
@@ -47,7 +44,7 @@ const defaultSidebarItems: SidebarItem[] = [
     href: '/dashboard',
     icon: LayoutDashboard,
     label: 'Painel',
-    description: 'Leitura executiva do negocio.',
+    description: 'Visao geral do negocio.',
     section: 'essencial',
     exact: true,
   },
@@ -71,14 +68,6 @@ const defaultSidebarItems: SidebarItem[] = [
     label: 'Inteligencia',
     description: 'Leitura automatica e insights.',
     section: 'essencial',
-  },
-  {
-    href: '/assistente',
-    icon: MessageSquareText,
-    label: 'Assistente EX',
-    description: 'Perguntas e respostas com base nos dados da barbearia.',
-    section: 'essencial',
-    navKind: 'assistant',
   },
   {
     href: '/indicadores',
@@ -241,14 +230,6 @@ const barberSidebarItems: SidebarItem[] = [
     section: 'essencial',
   },
   {
-    href: '/assistente',
-    icon: MessageSquareText,
-    label: 'Assistente EX',
-    description: 'Seu copiloto para meta, agenda e vendas do periodo.',
-    section: 'essencial',
-    navKind: 'assistant',
-  },
-  {
     href: '/equipe/metas',
     icon: Target,
     label: 'Minhas metas',
@@ -336,7 +317,6 @@ const SidebarLink = memo(function SidebarLink({
   childrenVisible,
   loading,
   onNavigate,
-  onAssistantSelect,
   onPreview,
   children,
 }: {
@@ -347,7 +327,6 @@ const SidebarLink = memo(function SidebarLink({
   childrenVisible: boolean
   loading: boolean
   onNavigate: (href: string) => void
-  onAssistantSelect: () => void
   onPreview: (href: string | null) => void
   children?: ReactNode
 }) {
@@ -373,185 +352,100 @@ const SidebarLink = memo(function SidebarLink({
         }
       }}
     >
-      {item.navKind === 'assistant' ? (
-        <button
-          type="button"
-          title={`${item.label}: ${item.description}`}
-          aria-current={active ? 'page' : undefined}
-          onClick={onAssistantSelect}
-          className={cn(
-            'group relative isolate flex min-w-0 items-center gap-3 border text-left transition-[background-color,border-color,color,box-shadow,opacity,transform] duration-150 ease-out',
-            compact
-              ? 'mx-auto h-[3.35rem] w-[3.35rem] justify-center rounded-[1rem] border-transparent bg-transparent p-0 shadow-none overflow-visible'
-              : 'min-h-[3.55rem] w-full rounded-[1.1rem] px-2.5 py-2.5 overflow-hidden',
-            level === 1 && !compact ? 'ml-4 min-h-[3.15rem] rounded-[1rem] pr-2' : '',
-            !compact && active
-              ? 'border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.045))] text-white shadow-[0_24px_38px_-30px_rgba(2,6,23,0.86)]'
-              : !compact
-                ? 'border-transparent text-slate-400 hover:border-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.04)] hover:text-slate-100'
-                : 'text-slate-400 hover:text-slate-100'
-          )}
-        >
-          {active && expanded && isTopLevel && (
-            <span className="absolute left-1.5 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-full bg-[linear-gradient(180deg,rgba(124,58,237,0.96),rgba(91,33,182,0.64))] shadow-[0_0_18px_rgba(91,33,182,0.36)]" />
-          )}
-          {active && !compact && (
-            <span
-              className={cn(
-                'absolute inset-[1px] border border-[rgba(255,255,255,0.04)]',
-                level === 1 ? 'rounded-[calc(1rem-1px)]' : 'rounded-[calc(1.1rem-1px)]'
-              )}
-            />
-          )}
+      <Link
+        href={item.href}
+        title={`${item.label}: ${item.description}`}
+        aria-current={active ? 'page' : undefined}
+        onClick={() => onNavigate(item.href)}
+        className={cn(
+          'group relative isolate flex min-w-0 items-center gap-3 border transition-[background-color,border-color,color,box-shadow,opacity,transform] duration-150 ease-out',
+          compact
+            ? 'mx-auto h-[3.35rem] w-[3.35rem] justify-center rounded-[1rem] border-transparent bg-transparent p-0 shadow-none overflow-visible'
+            : 'min-h-[3.55rem] w-full rounded-[1.1rem] px-2.5 py-2.5 overflow-hidden',
+          level === 1 && !compact ? 'ml-4 min-h-[3.15rem] rounded-[1rem] pr-2' : '',
+          !compact && active
+            ? 'border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.045))] text-white shadow-[0_24px_38px_-30px_rgba(2,6,23,0.86)]'
+            : !compact
+              ? 'border-transparent text-slate-400 hover:border-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.04)] hover:text-slate-100'
+              : 'text-slate-400 hover:text-slate-100',
+          loading ? 'bg-[rgba(255,255,255,0.06)] text-slate-100' : ''
+        )}
+      >
+        {active && expanded && isTopLevel && (
+          <span className="absolute left-1.5 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-full bg-[linear-gradient(180deg,rgba(124,58,237,0.96),rgba(91,33,182,0.64))] shadow-[0_0_18px_rgba(91,33,182,0.36)]" />
+        )}
+        {active && !compact && (
           <span
             className={cn(
-              'relative z-10 flex flex-shrink-0 items-center justify-center border transition-[border-color,background-color,color,box-shadow,opacity,transform] duration-150 ease-out',
-              iconSizeClass,
-              active
-                ? cn(
-                    'border-[rgba(124,58,237,0.18)] bg-[linear-gradient(135deg,rgba(124,58,237,0.2),rgba(15,23,42,0.94))] text-violet-100 shadow-[0_18px_28px_-24px_rgba(91,33,182,0.42)]',
-                    compact ? 'shadow-[0_16px_28px_-22px_rgba(91,33,182,0.42)]' : ''
-                  )
-                : 'border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.035)] text-slate-400 group-hover:border-[rgba(255,255,255,0.08)] group-hover:bg-[rgba(255,255,255,0.05)] group-hover:text-slate-100'
+              'absolute inset-[1px] border border-[rgba(255,255,255,0.04)]',
+              level === 1 ? 'rounded-[calc(1rem-1px)]' : 'rounded-[calc(1.1rem-1px)]'
             )}
-          >
-            <span
-              className={cn(
-                'absolute inset-[1px] transition-opacity duration-150 ease-out',
-                compact
-                  ? 'rounded-[calc(0.95rem-1px)]'
-                  : level === 0
-                    ? 'rounded-[calc(1rem-1px)]'
-                    : 'rounded-[calc(0.9rem-1px)]',
-                active
-                  ? 'opacity-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
-                  : 'opacity-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] group-hover:opacity-100'
-              )}
-            />
-            <item.icon
-              className={cn(
-                'relative transition-transform duration-150 ease-out',
-                compact ? 'h-[1.02rem] w-[1.02rem]' : level === 0 ? 'h-[1.02rem] w-[1.02rem]' : 'h-[0.95rem] w-[0.95rem]'
-              )}
-            />
-          </span>
-
-          <div
-            className={cn(
-              'min-w-0 flex-1 transition-[opacity,transform,max-width] duration-150 ease-out',
-              compact ? 'max-w-0 -translate-x-2 opacity-0' : 'max-w-full translate-x-0 opacity-100'
-            )}
-          >
-            <div className="flex min-w-0 items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className={cn('truncate font-medium leading-none', level === 0 ? 'text-sm' : 'text-[13px]')}>
-                  {item.label}
-                </p>
-                {level === 0 && (
-                  <p className="mt-1.5 truncate text-xs leading-none text-slate-500 transition-colors duration-200 group-hover:text-slate-400">
-                    {item.description}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </button>
-      ) : (
-        <Link
-          href={item.href}
-          title={`${item.label}: ${item.description}`}
-          aria-current={active ? 'page' : undefined}
-          onClick={() => onNavigate(item.href)}
+          />
+        )}
+        <span
           className={cn(
-            'group relative isolate flex min-w-0 items-center gap-3 border transition-[background-color,border-color,color,box-shadow,opacity,transform] duration-150 ease-out',
-            compact
-              ? 'mx-auto h-[3.35rem] w-[3.35rem] justify-center rounded-[1rem] border-transparent bg-transparent p-0 shadow-none overflow-visible'
-              : 'min-h-[3.55rem] w-full rounded-[1.1rem] px-2.5 py-2.5 overflow-hidden',
-            level === 1 && !compact ? 'ml-4 min-h-[3.15rem] rounded-[1rem] pr-2' : '',
-            !compact && active
-              ? 'border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.045))] text-white shadow-[0_24px_38px_-30px_rgba(2,6,23,0.86)]'
-              : !compact
-                ? 'border-transparent text-slate-400 hover:border-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.04)] hover:text-slate-100'
-                : 'text-slate-400 hover:text-slate-100',
-            loading ? 'bg-[rgba(255,255,255,0.06)] text-slate-100' : ''
+            'relative z-10 flex flex-shrink-0 items-center justify-center border transition-[border-color,background-color,color,box-shadow,opacity,transform] duration-150 ease-out',
+            iconSizeClass,
+            active
+              ? cn(
+                  'border-[rgba(124,58,237,0.18)] bg-[linear-gradient(135deg,rgba(124,58,237,0.2),rgba(15,23,42,0.94))] text-violet-100 shadow-[0_18px_28px_-24px_rgba(91,33,182,0.42)]',
+                  compact ? 'shadow-[0_16px_28px_-22px_rgba(91,33,182,0.42)]' : ''
+                )
+              : 'border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.035)] text-slate-400 group-hover:border-[rgba(255,255,255,0.08)] group-hover:bg-[rgba(255,255,255,0.05)] group-hover:text-slate-100',
+            loading ? 'scale-[0.97] opacity-80' : ''
           )}
         >
-          {active && expanded && isTopLevel && (
-            <span className="absolute left-1.5 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-full bg-[linear-gradient(180deg,rgba(124,58,237,0.96),rgba(91,33,182,0.64))] shadow-[0_0_18px_rgba(91,33,182,0.36)]" />
-          )}
-          {active && !compact && (
-            <span
-              className={cn(
-                'absolute inset-[1px] border border-[rgba(255,255,255,0.04)]',
-                level === 1 ? 'rounded-[calc(1rem-1px)]' : 'rounded-[calc(1.1rem-1px)]'
-              )}
-            />
-          )}
           <span
             className={cn(
-              'relative z-10 flex flex-shrink-0 items-center justify-center border transition-[border-color,background-color,color,box-shadow,opacity,transform] duration-150 ease-out',
-              iconSizeClass,
+              'absolute inset-[1px] transition-opacity duration-150 ease-out',
+              compact
+                ? 'rounded-[calc(0.95rem-1px)]'
+                : level === 0
+                  ? 'rounded-[calc(1rem-1px)]'
+                  : 'rounded-[calc(0.9rem-1px)]',
               active
-                ? cn(
-                    'border-[rgba(124,58,237,0.18)] bg-[linear-gradient(135deg,rgba(124,58,237,0.2),rgba(15,23,42,0.94))] text-violet-100 shadow-[0_18px_28px_-24px_rgba(91,33,182,0.42)]',
-                    compact ? 'shadow-[0_16px_28px_-22px_rgba(91,33,182,0.42)]' : ''
-                  )
-                : 'border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.035)] text-slate-400 group-hover:border-[rgba(255,255,255,0.08)] group-hover:bg-[rgba(255,255,255,0.05)] group-hover:text-slate-100',
-              loading ? 'scale-[0.97] opacity-80' : ''
+                ? 'opacity-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                : 'opacity-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] group-hover:opacity-100'
             )}
-          >
-            <span
-              className={cn(
-                'absolute inset-[1px] transition-opacity duration-150 ease-out',
-                compact
-                  ? 'rounded-[calc(0.95rem-1px)]'
-                  : level === 0
-                    ? 'rounded-[calc(1rem-1px)]'
-                    : 'rounded-[calc(0.9rem-1px)]',
-                active
-                  ? 'opacity-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
-                  : 'opacity-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] group-hover:opacity-100'
-              )}
-            />
-            <item.icon
-              className={cn(
-                'relative transition-transform duration-150 ease-out',
-                compact ? 'h-[1.02rem] w-[1.02rem]' : level === 0 ? 'h-[1.02rem] w-[1.02rem]' : 'h-[0.95rem] w-[0.95rem]',
-                loading ? 'scale-95' : ''
-              )}
-            />
-          </span>
-
-          <div
+          />
+          <item.icon
             className={cn(
-              'min-w-0 flex-1 transition-[opacity,transform,max-width] duration-150 ease-out',
-              compact ? 'max-w-0 -translate-x-2 opacity-0' : 'max-w-full translate-x-0 opacity-100'
+              'relative transition-transform duration-150 ease-out',
+              compact ? 'h-[1.02rem] w-[1.02rem]' : level === 0 ? 'h-[1.02rem] w-[1.02rem]' : 'h-[0.95rem] w-[0.95rem]',
+              loading ? 'scale-95' : ''
             )}
-          >
-            <div className="flex min-w-0 items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className={cn('truncate font-medium leading-none', level === 0 ? 'text-sm' : 'text-[13px]')}>
-                  {item.label}
-                </p>
-                {level === 0 && (
-                  <p className="mt-1.5 truncate text-xs leading-none text-slate-500 transition-colors duration-200 group-hover:text-slate-400">
-                    {item.description}
-                  </p>
-                )}
-              </div>
+          />
+        </span>
 
-              {item.children && (
-                <ChevronRight
-                  className={cn(
-                    'h-4 w-4 flex-shrink-0 text-slate-500 transition-transform duration-150 ease-out',
-                    childrenVisible ? 'rotate-90 text-slate-300' : ''
-                  )}
-                />
+        <div
+          className={cn(
+            'min-w-0 flex-1 transition-[opacity,transform,max-width] duration-150 ease-out',
+            compact ? 'max-w-0 -translate-x-2 opacity-0' : 'max-w-full translate-x-0 opacity-100'
+          )}
+        >
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className={cn('truncate font-medium leading-none', level === 0 ? 'text-sm' : 'text-[13px]')}>
+                {item.label}
+              </p>
+              {level === 0 && (
+                <p className="mt-1.5 truncate text-xs leading-none text-slate-500 transition-colors duration-200 group-hover:text-slate-400">
+                  {item.description}
+                </p>
               )}
             </div>
+
+            {item.children && (
+              <ChevronRight
+                className={cn(
+                  'h-4 w-4 flex-shrink-0 text-slate-500 transition-transform duration-150 ease-out',
+                  childrenVisible ? 'rotate-90 text-slate-300' : ''
+                )}
+              />
+            )}
           </div>
-        </Link>
-      )}
+        </div>
+      </Link>
 
       {item.children && expanded && (
         <div
@@ -587,19 +481,14 @@ export function Sidebar({
   onPinnedChange: (value: boolean) => void
 }) {
   const pathname = usePathname() ?? fallbackPath
-  const { isOpen: assistantOpen, openAssistant } = useAssistantWidget()
   const { startNavigation, targetHref } = useNavigationFeedback()
   const [hovered, setHovered] = useState(false)
   const [previewModuleHref, setPreviewModuleHref] = useState<string | null>(null)
   const barberView = isBarberRole(role)
-  const isInternalPath = pathname === '/internal' || pathname.startsWith('/internal/')
   const sidebarItems = useMemo(() => {
     const baseItems = barberView ? barberSidebarItems : defaultSidebarItems
-    const filteredBaseItems = isInternalPath
-      ? baseItems.filter((item) => item.navKind !== 'assistant')
-      : baseItems
-    return hasPlatformAccess(platformRole) ? [platformSidebarItem, ...filteredBaseItems] : filteredBaseItems
-  }, [barberView, isInternalPath, platformRole])
+    return hasPlatformAccess(platformRole) ? [platformSidebarItem, ...baseItems] : baseItems
+  }, [barberView, platformRole])
   const currentSectionLabels = barberView ? barberSectionLabels : sectionLabels
   const expanded = pinned || hovered
   const activeTopLevelHref = useMemo(() => resolveActiveHref(sidebarItems, pathname), [pathname, sidebarItems])
@@ -657,12 +546,11 @@ export function Sidebar({
           key={item.href}
           item={item}
           expanded={expanded}
-          active={item.navKind === 'assistant' ? assistantOpen || active : active}
+          active={active}
           level={level}
           childrenVisible={childrenVisible}
-          loading={item.navKind === 'assistant' ? false : targetHref === item.href}
+          loading={targetHref === item.href}
           onNavigate={handleNavigate}
-          onAssistantSelect={openAssistant}
           onPreview={handlePreview}
         >
           {item.children ? renderItems(item.children, level + 1) : null}

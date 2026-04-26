@@ -29,13 +29,16 @@ export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
     <section className="dashboard-panel p-6">
       <div className="flex flex-col gap-4 border-b border-[rgba(255,255,255,0.06)] pb-5 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <p className="page-kicker">Performance comercial</p>
           <h3 className="mt-2 text-[1.55rem] font-semibold tracking-tight text-foreground">Ranking dos profissionais</h3>
           <p className="mt-2 max-w-xl text-sm leading-7 text-muted-foreground">
             Uma leitura mais executiva do time, com peso de receita, proximidade da meta e relevancia na operacao.
           </p>
         </div>
-        {data[0] && <span className="surface-chip">Lider do periodo: {data[0].name}</span>}
+        {data[0] && (
+          <p className="text-sm text-muted-foreground">
+            Lider do periodo: <span className="font-semibold text-foreground">{data[0].name}</span>
+          </p>
+        )}
       </div>
 
       <div className="mt-5 space-y-3">

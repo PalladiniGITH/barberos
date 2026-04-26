@@ -37,17 +37,13 @@ export function RevenueChart({ data }: RevenueChartProps) {
     <section className="dashboard-panel p-6">
       <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <p className="page-kicker">Leitura de tendencia</p>
           <h3 className="mt-2 text-[1.6rem] font-semibold tracking-tight text-foreground">Ritmo do caixa</h3>
           <p className="mt-2 max-w-2xl text-sm leading-7 text-muted-foreground">
             Receita e custo organizados como leitura de decisao, com contraste suficiente para bater o olho e entender o mes.
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <span className="surface-chip">Ultimos 6 meses</span>
-          <span className="surface-chip">Receita x custo</span>
-        </div>
+        <p className="text-sm text-muted-foreground">Ultimos 6 meses de receita e custo.</p>
       </div>
 
       <div className="rounded-[1.65rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(35,38,58,0.94),rgba(21,24,33,0.98))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">

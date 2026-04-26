@@ -257,7 +257,7 @@ export default async function FinanceiroPage({ searchParams }: Props) {
     <div className="page-section mx-auto flex max-w-7xl flex-col gap-5">
       <PageHeader
         title="Financeiro"
-        description="Leitura executiva do caixa, das despesas e do que mais merece atencao agora."
+        description="Leitura do caixa, das despesas e do que mais merece atencao agora."
         action={(
           <Suspense>
             <PeriodSelector month={month} year={year} pathname="/financeiro" />
@@ -356,7 +356,7 @@ export default async function FinanceiroPage({ searchParams }: Props) {
         <section className="dashboard-panel p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="text-lg font-semibold text-foreground">Leitura executiva</h3>
+              <h3 className="text-lg font-semibold text-foreground">Resumo para decidir</h3>
               <p className="mt-1 text-sm text-muted-foreground">
                 Os sinais que ajudam a proteger caixa, meta e margem sem precisar abrir outra tela.
               </p>

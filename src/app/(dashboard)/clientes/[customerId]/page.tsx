@@ -376,7 +376,9 @@ export default async function ClienteProfilePage({ params, searchParams }: Props
                   Visao completa do comportamento recente do cliente, com servico, barbeiro, cobranca e status.
                 </p>
               </div>
-              <span className="surface-chip">{profile.appointmentHistory.length} registros</span>
+              <p className="text-sm text-muted-foreground">
+                {profile.appointmentHistory.length} registro{profile.appointmentHistory.length === 1 ? '' : 's'}
+              </p>
             </div>
 
             <div className="mt-5 space-y-3">

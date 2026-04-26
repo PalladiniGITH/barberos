@@ -134,10 +134,8 @@ export function InsightCard({
 
       {!compact && (
         <div className="mt-4 rounded-[1.2rem] border border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Acao recomendada
-          </p>
-          <p className="mt-2 text-sm leading-6 text-foreground">{insight.recommendedAction}</p>
+          <p className="text-sm font-semibold text-foreground">Proximo passo</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">{insight.recommendedAction}</p>
         </div>
       )}
 
@@ -160,10 +158,10 @@ export function DashboardInsightsPreview({ report }: { report: BusinessIntellige
       <div className="grid xl:grid-cols-[minmax(300px,390px)_minmax(0,1fr)]">
         <div className="premium-rail p-6">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="surface-chip">
-              <CircleDollarSign className="h-3.5 w-3.5" />
-              Analista do negocio
-            </span>
+            <div className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+              <CircleDollarSign className="h-4 w-4 text-primary" />
+              BarberEX IA
+            </div>
             <IntelligenceModeBadge report={report} />
           </div>
           <div className="mt-3">
@@ -171,7 +169,6 @@ export function DashboardInsightsPreview({ report }: { report: BusinessIntellige
           </div>
 
           <div className="mt-8">
-            <p className="page-kicker">Resumo de alto nivel</p>
             <h2 className="mt-3 text-[1.9rem] font-semibold tracking-tight text-foreground">{report.summary.headline}</h2>
             <p className="mt-3 max-w-sm text-sm leading-7 text-muted-foreground">{report.summary.body}</p>
           </div>

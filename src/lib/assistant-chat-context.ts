@@ -90,7 +90,7 @@ function getRoleUiConfig(scope: AssistantChatScope) {
   return {
     suggestions: [...MANAGEMENT_SUGGESTIONS],
     placeholder: 'Pergunte sobre faturamento, clientes, equipe, margem, campanhas e oportunidades.',
-    description: 'Leitura executiva da operação com foco em decisões práticas para a barbearia.',
+    description: 'Leitura da operacao com foco em decisoes praticas para a barbearia.',
   }
 }
 
@@ -239,7 +239,7 @@ export async function resolveAssistantScopeForSession(session: AssistantSessionI
       roleScope: 'FINANCIAL',
       professionalId: null,
       professionalName: null,
-      scopeLabel: 'Escopo financeiro global',
+      scopeLabel: 'Financeiro da barbearia',
     }
   }
 
@@ -248,7 +248,7 @@ export async function resolveAssistantScopeForSession(session: AssistantSessionI
     roleScope: 'MANAGEMENT',
     professionalId: null,
     professionalName: null,
-    scopeLabel: 'Escopo gerencial da barbearia',
+    scopeLabel: 'Gestao da barbearia',
   }
 }
 

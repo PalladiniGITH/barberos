@@ -78,8 +78,10 @@ export function BarbershopHealthPanel({ health }: { health: BarbershopHealthSnap
         <aside className="premium-rail p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="page-kicker">Leitura executiva</p>
               <h3 className="mt-2 text-[1.35rem] font-semibold tracking-tight text-foreground">Como estamos medindo</h3>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                A base abaixo explica como o painel le os sinais de retorno, uso e saude da assinatura.
+              </p>
             </div>
             <ShieldCheck className="h-5 w-5 text-primary" />
           </div>

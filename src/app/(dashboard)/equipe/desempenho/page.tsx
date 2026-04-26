@@ -567,7 +567,7 @@ export default async function DesempenhoPage({ searchParams }: Props) {
 
         <aside className="space-y-5">
           <section className="dashboard-panel p-6">
-            <h2 className="text-lg font-semibold text-foreground">Leitura executiva</h2>
+            <h2 className="text-lg font-semibold text-foreground">Resumo do time</h2>
             <div className="mt-4 space-y-3">
               <div className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
                 <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">

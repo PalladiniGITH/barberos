@@ -413,12 +413,14 @@ export function CustomerIntelligenceSection({
           <section className="dashboard-panel p-5 sm:p-6">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="page-kicker">Comparacao por grupo</p>
                 <h3 className="mt-2 text-xl font-semibold text-foreground">Assinatura versus avulso</h3>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  Compare margem, uso da agenda e peso comercial entre os dois modelos do recorte atual.
+                </p>
               </div>
-              <span className="surface-chip">
-                <RefreshCw className="h-3.5 w-3.5" />
-                Visao gerencial
+              <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                <RefreshCw className="h-4 w-4 text-primary" />
+                Comparativo do recorte atual
               </span>
             </div>
 
@@ -626,7 +628,9 @@ export function CustomerIntelligenceSection({
                 Valor gerado, custo estimado, margem, recorrencia e forma de consumo em um unico quadro.
               </p>
             </div>
-            <span className="surface-chip">{customers.table.length} linha{customers.table.length === 1 ? '' : 's'}</span>
+            <p className="text-sm text-muted-foreground">
+              {customers.table.length} cliente{customers.table.length === 1 ? '' : 's'} no recorte
+            </p>
           </div>
 
           <div className="mt-5 overflow-x-auto">

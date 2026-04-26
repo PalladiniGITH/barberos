@@ -10,8 +10,7 @@ export function PageHeader({ title, description, action }: PageHeaderProps) {
   return (
     <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
       <div className="max-w-3xl">
-        <p className="page-kicker">Painel operacional</p>
-        <h1 className="page-title mt-2.5">
+        <h1 className="page-title">
           {title}
         </h1>
         {description && (

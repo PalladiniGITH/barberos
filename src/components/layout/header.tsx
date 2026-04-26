@@ -53,7 +53,7 @@ function getPageMeta(pathname: string, role?: string | null) {
     return {
       breadcrumb: 'Visao geral',
       title: 'Painel executivo',
-      helper: 'Leitura executiva da operacao com mais contraste, mais ritmo e menos ruido.',
+      helper: 'Visao da operacao com mais contraste, mais ritmo e menos ruido.',
     }
   }
 
@@ -92,7 +92,7 @@ function getPageMeta(pathname: string, role?: string | null) {
   if (pathname.startsWith('/inteligencia')) {
     return {
       breadcrumb: 'Inteligencia',
-      title: 'Leitura estrategica',
+      title: 'Inteligencia da operacao',
       helper: 'Insights, contexto e sinais para agir com mais clareza.',
     }
   }

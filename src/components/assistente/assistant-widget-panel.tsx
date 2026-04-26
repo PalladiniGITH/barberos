@@ -8,7 +8,6 @@ import {
   MessageSquarePlus,
   Minimize2,
   Send,
-  Sparkles,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { askAssistant, loadAssistantThread, loadAssistantWorkspace } from '@/actions/assistant-chat'
@@ -24,14 +23,14 @@ import { useAssistantWidget } from '@/components/assistente/assistant-widget-pro
 
 function getScopeLabel(roleScope?: AiAssistantWorkspaceView['roleScope']) {
   if (roleScope === 'PROFESSIONAL') {
-    return 'Meu desempenho'
+    return 'Escopo: seu desempenho'
   }
 
   if (roleScope === 'FINANCIAL') {
-    return 'Escopo financeiro'
+    return 'Escopo: financeiro'
   }
 
-  return 'Escopo gerencial'
+  return 'Escopo: gestao da barbearia'
 }
 
 function MessageBubble({ message }: { message: AiChatMessageView }) {
@@ -49,7 +48,7 @@ function MessageBubble({ message }: { message: AiChatMessageView }) {
       >
         <div className="flex items-center justify-between gap-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            {isUser ? 'Voce' : 'Assistente EX'}
+            {isUser ? 'Voce' : 'BarberEX IA'}
           </p>
           <span className="text-[11px] text-muted-foreground">{message.createdAtLabel}</span>
         </div>
@@ -106,7 +105,7 @@ export function AssistantWidgetPanel() {
       setLoadState('ready')
     } catch (error) {
       setLoadState('error')
-      toast.error(error instanceof Error ? error.message : 'Nao foi possivel abrir o Assistente EX agora.')
+      toast.error(error instanceof Error ? error.message : 'Nao foi possivel abrir o BarberEX IA agora.')
     }
   }, [loadState])
 
@@ -215,22 +214,23 @@ export function AssistantWidgetPanel() {
         <header className="border-b border-[rgba(255,255,255,0.08)] px-4 py-4 sm:px-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="surface-chip">
-                  <BrainCircuit className="h-3.5 w-3.5" />
-                  Assistente EX
-                </span>
-                <span className="surface-chip">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  {getScopeLabel(workspace?.roleScope)}
-                </span>
+              <div className="flex items-center gap-2">
+                <BrainCircuit className="h-4 w-4 text-primary" />
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-violet-200/80">
+                  BarberEX IA
+                </p>
               </div>
               <h2 className="mt-3 text-lg font-semibold tracking-tight text-foreground">
-                {screenContext.label}
+                Pergunte sobre agenda, clientes, metas e numeros.
               </h2>
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
                 {helperDescription}
               </p>
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <span>{getScopeLabel(workspace?.roleScope)}</span>
+                <span className="text-slate-600">/</span>
+                <span>{screenContext.label}</span>
+              </div>
             </div>
 
             <div className="flex items-center gap-2">
@@ -264,6 +264,12 @@ export function AssistantWidgetPanel() {
         </header>
 
         <div className="border-b border-[rgba(255,255,255,0.06)] px-4 py-3 sm:px-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-foreground">Conversas recentes</p>
+            {threadSummaries.length > 0 && (
+              <p className="text-xs text-slate-400">{threadSummaries.length} conversa{threadSummaries.length === 1 ? '' : 's'}</p>
+            )}
+          </div>
           {threadSummaries.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               Sua primeira pergunta abre uma nova conversa. Depois disso, o historico recente aparece aqui.
@@ -276,18 +282,35 @@ export function AssistantWidgetPanel() {
                   type="button"
                   onClick={() => handleThreadSelect(thread.id)}
                   className={cn(
-                    'min-w-[168px] flex-shrink-0 rounded-[1rem] border px-3 py-2.5 text-left transition-colors',
+                    'min-w-[220px] flex-shrink-0 rounded-[1.05rem] border px-3.5 py-3 text-left transition-[border-color,background-color,transform] duration-150 ease-out hover:-translate-y-0.5',
                     selectedThread?.id === thread.id
-                      ? 'border-[rgba(124,58,237,0.22)] bg-[rgba(124,58,237,0.1)]'
-                      : 'border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(255,255,255,0.05)]'
+                      ? 'border-[rgba(124,58,237,0.22)] bg-[linear-gradient(180deg,rgba(45,36,79,0.78),rgba(26,27,42,0.98))] shadow-[0_20px_40px_-30px_rgba(91,33,182,0.48)]'
+                      : 'border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.035)] hover:border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.055)]'
                   )}
                   disabled={isPending}
                 >
-                  <p className="truncate text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Recente
+                  <p className={cn(
+                    'truncate text-sm font-semibold',
+                    selectedThread?.id === thread.id ? 'text-slate-50' : 'text-slate-100'
+                  )}>
+                    {thread.title}
                   </p>
-                  <p className="mt-1 truncate text-sm font-semibold text-foreground">{thread.title}</p>
-                  <p className="mt-1 truncate text-[11px] text-muted-foreground">{thread.updatedAtLabel}</p>
+                  {thread.lastMessagePreview ? (
+                    <p className={cn(
+                      'mt-2 line-clamp-2 text-xs leading-5',
+                      selectedThread?.id === thread.id ? 'text-slate-300' : 'text-slate-400'
+                    )}>
+                      {thread.lastMessagePreview}
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-xs leading-5 text-slate-500">Sem resposta registrada ainda.</p>
+                  )}
+                  <p className={cn(
+                    'mt-3 text-[11px]',
+                    selectedThread?.id === thread.id ? 'text-slate-400' : 'text-slate-500'
+                  )}>
+                    {thread.updatedAtLabel}
+                  </p>
                 </button>
               ))}
             </div>
@@ -299,7 +322,7 @@ export function AssistantWidgetPanel() {
             <div className="flex h-full min-h-[280px] items-center justify-center">
               <div className="rounded-[1.4rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-5 py-4 text-center">
                 <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
-                <p className="mt-3 text-sm font-medium text-foreground">Carregando o copiloto da tela atual</p>
+                <p className="mt-3 text-sm font-medium text-foreground">Carregando o contexto da tela atual</p>
                 <p className="mt-1 text-xs leading-6 text-muted-foreground">
                   Estamos montando o contexto seguro do seu perfil.
                 </p>
@@ -308,7 +331,7 @@ export function AssistantWidgetPanel() {
           ) : loadState === 'error' && !workspace ? (
             <div className="flex h-full min-h-[280px] items-center justify-center">
               <div className="max-w-sm rounded-[1.4rem] border border-[rgba(220,38,38,0.18)] bg-[rgba(220,38,38,0.08)] px-5 py-4 text-center">
-                <p className="text-sm font-semibold text-foreground">Nao foi possivel abrir o Assistente EX agora.</p>
+                <p className="text-sm font-semibold text-foreground">Nao foi possivel abrir o BarberEX IA agora.</p>
                 <p className="mt-2 text-xs leading-6 text-muted-foreground">
                   Tente novamente em instantes. O restante da tela continua funcionando normalmente.
                 </p>
@@ -342,7 +365,7 @@ export function AssistantWidgetPanel() {
               <div className="w-full max-w-md rounded-[1.5rem] border border-dashed border-[rgba(124,58,237,0.18)] bg-[rgba(124,58,237,0.06)] p-5">
                 <p className="text-sm font-semibold text-foreground">Pergunte o que voce precisa decidir agora</p>
                 <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                  O Assistente EX entende a tela atual, respeita o escopo do seu perfil e responde com base nos dados disponiveis do periodo.
+                  O BarberEX IA entende a tela atual, respeita o escopo do seu perfil e responde com base nos dados disponiveis do periodo.
                 </p>
 
                 <div className="mt-4 flex flex-wrap gap-2">

@@ -80,8 +80,8 @@ export function AuthEntryCard({
         </section>
 
         <section className="premium-block p-6 sm:p-8">
-          <div className="surface-chip">
-            <LockKeyhole className="h-3.5 w-3.5" />
+          <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-300">
+            <LockKeyhole className="h-4 w-4 text-primary" />
             Acesso seguro
           </div>
 

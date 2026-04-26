@@ -399,13 +399,13 @@ export default async function AgendamentosPage({ searchParams }: Props) {
           </section>
 
           <details className="disclosure-panel">
-            <summary className="disclosure-summary">
-              <div>
-                <p className="page-kicker">Status da agenda</p>
-                <h3 className="mt-2 text-[1.2rem] font-semibold tracking-tight text-foreground">Leitura rapida</h3>
-              </div>
-              <span className="surface-chip">Abrir</span>
-            </summary>
+          <summary className="disclosure-summary">
+            <div>
+              <p className="page-kicker">Status da agenda</p>
+              <h3 className="mt-2 text-[1.2rem] font-semibold tracking-tight text-foreground">Leitura rapida</h3>
+            </div>
+            <span className="text-sm font-medium text-muted-foreground">Ver resumo</span>
+          </summary>
 
             <div className="disclosure-body space-y-3">
               {[

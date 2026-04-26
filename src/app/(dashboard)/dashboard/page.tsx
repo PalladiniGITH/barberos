@@ -623,8 +623,8 @@ export default async function DashboardPage({ searchParams }: Props) {
               <div>
                 <p className="page-kicker">Execucao da meta</p>
                 <h3 className="mt-2 text-[1.4rem] font-semibold tracking-tight text-foreground">Meta do mes</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{data.monthLabel}</p>
               </div>
-              <span className="surface-chip">{data.monthLabel}</span>
             </div>
 
             {data.goalValue > 0 ? (
@@ -710,7 +710,7 @@ export default async function DashboardPage({ searchParams }: Props) {
               <p className="page-kicker">Leitura complementar</p>
               <h3 className="mt-2 text-[1.35rem] font-semibold tracking-tight text-foreground">Comparativos e sinais secundarios</h3>
             </div>
-            <span className="surface-chip">Abrir detalhes</span>
+            <span className="text-sm font-medium text-muted-foreground">Ver comparativos</span>
           </summary>
 
           <div className="disclosure-body">

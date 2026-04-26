@@ -24,7 +24,7 @@ export function AssistantLauncher() {
         bottom: 'max(1rem, env(safe-area-inset-bottom))',
         right: 'max(1rem, env(safe-area-inset-right))',
       }}
-      aria-label="Abrir Assistente EX"
+      aria-label="Abrir BarberEX IA"
     >
       <span className="relative flex h-12 w-12 items-center justify-center rounded-[1rem] border border-[rgba(124,58,237,0.3)] bg-[radial-gradient(circle_at_35%_25%,rgba(168,85,247,0.35),transparent_45%),linear-gradient(135deg,rgba(124,58,237,0.26),rgba(15,23,42,0.96))] text-[11px] font-semibold tracking-[0.16em] text-violet-50">
         <span className="absolute right-1.5 top-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[rgba(139,92,246,0.18)] text-violet-100">
@@ -35,10 +35,10 @@ export function AssistantLauncher() {
 
       <span className="hidden min-w-0 flex-col sm:flex">
         <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-200/80">
-          Assistente EX
+          BarberEX IA
         </span>
         <span className="mt-1 text-sm font-medium text-slate-100">
-          Abra seu copiloto
+          Abra o assistente
         </span>
       </span>
 
