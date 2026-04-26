@@ -190,6 +190,7 @@ export function AssistantWidgetPanel() {
     () => [...(selectedThread?.messages ?? []), ...optimisticMessages],
     [optimisticMessages, selectedThread]
   )
+  const displayedMessages = conversationMessages
 
   const helperDescription = screenContext.subtitle
   const helperSuggestions = screenContext.suggestions.length > 0 ? screenContext.suggestions : (workspace?.suggestions ?? [])
@@ -201,6 +202,31 @@ export function AssistantWidgetPanel() {
     || inlineErrorMessage
   )
   const activeConversationTitle = selectedThread?.title ?? optimisticThreadTitle ?? 'Nova conversa'
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production' || !isOpen) {
+      return
+    }
+
+    console.debug('[assistant-widget] visual state', {
+      activeThreadId: selectedThread?.id ?? null,
+      selectedThreadMessages: selectedThread?.messages.length ?? 0,
+      optimisticMessages: optimisticMessages.length,
+      displayedMessages: displayedMessages.length,
+      isRecentListOpen: showRecentThreads,
+      hasActiveConversation,
+      inlineErrorMessage: Boolean(inlineErrorMessage),
+    })
+  }, [
+    displayedMessages.length,
+    hasActiveConversation,
+    inlineErrorMessage,
+    isOpen,
+    optimisticMessages.length,
+    selectedThread?.id,
+    selectedThread?.messages.length,
+    showRecentThreads,
+  ])
 
   const loadWorkspace = useCallback(async () => {
     if (loadState === 'loading') {
@@ -355,13 +381,12 @@ export function AssistantWidgetPanel() {
         aria-hidden={!isOpen}
         className={cn(
           'fixed z-40 flex flex-col overflow-hidden rounded-[1.6rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.99),rgba(15,17,21,0.98))] shadow-[0_56px_120px_-58px_rgba(2,6,23,0.9)] transition-[opacity,transform] duration-200 ease-out',
-          'left-3 right-3 top-[5.25rem] bottom-3 sm:left-auto sm:right-6 sm:top-auto sm:bottom-6 sm:h-[min(720px,calc(100vh-7rem))] sm:w-[min(460px,calc(100vw-2.25rem))]',
+          'left-3 right-3 top-[5.25rem] bottom-3 sm:left-auto sm:top-auto sm:h-[min(720px,calc(100vh-3rem))] sm:w-[min(468px,calc(100vw-3rem))]',
           isOpen ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0 sm:translate-y-3'
         )}
         style={{
           right: 'max(1rem, env(safe-area-inset-right))',
           bottom: 'max(0.75rem, env(safe-area-inset-bottom))',
-          left: 'max(0.75rem, env(safe-area-inset-left))',
         }}
       >
         <header className="shrink-0 border-b border-[rgba(255,255,255,0.08)] px-4 py-4 sm:px-5">
@@ -409,7 +434,7 @@ export function AssistantWidgetPanel() {
           </div>
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-4 sm:px-5">
+        <div className="flex min-h-0 flex-1 flex-col overflow-visible px-4 py-4 sm:px-5">
           {loadState === 'loading' && !workspace ? (
             <div className="flex min-h-0 flex-1 items-center justify-center">
               <div className="rounded-[1.4rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-5 py-4 text-center">
@@ -439,7 +464,7 @@ export function AssistantWidgetPanel() {
           ) : (
             <>
               {hasActiveConversation ? (
-                <div className="mb-3 shrink-0 rounded-[1.05rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-3.5 py-3">
+                <div className="relative mb-3 shrink-0 rounded-[1.05rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-3.5 py-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -461,7 +486,7 @@ export function AssistantWidgetPanel() {
                   </div>
 
                   {showRecentThreads && (
-                    <div className="mt-3 border-t border-[rgba(255,255,255,0.06)] pt-3">
+                    <div className="absolute left-0 right-0 top-full z-20 mt-2 rounded-[1.05rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.99),rgba(15,17,21,0.98))] p-3 shadow-[0_30px_60px_-34px_rgba(2,6,23,0.88)]">
                       <RecentThreadsList
                         threadSummaries={threadSummaries}
                         selectedThreadId={selectedThread?.id ?? null}
@@ -497,23 +522,23 @@ export function AssistantWidgetPanel() {
                 </div>
               )}
 
-              <div className="min-h-0 flex-1 overflow-hidden rounded-[1.3rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(15,18,27,0.9),rgba(12,14,20,0.96))] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+              <div className="h-0 min-h-0 flex-1 overflow-hidden rounded-[1.3rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(15,18,27,0.9),rgba(12,14,20,0.96))] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                 <div
                   ref={messagesViewportRef}
                   className="flex h-full min-h-0 flex-col overflow-y-auto px-3 py-3 sm:px-4 sm:py-4"
                 >
                   {hasActiveConversation ? (
                     <div className="space-y-4">
-                      {conversationMessages.length > 0 ? (
-                        conversationMessages.map((message) => (
+                      {displayedMessages.length > 0 ? (
+                        displayedMessages.map((message) => (
                           <MessageBubble key={message.id} message={message} />
                         ))
                       ) : (
                         <div className="flex min-h-[220px] items-center justify-center">
                           <div className="max-w-sm text-center">
-                            <p className="text-sm font-semibold text-foreground">Faca uma pergunta para comecar.</p>
+                            <p className="text-sm font-semibold text-foreground">Esta conversa ainda nao tem mensagens visiveis.</p>
                             <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                              A conversa atual aparece aqui, com seu historico e as proximas respostas do BarberEX IA.
+                              Envie uma pergunta para comecar e acompanhar a troca completa aqui dentro.
                             </p>
                           </div>
                         </div>
