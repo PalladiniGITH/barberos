@@ -17,7 +17,7 @@ function DetailCard({
   icon: typeof Users
 }) {
   return (
-    <article className="dashboard-panel p-4">
+    <article className="executive-metric">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{label}</p>
@@ -137,7 +137,7 @@ export function PlatformBarbershopDetail({
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="platform-panel p-4">
+        <div className="platform-panel table-shell p-4">
           <div className="border-b border-[rgba(255,255,255,0.06)] pb-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Equipe e acessos</p>
             <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">Usuarios do tenant</h2>

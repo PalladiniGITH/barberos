@@ -16,7 +16,7 @@ function SummaryCard({
   icon: typeof Building2
 }) {
   return (
-    <article className="dashboard-panel p-4">
+    <article className="executive-metric">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{label}</p>
@@ -162,7 +162,7 @@ export function PlatformOverview({
 
       <section
         id="barbershops"
-        className="platform-panel p-4"
+        className="platform-panel table-shell p-4"
       >
         <div className="flex flex-col gap-4 border-b border-[rgba(255,255,255,0.06)] pb-4 lg:flex-row lg:items-end lg:justify-between">
           <div>

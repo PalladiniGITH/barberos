@@ -50,7 +50,7 @@ export function AuthEntryCard({
 
   return (
     <main className="auth-shell min-h-screen px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl items-center gap-6 lg:grid-cols-[minmax(0,1.15fr)_440px]">
+      <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl items-center gap-5 lg:grid-cols-[minmax(0,1.18fr)_430px]">
         <section className="dashboard-spotlight p-8 sm:p-10 lg:p-12">
           <h1 className="spotlight-title mt-0 max-w-xl">
             Operacao, agenda e inteligencia para a rotina da barbearia.
@@ -61,13 +61,13 @@ export function AuthEntryCard({
 
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
             <div className="hero-stat-card">
-              <p className="text-lg font-semibold text-foreground">Bloqueios e remanejamentos no mesmo grid</p>
+              <p className="text-base font-semibold leading-7 text-foreground">Bloqueios e remanejamentos no mesmo grid</p>
             </div>
             <div className="hero-stat-card">
-              <p className="text-lg font-semibold text-foreground">Indicadores e margem visiveis logo no primeiro acesso</p>
+              <p className="text-base font-semibold leading-7 text-foreground">Indicadores e margem visiveis logo no primeiro acesso</p>
             </div>
             <div className="hero-stat-card">
-              <p className="text-lg font-semibold text-foreground">Fluxo de agendamento alinhado com a operacao real</p>
+              <p className="text-base font-semibold leading-7 text-foreground">Fluxo de agendamento alinhado com a operacao real</p>
             </div>
           </div>
         </section>

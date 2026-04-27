@@ -31,12 +31,12 @@ export function PlatformShell({ children, user }: PlatformShellProps) {
   const pathname = usePathname() ?? '/internal'
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(124,58,237,0.08),transparent_20%),linear-gradient(180deg,rgba(11,13,19,0.99),rgba(8,10,15,1))] text-foreground">
-      <header className="sticky top-0 z-40 border-b border-[rgba(255,255,255,0.08)] bg-[rgba(9,12,18,0.84)] backdrop-blur-xl">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.08),transparent_16%),linear-gradient(180deg,rgba(17,17,21,0.99),rgba(11,11,14,1))] text-foreground">
+      <header className="sticky top-0 z-40 border-b border-[rgba(255,255,255,0.06)] bg-[rgba(12,12,16,0.84)] backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1760px] flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8 xl:flex-row xl:items-center xl:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-[0.95rem] border border-[rgba(124,58,237,0.28)] bg-[radial-gradient(circle_at_30%_20%,rgba(168,85,247,0.34),transparent_42%),linear-gradient(135deg,rgba(124,58,237,0.28),rgba(15,23,42,0.96))] text-[11px] font-semibold tracking-[0.16em] text-violet-50 shadow-[0_18px_34px_-24px_rgba(2,6,23,0.82)]">
+              <div className="flex h-11 w-11 items-center justify-center rounded-[0.95rem] border border-[rgba(124,92,255,0.18)] bg-[radial-gradient(circle_at_30%_20%,rgba(168,85,247,0.2),transparent_42%),linear-gradient(135deg,rgba(124,92,255,0.18),rgba(19,19,23,0.98))] text-[11px] font-semibold tracking-[0.16em] text-violet-50 shadow-[0_18px_34px_-26px_rgba(2,6,23,0.82)]">
                 {PRODUCT_MONOGRAM}
               </div>
               <div className="min-w-0">
@@ -83,8 +83,8 @@ export function PlatformShell({ children, user }: PlatformShellProps) {
                 className={cn(
                   'inline-flex items-center gap-2 rounded-[0.95rem] border px-3 py-2 text-sm transition-colors',
                   active
-                    ? 'border-[rgba(124,58,237,0.16)] bg-[rgba(124,58,237,0.1)] text-violet-100'
-                    : 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.025)] text-muted-foreground hover:bg-[rgba(255,255,255,0.04)] hover:text-foreground'
+                    ? 'border-[rgba(124,92,255,0.16)] bg-[rgba(124,92,255,0.08)] text-violet-100'
+                    : 'border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] text-muted-foreground hover:bg-[rgba(255,255,255,0.045)] hover:text-foreground'
                 )}
               >
                 {index === 0 ? <ShieldCheck className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}

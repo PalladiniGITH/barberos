@@ -201,7 +201,7 @@ export function ScheduleBlockModal({
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-3 pt-4 sm:items-center sm:p-4">
-          <div className="absolute inset-0 bg-[rgba(9,12,18,0.46)] backdrop-blur-sm" onClick={() => setOpen(false)} />
+          <div className="absolute inset-0 bg-[rgba(9,10,14,0.58)] backdrop-blur-sm" onClick={() => setOpen(false)} />
 
           <div className="premium-dialog relative z-10 grid w-full max-w-2xl gap-0 overflow-hidden rounded-[1.5rem]">
             <div className="flex items-start justify-between gap-4 border-b border-[rgba(255,255,255,0.06)] px-5 py-4 sm:px-6">
@@ -298,7 +298,7 @@ export function ScheduleBlockModal({
                 />
               </label>
 
-              <div className="surface-soft flex flex-wrap items-center justify-between gap-3 rounded-[1.2rem] px-4 py-3">
+              <div className="surface-tier-high flex flex-wrap items-center justify-between gap-3 rounded-[1.2rem] px-4 py-3">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-foreground">
                     {selectedProfessional?.name ?? 'Selecione o barbeiro'}{date ? ` em ${date}` : ''}
