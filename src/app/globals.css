@@ -53,9 +53,9 @@
     font-family: var(--font-sans), system-ui, sans-serif;
     font-feature-settings: 'rlig' 1, 'calt' 1;
     background:
-      radial-gradient(circle at top left, rgba(124, 58, 237, 0.18), transparent 24%),
-      radial-gradient(circle at top right, rgba(109, 40, 217, 0.14), transparent 22%),
-      linear-gradient(180deg, #11131a 0%, #0f1115 42%, #0f1115 100%);
+      radial-gradient(circle at 12% 0%, rgba(124, 58, 237, 0.11), transparent 26%),
+      radial-gradient(circle at 88% 8%, rgba(99, 102, 241, 0.08), transparent 22%),
+      linear-gradient(180deg, #111319 0%, #0d0f14 46%, #0b0d12 100%);
   }
 
   select {
@@ -183,11 +183,11 @@
   }
 
   .page-title {
-    @apply text-[2.45rem] font-semibold leading-[0.96] tracking-tight text-foreground sm:text-[2.95rem];
+    @apply text-[2.2rem] font-semibold leading-[0.98] tracking-tight text-foreground sm:text-[2.75rem];
   }
 
   .page-copy {
-    @apply text-[14px] leading-6 text-muted-foreground;
+    @apply text-[15px] leading-6 text-muted-foreground;
   }
 
   .dashboard-panel,
@@ -199,43 +199,43 @@
   .disclosure-panel,
   .panel-card,
   .metric-card {
-    @apply rounded-[1.1rem] border text-card-foreground;
+    @apply rounded-[1.12rem] border text-card-foreground;
     border-color: hsl(var(--border));
     box-shadow:
-      0 28px 54px -36px rgba(2, 6, 23, 0.82),
-      0 12px 26px -20px rgba(91, 33, 182, 0.24),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      0 26px 54px -40px rgba(2, 6, 23, 0.92),
+      0 12px 28px -22px rgba(15, 23, 42, 0.34),
+      inset 0 1px 0 rgba(255, 255, 255, 0.035);
   }
 
   .dashboard-panel {
     background:
-      linear-gradient(180deg, rgba(28, 32, 48, 0.98), rgba(21, 24, 33, 0.98));
+      linear-gradient(180deg, rgba(24, 27, 37, 0.98), rgba(16, 18, 24, 0.99));
   }
 
   .dashboard-spotlight {
     @apply rounded-[1.25rem] border;
-    border-color: rgba(139, 92, 246, 0.18);
+    border-color: rgba(139, 92, 246, 0.13);
     background:
-      radial-gradient(circle at top left, rgba(124, 58, 237, 0.18), transparent 28%),
-      linear-gradient(180deg, rgba(35, 38, 58, 0.98), rgba(21, 24, 33, 0.99));
+      radial-gradient(circle at top left, rgba(124, 58, 237, 0.12), transparent 28%),
+      linear-gradient(180deg, rgba(29, 33, 46, 0.98), rgba(16, 18, 24, 0.99));
     box-shadow:
-      0 30px 62px -38px rgba(2, 6, 23, 0.86),
-      0 16px 34px -28px rgba(91, 33, 182, 0.3);
+      0 28px 60px -42px rgba(2, 6, 23, 0.9),
+      0 16px 30px -28px rgba(15, 23, 42, 0.3);
   }
 
   .premium-shell {
     background:
-      linear-gradient(180deg, rgba(28, 32, 48, 0.98), rgba(21, 24, 33, 0.98));
+      linear-gradient(180deg, rgba(25, 29, 39, 0.98), rgba(16, 18, 24, 0.99));
   }
 
   .premium-block {
     background:
-      linear-gradient(180deg, rgba(24, 28, 40, 0.98), rgba(15, 17, 21, 0.98));
+      linear-gradient(180deg, rgba(21, 24, 32, 0.98), rgba(13, 15, 20, 0.99));
   }
 
   .premium-rail {
     background:
-      linear-gradient(180deg, rgba(35, 38, 58, 0.96), rgba(21, 24, 33, 0.94));
+      linear-gradient(180deg, rgba(30, 34, 46, 0.96), rgba(16, 18, 24, 0.96));
   }
 
   .surface-soft {
@@ -254,9 +254,9 @@
 
   .hero-stat-card {
     @apply rounded-[1rem] border p-4 backdrop-blur-sm;
-    border-color: rgba(255, 255, 255, 0.06);
-    background: rgba(255, 255, 255, 0.04);
-    box-shadow: 0 18px 28px -20px rgba(2, 6, 23, 0.45);
+    border-color: rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.03);
+    box-shadow: 0 18px 32px -24px rgba(2, 6, 23, 0.54);
   }
 
   .hero-stat-card strong,
@@ -266,18 +266,18 @@
   }
 
   .spotlight-title {
-    @apply mt-2.5 text-[2.9rem] font-semibold leading-[0.95] tracking-tight text-foreground sm:text-[3.5rem];
+    @apply mt-2 text-[2.55rem] font-semibold leading-[0.96] tracking-tight text-foreground sm:text-[3.15rem];
   }
 
   .spotlight-copy {
-    @apply mt-2.5 text-[14px] leading-6 text-muted-foreground;
+    @apply mt-2 text-[15px] leading-7 text-muted-foreground;
   }
 
   .spotlight-chip,
   .surface-chip {
     @apply inline-flex max-w-full items-center gap-1.5 rounded-[0.72rem] border px-2.5 py-1.5 text-[11px] font-semibold;
-    border-color: rgba(139, 92, 246, 0.22);
-    background: rgba(109, 40, 217, 0.18);
+    border-color: rgba(139, 92, 246, 0.16);
+    background: rgba(109, 40, 217, 0.12);
     color: hsl(var(--foreground));
     width: fit-content;
   }
@@ -285,12 +285,12 @@
   .spotlight-stat,
   .kpi-card {
     @apply rounded-[1rem] border p-4;
-    border-color: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.07);
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+      linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015));
     box-shadow:
-      0 18px 30px -20px rgba(2, 6, 23, 0.45),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      0 18px 30px -24px rgba(2, 6, 23, 0.52),
+      inset 0 1px 0 rgba(255, 255, 255, 0.035);
   }
 
   .metric-card {
@@ -299,14 +299,14 @@
 
   .executive-metric {
     @apply rounded-[1rem] border p-4;
-    border-color: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.07);
     background:
-      linear-gradient(180deg, rgba(28, 32, 48, 0.98), rgba(21, 24, 33, 0.98));
-    box-shadow: 0 18px 28px -20px rgba(2, 6, 23, 0.42);
+      linear-gradient(180deg, rgba(25, 28, 38, 0.98), rgba(16, 18, 24, 0.99));
+    box-shadow: 0 18px 30px -24px rgba(2, 6, 23, 0.56);
   }
 
   .executive-label {
-    @apply text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground;
+    @apply text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground;
   }
 
   .executive-value {
@@ -316,26 +316,33 @@
   .premium-dark-button,
   .action-button-primary {
     @apply inline-flex items-center justify-center gap-2 rounded-[0.9rem] border border-transparent px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-all;
-    background: linear-gradient(135deg, #5b21b6, #6d28d9 48%, #7c3aed);
-    box-shadow: 0 22px 42px -24px rgba(91, 33, 182, 0.5);
+    background: linear-gradient(135deg, #5b21b6 0%, #6d28d9 52%, #7c3aed 100%);
+    box-shadow: 0 18px 36px -24px rgba(91, 33, 182, 0.44);
   }
 
   .premium-dark-button:hover,
   .action-button-primary:hover {
     transform: translateY(-1px);
-    box-shadow: 0 28px 48px -24px rgba(91, 33, 182, 0.56);
+    box-shadow: 0 22px 40px -24px rgba(91, 33, 182, 0.5);
+  }
+
+  .premium-dark-button:focus-visible,
+  .action-button-primary:focus-visible,
+  .action-button:focus-visible,
+  .auth-input:focus-visible {
+    outline: none;
   }
 
   .action-button {
     @apply inline-flex items-center justify-center gap-2 rounded-[0.9rem] border px-4 py-2.5 text-sm font-semibold text-foreground transition-all;
     border-color: rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.04);
-    box-shadow: 0 12px 20px -16px rgba(2, 6, 23, 0.42);
+    background: rgba(255, 255, 255, 0.03);
+    box-shadow: 0 14px 26px -22px rgba(2, 6, 23, 0.5);
   }
 
   .action-button:hover {
-    background: rgba(109, 40, 217, 0.12);
-    border-color: rgba(124, 58, 237, 0.18);
+    background: rgba(109, 40, 217, 0.09);
+    border-color: rgba(124, 58, 237, 0.14);
   }
 
   .disclosure-summary {
@@ -353,8 +360,27 @@
 
   .panel-soft {
     @apply rounded-[0.95rem] border p-3;
-    border-color: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.025);
+  }
+
+  .premium-dialog,
+  .table-shell,
+  .platform-panel {
+    @apply rounded-[1.35rem] border;
+    border-color: rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, rgba(22, 25, 34, 0.98), rgba(13, 15, 20, 0.99));
+    box-shadow:
+      0 34px 78px -52px rgba(2, 6, 23, 0.92),
+      0 14px 32px -28px rgba(15, 23, 42, 0.34),
+      inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  }
+
+  .toolbar-surface {
+    @apply rounded-[0.95rem] border;
+    border-color: rgba(255, 255, 255, 0.08);
     background: rgba(255, 255, 255, 0.03);
+    box-shadow: 0 16px 28px -24px rgba(2, 6, 23, 0.46);
   }
 
   .data-table th {
@@ -363,17 +389,17 @@
 
   .auth-shell {
     background:
-      radial-gradient(circle at top left, rgba(124, 58, 237, 0.2), transparent 28%),
-      radial-gradient(circle at bottom right, rgba(109, 40, 217, 0.12), transparent 24%),
-      linear-gradient(180deg, #141723 0%, #0f1115 100%);
+      radial-gradient(circle at 10% 4%, rgba(124, 58, 237, 0.13), transparent 28%),
+      radial-gradient(circle at 88% 14%, rgba(99, 102, 241, 0.08), transparent 22%),
+      linear-gradient(180deg, #141723 0%, #0d0f14 100%);
   }
 
   .auth-dark-panel,
   .auth-panel {
     @apply rounded-[1.4rem] border;
     border-color: rgba(255, 255, 255, 0.08);
-    background: linear-gradient(180deg, rgba(28, 32, 48, 0.98), rgba(15, 17, 21, 0.98));
-    box-shadow: 0 32px 58px -32px rgba(2, 6, 23, 0.82);
+    background: linear-gradient(180deg, rgba(24, 27, 37, 0.98), rgba(14, 16, 22, 0.99));
+    box-shadow: 0 32px 58px -36px rgba(2, 6, 23, 0.88);
   }
 
   .auth-stat {
@@ -384,8 +410,8 @@
 
   .auth-input {
     @apply w-full rounded-[0.9rem] border px-4 py-3 text-foreground outline-none transition-all;
-    border-color: hsl(var(--border));
-    background: rgba(15, 17, 21, 0.9);
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(10, 12, 17, 0.92);
   }
 
   .auth-input::placeholder {
@@ -393,9 +419,9 @@
   }
 
   .auth-input:focus {
-    border-color: rgba(124, 58, 237, 0.32);
+    border-color: rgba(124, 58, 237, 0.24);
     box-shadow:
-      0 0 0 4px rgba(124, 58, 237, 0.14),
+      0 0 0 4px rgba(124, 58, 237, 0.1),
       inset 0 1px 0 rgba(255, 255, 255, 0.03);
   }
 

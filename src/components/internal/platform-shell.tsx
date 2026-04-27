@@ -31,8 +31,8 @@ export function PlatformShell({ children, user }: PlatformShellProps) {
   const pathname = usePathname() ?? '/internal'
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(124,58,237,0.12),transparent_22%),linear-gradient(180deg,rgba(13,16,24,0.99),rgba(9,12,18,1))] text-foreground">
-      <header className="sticky top-0 z-40 border-b border-[rgba(255,255,255,0.08)] bg-[rgba(10,14,22,0.86)] backdrop-blur-xl">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(124,58,237,0.08),transparent_20%),linear-gradient(180deg,rgba(11,13,19,0.99),rgba(8,10,15,1))] text-foreground">
+      <header className="sticky top-0 z-40 border-b border-[rgba(255,255,255,0.08)] bg-[rgba(9,12,18,0.84)] backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1760px] flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8 xl:flex-row xl:items-center xl:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
@@ -54,7 +54,7 @@ export function PlatformShell({ children, user }: PlatformShellProps) {
           <div className="flex flex-wrap items-center gap-3">
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-2 rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3.5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)]"
+              className="action-button"
             >
               Abrir barbearia vinculada
               <ArrowUpRight className="h-4 w-4" />
@@ -83,8 +83,8 @@ export function PlatformShell({ children, user }: PlatformShellProps) {
                 className={cn(
                   'inline-flex items-center gap-2 rounded-[0.95rem] border px-3 py-2 text-sm transition-colors',
                   active
-                    ? 'border-[rgba(124,58,237,0.22)] bg-[rgba(124,58,237,0.12)] text-violet-100'
-                    : 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-muted-foreground hover:bg-[rgba(255,255,255,0.05)] hover:text-foreground'
+                    ? 'border-[rgba(124,58,237,0.16)] bg-[rgba(124,58,237,0.1)] text-violet-100'
+                    : 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.025)] text-muted-foreground hover:bg-[rgba(255,255,255,0.04)] hover:text-foreground'
                 )}
               >
                 {index === 0 ? <ShieldCheck className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}

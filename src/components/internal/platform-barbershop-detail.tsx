@@ -17,7 +17,7 @@ function DetailCard({
   icon: typeof Users
 }) {
   return (
-    <article className="rounded-[1.2rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.96),rgba(18,21,31,0.98))] p-4 shadow-[0_20px_36px_-28px_rgba(2,6,23,0.9)]">
+    <article className="dashboard-panel p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{label}</p>
@@ -57,7 +57,7 @@ export function PlatformBarbershopDetail({
         action={(
           <Link
             href="/internal"
-            className="inline-flex items-center gap-2 rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)]"
+            className="action-button"
           >
             <ArrowLeft className="h-4 w-4" />
             Voltar ao painel master
@@ -76,7 +76,7 @@ export function PlatformBarbershopDetail({
         </section>
       )}
 
-      <section className="rounded-[1.35rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(20,23,34,0.98),rgba(15,17,21,0.98))] p-4 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.92)]">
+      <section className="platform-panel p-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full border border-violet-500/20 bg-violet-500/12 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-violet-200">
             {BARBERSHOP_SUBSCRIPTION_STATUS_LABELS[data.barbershop.subscriptionStatus] ?? data.barbershop.subscriptionStatus}
@@ -137,7 +137,7 @@ export function PlatformBarbershopDetail({
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-[1.35rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(20,23,34,0.98),rgba(15,17,21,0.98))] p-4 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.92)]">
+        <div className="platform-panel p-4">
           <div className="border-b border-[rgba(255,255,255,0.06)] pb-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Equipe e acessos</p>
             <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">Usuarios do tenant</h2>
@@ -175,7 +175,7 @@ export function PlatformBarbershopDetail({
         </div>
 
         <div className="space-y-6">
-          <section className="rounded-[1.35rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(20,23,34,0.98),rgba(15,17,21,0.98))] p-4 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.92)]">
+          <section className="platform-panel p-4">
             <div className="border-b border-[rgba(255,255,255,0.06)] pb-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Integracoes</p>
               <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">Saude operacional</h2>
@@ -209,7 +209,7 @@ export function PlatformBarbershopDetail({
             </div>
           </section>
 
-          <section className="rounded-[1.35rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(20,23,34,0.98),rgba(15,17,21,0.98))] p-4 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.92)]">
+          <section className="platform-panel p-4">
             <div className="border-b border-[rgba(255,255,255,0.06)] pb-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Erros recentes</p>
               <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">Fila de atencao</h2>
@@ -240,7 +240,7 @@ export function PlatformBarbershopDetail({
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
-        <div className="rounded-[1.35rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(20,23,34,0.98),rgba(15,17,21,0.98))] p-4 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.92)]">
+        <div className="platform-panel p-4">
           <div className="border-b border-[rgba(255,255,255,0.06)] pb-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Uso de IA</p>
             <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">Consumo por fonte</h2>
@@ -284,7 +284,7 @@ export function PlatformBarbershopDetail({
           </p>
         </div>
 
-        <div className="rounded-[1.35rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(20,23,34,0.98),rgba(15,17,21,0.98))] p-4 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.92)]">
+        <div className="platform-panel p-4">
           <div className="border-b border-[rgba(255,255,255,0.06)] pb-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Atividade recente</p>
             <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">IA e automacoes</h2>

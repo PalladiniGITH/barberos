@@ -102,7 +102,7 @@ interface AppointmentModalProps {
 }
 
 const fieldClassName =
-  'w-full min-w-0 rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(15,17,21,0.86)] px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-[rgba(124,58,237,0.28)] focus:bg-[rgba(124,58,237,0.08)] focus:ring-4 focus:ring-[rgba(124,58,237,0.14)]'
+  'auth-input w-full min-w-0 rounded-[1rem] px-3.5 py-2.5 text-sm placeholder:text-muted-foreground'
 
 function Field({
   label,
@@ -353,9 +353,9 @@ export function AppointmentModal({
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-3 pt-4 sm:items-center sm:p-4">
-          <div className="absolute inset-0 bg-[rgba(17,24,39,0.36)] backdrop-blur-sm" onClick={() => setOpen(false)} />
+          <div className="absolute inset-0 bg-[rgba(9,12,18,0.46)] backdrop-blur-sm" onClick={() => setOpen(false)} />
 
-          <div className="relative z-10 grid h-[min(920px,calc(100vh-1rem))] w-full max-w-5xl min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[1.5rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.99),rgba(15,17,21,0.98))] shadow-[0_42px_120px_-60px_rgba(2,6,23,0.88)]">
+          <div className="premium-dialog relative z-10 grid h-[min(920px,calc(100vh-1rem))] w-full max-w-5xl min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[1.5rem]">
             <div className="flex items-start justify-between gap-4 border-b border-[rgba(255,255,255,0.06)] px-5 py-4 sm:px-6">
               <div className="min-w-0">
                 <h2 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
@@ -369,7 +369,7 @@ export function AppointmentModal({
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-[0.9rem] text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)] hover:text-primary"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.1)] hover:text-primary"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -593,7 +593,7 @@ export function AppointmentModal({
                 </div>
               </form>
 
-              <aside className="min-h-0 min-w-0 overflow-y-auto border-t border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-5 xl:border-l xl:border-t-0 xl:px-6">
+              <aside className="min-h-0 min-w-0 overflow-y-auto border-t border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.025)] px-5 py-5 xl:border-l xl:border-t-0 xl:px-6">
                 <div className="space-y-4">
                   <div>
                     <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Resumo do horario</p>

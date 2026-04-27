@@ -51,7 +51,7 @@ export function AuthEntryCard({
   return (
     <main className="auth-shell min-h-screen px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl items-center gap-6 lg:grid-cols-[minmax(0,1.15fr)_440px]">
-        <section className="premium-shell p-8 sm:p-10 lg:p-12">
+        <section className="dashboard-spotlight p-8 sm:p-10 lg:p-12">
           <h1 className="spotlight-title mt-0 max-w-xl">
             Operacao, agenda e inteligencia para a rotina da barbearia.
           </h1>
@@ -72,7 +72,7 @@ export function AuthEntryCard({
           </div>
         </section>
 
-        <section className="premium-block p-6 sm:p-8">
+        <section className="auth-panel p-6 sm:p-8">
           {isAuthenticated ? (
             <div className="space-y-4">
               <h2 className="text-2xl font-semibold tracking-tight text-foreground">

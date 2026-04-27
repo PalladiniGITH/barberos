@@ -44,7 +44,7 @@ interface ScheduleBlockModalProps {
 }
 
 const fieldClassName =
-  'w-full min-w-0 rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(15,17,21,0.86)] px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-[rgba(124,58,237,0.28)] focus:bg-[rgba(124,58,237,0.08)] focus:ring-4 focus:ring-[rgba(124,58,237,0.14)]'
+  'auth-input w-full min-w-0 rounded-[1rem] px-3.5 py-2.5 text-sm placeholder:text-muted-foreground'
 
 function normalizeOptionalText(value: string) {
   const normalized = value.trim()
@@ -201,9 +201,9 @@ export function ScheduleBlockModal({
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-3 pt-4 sm:items-center sm:p-4">
-          <div className="absolute inset-0 bg-[rgba(17,24,39,0.36)] backdrop-blur-sm" onClick={() => setOpen(false)} />
+          <div className="absolute inset-0 bg-[rgba(9,12,18,0.46)] backdrop-blur-sm" onClick={() => setOpen(false)} />
 
-          <div className="relative z-10 grid w-full max-w-2xl gap-0 overflow-hidden rounded-[1.5rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.99),rgba(15,17,21,0.98))] shadow-[0_42px_120px_-60px_rgba(2,6,23,0.88)]">
+          <div className="premium-dialog relative z-10 grid w-full max-w-2xl gap-0 overflow-hidden rounded-[1.5rem]">
             <div className="flex items-start justify-between gap-4 border-b border-[rgba(255,255,255,0.06)] px-5 py-4 sm:px-6">
               <div className="min-w-0">
                 <h2 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
@@ -324,7 +324,7 @@ export function ScheduleBlockModal({
                   <button
                     type="submit"
                     disabled={isSubmitting || isRemoving}
-                    className="inline-flex items-center gap-2 rounded-[0.95rem] bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[0_20px_40px_-24px_rgba(91,33,182,0.52)] transition-transform hover:-translate-y-0.5 hover:bg-[rgba(76,29,149,1)] disabled:cursor-not-allowed disabled:opacity-70"
+                    className="action-button-primary disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : (isEdit ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />)}
                     {isEdit ? 'Salvar bloqueio' : 'Criar bloqueio'}
