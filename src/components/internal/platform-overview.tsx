@@ -97,19 +97,89 @@ export function PlatformOverview({
         </section>
       )}
 
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_340px]">
+        <div className="dashboard-spotlight p-6 sm:p-7">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div className="max-w-3xl">
+              <h2 className="spotlight-title mt-0 text-[2.25rem] sm:text-[2.7rem]">
+                Leitura executiva da plataforma em uma unica camada.
+              </h2>
+              <p className="spotlight-copy mt-3 max-w-2xl">
+                Tenants ativos, risco comercial, custo de IA, mensageria e saude operacional agrupados para decidir rapido sem entrar tenant por tenant.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:w-[320px] xl:grid-cols-1">
+              <div className="surface-tier-low p-4">
+                <p className="executive-label">Barbearias ativas</p>
+                <p className="mt-3 text-[1.9rem] font-semibold tracking-tight text-foreground">{data.cards.activeBarbershops}</p>
+                <p className="mt-2 text-sm text-muted-foreground">Tenants com operacao ligada e status comercial em dia.</p>
+              </div>
+              <div className="surface-tier-low p-4">
+                <p className="executive-label">Operacao em risco</p>
+                <p className="mt-3 text-[1.9rem] font-semibold tracking-tight text-foreground">
+                  {data.cards.pastDueBarbershops + data.cards.blockedBarbershops}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">Soma de tenants em atraso ou bloqueados para priorizacao comercial.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-4">
+            <div className="hero-stat-card">
+              <p className="executive-label">Trial</p>
+              <p className="mt-3 text-[1.8rem] font-semibold tracking-tight text-foreground">{data.cards.trialBarbershops}</p>
+              <p className="mt-2 text-sm text-muted-foreground">Contas em implantacao ou avaliacao inicial.</p>
+            </div>
+            <div className="hero-stat-card">
+              <p className="executive-label">WhatsApp no mes</p>
+              <p className="mt-3 text-[1.8rem] font-semibold tracking-tight text-foreground">{data.cards.whatsappMessagesThisMonth}</p>
+              <p className="mt-2 text-sm text-muted-foreground">Mensagens processadas pela plataforma no periodo.</p>
+            </div>
+            <div className="hero-stat-card">
+              <p className="executive-label">Agendamentos no mes</p>
+              <p className="mt-3 text-[1.8rem] font-semibold tracking-tight text-foreground">{data.cards.appointmentsThisMonth}</p>
+              <p className="mt-2 text-sm text-muted-foreground">Volume operacional somado entre tenants ativos.</p>
+            </div>
+            <div className="hero-stat-card">
+              <p className="executive-label">Automacoes hoje</p>
+              <p className="mt-3 text-[1.8rem] font-semibold tracking-tight text-foreground">{data.cards.automationsToday}</p>
+              <p className="mt-2 text-sm text-muted-foreground">Execucoes registradas na janela atual da plataforma.</p>
+            </div>
+          </div>
+        </div>
+
+        <aside className="premium-rail p-5">
+          <div>
+            <h3 className="text-[1.45rem] font-semibold tracking-tight text-foreground">Custos e saude de IA</h3>
+            <p className="mt-2 text-sm leading-7 text-muted-foreground">
+              Uma leitura curta do consumo atual para enxergar impacto financeiro, risco tecnico e necessidade de intervencao.
+            </p>
+          </div>
+
+          <div className="mt-5 space-y-3">
+            <div className="surface-tier-low p-4">
+              <p className="executive-label">Tokens IA no mes</p>
+              <p className="mt-3 text-[1.85rem] font-semibold tracking-tight text-foreground">
+                {new Intl.NumberFormat('pt-BR').format(data.cards.aiTokensThisMonth)}
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">Consumo agregado dos fluxos de IA instrumentados.</p>
+            </div>
+            <div className="surface-tier-low p-4">
+              <p className="executive-label">Custo IA estimado</p>
+              <p className="mt-3 text-[1.85rem] font-semibold tracking-tight text-foreground">{aiCostLabel}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{aiCostHelper}</p>
+            </div>
+            <div className="surface-tier-low p-4">
+              <p className="executive-label">Erros recentes</p>
+              <p className="mt-3 text-[1.85rem] font-semibold tracking-tight text-foreground">{data.cards.recentErrors}</p>
+              <p className="mt-2 text-sm text-muted-foreground">Falhas novas de IA, mensageria ou automacao que exigem fila de atencao.</p>
+            </div>
+          </div>
+        </aside>
+      </section>
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard
-          label="Barbearias ativas"
-          value={String(data.cards.activeBarbershops)}
-          helper="Tenants com operacao ativa e status comercial em dia."
-          icon={Building2}
-        />
-        <SummaryCard
-          label="Barbearias em trial"
-          value={String(data.cards.trialBarbershops)}
-          helper="Contas ainda em fase de avaliacao ou implantacao inicial."
-          icon={Building2}
-        />
         <SummaryCard
           label="Barbearias em atraso"
           value={String(data.cards.pastDueBarbershops)}
@@ -123,40 +193,28 @@ export function PlatformOverview({
           icon={TriangleAlert}
         />
         <SummaryCard
-          label="Agendamentos no mes"
-          value={String(data.cards.appointmentsThisMonth)}
-          helper="Volume global de agenda considerando todos os tenants ativos."
-          icon={RadioTower}
+          label="Usuarios"
+          value={String(data.barbershops.reduce((total, item) => total + item.usersCount, 0))}
+          helper="Total de contas autenticadas distribuido entre tenants filtrados."
+          icon={Building2}
         />
         <SummaryCard
-          label="WhatsApp no mes"
-          value={String(data.cards.whatsappMessagesThisMonth)}
-          helper="Mensagens processadas pela plataforma no periodo corrente."
+          label="Clientes"
+          value={String(data.barbershops.reduce((total, item) => total + item.customersCount, 0))}
+          helper="Base agregada de clientes dos tenants que entram nesta leitura."
+          icon={Building2}
+        />
+        <SummaryCard
+          label="Tenants sem custo"
+          value={String(data.barbershops.filter((item) => item.aiEstimatedCostUsd === null && item.aiTokensThisMonth > 0).length)}
+          helper="Contas com consumo de IA e modelo ainda sem preco configurado."
+          icon={Bot}
+        />
+        <SummaryCard
+          label="Tenants com ultima atividade"
+          value={String(data.barbershops.filter((item) => item.lastActivityLabel !== null).length)}
+          helper="Contas com sinal operacional recente dentro da janela carregada."
           icon={MessageSquareMore}
-        />
-        <SummaryCard
-          label="Tokens IA no mes"
-          value={new Intl.NumberFormat('pt-BR').format(data.cards.aiTokensThisMonth)}
-          helper="Consumo agregado de IA registrado pelos fluxos instrumentados."
-          icon={Bot}
-        />
-        <SummaryCard
-          label="Custo IA estimado"
-          value={aiCostLabel}
-          helper={aiCostHelper}
-          icon={Bot}
-        />
-        <SummaryCard
-          label="Automacoes hoje"
-          value={String(data.cards.automationsToday)}
-          helper="Execucoes de rotina registradas no dia atual da plataforma."
-          icon={RadioTower}
-        />
-        <SummaryCard
-          label="Erros recentes"
-          value={String(data.cards.recentErrors)}
-          helper="Falhas recentes de IA, automacao ou mensageria que merecem atencao."
-          icon={TriangleAlert}
         />
       </section>
 

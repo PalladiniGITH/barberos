@@ -112,44 +112,44 @@ interface DragState {
 
 const EVENT_GAP = 8
 const MINIMUM_SELECTION_DURATION = 30
-const SCHEDULE_MAJOR_GRID_LINE = 'rgba(148, 163, 184, 0.18)'
-const SCHEDULE_MAJOR_GRID_LINE_SOFT = 'rgba(15, 17, 21, 0.42)'
-const SCHEDULE_MINOR_GRID_LINE = 'rgba(124, 58, 237, 0.14)'
+const SCHEDULE_MAJOR_GRID_LINE = 'rgba(148, 163, 184, 0.14)'
+const SCHEDULE_MAJOR_GRID_LINE_SOFT = 'rgba(8, 10, 14, 0.52)'
+const SCHEDULE_MINOR_GRID_LINE = 'rgba(124, 58, 237, 0.1)'
 
 function getAppointmentStatusMeta(item: PositionedAppointment) {
   if (item.itemType === 'BLOCK') {
     return {
-      accent: 'from-violet-700/90 via-violet-500/75 to-transparent',
-      badge: 'border-[rgba(91,33,182,0.14)] bg-[rgba(91,33,182,0.09)] text-primary',
-      shell: 'border-[rgba(124,58,237,0.2)] bg-[linear-gradient(180deg,rgba(91,33,182,0.18),rgba(28,32,48,0.98))]',
+      accent: 'from-violet-500/85 via-violet-400/55 to-transparent',
+      badge: 'border-[rgba(91,33,182,0.18)] bg-[rgba(91,33,182,0.1)] text-violet-100',
+      shell: 'border-[rgba(124,58,237,0.16)] bg-[linear-gradient(180deg,rgba(78,48,144,0.26),rgba(18,18,23,0.98))]',
     } as const
   }
 
   const styles = {
     PENDING: {
-      accent: 'from-amber-500/90 via-amber-300/70 to-transparent',
-      badge: 'border-[rgba(245,158,11,0.12)] bg-[rgba(245,158,11,0.08)] text-amber-700',
-      shell: 'border-[rgba(245,158,11,0.18)] bg-[linear-gradient(180deg,rgba(245,158,11,0.18),rgba(28,32,48,0.98))]',
+      accent: 'from-amber-400/85 via-amber-300/55 to-transparent',
+      badge: 'border-[rgba(245,158,11,0.18)] bg-[rgba(245,158,11,0.1)] text-amber-100',
+      shell: 'border-[rgba(245,158,11,0.16)] bg-[linear-gradient(180deg,rgba(120,82,22,0.24),rgba(18,18,23,0.98))]',
     },
     CONFIRMED: {
-      accent: 'from-emerald-500/90 via-emerald-400/70 to-transparent',
-      badge: 'border-[rgba(16,185,129,0.12)] bg-[rgba(16,185,129,0.08)] text-emerald-700',
-      shell: 'border-[rgba(34,197,94,0.18)] bg-[linear-gradient(180deg,rgba(22,163,74,0.18),rgba(28,32,48,0.98))]',
+      accent: 'from-emerald-400/88 via-emerald-300/58 to-transparent',
+      badge: 'border-[rgba(16,185,129,0.16)] bg-[rgba(16,185,129,0.1)] text-emerald-100',
+      shell: 'border-[rgba(34,197,94,0.15)] bg-[linear-gradient(180deg,rgba(28,84,62,0.24),rgba(18,18,23,0.98))]',
     },
     CANCELLED: {
-      accent: 'from-rose-500/90 via-rose-400/70 to-transparent',
-      badge: 'border-[rgba(244,63,94,0.12)] bg-[rgba(244,63,94,0.08)] text-rose-700',
-      shell: 'border-[rgba(244,63,94,0.18)] bg-[linear-gradient(180deg,rgba(244,63,94,0.18),rgba(28,32,48,0.98))]',
+      accent: 'from-rose-400/88 via-rose-300/58 to-transparent',
+      badge: 'border-[rgba(244,63,94,0.16)] bg-[rgba(244,63,94,0.1)] text-rose-100',
+      shell: 'border-[rgba(244,63,94,0.16)] bg-[linear-gradient(180deg,rgba(98,34,49,0.26),rgba(18,18,23,0.98))]',
     },
     COMPLETED: {
-      accent: 'from-sky-500/90 via-sky-400/70 to-transparent',
-      badge: 'border-[rgba(14,165,233,0.12)] bg-[rgba(14,165,233,0.08)] text-sky-700',
-      shell: 'border-[rgba(14,165,233,0.18)] bg-[linear-gradient(180deg,rgba(14,165,233,0.18),rgba(28,32,48,0.98))]',
+      accent: 'from-sky-400/88 via-sky-300/58 to-transparent',
+      badge: 'border-[rgba(14,165,233,0.16)] bg-[rgba(14,165,233,0.1)] text-sky-100',
+      shell: 'border-[rgba(14,165,233,0.15)] bg-[linear-gradient(180deg,rgba(25,77,101,0.24),rgba(18,18,23,0.98))]',
     },
     NO_SHOW: {
-      accent: 'from-pink-500/90 via-fuchsia-400/70 to-transparent',
-      badge: 'border-[rgba(236,72,153,0.12)] bg-[rgba(236,72,153,0.08)] text-pink-700',
-      shell: 'border-[rgba(236,72,153,0.18)] bg-[linear-gradient(180deg,rgba(236,72,153,0.18),rgba(28,32,48,0.98))]',
+      accent: 'from-pink-400/88 via-fuchsia-300/58 to-transparent',
+      badge: 'border-[rgba(236,72,153,0.16)] bg-[rgba(236,72,153,0.1)] text-pink-100',
+      shell: 'border-[rgba(236,72,153,0.16)] bg-[linear-gradient(180deg,rgba(99,34,70,0.24),rgba(18,18,23,0.98))]',
     },
   } as const
 
@@ -448,7 +448,7 @@ function ScheduleAppointmentCard({
             }
           }}
           className={cn(
-            'group absolute overflow-hidden rounded-[0.9rem] border text-left shadow-[0_14px_24px_-16px_rgba(22,16,39,0.14)] transition-all duration-200 hover:shadow-[0_18px_28px_-18px_rgba(22,16,39,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(91,33,182,0.26)]',
+            'group absolute overflow-hidden rounded-[1rem] border text-left shadow-[0_18px_34px_-24px_rgba(8,10,18,0.5)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_24px_42px_-28px_rgba(8,10,18,0.62)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(91,33,182,0.26)]',
             statusMeta.shell
           )}
           style={{
@@ -459,12 +459,12 @@ function ScheduleAppointmentCard({
           }}
         >
           <span className={cn('absolute inset-y-0 left-0 w-[3px] bg-gradient-to-b', statusMeta.accent)} />
-          <div className="flex h-full min-w-0 flex-col justify-between px-3 py-3">
+          <div className="flex h-full min-w-0 flex-col justify-between px-3 py-3.5">
             <div className="flex items-start justify-between gap-2">
-              <span className="inline-flex rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(15,17,21,0.78)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-foreground">
+              <span className="inline-flex rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(8,10,14,0.62)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-100">
                 {item.startTimeLabel}
               </span>
-              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-400">
                 <GripVertical className="h-3 w-3" />
                 mover
               </span>
@@ -484,14 +484,14 @@ function ScheduleAppointmentCard({
                 title={item.itemType === 'BLOCK' ? `Bloqueio com ${item.professionalName}` : item.serviceName}
                 className={cn(
                   'mt-1 overflow-hidden text-muted-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]',
-                  compact ? 'text-[11px] leading-4' : 'text-xs leading-5'
+                  compact ? 'text-[11px] leading-4 text-slate-300' : 'text-xs leading-5 text-slate-300'
                 )}
               >
                 {item.itemType === 'BLOCK' ? `Bloqueio com ${item.professionalName}` : item.serviceName}
               </p>
             </div>
 
-            <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+            <div className="flex items-center justify-between gap-2 text-[11px] text-slate-300">
               <span className="truncate">
                 {item.itemType === 'BLOCK'
                   ? 'Intervalo indisponivel'
@@ -518,7 +518,7 @@ function ScheduleAppointmentCard({
           onCloseAutoFocus={(event) => event.preventDefault()}
           onEscapeKeyDown={closePreview}
           onWheelCapture={closePreview}
-          className="pointer-events-none z-50 w-[320px] select-none rounded-[1.3rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.98),rgba(15,17,21,0.98))] p-4 text-foreground shadow-[0_36px_90px_-44px_rgba(2,6,23,0.82)]"
+          className="pointer-events-none z-50 w-[320px] select-none rounded-[1.3rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,30,40,0.98),rgba(12,13,17,0.995))] p-4 text-foreground shadow-[0_36px_90px_-44px_rgba(2,6,23,0.82)]"
         >
           <ScheduleItemPreview item={item} />
           <Popover.Arrow className="fill-white" />
@@ -806,14 +806,14 @@ export function ScheduleCalendar({
             className="grid gap-3"
             style={{ gridTemplateColumns: `88px repeat(${Math.max(columns.length, 1)}, minmax(${minColumnWidth}px, 1fr))` }}
           >
-            <div className="sticky left-0 z-20 rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(35,38,58,0.98),rgba(21,24,33,0.98))] px-3 py-3 shadow-[0_16px_24px_-18px_rgba(2,6,23,0.54)]">
+            <div className="sticky left-0 z-20 rounded-[0.95rem] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(31,34,44,0.99),rgba(18,20,28,0.99))] px-3 py-3 shadow-[0_16px_24px_-18px_rgba(2,6,23,0.54)]">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Horario</p>
             </div>
 
             {columns.map((column) => (
               <div
                 key={`${column.key}-header`}
-                className="rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(35,38,58,0.98),rgba(21,24,33,0.96))] px-4 py-3 shadow-[0_16px_24px_-18px_rgba(2,6,23,0.5)]"
+                className="rounded-[0.95rem] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(31,34,44,0.99),rgba(18,20,28,0.99))] px-4 py-3 shadow-[0_16px_24px_-18px_rgba(2,6,23,0.5)]"
               >
                 <p className="text-sm font-semibold tracking-tight text-foreground">{column.title}</p>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">{column.helper}</p>
@@ -825,7 +825,7 @@ export function ScheduleCalendar({
             className="mt-3 grid gap-3"
             style={{ gridTemplateColumns: `88px repeat(${Math.max(columns.length, 1)}, minmax(${minColumnWidth}px, 1fr))` }}
           >
-            <div className="sticky left-0 z-10 rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(35,38,58,0.96),rgba(21,24,33,0.98))] px-2 shadow-[0_16px_24px_-18px_rgba(2,6,23,0.5)]">
+            <div className="sticky left-0 z-10 rounded-[0.95rem] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(29,31,39,0.98),rgba(17,18,24,0.99))] px-2 shadow-[0_16px_24px_-18px_rgba(2,6,23,0.5)]">
               {hours.map((hour, index) => (
                 <div
                   key={hour}
@@ -837,7 +837,7 @@ export function ScheduleCalendar({
                   }}
                 >
                   <span className={cn(
-                    'absolute -top-2 left-0 rounded-[0.7rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(15,17,21,0.86)] px-2.5 py-1 text-xs font-semibold text-foreground shadow-[0_10px_16px_-10px_rgba(2,6,23,0.5)]',
+                    'absolute -top-2 left-0 rounded-[0.7rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(9,10,14,0.88)] px-2.5 py-1 text-xs font-semibold text-foreground shadow-[0_10px_16px_-10px_rgba(2,6,23,0.5)]',
                     index === 0 ? 'top-0' : ''
                   )}>
                     {hour}
@@ -882,7 +882,7 @@ export function ScheduleCalendar({
                         currentMinutes: minutes,
                       })
                     }}
-                    className="relative overflow-hidden rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.98),rgba(21,24,33,0.96))] shadow-[0_18px_28px_-20px_rgba(2,6,23,0.56)]"
+                    className="relative overflow-hidden rounded-[1.05rem] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(23,25,31,0.98),rgba(14,15,20,0.99))] shadow-[0_18px_28px_-20px_rgba(2,6,23,0.56)]"
                     style={{ height: `${calendarHeight}px` }}
                   >
                     {hours.map((hour, index) => (
@@ -947,7 +947,7 @@ export function ScheduleCalendar({
 
                     {liveSelection && (
                       <div
-                        className="absolute inset-x-3 rounded-[0.85rem] border border-dashed border-[rgba(91,33,182,0.18)] bg-[rgba(91,33,182,0.08)]"
+                        className="absolute inset-x-3 rounded-[0.9rem] border border-dashed border-[rgba(91,33,182,0.18)] bg-[rgba(91,33,182,0.08)]"
                         style={{
                           top: `${getAppointmentTop(liveSelection.startMinutes, dayStartMinutes, schedulePxPerMinute)}px`,
                           height: `${Math.max(liveSelection.durationMinutes * schedulePxPerMinute, 40)}px`,
@@ -958,7 +958,7 @@ export function ScheduleCalendar({
                     {committedForColumn && (
                       <div
                         data-schedule-selection-actions
-                        className="absolute inset-x-3 rounded-[0.85rem] border border-[rgba(91,33,182,0.16)] bg-[rgba(91,33,182,0.08)] shadow-[0_12px_20px_-16px_rgba(22,16,39,0.12)]"
+                        className="absolute inset-x-3 rounded-[0.9rem] border border-[rgba(91,33,182,0.16)] bg-[rgba(91,33,182,0.08)] shadow-[0_16px_28px_-20px_rgba(22,16,39,0.18)]"
                         style={{
                           top: `${getAppointmentTop(committedForColumn.startMinutes, dayStartMinutes, schedulePxPerMinute)}px`,
                           height: `${Math.max(committedForColumn.durationMinutes * schedulePxPerMinute, 58)}px`,
@@ -1081,7 +1081,7 @@ export function ScheduleCalendar({
                     )}
 
                     {column.appointments.length === 0 && !committedForColumn && (
-                      <div className="absolute inset-x-5 top-6 rounded-[0.9rem] border border-dashed border-[rgba(52,44,78,0.12)] bg-[rgba(91,33,182,0.035)] px-4 py-3 text-xs leading-6 text-muted-foreground">
+                      <div className="absolute inset-x-5 top-6 rounded-[0.95rem] border border-dashed border-[rgba(52,44,78,0.12)] bg-[rgba(91,33,182,0.035)] px-4 py-3 text-xs leading-6 text-muted-foreground">
                         Clique para criar. Arraste para reservar um intervalo maior.
                       </div>
                     )}

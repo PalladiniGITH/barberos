@@ -86,11 +86,11 @@ export function ScheduleToolbar({
   return (
     <div className="flex w-full flex-col gap-3 xl:min-w-[720px]">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-end">
-        <div className="toolbar-surface flex min-w-0 items-center gap-1 p-1">
+        <div className="toolbar-surface flex min-w-0 items-center gap-1 p-1.5">
           <button
             type="button"
             onClick={() => goToDate('previous')}
-            className="rounded-[0.8rem] p-2 text-muted-foreground transition-colors hover:bg-[rgba(255,255,255,0.045)] hover:text-foreground"
+            className="rounded-[0.85rem] p-2 text-muted-foreground transition-colors hover:bg-[rgba(255,255,255,0.045)] hover:text-foreground"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -98,7 +98,7 @@ export function ScheduleToolbar({
           <button
             type="button"
             onClick={() => goToDate('today')}
-            className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-[0.85rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-foreground"
+            className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-[0.95rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.04)] px-3.5 py-2.5 text-foreground"
           >
             <CalendarDays className="h-3.5 w-3.5 text-primary" />
             <span className="truncate text-center text-sm font-semibold">{label}</span>
@@ -107,7 +107,7 @@ export function ScheduleToolbar({
           <button
             type="button"
             onClick={() => goToDate('next')}
-            className="rounded-[0.8rem] p-2 text-muted-foreground transition-colors hover:bg-[rgba(255,255,255,0.045)] hover:text-foreground"
+            className="rounded-[0.85rem] p-2 text-muted-foreground transition-colors hover:bg-[rgba(255,255,255,0.045)] hover:text-foreground"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -166,10 +166,10 @@ export function ScheduleToolbar({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-        {[
-          { value: 'barber' as const, label: 'Grade por barbeiro', icon: PanelsTopLeft },
-          { value: 'day' as const, label: 'Linha do dia', icon: LayoutGrid },
+        <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+          {[
+            { value: 'barber' as const, label: 'Grade por barbeiro', icon: PanelsTopLeft },
+            { value: 'day' as const, label: 'Linha do dia', icon: LayoutGrid },
         ].map((item) => (
           <button
             key={item.value}
@@ -180,9 +180,9 @@ export function ScheduleToolbar({
               router.push(href)
             }}
             className={cn(
-              'inline-flex items-center gap-2 rounded-[0.9rem] border px-3 py-1.5 text-sm font-semibold transition-colors',
+              'inline-flex items-center gap-2 rounded-[0.95rem] border px-3.5 py-2 text-sm font-semibold transition-colors',
               view === item.value
-                ? 'border-[rgba(124,92,255,0.16)] bg-[rgba(124,92,255,0.08)] text-violet-100'
+                ? 'border-[rgba(124,92,255,0.18)] bg-[linear-gradient(180deg,rgba(124,92,255,0.16),rgba(63,53,111,0.18))] text-violet-50'
                 : 'border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.025)] text-muted-foreground hover:bg-[rgba(255,255,255,0.045)] hover:text-foreground'
             )}
           >

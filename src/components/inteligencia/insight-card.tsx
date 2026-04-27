@@ -155,8 +155,8 @@ export function DashboardInsightsPreview({ report }: { report: BusinessIntellige
 
   return (
     <section className="dashboard-panel overflow-hidden p-0">
-      <div className="grid xl:grid-cols-[minmax(300px,390px)_minmax(0,1fr)]">
-        <div className="premium-rail p-6">
+      <div className="flex h-full flex-col">
+        <div className="premium-rail border-b border-[rgba(255,255,255,0.06)] p-5">
           <div className="flex flex-wrap items-center gap-2">
             <div className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
               <CircleDollarSign className="h-4 w-4 text-primary" />
@@ -168,12 +168,12 @@ export function DashboardInsightsPreview({ report }: { report: BusinessIntellige
             <IntelligenceRuntimeDetails report={report} />
           </div>
 
-          <div className="mt-8">
-            <h2 className="mt-3 text-[1.9rem] font-semibold tracking-tight text-foreground">{report.summary.headline}</h2>
-            <p className="mt-3 max-w-sm text-sm leading-7 text-muted-foreground">{report.summary.body}</p>
+          <div className="mt-6">
+            <h2 className="text-[1.55rem] font-semibold tracking-tight text-foreground">{report.summary.headline}</h2>
+            <p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground">{report.summary.body}</p>
           </div>
 
-          <div className="mt-8">
+          <div className="mt-6">
             <Link href="/inteligencia" className="premium-dark-button">
               Abrir analise completa
               <ArrowUpRight className="h-4 w-4" />
@@ -181,16 +181,14 @@ export function DashboardInsightsPreview({ report }: { report: BusinessIntellige
           </div>
         </div>
 
-        <div className="p-6">
-          <div className="mb-5 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-base font-semibold text-foreground">
-                Os sinais mais relevantes para agir sem perder tempo.
-              </p>
-            </div>
+        <div className="p-5">
+          <div className="mb-4">
+            <p className="text-sm font-semibold text-foreground">
+              Os sinais mais relevantes para agir sem perder tempo.
+            </p>
           </div>
 
-          <div className="grid gap-3 xl:grid-cols-3">
+          <div className="space-y-3">
             {insights.map((insight) => (
               <InsightCard key={insight.id} insight={insight} compact />
             ))}

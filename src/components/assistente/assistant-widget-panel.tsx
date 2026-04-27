@@ -88,24 +88,24 @@ function MessageBubble({ message }: { message: AssistantDisplayedMessage }) {
     <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
       <article
         className={cn(
-          'max-w-[88%] rounded-[1.2rem] border px-4 py-3 shadow-[0_18px_34px_-30px_rgba(2,6,23,0.78)]',
+          'max-w-[90%] rounded-[1.25rem] border px-4 py-3.5 shadow-[0_18px_34px_-30px_rgba(2,6,23,0.78)]',
           isError
             ? 'border-[rgba(220,38,38,0.24)] bg-[rgba(220,38,38,0.08)] text-slate-100'
             : isPending
               ? 'border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] text-muted-foreground'
-              : isUser
-            ? 'border-[rgba(124,92,255,0.18)] bg-[linear-gradient(180deg,rgba(124,92,255,0.16),rgba(65,53,112,0.18))] text-violet-50'
-            : 'border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(42,42,45,0.38),rgba(27,27,30,0.76))] text-foreground'
+            : isUser
+            ? 'border-[rgba(124,92,255,0.18)] bg-[linear-gradient(180deg,rgba(124,92,255,0.18),rgba(63,53,111,0.24))] text-violet-50'
+            : 'border-[rgba(255,255,255,0.05)] bg-[linear-gradient(180deg,rgba(34,34,38,0.54),rgba(19,19,22,0.9))] text-foreground'
         )}
       >
         <div className="flex items-center justify-between gap-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             {isUser ? 'Voce' : 'BarberEX IA'}
           </p>
           <span className="text-[11px] text-muted-foreground">{message.createdAtLabel}</span>
         </div>
         {isUser ? (
-          <p className="mt-2 whitespace-pre-line break-words text-sm leading-7">{message.content}</p>
+          <p className="mt-2.5 whitespace-pre-line break-words text-sm leading-7">{message.content}</p>
         ) : (
           <AssistantMessageContent content={message.content} />
         )}
@@ -150,7 +150,7 @@ function RecentThreadsList(input: {
             className={cn(
               'w-full rounded-[1.05rem] border px-3.5 py-3 text-left transition-[border-color,background-color,transform] duration-150 ease-out hover:-translate-y-0.5',
               isActive
-                ? 'border-[rgba(124,92,255,0.16)] bg-[linear-gradient(180deg,rgba(53,52,56,0.88),rgba(27,27,30,0.98))] shadow-[0_20px_40px_-32px_rgba(91,33,182,0.34)]'
+                ? 'border-[rgba(124,92,255,0.16)] bg-[linear-gradient(180deg,rgba(44,43,52,0.92),rgba(21,21,24,0.98))] shadow-[0_20px_40px_-32px_rgba(91,33,182,0.34)]'
                 : 'border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.025)] hover:border-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.04)]'
             )}
             disabled={disabled}
@@ -449,7 +449,7 @@ export function AssistantWidgetPanel() {
         aria-hidden={!isOpen}
         className={cn(
           'fixed z-40 flex flex-col overflow-hidden rounded-[1.6rem] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(28,28,33,0.99),rgba(14,14,17,0.995))] shadow-[0_44px_86px_-54px_rgba(2,6,23,0.94)] transition-[opacity,transform] duration-200 ease-out',
-          'left-3 right-3 top-[5.25rem] bottom-3 sm:left-auto sm:top-auto sm:h-[min(720px,calc(100vh-3rem))] sm:w-[min(468px,calc(100vw-3rem))]',
+          'left-3 right-3 top-[5.25rem] bottom-3 sm:left-auto sm:top-auto sm:h-[min(720px,calc(100vh-3rem))] sm:w-[min(476px,calc(100vw-3rem))]',
           isOpen ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0 sm:translate-y-3'
         )}
         style={{
@@ -459,7 +459,7 @@ export function AssistantWidgetPanel() {
       >
         <header className={cn(
           'shrink-0 border-b border-[rgba(255,255,255,0.06)] px-4 sm:px-5',
-          compactConversationView ? 'py-3' : 'py-4'
+          compactConversationView ? 'py-2.5' : 'py-4'
         )}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -469,7 +469,7 @@ export function AssistantWidgetPanel() {
               </div>
               <p className={cn(
                 'text-foreground',
-                compactConversationView ? 'mt-1 text-xs leading-5 text-muted-foreground' : 'mt-2 text-sm leading-6'
+                compactConversationView ? 'mt-1 text-[11px] leading-5 text-muted-foreground' : 'mt-2 text-sm leading-6'
               )}>
                 {headerDescription}
               </p>
@@ -505,7 +505,7 @@ export function AssistantWidgetPanel() {
 
           <div className={cn(
             'text-xs text-muted-foreground',
-            compactConversationView ? 'mt-2 truncate leading-5' : 'mt-3 space-y-1 leading-6'
+            compactConversationView ? 'mt-1.5 truncate text-[11px] leading-5' : 'mt-3 space-y-1 leading-6'
           )}>
             {compactConversationView ? (
               <p className="truncate">
@@ -525,7 +525,7 @@ export function AssistantWidgetPanel() {
 
         <div className={cn(
           'flex min-h-0 flex-1 flex-col overflow-hidden px-4 sm:px-5',
-          compactConversationView ? 'py-2.5' : 'py-4'
+          compactConversationView ? 'py-2' : 'py-4'
         )}>
           {loadState === 'loading' && !workspace ? (
             <div className="flex min-h-0 flex-1 items-center justify-center">
@@ -557,10 +557,10 @@ export function AssistantWidgetPanel() {
             <>
               {hasActiveConversation ? (
                 <div className="relative mb-2 shrink-0">
-                  <div className="flex items-center gap-3 rounded-[1rem] border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)] px-3 py-2.5">
+                  <div className="flex items-center gap-3 rounded-[0.95rem] border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)] px-3 py-2">
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-foreground">
-                        <span className="mr-2 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                        <span className="mr-2 text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
                           Conversa atual
                         </span>
                         {activeConversationTitle}
@@ -570,7 +570,7 @@ export function AssistantWidgetPanel() {
                       <button
                         type="button"
                         onClick={() => setShowRecentThreads((current) => !current)}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-[0.75rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.025)] px-2.5 py-1 text-[11px] font-semibold text-slate-300 transition-colors hover:bg-[rgba(255,255,255,0.045)]"
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-[0.75rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.025)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-300 transition-colors hover:bg-[rgba(255,255,255,0.045)]"
                       >
                         <span>{showRecentThreads ? 'Ocultar' : 'Ver conversas'}</span>
                         <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', showRecentThreads && 'rotate-180')} />
@@ -579,7 +579,7 @@ export function AssistantWidgetPanel() {
                   </div>
 
                   {showRecentThreads && threadSummaries.length > 0 && (
-                    <div className="absolute inset-x-0 top-full z-10 mt-2 overflow-hidden rounded-[1.05rem] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(27,27,30,0.985),rgba(14,14,17,0.995))] shadow-[0_24px_44px_-30px_rgba(2,6,23,0.92)]">
+                    <div className="absolute inset-x-0 top-full z-10 mt-2 overflow-hidden rounded-[1.05rem] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(27,27,30,0.985),rgba(14,14,17,0.995))] shadow-[0_30px_54px_-36px_rgba(2,6,23,0.92)]">
                       <div className="max-h-60 overflow-y-auto p-2.5">
                         <RecentThreadsList
                           threadSummaries={threadSummaries}
@@ -617,12 +617,12 @@ export function AssistantWidgetPanel() {
                 </div>
               )}
 
-              <div className="min-h-0 flex-1 overflow-hidden rounded-[1.3rem] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(19,19,22,0.96),rgba(11,11,14,0.99))] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+              <div className="min-h-0 flex-1 overflow-hidden rounded-[1.3rem] border border-[rgba(255,255,255,0.05)] bg-[linear-gradient(180deg,rgba(17,17,20,0.98),rgba(10,10,12,0.995))] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
                 <div
                   ref={messagesViewportRef}
                   className={cn(
                     'flex h-full min-h-0 flex-col overflow-y-auto px-3 sm:px-4',
-                    compactConversationView ? 'py-3 sm:py-3.5' : 'py-3 sm:py-4'
+                    compactConversationView ? 'py-2.5 sm:py-3' : 'py-3 sm:py-4'
                   )}
                 >
                   {hasActiveConversation ? (
@@ -653,7 +653,7 @@ export function AssistantWidgetPanel() {
                     </div>
                   ) : (
                     <div className="flex min-h-full items-center justify-center">
-                      <div className="w-full max-w-md rounded-[1.5rem] border border-dashed border-[rgba(124,92,255,0.14)] bg-[rgba(124,92,255,0.05)] p-5">
+                      <div className="w-full max-w-md rounded-[1.4rem] border border-dashed border-[rgba(124,92,255,0.14)] bg-[rgba(124,92,255,0.05)] p-5">
                         <p className="text-sm font-semibold text-foreground">Pergunte o que voce precisa decidir agora</p>
                         <p className="mt-2 text-sm leading-7 text-muted-foreground">
                           O BarberEX IA entende a tela atual, respeita o escopo do seu perfil e responde com base nos dados disponiveis do periodo.
@@ -683,7 +683,7 @@ export function AssistantWidgetPanel() {
 
         <footer className={cn(
           'shrink-0 border-t border-[rgba(255,255,255,0.06)] px-4 sm:px-5',
-          compactConversationView ? 'py-3' : 'py-4'
+          compactConversationView ? 'py-2.5' : 'py-4'
         )}>
           <form
             onSubmit={(event) => {
@@ -705,14 +705,14 @@ export function AssistantWidgetPanel() {
               placeholder={helperPlaceholder}
               className={cn(
                 'auth-input w-full resize-none rounded-[1.1rem] px-4 text-sm leading-6',
-                compactConversationView ? 'min-h-[84px] py-2.5' : 'min-h-[104px] py-3'
+                compactConversationView ? 'min-h-[76px] py-2.5' : 'min-h-[104px] py-3'
               )}
               disabled={isPending || loadState !== 'ready'}
             />
             <div className="flex items-end justify-between gap-3">
               <p className={cn(
                 'max-w-[70%] text-muted-foreground',
-                compactConversationView ? 'text-[11px] leading-5' : 'text-xs leading-6'
+                compactConversationView ? 'text-[10px] leading-5' : 'text-xs leading-6'
               )}>
                 {footerNote}
               </p>

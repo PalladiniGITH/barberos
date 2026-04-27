@@ -159,23 +159,35 @@ function ExecutiveCard({
   helper,
   trend,
   positiveIsGood = true,
+  emphasis = false,
+  className,
 }: {
   title: string
   value: string
   helper: string
   trend?: number | null
   positiveIsGood?: boolean
+  emphasis?: boolean
+  className?: string
 }) {
   return (
-    <article className="executive-metric">
+    <article className={cn(
+      'executive-metric',
+      emphasis && 'rounded-[1.2rem] p-5 sm:p-6',
+      className
+    )}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="executive-label">{title}</p>
-          <p className="executive-value">{value}</p>
+          <p className={cn('executive-value', emphasis && 'mt-3 text-[2.35rem] sm:text-[2.55rem]')}>
+            {value}
+          </p>
         </div>
         {trend !== undefined && <TrendBadge change={trend} positiveIsGood={positiveIsGood} />}
       </div>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">{helper}</p>
+      <p className={cn('mt-2 text-sm leading-6 text-muted-foreground', emphasis && 'mt-3 max-w-sm text-[15px] leading-7')}>
+        {helper}
+      </p>
     </article>
   )
 }
@@ -476,7 +488,7 @@ export default async function DashboardPage({ searchParams }: Props) {
       />
 
       <section className="dashboard-spotlight overflow-hidden p-5 sm:p-6">
-        <div className="dashboard-hero-grid">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_360px]">
           <div>
             <h2 className="spotlight-title mt-0">{formatCurrency(data.totalRevenue)}</h2>
             <p className="spotlight-copy max-w-2xl">
@@ -574,39 +586,111 @@ export default async function DashboardPage({ searchParams }: Props) {
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
-        <ExecutiveCard
-          title="Receita confirmada"
-          value={formatCurrency(data.totalRevenue)}
-          helper="Faturamento registrado no periodo com base real."
-          trend={data.revenueChange}
-        />
-        <ExecutiveCard
-          title="Lucro estimado"
-          value={formatCurrency(data.profit)}
-          helper={data.profit >= 0 ? `${formatPercent(data.profitMargin, 0)} de margem sobre a receita.` : 'O lucro estimado ficou negativo neste periodo.'}
-          trend={data.profitChange}
-        />
-        <ExecutiveCard
-          title="Despesas"
-          value={formatCurrency(data.totalExpense)}
-          helper={data.expenseLimit > 0 ? `${formatPercent(data.expenseLimitUsage, 0)} do teto mensal.` : 'Sem teto formal de despesa definido.'}
-          trend={data.expenseChange}
-          positiveIsGood={false}
-        />
-        <ExecutiveCard
-          title="Ticket medio"
-          value={formatCurrency(data.ticketAverage)}
-          helper={`${data.totalAppointments} atendimentos registrados no periodo.`}
-          trend={data.ticketChange}
-        />
+      {primaryAlert && <AlertBanner alert={primaryAlert} />}
+
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_330px]">
+        <div className="grid gap-4 xl:grid-cols-12">
+          <ExecutiveCard
+            title="Lucro estimado"
+            value={formatCurrency(data.profit)}
+            helper={data.profit >= 0 ? `${formatPercent(data.profitMargin, 0)} de margem sobre a receita lancada.` : 'O lucro estimado ficou negativo neste periodo.'}
+            trend={data.profitChange}
+            emphasis
+            className="xl:col-span-6"
+          />
+          <ExecutiveCard
+            title="Falta para meta"
+            value={formatCurrency(Math.max(0, data.remainingToGoal))}
+            helper={data.goalValue > 0
+              ? data.goalAttainment >= 100
+                ? 'A meta principal ja foi batida neste periodo.'
+                : `${formatCurrency(data.requiredDailyRevenue)} por dia para fechar o objetivo.`
+              : 'Defina uma meta para o painel orientar o ritmo do mes.'}
+            emphasis
+            className="xl:col-span-6"
+          />
+          <ExecutiveCard
+            title="Despesas"
+            value={formatCurrency(data.totalExpense)}
+            helper={data.expenseLimit > 0 ? `${formatPercent(data.expenseLimitUsage, 0)} do teto mensal.` : 'Sem teto formal de despesa definido.'}
+            trend={data.expenseChange}
+            positiveIsGood={false}
+            className="xl:col-span-3"
+          />
+          <ExecutiveCard
+            title="Ticket medio"
+            value={formatCurrency(data.ticketAverage)}
+            helper={`${data.totalAppointments} atendimentos registrados no periodo.`}
+            trend={data.ticketChange}
+            className="xl:col-span-3"
+          />
+          <ExecutiveCard
+            title="Receita confirmada"
+            value={formatCurrency(data.totalRevenue)}
+            helper="Faturamento registrado no periodo com base real."
+            trend={data.revenueChange}
+            className="xl:col-span-3"
+          />
+          <ExecutiveCard
+            title="Meta do mes"
+            value={data.goalValue > 0 ? formatPercent(data.goalAttainment, 0) : 'Sem meta'}
+            helper={data.goalValue > 0
+              ? `${formatCurrency(data.totalRevenue)} de ${formatCurrency(data.goalValue)}.`
+              : 'Sem objetivo formal configurado para este periodo.'}
+            className="xl:col-span-3"
+          />
+        </div>
+
+        <aside className="premium-rail p-5">
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-[1.4rem] font-semibold tracking-tight text-foreground">Leitura rapida do periodo</h3>
+              <p className="mt-2 text-sm leading-7 text-muted-foreground">
+                Um resumo curto para decidir o que merece atencao antes de mergulhar nos modulos.
+              </p>
+            </div>
+
+            <div className="surface-tier-low p-4">
+              <p className="executive-label">Comparacao usada</p>
+              <p className="mt-3 text-base font-semibold text-foreground">{data.comparisonMonthLabel}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {data.partialComparison ? 'Mesmo intervalo do mes anterior.' : 'Periodo completo do mes anterior.'}
+              </p>
+            </div>
+
+            <div className="surface-tier-low p-4">
+              <p className="executive-label">Pressao de caixa</p>
+              <p className="mt-3 text-base font-semibold text-foreground">
+                {data.overdueExpenseCount > 0 ? `${data.overdueExpenseCount} despesa(s) em aberto` : 'Sem despesas vencidas'}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {data.overdueExpenseCount > 0
+                  ? `${formatCurrency(data.overdueExpenseAmount)} ainda pressionam o caixa.`
+                  : 'O caixa nao mostra passivo vencido relevante na janela atual.'}
+              </p>
+            </div>
+
+            <div className="surface-tier-low p-4">
+              <p className="executive-label">Profissional em destaque</p>
+              <p className="mt-3 text-base font-semibold text-foreground">
+                {data.ranking[0]?.name ?? 'Sem ranking ainda'}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {data.ranking[0]
+                  ? `${formatCurrency(data.ranking[0].revenue)} no periodo.`
+                  : 'Assim que a receita for vinculada por profissional, o destaque aparece aqui.'}
+              </p>
+            </div>
+          </div>
+        </aside>
       </section>
 
-      <BarbershopHealthPanel health={barbershopHealth} />
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(300px,380px)]">
+        <BarbershopHealthPanel health={barbershopHealth} />
+        <DashboardInsightsPreview report={intelligenceReport} />
+      </section>
 
       <CampaignAutomationPanel data={campaignAutomation} />
-
-      {primaryAlert && <AlertBanner alert={primaryAlert} />}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_360px]">
         <RevenueChart data={data.chartData} />
@@ -630,16 +714,18 @@ export default async function DashboardPage({ searchParams }: Props) {
                   <p className="mt-2 text-sm text-muted-foreground">Meta principal: {formatCurrency(data.goalValue)}</p>
                 </div>
 
-                <div className="panel-soft">
-                  <p className="executive-label">Meta minima saudavel</p>
-                  <p className="mt-3 text-xl font-semibold text-foreground">{formatCurrency(data.minGoalValue)}</p>
-                  <p className="mt-2 text-sm text-muted-foreground">Base minima para o mes nao ficar aquem do esperado.</p>
-                </div>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                  <div className="panel-soft">
+                    <p className="executive-label">Meta minima saudavel</p>
+                    <p className="mt-3 text-xl font-semibold text-foreground">{formatCurrency(data.minGoalValue)}</p>
+                    <p className="mt-2 text-sm text-muted-foreground">Base minima para o mes nao ficar aquem do esperado.</p>
+                  </div>
 
-                <div className="panel-soft">
-                  <p className="executive-label">Ritmo necessario</p>
-                  <p className="mt-3 text-xl font-semibold text-foreground">{formatCurrency(data.requiredDailyRevenue)}</p>
-                  <p className="mt-2 text-sm text-muted-foreground">Por dia para fechar o objetivo no tempo restante.</p>
+                  <div className="panel-soft">
+                    <p className="executive-label">Ritmo necessario</p>
+                    <p className="mt-3 text-xl font-semibold text-foreground">{formatCurrency(data.requiredDailyRevenue)}</p>
+                    <p className="mt-2 text-sm text-muted-foreground">Por dia para fechar o objetivo no tempo restante.</p>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -675,8 +761,6 @@ export default async function DashboardPage({ searchParams }: Props) {
           </section>
         </aside>
       </div>
-
-      <DashboardInsightsPreview report={intelligenceReport} />
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,1fr)]">
         {data.ranking.length > 0 ? (

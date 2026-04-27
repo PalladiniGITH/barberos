@@ -10,7 +10,7 @@ function renderInlineTokens(tokens: AssistantMarkdownInlineToken[]) {
   return tokens.map((token, index) => {
     if (token.type === 'strong') {
       return (
-        <strong key={`strong-${index}`} className="font-semibold text-current">
+        <strong key={`strong-${index}`} className="font-semibold text-slate-50">
           {token.content}
         </strong>
       )
@@ -32,7 +32,7 @@ function renderLineGroups(lines: AssistantMarkdownInlineToken[][]) {
 function renderBlock(block: AssistantMarkdownBlock, index: number) {
   if (block.type === 'paragraph') {
     return (
-      <p key={`paragraph-${index}`} className="break-words">
+      <p key={`paragraph-${index}`} className="break-words text-[0.95rem] leading-7 text-current">
         {renderLineGroups(block.lines)}
       </p>
     )
@@ -44,12 +44,12 @@ function renderBlock(block: AssistantMarkdownBlock, index: number) {
     <ListTag
       key={`${block.type}-${index}`}
       className={cn(
-        'space-y-1.5 pl-5',
+        'space-y-2 pl-5 text-[0.95rem] leading-7 marker:text-violet-300',
         block.type === 'ordered-list' ? 'list-decimal' : 'list-disc'
       )}
     >
       {block.items.map((tokens, itemIndex) => (
-        <li key={`item-${itemIndex}`} className="break-words">
+        <li key={`item-${itemIndex}`} className="break-words pl-1">
           {renderInlineTokens(tokens)}
         </li>
       ))}
@@ -71,7 +71,7 @@ export function AssistantMessageContent({
   }
 
   return (
-    <div className={cn('mt-2 space-y-3 text-sm leading-7', className)}>
+    <div className={cn('mt-2 space-y-3.5 text-sm leading-7', className)}>
       {blocks.map((block, index) => renderBlock(block, index))}
     </div>
   )

@@ -244,8 +244,8 @@ export default async function AgendamentosPage({ searchParams }: Props) {
         )}
       />
 
-      <section className="dashboard-spotlight overflow-hidden px-5 py-5">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_360px]">
+      <section className="dashboard-spotlight overflow-hidden px-5 py-5 sm:px-6 sm:py-6">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_340px]">
           <div>
             <h2 className="text-[2.5rem] font-semibold tracking-tight text-foreground sm:text-[2.9rem]">
               {schedule.rangeLabel}
@@ -258,18 +258,18 @@ export default async function AgendamentosPage({ searchParams }: Props) {
               {schedule.view === 'barber' ? 'Grade por barbeiro' : 'Linha do dia'} · {schedule.summary.scheduledCount} atendimentos · {schedule.summary.blockedCount} bloqueios · {whatsappBookings} via WhatsApp
             </p>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              <div className="hero-stat-card">
+            <div className="mt-6 grid gap-3 lg:grid-cols-12">
+              <div className="hero-stat-card lg:col-span-4">
                 <p className="executive-label">Confirmados</p>
                 <p className="mt-3 text-[1.9rem] font-semibold tracking-tight text-foreground">{schedule.summary.confirmedCount}</p>
                 <p className="mt-2 text-sm text-muted-foreground">{formatPercent(scheduledRatio)} da agenda pronta para atendimento.</p>
               </div>
-              <div className="hero-stat-card">
+              <div className="hero-stat-card lg:col-span-5">
                 <p className="executive-label">Agendado no dia</p>
                 <p className="mt-3 text-[1.9rem] font-semibold tracking-tight text-foreground">{formatCurrency(schedule.summary.scheduledValue)}</p>
                 <p className="mt-2 text-sm text-muted-foreground">Valor bruto montado para a operacao do dia.</p>
               </div>
-              <div className="hero-stat-card">
+              <div className="hero-stat-card lg:col-span-3">
                 <p className="executive-label">WhatsApp</p>
                 <p className="mt-3 text-[1.9rem] font-semibold tracking-tight text-foreground">{whatsappBookings}</p>
                 <p className="mt-2 text-sm text-muted-foreground">Agendamentos de IA visiveis no mesmo fluxo operacional.</p>
@@ -278,17 +278,17 @@ export default async function AgendamentosPage({ searchParams }: Props) {
           </div>
 
           <aside className="premium-rail p-5">
-            <h3 className="text-[1.5rem] font-semibold tracking-tight text-foreground">{schedule.panel.title}</h3>
+            <h3 className="text-[1.45rem] font-semibold tracking-tight text-foreground">{schedule.panel.title}</h3>
             <p className="mt-2 text-sm leading-7 text-muted-foreground">{schedule.panel.subtitle}</p>
 
             <div className="mt-5 space-y-3">
-              <div className="rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
+              <div className="surface-tier-low p-4">
                 <p className="executive-label">Faturamento do periodo</p>
                 <p className="mt-3 text-[1.85rem] font-semibold tracking-tight text-foreground">{formatCurrency(schedule.panel.periodRevenue)}</p>
                 <p className="mt-2 text-sm text-muted-foreground">Meta do periodo: {formatCurrency(schedule.panel.periodGoal)}</p>
               </div>
 
-              <div className="rounded-[0.95rem] border border-[rgba(52,44,78,0.1)] bg-[rgba(91,33,182,0.06)] p-4">
+              <div className="surface-tier-high p-4">
                 <p className="executive-label">Ritmo da meta</p>
                 <p className="mt-3 text-[1.6rem] font-semibold tracking-tight text-foreground">{formatPercent(schedule.panel.periodGoalProgress)}</p>
                 <p className="mt-2 text-sm text-muted-foreground">Leitura do periodo com receita real, nao estimada.</p>
@@ -309,16 +309,18 @@ export default async function AgendamentosPage({ searchParams }: Props) {
         </div>
       </section>
 
-      <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_340px]">
         <section className="dashboard-panel overflow-hidden">
-          <div className="flex flex-col gap-3 border-b border-[rgba(58,47,86,0.08)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div className="flex flex-col gap-4 border-b border-[rgba(58,47,86,0.08)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div>
               <h3 className="text-[1.45rem] font-semibold tracking-tight text-foreground">Agenda em grid</h3>
               <p className="mt-2 max-w-3xl text-sm leading-7 text-muted-foreground">
                 Clique em um slot vazio para criar. Clique e arraste para escolher intervalo. Arraste um bloco existente para remarcar com seguranca.
               </p>
             </div>
-            <p className="text-sm text-muted-foreground">Bloqueios e conflitos visiveis na grade.</p>
+            <div className="surface-tier-low px-3.5 py-2 text-sm text-muted-foreground">
+              Bloqueios, conflitos e origem do atendimento visiveis na grade.
+            </div>
           </div>
 
           <ScheduleCalendar
@@ -346,7 +348,7 @@ export default async function AgendamentosPage({ searchParams }: Props) {
 
             <div className="mt-4 space-y-3">
               {schedule.panel.upcomingToday.length > 0 ? schedule.panel.upcomingToday.map((appointment) => (
-                <div key={appointment.id} className="rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 shadow-[0_16px_24px_-18px_rgba(2,6,23,0.5)]">
+                <div key={appointment.id} className="surface-tier-low p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-foreground">{appointment.customerName}</p>
@@ -354,7 +356,7 @@ export default async function AgendamentosPage({ searchParams }: Props) {
                         {appointment.serviceName} com {appointment.professionalName}
                       </p>
                     </div>
-                    <span className="rounded-[0.7rem] bg-[rgba(91,33,182,0.08)] px-2.5 py-1 text-xs font-semibold text-primary">
+                    <span className="rounded-[0.7rem] border border-[rgba(124,92,255,0.16)] bg-[rgba(124,92,255,0.08)] px-2.5 py-1 text-xs font-semibold text-primary">
                       {appointment.startTimeLabel}
                     </span>
                   </div>

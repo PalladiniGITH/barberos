@@ -33,6 +33,11 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 export function RevenueChart({ data }: RevenueChartProps) {
+  const latestPoint = data[data.length - 1] ?? null
+  const highestRevenue = data.reduce((highest, point) => Math.max(highest, point.receitas), 0)
+  const lowestExpense = data.reduce((lowest, point) => point.despesas > 0 ? Math.min(lowest, point.despesas) : lowest, Number.POSITIVE_INFINITY)
+  const lowestExpenseValue = Number.isFinite(lowestExpense) ? lowestExpense : 0
+
   return (
     <section className="dashboard-panel p-6">
       <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -44,6 +49,30 @@ export function RevenueChart({ data }: RevenueChartProps) {
         </div>
 
         <p className="text-sm text-muted-foreground">Ultimos 6 meses de receita e custo.</p>
+      </div>
+
+      <div className="mb-5 grid gap-3 sm:grid-cols-3">
+        <div className="surface-tier-low p-4">
+          <p className="executive-label">Ultimo fechamento</p>
+          <p className="mt-3 text-lg font-semibold text-foreground">
+            {latestPoint ? formatCurrency(latestPoint.receitas) : 'Sem leitura'}
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {latestPoint ? `${latestPoint.month} como base mais recente de receita.` : 'Ainda sem historico suficiente.'}
+          </p>
+        </div>
+
+        <div className="surface-tier-low p-4">
+          <p className="executive-label">Pico de receita</p>
+          <p className="mt-3 text-lg font-semibold text-foreground">{formatCurrency(highestRevenue)}</p>
+          <p className="mt-2 text-sm text-muted-foreground">Maior patamar de caixa observado na serie recente.</p>
+        </div>
+
+        <div className="surface-tier-low p-4">
+          <p className="executive-label">Menor pressao de custo</p>
+          <p className="mt-3 text-lg font-semibold text-foreground">{formatCurrency(lowestExpenseValue)}</p>
+          <p className="mt-2 text-sm text-muted-foreground">Referencia util para medir folga do caixa ao longo do periodo.</p>
+        </div>
       </div>
 
       <div className="rounded-[1.65rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(35,38,58,0.94),rgba(21,24,33,0.98))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
