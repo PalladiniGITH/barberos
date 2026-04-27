@@ -43,9 +43,9 @@ function ComparisonCard({
   tone?: 'neutral' | 'positive' | 'warning'
 }) {
   const toneClass = {
-    neutral: 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)]',
-    positive: 'border-[rgba(52,211,153,0.18)] bg-[rgba(52,211,153,0.08)]',
-    warning: 'border-[rgba(251,191,36,0.18)] bg-[rgba(251,191,36,0.08)]',
+    neutral: 'border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.03)]',
+    positive: 'border-[rgba(52,211,153,0.14)] bg-[rgba(52,211,153,0.06)]',
+    warning: 'border-[rgba(251,191,36,0.14)] bg-[rgba(251,191,36,0.06)]',
   }[tone]
 
   const badgeClass = {
@@ -55,7 +55,7 @@ function ComparisonCard({
   }[tone]
 
   return (
-    <div className={cn('surface-inverse rounded-[1.35rem] border p-4 shadow-[0_20px_44px_-34px_rgba(2,6,23,0.82)]', toneClass)}>
+    <div className={cn('surface-inverse tonal-note rounded-[1.35rem] p-4 shadow-none', toneClass)}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{label}</p>
@@ -268,7 +268,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
                 <h3 className="text-lg font-semibold text-foreground">Prioridades de acao</h3>
                 <div className="mt-4 space-y-3">
                   {topRecommendations.map((insight, index) => (
-                    <div key={insight.id} className="surface-inverse tonal-note">
+                  <div key={insight.id} className="surface-inverse tonal-note">
                       <p className="text-sm font-medium text-muted-foreground">
                         Prioridade {index + 1}
                       </p>
@@ -320,7 +320,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
                     </p>
                   </Link>
 
-                  <Link href="/indicadores" className="surface-inverse rounded-[1.25rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 transition-colors hover:bg-[rgba(255,255,255,0.06)]">
+                  <Link href="/indicadores" className="surface-inverse tonal-note rounded-[1.25rem] p-4 transition-colors hover:bg-[rgba(255,255,255,0.045)]">
                     <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                       <TrendingUp className="h-4 w-4 text-primary" />
                       Ler tendencia

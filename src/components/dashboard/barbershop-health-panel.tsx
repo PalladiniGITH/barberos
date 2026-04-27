@@ -15,7 +15,7 @@ function HealthMetricCard({
   icon: typeof Users
 }) {
   return (
-    <div className="rounded-[1rem] border border-[rgba(255,255,255,0.045)] bg-[rgba(255,255,255,0.025)] p-4">
+    <div className="tonal-note p-4">
       <div className="flex items-center gap-3">
         <span className="flex h-10 w-10 items-center justify-center rounded-[0.95rem] border border-[rgba(91,33,182,0.12)] bg-[rgba(91,33,182,0.08)] text-primary">
           <Icon className="h-4 w-4" />
@@ -32,9 +32,9 @@ function HealthMetricCard({
 
 export function BarbershopHealthPanel({ health }: { health: BarbershopHealthSnapshot }) {
   const toneClass = {
-    healthy: 'border-[rgba(22,163,74,0.18)] bg-[radial-gradient(circle_at_top_left,rgba(22,163,74,0.16),transparent_35%),linear-gradient(180deg,rgba(20,36,29,0.98),rgba(21,24,33,0.98))]',
-    attention: 'border-[rgba(245,158,11,0.22)] bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.16),transparent_35%),linear-gradient(180deg,rgba(39,31,22,0.98),rgba(21,24,33,0.98))]',
-    cooling: 'border-[rgba(244,63,94,0.22)] bg-[radial-gradient(circle_at_top_left,rgba(244,63,94,0.16),transparent_35%),linear-gradient(180deg,rgba(39,24,31,0.98),rgba(21,24,33,0.98))]',
+    healthy: 'border-[rgba(22,163,74,0.12)] bg-[radial-gradient(circle_at_top_left,rgba(22,163,74,0.1),transparent_38%),linear-gradient(180deg,rgba(22,32,28,0.98),rgba(20,22,27,0.99))]',
+    attention: 'border-[rgba(245,158,11,0.14)] bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.1),transparent_38%),linear-gradient(180deg,rgba(34,29,23,0.98),rgba(20,22,27,0.99))]',
+    cooling: 'border-[rgba(244,63,94,0.14)] bg-[radial-gradient(circle_at_top_left,rgba(244,63,94,0.1),transparent_38%),linear-gradient(180deg,rgba(34,24,29,0.98),rgba(20,22,27,0.99))]',
   }[health.healthStatus]
 
   return (

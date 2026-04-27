@@ -103,13 +103,13 @@ export function InsightCard({
   return (
     <article
       className={cn(
-        'surface-inverse relative isolate overflow-hidden rounded-[1.45rem] border bg-[linear-gradient(180deg,rgba(26,28,34,0.97),rgba(18,20,24,0.95))] p-5 shadow-[0_20px_36px_-34px_rgba(2,6,23,0.56)]',
+        'surface-inverse relative isolate overflow-hidden rounded-[1.45rem] border bg-[linear-gradient(180deg,rgba(25,27,32,0.9),rgba(19,20,24,0.94))] p-5 shadow-[0_18px_32px_-34px_rgba(2,6,23,0.48)]',
         meta.panelClass
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <span className={cn('mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl border border-[rgba(255,255,255,0.04)]', meta.iconClass)}>
+          <span className={cn('mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl border border-[rgba(255,255,255,0.03)]', meta.iconClass)}>
             <meta.Icon className="h-4 w-4" />
           </span>
           <div className="min-w-0">
@@ -121,7 +121,7 @@ export function InsightCard({
         </div>
 
         {insight.metric && (
-          <div className="rounded-[1rem] border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.025)] px-3 py-2 text-right shadow-[0_10px_22px_-24px_rgba(2,6,23,0.4)]">
+          <div className="tonal-note px-3 py-2 text-right shadow-none">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               {insight.metric.label}
             </p>
@@ -133,7 +133,7 @@ export function InsightCard({
       <p className="mt-4 text-sm leading-7 text-muted-foreground">{insight.explanation}</p>
 
       {!compact && (
-        <div className="mt-4 rounded-[1.15rem] bg-[rgba(255,255,255,0.028)] px-4 py-3.5">
+        <div className="tonal-note mt-4 border-[rgba(255,255,255,0.02)] px-4 py-3.5">
           <p className="text-sm font-semibold text-foreground">Proximo passo</p>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">{insight.recommendedAction}</p>
         </div>
@@ -156,7 +156,7 @@ export function DashboardInsightsPreview({ report }: { report: BusinessIntellige
   return (
     <section className="dashboard-panel overflow-hidden p-0">
       <div className="flex h-full flex-col">
-        <div className="premium-rail border-b border-[rgba(255,255,255,0.04)] p-5">
+        <div className="premium-rail border-b border-[rgba(255,255,255,0.03)] p-5">
           <div className="flex flex-wrap items-center gap-2">
             <div className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
               <CircleDollarSign className="h-4 w-4 text-primary" />

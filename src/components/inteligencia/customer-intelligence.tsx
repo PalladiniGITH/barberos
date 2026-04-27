@@ -100,13 +100,13 @@ function SummaryMetric({
   tone?: 'neutral' | 'positive' | 'warning'
 }) {
   const toneClass = {
-    neutral: 'border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.98),rgba(21,24,33,0.98))]',
-    positive: 'border-[rgba(22,163,74,0.2)] bg-[radial-gradient(circle_at_top_left,rgba(22,163,74,0.16),transparent_38%),linear-gradient(180deg,rgba(24,38,32,0.98),rgba(21,24,33,0.98))]',
-    warning: 'border-[rgba(245,158,11,0.22)] bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.16),transparent_38%),linear-gradient(180deg,rgba(40,31,24,0.98),rgba(21,24,33,0.98))]',
+    neutral: 'border-[rgba(255,255,255,0.05)] bg-[linear-gradient(180deg,rgba(28,32,48,0.92),rgba(21,24,33,0.96))]',
+    positive: 'border-[rgba(22,163,74,0.14)] bg-[radial-gradient(circle_at_top_left,rgba(22,163,74,0.1),transparent_40%),linear-gradient(180deg,rgba(24,36,31,0.94),rgba(21,24,33,0.98))]',
+    warning: 'border-[rgba(245,158,11,0.14)] bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.1),transparent_40%),linear-gradient(180deg,rgba(36,31,24,0.94),rgba(21,24,33,0.98))]',
   }[tone]
 
   return (
-    <div className={cn('surface-inverse rounded-[1.1rem] border p-4 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.82)]', toneClass)}>
+    <div className={cn('surface-inverse rounded-[1.1rem] border p-4 shadow-[0_18px_34px_-34px_rgba(2,6,23,0.62)]', toneClass)}>
       <div className="flex items-center gap-3">
         <span className="flex h-10 w-10 items-center justify-center rounded-[0.95rem] border border-[rgba(91,33,182,0.12)] bg-[rgba(91,33,182,0.08)] text-primary">
           <Icon className="h-4 w-4" />
@@ -191,7 +191,7 @@ function RankingList({
 
       <div className="mt-4 space-y-3">
         {items.length > 0 ? items.map((customer) => (
-          <div key={customer.id} className="surface-inverse rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.96),rgba(21,24,33,0.96))] p-4 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.82)]">
+          <div key={customer.id} className="surface-inverse tonal-note p-4 shadow-none">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <Link
@@ -367,7 +367,7 @@ export function CustomerIntelligenceSection({
 
             <Link
               href={`/clientes?month=${month}&year=${year}${customers.filters.professionalId ? `&professionalId=${customers.filters.professionalId}` : ''}${customers.filters.customerType !== 'all' ? `&customerType=${customers.filters.customerType}` : ''}`}
-              className="inline-flex items-center gap-2 rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-slate-200 transition-colors hover:bg-[rgba(91,33,182,0.12)] hover:text-slate-50"
+              className="inline-flex items-center gap-2 rounded-[0.95rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-sm text-slate-200 transition-colors hover:bg-[rgba(91,33,182,0.08)] hover:text-slate-50"
             >
               <UserRound className="h-4 w-4" />
               Abrir modulo de clientes
@@ -423,35 +423,35 @@ export function CustomerIntelligenceSection({
 
             <div className="mt-5 grid gap-4 lg:grid-cols-2">
               {[customers.groups.subscription, customers.groups.walkIn].map((group) => (
-                <div key={group.type} className="surface-inverse rounded-[1.2rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.98),rgba(21,24,33,0.98))] p-5 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.82)]">
+                <div key={group.type} className="surface-inverse surface-tier-low p-5 shadow-none">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{group.label}</p>
                       <p className="mt-3 text-2xl font-semibold text-foreground">{formatCurrency(group.margin)}</p>
                       <p className="mt-1 text-sm text-muted-foreground">{formatPercent(group.marginPercent, 0)} de margem estimada</p>
                     </div>
-                    <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-xs font-semibold text-muted-foreground">
+                    <span className="surface-inverse-chip rounded-full border px-3 py-1 text-xs font-semibold text-muted-foreground">
                       {group.customers} cliente{group.customers === 1 ? '' : 's'}
                     </span>
                   </div>
 
                   <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                    <div className="surface-soft p-3">
+                    <div className="tonal-note p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Receita</p>
                       <p className="mt-2 text-base font-semibold text-foreground">{formatCurrency(group.totalRevenue)}</p>
                       <p className="mt-1 text-xs text-muted-foreground">{formatCurrency(group.realRevenue)} real</p>
                     </div>
-                    <div className="surface-soft p-3">
+                    <div className="tonal-note p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Custo estimado</p>
                       <p className="mt-2 text-base font-semibold text-foreground">{formatCurrency(group.totalCost)}</p>
                       <p className="mt-1 text-xs text-muted-foreground">{formatCurrency(group.averageCostPerVisit)} por visita</p>
                     </div>
-                    <div className="surface-soft p-3">
+                    <div className="tonal-note p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Ticket medio</p>
                       <p className="mt-2 text-base font-semibold text-foreground">{formatCurrency(group.averageTicket)}</p>
                       <p className="mt-1 text-xs text-muted-foreground">{formatPercent(group.revenueSharePercent, 0)} da receita do recorte</p>
                     </div>
-                    <div className="surface-soft p-3">
+                    <div className="tonal-note p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Volume operacional</p>
                       <p className="mt-2 text-base font-semibold text-foreground">{group.averageVisitsPerCustomer.toFixed(1)}</p>
                       <p className="mt-1 text-xs text-muted-foreground">{formatPercent(group.operationalSharePercent, 0)} da agenda consumida</p>
@@ -525,34 +525,34 @@ export function CustomerIntelligenceSection({
             <h3 className="text-lg font-semibold text-foreground">Leitura da assinatura</h3>
 
             <div className="mt-4 space-y-3">
-              <div className="surface-soft-strong p-4">
+              <div className="surface-tier-low p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Preco de referencia</p>
                 <p className="mt-2 text-2xl font-semibold text-foreground">{formatCurrency(customers.plan.monthlyPriceReference)}</p>
                 <p className="mt-1 text-sm text-muted-foreground">{customers.plan.activeMembers} assinante{customers.plan.activeMembers === 1 ? '' : 's'} ativos</p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                <div className="surface-soft p-4">
+                  <div className="tonal-note p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Clientes em risco</p>
                   <p className="mt-2 text-xl font-semibold text-foreground">{customers.plan.riskCount + customers.plan.lossCount}</p>
                 </div>
-                <div className="surface-soft p-4">
+                  <div className="tonal-note p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Subutilizados</p>
                   <p className="mt-2 text-xl font-semibold text-foreground">{customers.plan.underusedCount}</p>
                 </div>
-                <div className="surface-soft p-4">
+                  <div className="tonal-note p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Receita do plano</p>
                   <p className="mt-2 text-xl font-semibold text-foreground">{formatCurrency(customers.plan.totalRevenue)}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{formatCurrency(customers.plan.realRevenue)} real / {formatCurrency(customers.plan.estimatedRevenue)} estimado</p>
                 </div>
-                <div className="surface-soft p-4">
+                  <div className="tonal-note p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Participacao</p>
                   <p className="mt-2 text-xl font-semibold text-foreground">{formatPercent(customers.plan.revenueSharePercent, 0)}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{formatPercent(customers.plan.operationalSharePercent, 0)} da operacao do periodo</p>
                 </div>
               </div>
 
-              <div className="surface-soft p-4">
+              <div className="tonal-note p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Cobertura media de custo</p>
                 <p className="mt-2 text-xl font-semibold text-foreground">
                   {customers.plan.averageCostCoverage === null ? 'Sem base' : formatPercent(customers.plan.averageCostCoverage, 0)}
@@ -564,7 +564,7 @@ export function CustomerIntelligenceSection({
                 </p>
               </div>
 
-              <div className="surface-soft p-4">
+              <div className="tonal-note p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Extras compensam?</p>
                 <p className="mt-2 text-xl font-semibold text-foreground">
                   {formatCurrency(customers.groups.subscription.averageRevenuePerVisit)}
@@ -579,7 +579,7 @@ export function CustomerIntelligenceSection({
 
             <div className="mt-4 space-y-3">
               {customerInsights.length > 0 ? customerInsights.map((insight) => (
-                <div key={insight.id} className="surface-inverse rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
+                <div key={insight.id} className="surface-inverse tonal-note p-4">
                   <p className="text-sm font-semibold text-foreground">{insight.title}</p>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">{insight.explanation}</p>
                 </div>
@@ -595,15 +595,15 @@ export function CustomerIntelligenceSection({
             <h3 className="text-lg font-semibold text-foreground">Transparencia analitica</h3>
 
             <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-              <div className="surface-inverse rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
+              <div className="surface-inverse tonal-note p-4">
                 <p className="font-semibold text-foreground">Receita real</p>
                 <p className="mt-2 leading-6">{customers.methodology.realRevenueDefinition}</p>
               </div>
-              <div className="surface-inverse rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
+              <div className="surface-inverse tonal-note p-4">
                 <p className="font-semibold text-foreground">Receita estimada</p>
                 <p className="mt-2 leading-6">{customers.methodology.estimatedRevenueDefinition}</p>
               </div>
-              <div className="surface-inverse rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
+              <div className="surface-inverse tonal-note p-4">
                 <p className="font-semibold text-foreground">Custo e margem</p>
                 <p className="mt-2 leading-6">{customers.methodology.marginDefinition}</p>
               </div>
@@ -714,7 +714,7 @@ export function CustomerIntelligenceSection({
             <h3 className="text-lg font-semibold text-foreground">Respostas do recorte atual</h3>
 
             <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-              <div className="surface-inverse rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
+              <div className="surface-inverse tonal-note p-4">
                 <p className="font-semibold text-foreground">Quem mais ajuda no lucro?</p>
                 <p className="mt-2 leading-6">
                   {customers.rankings.mostProfitable[0]
@@ -723,7 +723,7 @@ export function CustomerIntelligenceSection({
                 </p>
               </div>
 
-              <div className="surface-inverse rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
+              <div className="surface-inverse tonal-note p-4">
                 <p className="font-semibold text-foreground">Quem mais consome tempo e retorno baixo?</p>
                 <p className="mt-2 leading-6">
                   {customers.rankings.leastProfitable[0]
@@ -732,7 +732,7 @@ export function CustomerIntelligenceSection({
                 </p>
               </div>
 
-              <div className="surface-inverse rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
+              <div className="surface-inverse tonal-note p-4">
                 <p className="font-semibold text-foreground">O plano atual esta saudavel?</p>
                 <p className="mt-2 leading-6">
                   {customers.plan.enabled
@@ -743,7 +743,7 @@ export function CustomerIntelligenceSection({
                 </p>
               </div>
 
-              <div className="surface-inverse rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
+              <div className="surface-inverse tonal-note p-4">
                 <p className="font-semibold text-foreground">Alertas executivos</p>
                 <div className="mt-2 space-y-2 leading-6">
                   {executiveAlerts.map((alert) => (
@@ -752,7 +752,7 @@ export function CustomerIntelligenceSection({
                 </div>
               </div>
 
-              <div className="surface-inverse rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
+              <div className="surface-inverse tonal-note p-4">
                 <p className="font-semibold text-foreground">Leitura de incerteza</p>
                 <p className="mt-2 leading-6">{customers.methodology.caution}</p>
               </div>

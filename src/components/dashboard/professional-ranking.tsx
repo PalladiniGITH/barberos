@@ -28,7 +28,7 @@ export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
 
   return (
     <section className="dashboard-panel p-6">
-      <div className="flex flex-col gap-4 border-b border-[rgba(255,255,255,0.04)] pb-5 xl:flex-row xl:items-start xl:justify-between">
+      <div className="flex flex-col gap-4 border-b border-[rgba(255,255,255,0.03)] pb-5 xl:flex-row xl:items-start xl:justify-between">
         <div>
           <h3 className="mt-2 text-[1.55rem] font-semibold tracking-tight text-foreground">Ranking dos profissionais</h3>
           <p className="mt-2 max-w-xl text-sm leading-7 text-muted-foreground">
@@ -50,7 +50,7 @@ export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
           const shareOfTeam = totalRevenue > 0 ? (leader.revenue / totalRevenue) * 100 : 0
 
           return (
-            <article className="surface-tier-high p-5 sm:p-6">
+            <article className="surface-tier-low p-5 sm:p-6">
               <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                 <div className="min-w-0">
                   <div className="flex items-center gap-3">
@@ -58,10 +58,10 @@ export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
                       {positionIcon(leader.position)}
                     </span>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold tracking-[0.16em] text-violet-100">Profissional em destaque</p>
-                      <h4 className="truncate text-[1.4rem] font-semibold tracking-tight text-foreground">{leader.name}</h4>
-                    </div>
+                    <p className="text-sm font-semibold tracking-[0.16em] text-violet-100">Profissional em destaque</p>
+                    <h4 className="truncate text-[1.4rem] font-semibold tracking-tight text-foreground">{leader.name}</h4>
                   </div>
+                </div>
 
                   <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground">
                     {hasGoal
@@ -141,7 +141,7 @@ export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
                       </p>
                     </div>
 
-                    <div className="rounded-[0.95rem] border border-[rgba(255,255,255,0.045)] bg-[rgba(255,255,255,0.022)] px-3.5 py-2.5 text-right">
+                    <div className="tonal-note px-3.5 py-2.5 text-right">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Receita</p>
                       <p className="mt-1 text-base font-semibold tabular-nums text-foreground">
                         {formatCurrency(entry.revenue)}
@@ -170,7 +170,7 @@ export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
                       <TrendingUp className="h-3.5 w-3.5" />
                       {hasGoal ? 'Progresso da meta' : 'Participacao na equipe'}
                     </span>
-                    <span className="rounded-full bg-[rgba(91,33,182,0.04)] px-2.5 py-1 font-medium text-foreground">
+                    <span className="rounded-full border border-[rgba(255,255,255,0.04)] bg-[rgba(255,255,255,0.028)] px-2.5 py-1 font-medium text-foreground">
                       {hasGoal
                         ? goalProgress >= 100
                           ? 'Meta batida'

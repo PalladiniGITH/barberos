@@ -78,7 +78,7 @@ export function RevenueChart({ data }: RevenueChartProps) {
         </div>
       </div>
 
-      <div className="rounded-[1.65rem] border border-[rgba(255,255,255,0.05)] bg-[linear-gradient(180deg,rgba(33,35,46,0.92),rgba(22,24,30,0.97))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+      <div className="surface-tier-low rounded-[1.65rem] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.016)]">
         <ResponsiveContainer width="100%" height={320}>
           <AreaChart data={data} margin={{ top: 8, right: 10, left: -18, bottom: 0 }}>
             <defs>

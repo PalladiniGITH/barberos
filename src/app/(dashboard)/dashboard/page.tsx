@@ -241,7 +241,7 @@ function AlertBanner({ alert }: { alert: DashboardAlert }) {
 
 function ComparisonRow({ metric }: { metric: ComparisonMetric }) {
   return (
-    <div className="rounded-[1.2rem] border border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] px-4 py-4 sm:px-5">
+    <div className="tonal-note rounded-[1.2rem] px-4 py-4 sm:px-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-foreground">{metric.label}</p>
@@ -659,7 +659,7 @@ export default async function DashboardPage({ searchParams }: Props) {
               </p>
             </div>
 
-            <div className="surface-tier-low p-5">
+            <div className="tonal-note p-5">
               <p className="executive-label">Comparacao usada</p>
               <p className="mt-3 text-base font-semibold text-foreground">{data.comparisonMonthLabel}</p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -667,7 +667,7 @@ export default async function DashboardPage({ searchParams }: Props) {
               </p>
             </div>
 
-            <div className="surface-tier-low p-5">
+            <div className="tonal-note p-5">
               <p className="executive-label">Pressao de caixa</p>
               <p className="mt-3 text-base font-semibold text-foreground">
                 {data.overdueExpenseCount > 0 ? `${data.overdueExpenseCount} despesa(s) em aberto` : 'Sem despesas vencidas'}
@@ -679,7 +679,7 @@ export default async function DashboardPage({ searchParams }: Props) {
               </p>
             </div>
 
-            <div className="surface-tier-low p-5">
+            <div className="tonal-note p-5">
               <p className="executive-label">Profissional em destaque</p>
               <p className="mt-3 text-base font-semibold text-foreground">
                 {data.ranking[0]?.name ?? 'Sem ranking ainda'}
@@ -738,7 +738,7 @@ export default async function DashboardPage({ searchParams }: Props) {
                 </div>
               </div>
             ) : (
-              <div className="tonal-note mt-5 border-dashed p-5">
+              <div className="tonal-note mt-5 p-5">
                 <p className="text-sm font-semibold text-foreground">Meta ainda nao configurada</p>
                 <p className="mt-2 text-sm leading-7 text-muted-foreground">
                   Defina a meta e o painel deixa de ser so historico para virar direcao comercial.
@@ -776,7 +776,7 @@ export default async function DashboardPage({ searchParams }: Props) {
           <ProfessionalRanking data={data.ranking.slice(0, 5)} />
         ) : (
           <section className="dashboard-panel flex min-h-[280px] flex-col justify-center p-6">
-              <div className="tonal-note border-dashed p-5 text-center">
+              <div className="tonal-note p-5 text-center">
               <p className="text-sm font-semibold text-foreground">Ranking ainda indisponivel</p>
               <p className="mt-2 text-sm leading-7 text-muted-foreground">
                 Assim que as receitas forem lancadas por profissional, o time aparece aqui com hierarquia e comparacao real.
@@ -807,7 +807,7 @@ export default async function DashboardPage({ searchParams }: Props) {
             {secondaryAlerts.length > 0 && (
               <div className="mt-5 space-y-3">
                 {secondaryAlerts.map((alert) => (
-                  <Link key={alert.title} href={alert.href} className="tonal-note block transition-colors hover:bg-[rgba(91,33,182,0.06)]">
+                  <Link key={alert.title} href={alert.href} className="tonal-note block transition-colors hover:bg-[rgba(91,33,182,0.045)]">
                     <p className="text-sm font-semibold text-foreground">{alert.title}</p>
                     <p className="mt-1 text-sm leading-7 text-muted-foreground">{alert.body}</p>
                   </Link>
