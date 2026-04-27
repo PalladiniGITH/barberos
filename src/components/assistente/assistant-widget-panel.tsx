@@ -19,6 +19,7 @@ import type {
   AiChatThreadDetailView,
   AiChatThreadSummaryView,
 } from '@/lib/ai/assistant-chat-types'
+import { buildAssistantDisplayedMessages, type AssistantDisplayedMessage } from '@/lib/assistant-widget-state'
 import { cn } from '@/lib/utils'
 import { useAssistantWidget } from '@/components/assistente/assistant-widget-provider'
 
@@ -55,8 +56,9 @@ function buildOptimisticMessage(input: {
   role: AiChatMessageView['role']
   content: string
   statusNote?: string | null
+  createdAt?: Date
 }) {
-  const createdAt = new Date()
+  const createdAt = input.createdAt ?? new Date()
 
   return {
     id: `optimistic-${input.role.toLowerCase()}-${createdAt.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -76,15 +78,21 @@ function buildOptimisticMessage(input: {
   } satisfies AiChatMessageView
 }
 
-function MessageBubble({ message }: { message: AiChatMessageView }) {
+function MessageBubble({ message }: { message: AssistantDisplayedMessage }) {
   const isUser = message.role === 'USER'
+  const isPending = message.status === 'pending'
+  const isError = message.status === 'error'
 
   return (
     <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
       <article
         className={cn(
           'max-w-[88%] rounded-[1.2rem] border px-4 py-3 shadow-[0_18px_34px_-28px_rgba(2,6,23,0.72)]',
-          isUser
+          isError
+            ? 'border-[rgba(220,38,38,0.24)] bg-[rgba(220,38,38,0.08)] text-slate-100'
+            : isPending
+              ? 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-muted-foreground'
+              : isUser
             ? 'border-[rgba(124,58,237,0.24)] bg-[linear-gradient(180deg,rgba(124,58,237,0.18),rgba(91,33,182,0.12))] text-violet-50'
             : 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.05)] text-foreground'
         )}
@@ -174,6 +182,7 @@ export function AssistantWidgetPanel() {
   const [optimisticMessages, setOptimisticMessages] = useState<AiChatMessageView[]>([])
   const [optimisticThreadTitle, setOptimisticThreadTitle] = useState<string | null>(null)
   const [inlineErrorMessage, setInlineErrorMessage] = useState<string | null>(null)
+  const [isLoadingThread, setIsLoadingThread] = useState(false)
   const [isPending, startTransition] = useTransition()
   const messagesViewportRef = useRef<HTMLDivElement | null>(null)
 
@@ -186,11 +195,36 @@ export function AssistantWidgetPanel() {
     () => [...(selectedThread?.messages ?? [])].reverse().find((message) => message.role === 'ASSISTANT') ?? null,
     [selectedThread]
   )
-  const conversationMessages = useMemo(
-    () => [...(selectedThread?.messages ?? []), ...optimisticMessages],
-    [optimisticMessages, selectedThread]
+  const persistedMessages = selectedThread?.messages ?? []
+  const pendingAssistantMessage = useMemo(
+    () => isPending
+      ? buildOptimisticMessage({
+        role: 'ASSISTANT',
+        content: 'BarberEX IA esta analisando...',
+        statusNote: 'A resposta entra nesta conversa assim que o processamento terminar.',
+      })
+      : null,
+    [isPending]
   )
-  const displayedMessages = conversationMessages
+  const errorAssistantMessage = useMemo(
+    () => inlineErrorMessage
+      ? buildOptimisticMessage({
+        role: 'ASSISTANT',
+        content: 'Nao consegui responder agora. Tente novamente em instantes.',
+        statusNote: inlineErrorMessage,
+      })
+      : null,
+    [inlineErrorMessage]
+  )
+  const displayedMessages = useMemo(
+    () => buildAssistantDisplayedMessages({
+      persistedMessages,
+      optimisticMessages,
+      pendingAssistantMessage,
+      errorAssistantMessage,
+    }),
+    [errorAssistantMessage, optimisticMessages, pendingAssistantMessage, persistedMessages]
+  )
 
   const helperDescription = screenContext.subtitle
   const helperSuggestions = screenContext.suggestions.length > 0 ? screenContext.suggestions : (workspace?.suggestions ?? [])
@@ -198,7 +232,7 @@ export function AssistantWidgetPanel() {
   const hasActiveConversation = Boolean(
     selectedThread
     || optimisticThreadTitle
-    || conversationMessages.length > 0
+    || displayedMessages.length > 0
     || inlineErrorMessage
   )
   const activeConversationTitle = selectedThread?.title ?? optimisticThreadTitle ?? 'Nova conversa'
@@ -210,21 +244,24 @@ export function AssistantWidgetPanel() {
 
     console.debug('[assistant-widget] visual state', {
       activeThreadId: selectedThread?.id ?? null,
-      selectedThreadMessages: selectedThread?.messages.length ?? 0,
-      optimisticMessages: optimisticMessages.length,
-      displayedMessages: displayedMessages.length,
-      isRecentListOpen: showRecentThreads,
-      hasActiveConversation,
-      inlineErrorMessage: Boolean(inlineErrorMessage),
+      currentThreadTitle: selectedThread?.title ?? optimisticThreadTitle ?? null,
+      persistedMessagesCount: persistedMessages.length,
+      optimisticMessagesCount: optimisticMessages.length,
+      displayedMessagesCount: displayedMessages.length,
+      isLoadingThread,
+      isSending: isPending,
+      recentListOpen: showRecentThreads,
     })
   }, [
     displayedMessages.length,
-    hasActiveConversation,
-    inlineErrorMessage,
     isOpen,
+    isLoadingThread,
+    isPending,
     optimisticMessages.length,
+    optimisticThreadTitle,
+    persistedMessages.length,
     selectedThread?.id,
-    selectedThread?.messages.length,
+    selectedThread?.title,
     showRecentThreads,
   ])
 
@@ -244,6 +281,7 @@ export function AssistantWidgetPanel() {
       setOptimisticMessages([])
       setOptimisticThreadTitle(null)
       setInlineErrorMessage(null)
+      setIsLoadingThread(false)
       setLoadState('ready')
     } catch (error) {
       setLoadState('error')
@@ -271,7 +309,7 @@ export function AssistantWidgetPanel() {
       top: viewport.scrollHeight,
       behavior: 'smooth',
     })
-  }, [conversationMessages, inlineErrorMessage, isOpen, isPending])
+  }, [displayedMessages, isOpen])
 
   function replaceThreadSummary(nextSummary: AiChatThreadSummaryView) {
     setThreadSummaries((current) => {
@@ -293,15 +331,18 @@ export function AssistantWidgetPanel() {
     }
 
     resetTransientConversation()
+    setIsLoadingThread(true)
+    setShowRecentThreads(false)
 
     startTransition(() => {
       void (async () => {
         try {
           const thread = await loadAssistantThread(threadId)
           setSelectedThread(thread)
-          setShowRecentThreads(false)
         } catch (error) {
           toast.error(error instanceof Error ? error.message : 'Nao foi possivel abrir essa conversa.')
+        } finally {
+          setIsLoadingThread(false)
         }
       })()
     })
@@ -311,6 +352,7 @@ export function AssistantWidgetPanel() {
     setSelectedThread(null)
     setDraft('')
     setShowRecentThreads(true)
+    setIsLoadingThread(false)
     resetTransientConversation()
   }
 
@@ -434,7 +476,7 @@ export function AssistantWidgetPanel() {
           </div>
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-visible px-4 py-4 sm:px-5">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-4 sm:px-5">
           {loadState === 'loading' && !workspace ? (
             <div className="flex min-h-0 flex-1 items-center justify-center">
               <div className="rounded-[1.4rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-5 py-4 text-center">
@@ -484,18 +526,6 @@ export function AssistantWidgetPanel() {
                       </button>
                     )}
                   </div>
-
-                  {showRecentThreads && (
-                    <div className="absolute left-0 right-0 top-full z-20 mt-2 rounded-[1.05rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.99),rgba(15,17,21,0.98))] p-3 shadow-[0_30px_60px_-34px_rgba(2,6,23,0.88)]">
-                      <RecentThreadsList
-                        threadSummaries={threadSummaries}
-                        selectedThreadId={selectedThread?.id ?? null}
-                        onSelect={handleThreadSelect}
-                        disabled={isPending}
-                        compact
-                      />
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div className="mb-3 shrink-0 rounded-[1.15rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-4 py-4">
@@ -522,14 +552,35 @@ export function AssistantWidgetPanel() {
                 </div>
               )}
 
-              <div className="h-0 min-h-0 flex-1 overflow-hidden rounded-[1.3rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(15,18,27,0.9),rgba(12,14,20,0.96))] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+              {hasActiveConversation && showRecentThreads && threadSummaries.length > 0 && (
+                <div className="mb-3 shrink-0 rounded-[1.05rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.035)] p-3">
+                  <RecentThreadsList
+                    threadSummaries={threadSummaries}
+                    selectedThreadId={selectedThread?.id ?? null}
+                    onSelect={handleThreadSelect}
+                    disabled={isPending}
+                    compact
+                  />
+                </div>
+              )}
+
+              <div className="min-h-0 flex-1 overflow-hidden rounded-[1.3rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(15,18,27,0.9),rgba(12,14,20,0.96))] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                 <div
                   ref={messagesViewportRef}
                   className="flex h-full min-h-0 flex-col overflow-y-auto px-3 py-3 sm:px-4 sm:py-4"
                 >
                   {hasActiveConversation ? (
                     <div className="space-y-4">
-                      {displayedMessages.length > 0 ? (
+                      {isLoadingThread ? (
+                        <div className="flex min-h-[220px] items-center justify-center">
+                          <div className="rounded-[1.15rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-4 py-3 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-2">
+                              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                              Carregando as mensagens desta conversa...
+                            </div>
+                          </div>
+                        </div>
+                      ) : displayedMessages.length > 0 ? (
                         displayedMessages.map((message) => (
                           <MessageBubble key={message.id} message={message} />
                         ))
@@ -540,26 +591,6 @@ export function AssistantWidgetPanel() {
                             <p className="mt-2 text-sm leading-7 text-muted-foreground">
                               Envie uma pergunta para comecar e acompanhar a troca completa aqui dentro.
                             </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {inlineErrorMessage && (
-                        <div className="flex justify-start">
-                          <div className="max-w-[88%] rounded-[1.1rem] border border-[rgba(220,38,38,0.24)] bg-[rgba(220,38,38,0.08)] px-4 py-3 text-sm text-slate-100">
-                            <p className="font-medium">Nao foi possivel responder agora.</p>
-                            <p className="mt-1 text-xs leading-6 text-rose-100/90">{inlineErrorMessage}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {isPending && (
-                        <div className="flex justify-start">
-                          <div className="max-w-[88%] rounded-[1.1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-4 py-3 text-sm text-muted-foreground">
-                            <div className="flex items-center gap-2">
-                              <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                              BarberEX IA esta analisando...
-                            </div>
                           </div>
                         </div>
                       )}
