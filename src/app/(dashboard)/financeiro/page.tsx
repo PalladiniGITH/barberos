@@ -32,13 +32,13 @@ function MetricCard({
   icon: LucideIcon
 }) {
   const toneClasses = {
-    neutral: 'text-sky-700 bg-sky-500/10',
-    positive: 'text-emerald-700 bg-emerald-500/10',
-    warning: 'text-amber-700 bg-amber-500/10',
+    neutral: 'text-sky-700 bg-sky-500/10 border border-sky-500/10',
+    positive: 'text-emerald-700 bg-emerald-500/10 border border-emerald-500/10',
+    warning: 'text-amber-700 bg-amber-500/10 border border-amber-500/10',
   }[tone]
 
   return (
-    <div className="kpi-card">
+    <div className="executive-metric">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{title}</p>
@@ -67,7 +67,7 @@ function MonthBars({
         const netWidth = Math.max(8, (Math.abs(item.net) / maxAbs) * 100)
 
         return (
-          <div key={item.label} className="rounded-2xl border border-border/70 bg-secondary/25 p-4">
+          <div key={item.label} className="tonal-note">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-foreground">{item.label}</p>
@@ -278,17 +278,17 @@ export default async function FinanceiroPage({ searchParams }: Props) {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[420px]">
-            <Link href="/financeiro/receitas" className="rounded-2xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 transition-colors hover:border-primary/30 hover:bg-white/[0.06]">
+            <Link href="/financeiro/receitas" className="surface-floating px-3.5 py-2.5 transition-colors hover:border-primary/20 hover:bg-white/[0.06]">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Receitas</p>
               <p className="mt-2 text-lg font-semibold text-white">{formatCurrency(totalRevenue)}</p>
               <p className="mt-1 text-xs text-slate-400">Abrir entradas</p>
             </Link>
-            <Link href="/financeiro/despesas" className="rounded-2xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 transition-colors hover:border-primary/30 hover:bg-white/[0.06]">
+            <Link href="/financeiro/despesas" className="surface-floating px-3.5 py-2.5 transition-colors hover:border-primary/20 hover:bg-white/[0.06]">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Despesas</p>
               <p className="mt-2 text-lg font-semibold text-white">{formatCurrency(totalExpense)}</p>
               <p className="mt-1 text-xs text-slate-400">Abrir saidas</p>
             </Link>
-            <Link href="/financeiro/categorias" className="rounded-2xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 transition-colors hover:border-primary/30 hover:bg-white/[0.06]">
+            <Link href="/financeiro/categorias" className="surface-floating px-3.5 py-2.5 transition-colors hover:border-primary/20 hover:bg-white/[0.06]">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Categorias</p>
               <p className="mt-2 text-lg font-semibold text-white">{categories.length}</p>
               <p className="mt-1 text-xs text-slate-400">Organizacao do uso</p>
@@ -343,7 +343,7 @@ export default async function FinanceiroPage({ searchParams }: Props) {
                 Uma linha simples para enxergar se o negocio ganhou tracao ou perdeu folego.
               </p>
             </div>
-            <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-muted-foreground">
+            <span className="surface-chip">
               {isCurrentMonth ? 'Mes atual' : 'Mes fechado'}
             </span>
           </div>
@@ -364,7 +364,7 @@ export default async function FinanceiroPage({ searchParams }: Props) {
           </div>
 
           <div className="mt-5 space-y-3">
-            <div className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
+            <div className="tonal-note-strong">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Projecao simples</p>
               <p className="mt-2 text-2xl font-semibold text-foreground tabular-nums">
                 {formatCurrency(forecast.projectedNet)}
@@ -376,7 +376,7 @@ export default async function FinanceiroPage({ searchParams }: Props) {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
+            <div className="tonal-note">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Meta e teto</p>
               <div className="mt-3 space-y-3">
                 <div>
@@ -409,28 +409,28 @@ export default async function FinanceiroPage({ searchParams }: Props) {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
+            <div className="tonal-note">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Sinais de maior peso</p>
               <div className="mt-3 space-y-3">
-                <div className="flex items-center justify-between gap-3 rounded-xl bg-background/40 px-3 py-2">
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-background/30 px-3 py-2.5">
                   <span className="text-sm text-foreground">Top receita</span>
                   <span className="text-sm text-muted-foreground">
                     {topRevenueCategory?.category?.name ?? 'Sem categoria'}
                   </span>
                 </div>
-                <div className="flex items-center justify-between gap-3 rounded-xl bg-background/40 px-3 py-2">
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-background/30 px-3 py-2.5">
                   <span className="text-sm text-foreground">Top despesa</span>
                   <span className="text-sm text-muted-foreground">
                     {topExpenseCategory?.category?.name ?? 'Sem categoria'}
                   </span>
                 </div>
-                <div className="flex items-center justify-between gap-3 rounded-xl bg-background/40 px-3 py-2">
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-background/30 px-3 py-2.5">
                   <span className="text-sm text-foreground">Movimentos</span>
                   <span className="text-sm text-muted-foreground">
                     {currentRevenue._count + currentExpense._count}
                   </span>
                 </div>
-                <div className="flex items-center justify-between gap-3 rounded-xl bg-background/40 px-3 py-2">
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-background/30 px-3 py-2.5">
                   <span className="text-sm text-foreground">Mix de pagamentos</span>
                   <span className="text-sm text-muted-foreground">{formatCurrency(paymentTotal)}</span>
                 </div>
@@ -460,7 +460,7 @@ export default async function FinanceiroPage({ searchParams }: Props) {
               const amount = Number(item._sum.amount ?? 0)
               const share = paymentTotal > 0 ? (amount / paymentTotal) * 100 : 0
               return (
-                <div key={item.paymentMethod} className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
+                <div key={item.paymentMethod} className="tonal-note">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-medium text-foreground">{item.paymentMethod}</p>
@@ -474,7 +474,7 @@ export default async function FinanceiroPage({ searchParams }: Props) {
                 </div>
               )
             }) : (
-              <div className="rounded-2xl border border-dashed border-border bg-secondary/25 p-5 text-sm text-muted-foreground">
+              <div className="tonal-note border-dashed text-sm text-muted-foreground">
                 Nenhuma receita registrada no periodo.
               </div>
             )}

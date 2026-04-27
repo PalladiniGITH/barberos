@@ -74,7 +74,7 @@ export function AddRevenueButton({ professionals, services, categories }: Props)
     <>
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+        className="action-button-primary"
       >
         <Plus className="h-4 w-4" />
         Nova Receita
@@ -83,7 +83,7 @@ export function AddRevenueButton({ professionals, services, categories }: Props)
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <div className="relative w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-2xl animate-fade-in">
+          <div className="premium-dialog relative w-full max-w-md p-6 animate-fade-in">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-foreground">Nova Receita</h2>
               <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">
@@ -101,7 +101,7 @@ export function AddRevenueButton({ professionals, services, categories }: Props)
                     step="0.01"
                     min="0.01"
                     placeholder="0,00"
-                    className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="auth-input px-3 py-2.5"
                   />
                   {errors.amount && <p className="mt-1 text-xs text-destructive">{errors.amount.message}</p>}
                 </div>
@@ -110,7 +110,7 @@ export function AddRevenueButton({ professionals, services, categories }: Props)
                   <input
                     {...register('date')}
                     type="date"
-                    className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="auth-input px-3 py-2.5"
                   />
                   {errors.date && <p className="mt-1 text-xs text-destructive">{errors.date.message}</p>}
                 </div>
@@ -120,7 +120,7 @@ export function AddRevenueButton({ professionals, services, categories }: Props)
                 <label className="mb-1.5 block text-sm font-medium text-foreground">Forma de Pagamento *</label>
                 <select
                   {...register('paymentMethod')}
-                  className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className="auth-input px-3 py-2.5"
                 >
                   <option value="PIX">PIX</option>
                   <option value="CASH">Dinheiro</option>
@@ -136,7 +136,7 @@ export function AddRevenueButton({ professionals, services, categories }: Props)
                 <label className="mb-1.5 block text-sm font-medium text-foreground">Profissional</label>
                 <select
                   {...register('professionalId')}
-                  className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className="auth-input px-3 py-2.5"
                 >
                   <option value="">Sem profissional</option>
                   {professionals.map((professional) => (
@@ -149,7 +149,7 @@ export function AddRevenueButton({ professionals, services, categories }: Props)
                 <label className="mb-1.5 block text-sm font-medium text-foreground">Servico</label>
                 <select
                   {...register('serviceId')}
-                  className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className="auth-input px-3 py-2.5"
                 >
                   <option value="">Selecione um servico</option>
                   {services.map((service) => (
@@ -162,7 +162,7 @@ export function AddRevenueButton({ professionals, services, categories }: Props)
                 <label className="mb-1.5 block text-sm font-medium text-foreground">Categoria</label>
                 <select
                   {...register('categoryId')}
-                  className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className="auth-input px-3 py-2.5"
                 >
                   <option value="">Sem categoria</option>
                   {categories.map((category) => (
@@ -177,7 +177,7 @@ export function AddRevenueButton({ professionals, services, categories }: Props)
                   {...register('description')}
                   type="text"
                   placeholder="Observacao..."
-                  className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className="auth-input px-3 py-2.5"
                 />
               </div>
 
@@ -185,14 +185,14 @@ export function AddRevenueButton({ professionals, services, categories }: Props)
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="flex-1 rounded-lg border border-border py-2 text-sm text-foreground transition-colors hover:bg-secondary"
+                  className="action-button flex-1"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                  className="action-button-primary flex flex-1 items-center justify-center gap-2"
                 >
                   {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
                   {isSubmitting ? 'Salvando...' : 'Salvar Receita'}

@@ -91,10 +91,8 @@ function FilterLink({
     <Link
       href={href}
       className={cn(
-        'inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
-        active
-          ? 'border-[rgba(91,33,182,0.22)] bg-[rgba(91,33,182,0.16)] text-violet-100'
-          : 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-slate-300 hover:bg-[rgba(91,33,182,0.12)] hover:text-slate-100'
+        'filter-pill',
+        active ? 'filter-pill-active' : ''
       )}
     >
       {label}
@@ -146,8 +144,8 @@ function ToneBadge({
 }) {
   const toneClass = {
     neutral: 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-slate-300',
-    positive: 'border-[rgba(52,211,153,0.22)] bg-[rgba(16,185,129,0.12)] text-emerald-100',
-    warning: 'border-[rgba(251,191,36,0.22)] bg-[rgba(251,191,36,0.12)] text-amber-100',
+    positive: 'border-[rgba(52,211,153,0.16)] bg-[rgba(16,185,129,0.1)] text-emerald-100',
+    warning: 'border-[rgba(251,191,36,0.16)] bg-[rgba(251,191,36,0.1)] text-amber-100',
   }[tone]
 
   return (
@@ -299,7 +297,7 @@ export default async function ClientesPage({ searchParams }: Props) {
         />
       </div>
 
-      <section className="dashboard-panel p-5 sm:p-5">
+      <section className="filter-rail">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <h2 className="text-xl font-semibold text-foreground">Refine a carteira por barbeiro, frequencia e valor</h2>
@@ -396,10 +394,10 @@ export default async function ClientesPage({ searchParams }: Props) {
             <p className="text-sm text-muted-foreground">{directory.rows.length} clientes no recorte</p>
           </div>
 
-          <div className="mt-5 overflow-x-auto">
-            <table className="min-w-full text-sm">
+          <div className="table-shell mt-5 overflow-x-auto">
+            <table className="data-table min-w-full text-sm">
               <thead>
-                <tr className="border-b border-[rgba(255,255,255,0.08)] text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                <tr className="border-b border-[rgba(255,255,255,0.05)] text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   <th className="pb-3 pr-4">Cliente</th>
                   <th className="pb-3 pr-4">Tipo</th>
                   <th className="pb-3 pr-4">Barbeiro</th>
@@ -410,9 +408,9 @@ export default async function ClientesPage({ searchParams }: Props) {
                   <th className="pb-3">Sinalizacao</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[rgba(255,255,255,0.06)]">
+              <tbody className="divide-y divide-[rgba(255,255,255,0.05)]">
                 {directory.rows.length > 0 ? directory.rows.map((row) => (
-                  <tr key={row.id} className="align-top">
+                  <tr key={row.id} className="align-top transition-colors hover:bg-[rgba(124,92,255,0.04)]">
                     <td className="py-4 pr-4">
                       <div className="min-w-[220px]">
                         <Link
@@ -481,29 +479,29 @@ export default async function ClientesPage({ searchParams }: Props) {
         </section>
 
         <aside className="space-y-5">
-          <section className="premium-rail">
+          <section className="premium-rail p-5">
             <h3 className="text-lg font-semibold text-foreground">Metodologia do recorte</h3>
             <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-              <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="tonal-note">
                 <p className="font-semibold text-foreground">Receita real</p>
                 <p className="mt-2 leading-6">{directory.methodology.realRevenueDefinition}</p>
               </div>
-              <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="tonal-note">
                 <p className="font-semibold text-foreground">Receita estimada</p>
                 <p className="mt-2 leading-6">{directory.methodology.estimatedRevenueDefinition}</p>
               </div>
-              <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="tonal-note">
                 <p className="font-semibold text-foreground">Margem</p>
                 <p className="mt-2 leading-6">{directory.methodology.marginDefinition}</p>
               </div>
             </div>
           </section>
 
-          <section className="premium-block">
+          <section className="premium-block p-5">
             <h3 className="text-lg font-semibold text-foreground">Sinais da carteira</h3>
 
             <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-              <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="tonal-note">
                 <p className="font-semibold text-foreground">Cliente mais valioso do filtro</p>
                 <p className="mt-2 leading-6">
                   {directory.rows[0]
@@ -511,7 +509,7 @@ export default async function ClientesPage({ searchParams }: Props) {
                     : 'Ainda sem base suficiente.'}
                 </p>
               </div>
-              <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="tonal-note">
                 <p className="font-semibold text-foreground">Peso das estimativas</p>
                 <p className="mt-2 leading-6">
                   {directory.summary.estimatedRevenue > 0
@@ -519,7 +517,7 @@ export default async function ClientesPage({ searchParams }: Props) {
                     : 'A leitura atual nao depende de estimativa relevante de receita.'}
                 </p>
               </div>
-              <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="tonal-note">
                 <p className="font-semibold text-foreground">Cautela analitica</p>
                 <p className="mt-2 leading-6">{directory.methodology.caution}</p>
               </div>

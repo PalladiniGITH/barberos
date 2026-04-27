@@ -31,7 +31,7 @@ function FlowBars({
         const netWidth = Math.max(10, (Math.abs(item.net) / maxAbs) * 100)
 
         return (
-          <div key={item.label} className="rounded-2xl border border-border/70 bg-secondary/25 p-4">
+          <div key={item.label} className="tonal-note">
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm font-semibold text-foreground">{item.label}</p>
               <span className={cn(
@@ -179,21 +179,21 @@ export default async function FluxoCaixaPage({ searchParams }: Props) {
       <SectionTabs items={FINANCE_SECTION_TABS} currentPath="/financeiro/fluxo-caixa" />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="kpi-card">
+        <div className="executive-metric">
           <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Receitas</p>
           <p className="text-2xl font-bold tabular-nums text-emerald-700">{formatCurrency(totalRevenue)}</p>
           <p className="mt-2 text-xs text-muted-foreground">
             {revenueChange === null ? 'Sem comparacao anterior.' : `vs mes anterior: ${formatPercent(revenueChange, 0)}`}
           </p>
         </div>
-        <div className="kpi-card">
+        <div className="executive-metric">
           <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Despesas</p>
           <p className="text-2xl font-bold tabular-nums text-rose-700">{formatCurrency(totalExpense)}</p>
           <p className="mt-2 text-xs text-muted-foreground">
             {expenseChange === null ? 'Sem comparacao anterior.' : `vs mes anterior: ${formatPercent(expenseChange, 0)}`}
           </p>
         </div>
-        <div className="kpi-card">
+        <div className="executive-metric">
           <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Saldo do periodo</p>
           <p className={cn('text-2xl font-bold tabular-nums', currentNet >= 0 ? 'text-emerald-700' : 'text-rose-700')}>
             {formatCurrency(currentNet)}
@@ -202,7 +202,7 @@ export default async function FluxoCaixaPage({ searchParams }: Props) {
             {currentNet >= 0 ? 'Caixa positivo no periodo selecionado.' : 'Caixa pressionado no periodo selecionado.'}
           </p>
         </div>
-        <div className="kpi-card">
+        <div className="executive-metric">
           <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Previsao simples</p>
           <p className={cn('text-2xl font-bold tabular-nums', forecast.projectedNet >= 0 ? 'text-sky-700' : 'text-rose-700')}>
             {formatCurrency(forecast.projectedNet)}
@@ -222,7 +222,7 @@ export default async function FluxoCaixaPage({ searchParams }: Props) {
                 Cada bloco mostra receita, despesa e saldo liquido para acompanhar o movimento com clareza.
               </p>
             </div>
-            <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-muted-foreground">
+            <span className="surface-chip">
               Ultimos 6 meses
             </span>
           </div>
@@ -243,7 +243,7 @@ export default async function FluxoCaixaPage({ searchParams }: Props) {
           </div>
 
           <div className="mt-5 space-y-3">
-            <div className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
+            <div className="tonal-note-strong">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Saldo projetado</p>
               <p className={cn('mt-2 text-2xl font-semibold tabular-nums', forecast.projectedNet >= 0 ? 'text-emerald-700' : 'text-rose-700')}>
                 {formatCurrency(forecast.projectedNet)}
@@ -255,7 +255,7 @@ export default async function FluxoCaixaPage({ searchParams }: Props) {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
+            <div className="tonal-note">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Meta do mes</p>
               <p className="mt-2 text-xl font-semibold text-foreground">
                 {goalValue > 0 ? formatPercent(goalProgress, 0) : 'Sem meta'}
@@ -270,7 +270,7 @@ export default async function FluxoCaixaPage({ searchParams }: Props) {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
+            <div className="tonal-note">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Media recente</p>
               <p className="mt-2 text-xl font-semibold text-foreground">
                 {formatCurrency(forecast.trailingAverage)}

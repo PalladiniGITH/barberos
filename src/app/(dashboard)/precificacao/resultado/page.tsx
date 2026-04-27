@@ -191,14 +191,14 @@ export default async function ResultadoPage() {
               </p>
             </div>
             {bestService && (
-              <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700">
+              <span className="surface-chip border-emerald-500/20 bg-emerald-500/10 text-emerald-700">
                 Melhor margem: {bestService.name}
               </span>
             )}
           </div>
 
           {!hasServices ? (
-            <div className="mt-6 rounded-2xl border border-dashed border-border bg-secondary/20 p-8">
+            <div className="tonal-note mt-6 border-dashed p-8">
               <div className="flex items-start gap-4">
                 <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                   <Scissors className="h-5 w-5" />
@@ -213,7 +213,7 @@ export default async function ResultadoPage() {
             </div>
           ) : (
             <>
-              <div className="mt-6 overflow-hidden rounded-2xl border border-border/70">
+              <div className="table-shell mt-6 overflow-hidden">
                 <table className="w-full data-table">
                   <thead className="bg-secondary/30">
                     <tr className="border-b border-border/70">
@@ -255,7 +255,7 @@ export default async function ResultadoPage() {
               </div>
 
               <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-border/70 bg-secondary/25 p-5">
+                <div className="tonal-note-strong">
                   <p className="text-sm font-semibold text-foreground">Serviço mais rentável</p>
                   {bestService ? (
                     <>
@@ -267,7 +267,7 @@ export default async function ResultadoPage() {
                   ) : null}
                 </div>
 
-                <div className="rounded-2xl border border-border/70 bg-secondary/25 p-5">
+                <div className="tonal-note">
                   <p className="text-sm font-semibold text-foreground">Serviço mais pressionado</p>
                   {worstService ? (
                     <>

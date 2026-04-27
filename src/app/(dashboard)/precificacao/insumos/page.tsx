@@ -95,25 +95,25 @@ export default async function InsumosPage() {
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="dashboard-panel p-5">
+        <div className="executive-metric">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Insumos cadastrados</p>
           <p className="mt-3 text-3xl font-semibold text-foreground">{supplies.length}</p>
           <p className="mt-2 text-sm text-muted-foreground">Itens que sustentam cálculo de custo e rentabilidade dos serviços.</p>
         </div>
 
-        <div className="dashboard-panel p-5">
+        <div className="executive-metric">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Vinculados a serviços</p>
           <p className="mt-3 text-3xl font-semibold text-foreground">{linkedSupplies}</p>
           <p className="mt-2 text-sm text-muted-foreground">Itens que já alimentam precificação de forma real.</p>
         </div>
 
-        <div className="dashboard-panel p-5">
+        <div className="executive-metric">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Custo unitário médio</p>
           <p className="mt-3 text-3xl font-semibold text-foreground">{formatCurrency(averageCost)}</p>
           <p className="mt-2 text-sm text-muted-foreground">Faixa útil para revisar consumo e reposição do estoque operacional.</p>
         </div>
 
-        <div className="dashboard-panel p-5">
+        <div className="executive-metric">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Itens sem uso</p>
           <p className="mt-3 text-3xl font-semibold text-foreground">{orphanSupplies}</p>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -133,13 +133,10 @@ export default async function InsumosPage() {
                 Organize os insumos usados em cada serviço para manter custo, margem e reposição sob controle.
               </p>
             </div>
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-              Estrutura funcional
-            </span>
           </div>
 
           {canManageCatalog && (
-            <div className="mt-6 rounded-2xl border border-border/70 bg-secondary/20 p-5">
+            <div className="tonal-note mt-6">
               <div className="flex flex-col gap-1">
                 <h3 className="text-base font-semibold text-foreground">Cadastrar ou importar insumo</h3>
                 <p className="text-sm text-muted-foreground">
@@ -227,7 +224,7 @@ export default async function InsumosPage() {
 
               <div className="mt-6 grid gap-3 md:grid-cols-3">
                 {starterSupplies.map((supply) => (
-                  <div key={supply.name} className="rounded-2xl border border-border/70 bg-background/50 p-4">
+                  <div key={supply.name} className="tonal-note">
                     <p className="text-sm font-semibold text-foreground">{supply.name}</p>
                     <div className="mt-4 space-y-2 text-sm text-muted-foreground">
                       <p>Unidade: <strong className="text-foreground">{supply.unit}</strong></p>
@@ -239,7 +236,7 @@ export default async function InsumosPage() {
               </div>
             </div>
           ) : (
-            <div className="mt-6 overflow-x-auto rounded-2xl border border-border/70">
+            <div className="table-shell mt-6 overflow-x-auto">
               <table className="w-full data-table">
                 <thead className="bg-secondary/30">
                   <tr className="border-b border-border/70">
@@ -396,7 +393,7 @@ export default async function InsumosPage() {
                 </p>
               </div>
             ) : (
-              <div className="mt-4 rounded-2xl border border-dashed border-border bg-secondary/20 p-5 text-sm text-muted-foreground">
+              <div className="tonal-note mt-4 border-dashed text-sm text-muted-foreground">
                 Assim que os insumos forem lançados, este painel mostra quais itens mais impactam o catálogo.
               </div>
             )}

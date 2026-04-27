@@ -55,7 +55,7 @@ export function AddExpenseButton({ categories }: Props) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg text-sm transition-colors"
+        className="action-button-primary"
       >
         <Plus className="w-4 h-4" />
         Nova Despesa
@@ -64,7 +64,7 @@ export function AddExpenseButton({ categories }: Props) {
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <div className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-md p-6 animate-fade-in">
+          <div className="premium-dialog relative w-full max-w-md p-6 animate-fade-in">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-semibold text-foreground">Nova Despesa</h2>
               <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">
@@ -78,7 +78,7 @@ export function AddExpenseButton({ categories }: Props) {
                 <input
                   {...register('description')}
                   placeholder="Ex: Aluguel, Insumos..."
-                  className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className="auth-input px-3 py-2.5"
                 />
                 {errors.description && <p className="text-destructive text-xs mt-1">{errors.description.message}</p>}
               </div>
@@ -89,7 +89,7 @@ export function AddExpenseButton({ categories }: Props) {
                   <input
                     {...register('amount')}
                     type="number" step="0.01" placeholder="0,00"
-                    className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="auth-input px-3 py-2.5"
                   />
                   {errors.amount && <p className="text-destructive text-xs mt-1">{errors.amount.message}</p>}
                 </div>
@@ -98,7 +98,7 @@ export function AddExpenseButton({ categories }: Props) {
                   <input
                     {...register('dueDate')}
                     type="date"
-                    className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="auth-input px-3 py-2.5"
                   />
                 </div>
               </div>
@@ -108,7 +108,7 @@ export function AddExpenseButton({ categories }: Props) {
                   <label className="block text-sm font-medium text-foreground mb-1.5">Tipo</label>
                   <select
                     {...register('type')}
-                    className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="auth-input px-3 py-2.5"
                   >
                     <option value="FIXED">Fixo</option>
                     <option value="VARIABLE">Variável</option>
@@ -118,7 +118,7 @@ export function AddExpenseButton({ categories }: Props) {
                   <label className="block text-sm font-medium text-foreground mb-1.5">Categoria</label>
                   <select
                     {...register('categoryId')}
-                    className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="auth-input px-3 py-2.5"
                   >
                     <option value="">Sem categoria</option>
                     {categories.map((c) => (
@@ -136,13 +136,13 @@ export function AddExpenseButton({ categories }: Props) {
               <div className="flex gap-3 pt-2">
                 <button
                   type="button" onClick={() => setOpen(false)}
-                  className="flex-1 py-2 rounded-lg border border-border text-foreground hover:bg-secondary transition-colors text-sm"
+                  className="action-button flex-1"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit" disabled={isSubmitting}
-                  className="flex-1 flex items-center justify-center gap-2 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg text-sm transition-colors disabled:opacity-50"
+                  className="action-button-primary flex flex-1 items-center justify-center gap-2"
                 >
                   {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   Salvar

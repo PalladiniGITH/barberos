@@ -32,8 +32,8 @@ export function SectionTabs({ items, currentPath }: SectionTabsProps) {
               className={cn(
                 'rounded-[1.1rem] border px-3.5 py-2.5 transition-all',
                 active
-                  ? 'surface-inverse border-[rgba(124,58,237,0.22)] bg-[linear-gradient(135deg,rgba(109,40,217,0.28),rgba(21,24,33,0.96))] text-white shadow-[0_20px_44px_-26px_rgba(2,6,23,0.78)]'
-                  : 'border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] hover:border-[rgba(124,58,237,0.18)] hover:bg-[rgba(124,58,237,0.08)]'
+                  ? 'surface-inverse border-[rgba(124,58,237,0.16)] bg-[linear-gradient(135deg,rgba(124,92,255,0.16),rgba(21,24,33,0.96))] text-white shadow-[0_18px_34px_-28px_rgba(2,6,23,0.72)]'
+                  : 'border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)] hover:border-[rgba(124,58,237,0.12)] hover:bg-[rgba(124,58,237,0.06)]'
               )}
             >
               <p className={cn('text-[13px] font-semibold', active ? 'text-white' : 'text-foreground')}>

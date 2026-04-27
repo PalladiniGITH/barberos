@@ -184,7 +184,7 @@ export default async function ServicosPage() {
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="dashboard-panel p-5">
+        <div className="executive-metric">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Serviços ativos</p>
           <p className="mt-3 text-3xl font-semibold text-foreground">{activeServicesCount}</p>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -194,19 +194,19 @@ export default async function ServicosPage() {
           </p>
         </div>
 
-        <div className="dashboard-panel p-5">
+        <div className="executive-metric">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Preço médio</p>
           <p className="mt-3 text-3xl font-semibold text-foreground">{formatCurrency(averagePrice)}</p>
           <p className="mt-2 text-sm text-muted-foreground">Faixa útil para revisar posicionamento e consistência do catálogo.</p>
         </div>
 
-        <div className="dashboard-panel p-5">
+        <div className="executive-metric">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Margem média estimada</p>
           <p className="mt-3 text-3xl font-semibold text-foreground">{formatPercent(averageMargin, 0)}</p>
           <p className="mt-2 text-sm text-muted-foreground">O que o catálogo deixa em média após custo e comissão.</p>
         </div>
 
-        <div className="dashboard-panel p-5">
+        <div className="executive-metric">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Serviços com atenção</p>
           <p className="mt-3 text-3xl font-semibold text-foreground">{attentionServices}</p>
           <p className="mt-2 text-sm text-muted-foreground">Itens que merecem revisão rápida de preço, comissão ou insumo.</p>
@@ -222,13 +222,10 @@ export default async function ServicosPage() {
                 Compare preço, custo e margem para ajustar o catálogo com base em rentabilidade real.
               </p>
             </div>
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-              Leitura operacional
-            </span>
           </div>
 
           {canManageCatalog && (
-            <div className="mt-6 rounded-2xl border border-border/70 bg-secondary/20 p-5">
+            <div className="tonal-note mt-6">
               <div className="flex flex-col gap-1">
                 <h3 className="text-base font-semibold text-foreground">Cadastrar ou importar servico</h3>
                 <p className="text-sm text-muted-foreground">
@@ -320,7 +317,7 @@ export default async function ServicosPage() {
 
               <div className="mt-6 grid gap-3 md:grid-cols-3">
                 {starterServices.map((service) => (
-                  <div key={service.name} className="rounded-2xl border border-border/70 bg-background/50 p-4">
+                  <div key={service.name} className="tonal-note">
                     <p className="text-sm font-semibold text-foreground">{service.name}</p>
                     <div className="mt-4 space-y-2 text-sm text-muted-foreground">
                       <p>Preço sugerido: <strong className="text-foreground">{service.price}</strong></p>
@@ -334,7 +331,7 @@ export default async function ServicosPage() {
           ) : (
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               {enrichedServices.map((service) => (
-                <article key={service.id} className="rounded-2xl border border-border/70 bg-secondary/25 p-5">
+                <article key={service.id} className="tonal-note-strong">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h3 className="text-lg font-semibold text-foreground">{service.name}</h3>
@@ -370,15 +367,15 @@ export default async function ServicosPage() {
                   </div>
 
                   <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
+                    <div className="tonal-note">
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Preço</p>
                       <p className="mt-2 text-xl font-semibold text-foreground">{formatCurrency(Number(service.price))}</p>
                     </div>
-                    <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
+                    <div className="tonal-note">
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Custo total</p>
                       <p className="mt-2 text-xl font-semibold text-foreground">{formatCurrency(service.totalCost)}</p>
                     </div>
-                    <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
+                    <div className="tonal-note">
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Margem</p>
                       <p className={cn(
                         'mt-2 text-xl font-semibold',
@@ -389,7 +386,7 @@ export default async function ServicosPage() {
                     </div>
                   </div>
 
-                  <div className="mt-5 rounded-2xl border border-border/70 bg-background/50 p-4">
+                  <div className="tonal-note mt-5">
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-sm font-semibold text-foreground">Saúde de margem</p>
                       <span className={cn(
@@ -445,7 +442,7 @@ export default async function ServicosPage() {
                   </div>
 
                   {canManageCatalog && (
-                  <details className="mt-5 overflow-hidden rounded-2xl border border-border/70 bg-background/45 p-4">
+                  <details className="tonal-note mt-5 overflow-hidden">
                     <summary className="cursor-pointer text-sm font-semibold text-foreground">Editar cadastro do servico</summary>
                       <form action={saveServiceFromForm} className="mt-4 min-w-0 space-y-4">
                         <input type="hidden" name="id" value={service.id} />
@@ -561,7 +558,7 @@ export default async function ServicosPage() {
                 </p>
               </div>
             ) : (
-              <div className="mt-4 rounded-2xl border border-dashed border-border bg-secondary/20 p-5 text-sm text-muted-foreground">
+              <div className="tonal-note mt-4 border-dashed text-sm text-muted-foreground">
                 Assim que os serviços forem cadastrados, esta área destaca os itens mais rentáveis e os que pedem revisão.
               </div>
             )}
@@ -570,7 +567,7 @@ export default async function ServicosPage() {
           <section className="dashboard-panel p-6">
             <h2 className="text-lg font-semibold text-foreground">Leituras rápidas</h2>
             <div className="mt-4 space-y-3">
-              <div className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
+              <div className="tonal-note">
                 <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                   <Wallet className="h-4 w-4 text-primary" />
                   Resumo operacional
@@ -580,7 +577,7 @@ export default async function ServicosPage() {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
+              <div className="tonal-note">
                 <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                   <TrendingUp className="h-4 w-4 text-primary" />
                   Oportunidade de ajuste
@@ -590,7 +587,7 @@ export default async function ServicosPage() {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
+              <div className="tonal-note">
                 <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                   <Receipt className="h-4 w-4 text-primary" />
                   Leitura integrada

@@ -98,19 +98,19 @@ export default async function ReceitasPage({ searchParams }: Props) {
       <SectionTabs items={FINANCE_SECTION_TABS} currentPath="/financeiro/receitas" />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <div className="kpi-card">
+        <div className="executive-metric">
           <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Entradas do periodo</p>
           <p className="text-2xl font-bold tabular-nums text-emerald-700">{formatCurrency(totalRevenue)}</p>
         </div>
-        <div className="kpi-card">
+        <div className="executive-metric">
           <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Movimentos</p>
           <p className="text-2xl font-bold tabular-nums text-foreground">{summary._count}</p>
         </div>
-        <div className="kpi-card">
+        <div className="executive-metric">
           <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Ticket medio</p>
           <p className="text-2xl font-bold tabular-nums text-foreground">{formatCurrency(avgTicket)}</p>
         </div>
-        <div className="kpi-card">
+        <div className="executive-metric">
           <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">PIX + dinheiro</p>
           <p className="text-2xl font-bold tabular-nums text-foreground">
             {formatCurrency((byPayment['PIX'] ?? 0) + (byPayment['CASH'] ?? 0))}
@@ -119,8 +119,8 @@ export default async function ReceitasPage({ searchParams }: Props) {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-        <section className="dashboard-panel overflow-hidden">
-          <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+        <section className="dashboard-panel table-shell overflow-hidden">
+          <div className="flex items-center justify-between gap-3 border-b border-[rgba(255,255,255,0.05)] px-5 py-4">
             <h3 className="font-semibold text-foreground">Entradas do periodo</h3>
             <span className="text-sm text-muted-foreground">{revenues.length} movimentos</span>
           </div>
@@ -139,7 +139,7 @@ export default async function ReceitasPage({ searchParams }: Props) {
             <div className="overflow-x-auto">
               <table className="w-full data-table">
                 <thead>
-                  <tr className="border-b border-border">
+                  <tr className="border-b border-[rgba(255,255,255,0.05)]">
                     <th className="px-5 py-3 text-left">Data</th>
                     <th className="px-5 py-3 text-left">Profissional</th>
                     <th className="px-5 py-3 text-left">Servico</th>
@@ -151,13 +151,13 @@ export default async function ReceitasPage({ searchParams }: Props) {
                 </thead>
                 <tbody>
                   {revenues.map((revenue) => (
-                    <tr key={revenue.id} className="group border-b border-border/50 transition-colors hover:bg-secondary/30">
+                    <tr key={revenue.id} className="group border-b border-[rgba(255,255,255,0.05)] transition-colors">
                       <td className="px-5 py-3 text-sm tabular-nums text-muted-foreground">{formatDate(revenue.date)}</td>
                       <td className="px-5 py-3 text-sm text-foreground">{revenue.professional?.name ?? 'Sem profissional'}</td>
                       <td className="px-5 py-3 text-sm text-foreground">{revenue.service?.name ?? revenue.description ?? 'Sem servico'}</td>
                       <td className="px-5 py-3 text-sm text-muted-foreground">{revenue.category?.name ?? 'Sem categoria'}</td>
                       <td className="px-5 py-3 text-sm">
-                        <span className="inline-flex items-center rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-foreground">
+                        <span className="surface-chip rounded-md px-2 py-0.5 text-xs font-medium">
                           {PAYMENT_METHOD_LABELS[revenue.paymentMethod] ?? revenue.paymentMethod}
                         </span>
                       </td>
@@ -173,7 +173,7 @@ export default async function ReceitasPage({ searchParams }: Props) {
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="border-t border-border bg-secondary/20">
+                  <tr className="border-t border-[rgba(255,255,255,0.05)] bg-secondary/20">
                     <td colSpan={5} className="px-5 py-3 text-sm font-medium text-muted-foreground">Total</td>
                     <td className="px-5 py-3 text-right font-bold tabular-nums text-emerald-700">
                       {formatCurrency(totalRevenue)}
@@ -186,7 +186,7 @@ export default async function ReceitasPage({ searchParams }: Props) {
           )}
         </section>
 
-        <aside className="dashboard-panel p-6">
+        <aside className="premium-rail p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 className="text-lg font-semibold text-foreground">Composicao do caixa</h3>
@@ -202,7 +202,7 @@ export default async function ReceitasPage({ searchParams }: Props) {
               const share = paymentTotal > 0 ? (amount / paymentTotal) * 100 : 0
 
               return (
-                <div key={item.paymentMethod} className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
+                <div key={item.paymentMethod} className="tonal-note">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-medium text-foreground">{PAYMENT_METHOD_LABELS[item.paymentMethod] ?? item.paymentMethod}</p>
@@ -216,7 +216,7 @@ export default async function ReceitasPage({ searchParams }: Props) {
                 </div>
               )
             }) : (
-              <div className="rounded-2xl border border-dashed border-border bg-secondary/25 p-5 text-sm text-muted-foreground">
+              <div className="tonal-note border-dashed p-5 text-sm text-muted-foreground">
                 Nenhum mix de pagamento disponivel neste periodo.
               </div>
             )}

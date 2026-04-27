@@ -200,13 +200,13 @@ export function Header({
   const periodLabel = getPeriodLabel(currentQuery, pathname)
 
   return (
-    <header className="border-b border-[rgba(255,255,255,0.06)] bg-[rgba(21,24,33,0.88)] px-4 py-2.5 backdrop-blur-xl sm:px-6">
+    <header className="border-b border-[rgba(255,255,255,0.04)] bg-[rgba(17,18,23,0.84)] px-4 py-2.5 backdrop-blur-xl sm:px-6">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0 flex items-start gap-3">
           <button
             type="button"
             onClick={onToggleSidebar}
-            className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-[0.9rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)] hover:text-foreground"
+            className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-[0.9rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] text-muted-foreground transition-colors hover:border-[rgba(124,58,237,0.14)] hover:bg-[rgba(124,58,237,0.08)] hover:text-foreground"
             aria-label={sidebarPinned ? 'Soltar barra lateral' : 'Fixar barra lateral'}
           >
             {sidebarPinned ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
@@ -235,8 +235,8 @@ export function Header({
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="hidden min-w-[190px] items-center gap-2 rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1.5 text-sm xl:flex">
-            <span className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] bg-[rgba(124,58,237,0.16)] text-primary">
+          <div className="hidden min-w-[190px] items-center gap-2 rounded-[0.95rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5 text-sm xl:flex">
+            <span className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] border border-[rgba(124,58,237,0.12)] bg-[rgba(124,58,237,0.1)] text-primary">
               <Clock3 className="h-3.5 w-3.5" />
             </span>
             <div className="min-w-0">

@@ -87,10 +87,8 @@ function FilterLink({
     <Link
       href={href}
       className={cn(
-        'inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
-        active
-          ? 'border-[rgba(91,33,182,0.22)] bg-[rgba(91,33,182,0.16)] text-violet-100'
-          : 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-slate-300 hover:bg-[rgba(91,33,182,0.12)] hover:text-slate-100'
+        'filter-pill',
+        active ? 'filter-pill-active' : ''
       )}
     >
       {label}
@@ -107,8 +105,8 @@ function ToneBadge({
 }) {
   const toneClass = {
     neutral: 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-slate-300',
-    positive: 'border-[rgba(52,211,153,0.22)] bg-[rgba(16,185,129,0.12)] text-emerald-100',
-    warning: 'border-[rgba(251,191,36,0.22)] bg-[rgba(251,191,36,0.12)] text-amber-100',
+    positive: 'border-[rgba(52,211,153,0.16)] bg-[rgba(16,185,129,0.1)] text-emerald-100',
+    warning: 'border-[rgba(251,191,36,0.16)] bg-[rgba(251,191,36,0.1)] text-amber-100',
   }[tone]
 
   return (
@@ -380,7 +378,7 @@ export default async function ClienteProfilePage({ params, searchParams }: Props
 
             <div className="mt-5 space-y-3">
               {profile.appointmentHistory.length > 0 ? profile.appointmentHistory.map((appointment) => (
-                <div key={appointment.id} className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+                <div key={appointment.id} className="tonal-note">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-foreground">{appointment.serviceName}</p>
@@ -399,7 +397,7 @@ export default async function ClienteProfilePage({ params, searchParams }: Props
                   </div>
                 </div>
               )) : (
-                <div className="rounded-[1rem] border border-dashed border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.02)] p-5 text-sm text-muted-foreground">
+                <div className="tonal-note border-dashed p-5 text-sm text-muted-foreground">
                   Ainda nao ha atendimentos no recorte escolhido para este cliente.
                 </div>
               )}
@@ -408,22 +406,22 @@ export default async function ClienteProfilePage({ params, searchParams }: Props
         </section>
 
         <aside className="space-y-5">
-          <section className="premium-rail">
+          <section className="premium-rail p-5">
             <h3 className="text-lg font-semibold text-foreground">Leituras prontas para gestao</h3>
             <div className="mt-4 space-y-3">
               {profile.recentBehavior.map((message) => (
-                <div key={message} className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4 text-sm leading-6 text-muted-foreground">
+                <div key={message} className="tonal-note text-sm leading-6 text-muted-foreground">
                   {message}
                 </div>
               ))}
             </div>
           </section>
 
-          <section className="premium-block">
+          <section className="premium-block p-5">
             <h3 className="text-lg font-semibold text-foreground">Servicos e barbeiros dominantes</h3>
 
             <div className="mt-4 space-y-4">
-              <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="tonal-note">
                 <p className="text-sm font-semibold text-foreground">Servicos mais usados</p>
                 <div className="mt-3 space-y-2 text-sm text-muted-foreground">
                   {profile.favoriteServices.length > 0 ? profile.favoriteServices.map((service) => (
@@ -437,7 +435,7 @@ export default async function ClienteProfilePage({ params, searchParams }: Props
                 </div>
               </div>
 
-              <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="tonal-note">
                 <p className="text-sm font-semibold text-foreground">Barbeiros mais frequentes</p>
                 <div className="mt-3 space-y-2 text-sm text-muted-foreground">
                   {profile.favoriteProfessionals.length > 0 ? profile.favoriteProfessionals.map((professional) => (
@@ -453,19 +451,19 @@ export default async function ClienteProfilePage({ params, searchParams }: Props
             </div>
           </section>
 
-          <section className="premium-block">
+          <section className="premium-block p-5">
             <h3 className="text-lg font-semibold text-foreground">Como interpretar a analise</h3>
 
             <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-              <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="tonal-note">
                 <p className="font-semibold text-foreground">Receita real</p>
                 <p className="mt-2 leading-6">{profile.methodology.realRevenueDefinition}</p>
               </div>
-              <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="tonal-note">
                 <p className="font-semibold text-foreground">Receita estimada</p>
                 <p className="mt-2 leading-6">{profile.methodology.estimatedRevenueDefinition}</p>
               </div>
-              <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="tonal-note">
                 <p className="font-semibold text-foreground">Cautela</p>
                 <p className="mt-2 leading-6">{profile.methodology.caution}</p>
               </div>

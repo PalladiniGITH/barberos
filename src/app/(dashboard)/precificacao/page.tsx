@@ -124,15 +124,15 @@ export default async function PrecificacaoPage() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-slate-200">
+            <span className="surface-chip bg-white/10 text-slate-200">
               <Scissors className="h-3.5 w-3.5" />
               {activeServices} serviços ativos
             </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-slate-200">
+            <span className="surface-chip bg-white/10 text-slate-200">
               <Boxes className="h-3.5 w-3.5" />
               {linkedSupplies} insumos conectados
             </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-slate-200">
+            <span className="surface-chip bg-white/10 text-slate-200">
               <TrendingUp className="h-3.5 w-3.5" />
               {formatPercent(averageMargin, 0)} de margem média
             </span>
@@ -140,22 +140,22 @@ export default async function PrecificacaoPage() {
         </div>
 
         <div className="mt-6 grid gap-3 md:grid-cols-4">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="surface-floating p-4">
             <p className="text-sm text-slate-300">Serviços ativos</p>
             <p className="mt-3 text-2xl font-semibold text-white">{services.length}</p>
             <p className="mt-1 text-xs text-slate-400">Catálogo pronto para operar.</p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="surface-floating p-4">
             <p className="text-sm text-slate-300">Insumos cadastrados</p>
             <p className="mt-3 text-2xl font-semibold text-white">{supplies.length}</p>
             <p className="mt-1 text-xs text-slate-400">Base de custo do catálogo.</p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="surface-floating p-4">
             <p className="text-sm text-slate-300">Preço médio</p>
             <p className="mt-3 text-2xl font-semibold text-white">{formatCurrency(averagePrice)}</p>
             <p className="mt-1 text-xs text-slate-400">Referência comercial do salão.</p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="surface-floating p-4">
             <p className="text-sm text-slate-300">Margem média</p>
             <p className="mt-3 text-2xl font-semibold text-white">{formatPercent(averageMargin, 0)}</p>
             <p className="mt-1 text-xs text-slate-400">Leitura resumida do resultado.</p>
@@ -164,7 +164,7 @@ export default async function PrecificacaoPage() {
       </section>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <Link href="/precificacao/servicos" className="dashboard-panel p-5 transition-transform hover:-translate-y-0.5">
+        <Link href="/precificacao/servicos" className="executive-metric p-5 transition-transform hover:-translate-y-0.5">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Serviços</p>
           <p className="mt-3 text-2xl font-semibold text-foreground">{services.length}</p>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -176,7 +176,7 @@ export default async function PrecificacaoPage() {
           </span>
         </Link>
 
-        <Link href="/precificacao/insumos" className="dashboard-panel p-5 transition-transform hover:-translate-y-0.5">
+        <Link href="/precificacao/insumos" className="executive-metric p-5 transition-transform hover:-translate-y-0.5">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Insumos</p>
           <p className="mt-3 text-2xl font-semibold text-foreground">{supplies.length}</p>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -188,7 +188,7 @@ export default async function PrecificacaoPage() {
           </span>
         </Link>
 
-        <Link href="/precificacao/resultado" className="dashboard-panel p-5 transition-transform hover:-translate-y-0.5">
+        <Link href="/precificacao/resultado" className="executive-metric p-5 transition-transform hover:-translate-y-0.5">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Resultado</p>
           <p className="mt-3 text-2xl font-semibold text-foreground">{formatPercent(averageMargin, 0)}</p>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -210,13 +210,10 @@ export default async function PrecificacaoPage() {
                 Um caminho curto para mostrar que precificação no produto é decisão financeira, não cadastro solto.
               </p>
             </div>
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-              Pronto para demo
-            </span>
           </div>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border border-border/70 bg-secondary/25 p-5">
+            <div className="tonal-note-strong">
               <p className="text-sm font-semibold text-foreground">Serviço mais forte</p>
               {bestService ? (
                 <>
@@ -232,7 +229,7 @@ export default async function PrecificacaoPage() {
               )}
             </div>
 
-            <div className="rounded-2xl border border-border/70 bg-secondary/25 p-5">
+            <div className="tonal-note">
               <p className="text-sm font-semibold text-foreground">Insumo mais conectado</p>
               {bestSupply ? (
                 <>
@@ -252,14 +249,14 @@ export default async function PrecificacaoPage() {
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
               href="/precificacao/resultado"
-              className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+              className="action-button-primary rounded-full"
             >
               Ver resultado consolidado
               <ArrowUpRight className="h-4 w-4" />
             </Link>
             <Link
               href="/precificacao/servicos"
-              className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-secondary"
+              className="action-button rounded-full"
             >
               Revisar serviços
             </Link>
@@ -267,10 +264,10 @@ export default async function PrecificacaoPage() {
         </section>
 
         <aside className="space-y-5">
-          <section className="dashboard-panel p-6">
+          <section className="premium-rail p-6">
             <h2 className="text-lg font-semibold text-foreground">Leituras rápidas</h2>
             <div className="mt-4 space-y-3">
-              <div className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
+              <div className="tonal-note">
                 <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                   <Wallet className="h-4 w-4 text-primary" />
                   O que vende aqui
@@ -280,7 +277,7 @@ export default async function PrecificacaoPage() {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
+              <div className="tonal-note">
                 <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                   <ShieldCheck className="h-4 w-4 text-primary" />
                   Por que importa
@@ -290,7 +287,7 @@ export default async function PrecificacaoPage() {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
+              <div className="tonal-note">
                 <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                   <Sparkles className="h-4 w-4 text-primary" />
                   Próximo passo
@@ -302,7 +299,7 @@ export default async function PrecificacaoPage() {
             </div>
           </section>
 
-          <section className="dashboard-panel p-6">
+          <section className="premium-block p-6">
             <h2 className="text-lg font-semibold text-foreground">Serviços que pedem atenção</h2>
             <div className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4">
               <p className={cn(

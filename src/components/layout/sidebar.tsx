@@ -364,15 +364,15 @@ const SidebarLink = memo(function SidebarLink({
             : 'min-h-[3.55rem] w-full rounded-[1.1rem] px-2.5 py-2.5 overflow-hidden',
           level === 1 && !compact ? 'ml-4 min-h-[3.15rem] rounded-[1rem] pr-2' : '',
           !compact && active
-            ? 'border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.045))] text-white shadow-[0_24px_38px_-30px_rgba(2,6,23,0.86)]'
+            ? 'border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.025))] text-white shadow-[0_20px_34px_-30px_rgba(2,6,23,0.74)]'
             : !compact
-              ? 'border-transparent text-slate-400 hover:border-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.04)] hover:text-slate-100'
+              ? 'border-transparent text-slate-400 hover:border-[rgba(255,255,255,0.045)] hover:bg-[rgba(255,255,255,0.03)] hover:text-slate-100'
               : 'text-slate-400 hover:text-slate-100',
           loading ? 'bg-[rgba(255,255,255,0.06)] text-slate-100' : ''
         )}
       >
         {active && expanded && isTopLevel && (
-          <span className="absolute left-1.5 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-full bg-[linear-gradient(180deg,rgba(124,58,237,0.96),rgba(91,33,182,0.64))] shadow-[0_0_18px_rgba(91,33,182,0.36)]" />
+          <span className="absolute left-1.5 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-full bg-[linear-gradient(180deg,rgba(124,58,237,0.9),rgba(91,33,182,0.46))] shadow-[0_0_14px_rgba(91,33,182,0.22)]" />
         )}
         {active && !compact && (
           <span
@@ -388,10 +388,10 @@ const SidebarLink = memo(function SidebarLink({
             iconSizeClass,
             active
               ? cn(
-                  'border-[rgba(124,58,237,0.18)] bg-[linear-gradient(135deg,rgba(124,58,237,0.2),rgba(15,23,42,0.94))] text-violet-100 shadow-[0_18px_28px_-24px_rgba(91,33,182,0.42)]',
+                  'border-[rgba(124,58,237,0.14)] bg-[linear-gradient(135deg,rgba(124,58,237,0.14),rgba(15,23,42,0.92))] text-violet-100 shadow-[0_16px_24px_-22px_rgba(91,33,182,0.3)]',
                   compact ? 'shadow-[0_16px_28px_-22px_rgba(91,33,182,0.42)]' : ''
                 )
-              : 'border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.035)] text-slate-400 group-hover:border-[rgba(255,255,255,0.08)] group-hover:bg-[rgba(255,255,255,0.05)] group-hover:text-slate-100',
+              : 'border-[rgba(255,255,255,0.045)] bg-[rgba(255,255,255,0.025)] text-slate-400 group-hover:border-[rgba(255,255,255,0.06)] group-hover:bg-[rgba(255,255,255,0.04)] group-hover:text-slate-100',
             loading ? 'scale-[0.97] opacity-80' : ''
           )}
         >
@@ -566,7 +566,7 @@ export function Sidebar({
       onBlurCapture={handleBlurCapture}
       onMouseLeave={handleMouseLeave}
       className={cn(
-        'hidden h-full overflow-hidden border-r border-[rgba(255,255,255,0.05)] bg-[linear-gradient(180deg,rgba(10,15,28,0.97),rgba(11,18,32,0.95))] text-slate-100 shadow-[18px_0_40px_-34px_rgba(2,6,23,0.92)] transition-[width] duration-200 ease-out lg:flex',
+        'hidden h-full overflow-hidden border-r border-[rgba(255,255,255,0.04)] bg-[linear-gradient(180deg,rgba(13,16,24,0.97),rgba(12,14,20,0.96))] text-slate-100 shadow-[18px_0_40px_-34px_rgba(2,6,23,0.88)] transition-[width] duration-200 ease-out lg:flex',
         expanded ? 'w-[312px]' : 'w-[96px]',
         focusMode && !expanded ? 'opacity-95' : ''
       )}
@@ -577,7 +577,7 @@ export function Sidebar({
           <Link
             href={homeHref}
             onClick={() => startNavigation(homeHref)}
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[0.95rem] border border-[rgba(124,58,237,0.28)] bg-[radial-gradient(circle_at_30%_20%,rgba(168,85,247,0.34),transparent_42%),linear-gradient(135deg,rgba(124,58,237,0.28),rgba(15,23,42,0.96))] text-[11px] font-semibold tracking-[0.16em] text-violet-50 shadow-[0_18px_34px_-24px_rgba(2,6,23,0.82)]"
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[0.95rem] border border-[rgba(124,58,237,0.22)] bg-[radial-gradient(circle_at_30%_20%,rgba(168,85,247,0.24),transparent_42%),linear-gradient(135deg,rgba(124,58,237,0.22),rgba(15,23,42,0.96))] text-[11px] font-semibold tracking-[0.16em] text-violet-50 shadow-[0_18px_34px_-24px_rgba(2,6,23,0.76)]"
             title={homeHref === '/internal' ? 'Painel master da plataforma' : barberView ? 'Meu painel' : 'Painel do negocio'}
           >
             {PRODUCT_MONOGRAM}
@@ -622,14 +622,14 @@ export function Sidebar({
           </nav>
         </div>
 
-        <div className="mt-3 shrink-0 border-t border-[rgba(255,255,255,0.05)] pt-3">
+        <div className="mt-3 shrink-0 border-t border-[rgba(255,255,255,0.04)] pt-3">
           <button
             type="button"
             onClick={() => onPinnedChange(!pinned)}
             className={cn(
               'flex w-full items-center gap-3 rounded-[0.95rem] px-3 py-2.5 text-sm transition-colors',
               expanded ? 'justify-start' : 'justify-center px-0',
-              'text-slate-400 hover:bg-[rgba(255,255,255,0.05)] hover:text-slate-100'
+              'text-slate-400 hover:bg-[rgba(255,255,255,0.035)] hover:text-slate-100'
             )}
             title={pinned ? 'Soltar lateral' : 'Fixar lateral'}
           >
