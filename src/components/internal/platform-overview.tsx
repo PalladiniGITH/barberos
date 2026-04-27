@@ -82,9 +82,20 @@ export function PlatformOverview({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Painel master"
-        description="Visao consolidada da operacao SaaS do BarberEX: tenants, uso de IA, WhatsApp, automacoes e saude recente da base."
+        title="Operacao BarberEX"
+        description="Gestao da plataforma, tenants, consumo de IA, WhatsApp, automacoes e saude operacional em uma visao unica."
       />
+
+      {data.warnings.length > 0 && (
+        <section className="rounded-[1.2rem] border border-amber-500/20 bg-amber-500/10 px-4 py-4 text-sm text-amber-100">
+          <p className="font-semibold">Leitura parcial do painel master</p>
+          <div className="mt-2 space-y-2">
+            {data.warnings.map((warning) => (
+              <p key={warning}>{warning}</p>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
@@ -98,6 +109,18 @@ export function PlatformOverview({
           value={String(data.cards.trialBarbershops)}
           helper="Contas ainda em fase de avaliacao ou implantacao inicial."
           icon={Building2}
+        />
+        <SummaryCard
+          label="Barbearias em atraso"
+          value={String(data.cards.pastDueBarbershops)}
+          helper="Tenants que exigem acompanhamento comercial ou financeiro."
+          icon={TriangleAlert}
+        />
+        <SummaryCard
+          label="Barbearias bloqueadas"
+          value={String(data.cards.blockedBarbershops)}
+          helper="Contas pausadas ou bloqueadas que pedem retomada ou revisao."
+          icon={TriangleAlert}
         />
         <SummaryCard
           label="Agendamentos no mes"
@@ -137,10 +160,12 @@ export function PlatformOverview({
         />
       </section>
 
-      <section className="rounded-[1.35rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(20,23,34,0.98),rgba(15,17,21,0.98))] p-4 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.92)]">
+      <section
+        id="barbershops"
+        className="rounded-[1.35rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(20,23,34,0.98),rgba(15,17,21,0.98))] p-4 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.92)]"
+      >
         <div className="flex flex-col gap-4 border-b border-[rgba(255,255,255,0.06)] pb-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Tenants</p>
             <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">Leitura global das barbearias</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
               Busque por nome ou slug, filtre por status/plano e entre no detalhe operacional de cada conta.
@@ -280,7 +305,6 @@ export function PlatformOverview({
 
       <section className="rounded-[1.35rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(20,23,34,0.98),rgba(15,17,21,0.98))] p-4 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.92)]">
         <div className="border-b border-[rgba(255,255,255,0.06)] pb-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Falhas recentes</p>
           <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">Sinais que merecem atencao</h2>
         </div>
 

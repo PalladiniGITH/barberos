@@ -15,14 +15,27 @@ interface AccountMenuProps {
     platformRole?: string | null
     barbershopName?: string | null
   }
+  primaryHref?: string | null
+  primaryLabel?: string | null
 }
 
-export function AccountMenu({ user }: AccountMenuProps) {
+export function AccountMenu({
+  user,
+  primaryHref = '/configuracoes',
+  primaryLabel,
+}: AccountMenuProps) {
   const [open, setOpen] = useState(false)
   const isBarber = user.role === 'BARBER'
   const effectiveRole = user.platformRole && user.platformRole !== 'NONE'
     ? user.platformRole
     : user.role
+  const resolvedPrimaryLabel = primaryLabel ?? (
+    user.platformRole && user.platformRole !== 'NONE'
+      ? 'Abrir minha conta'
+      : isBarber
+        ? 'Abrir minha conta'
+        : 'Abrir conta da barbearia'
+  )
 
   return (
     <div className="relative">
@@ -55,18 +68,16 @@ export function AccountMenu({ user }: AccountMenuProps) {
             </div>
 
             <div className="p-2">
-              <Link
-                href="/configuracoes"
-                onClick={() => setOpen(false)}
-                className="flex items-center gap-2 rounded-[0.85rem] px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)] hover:text-foreground"
-              >
-                <Settings2 className="h-4 w-4" />
-                {user.platformRole && user.platformRole !== 'NONE'
-                  ? 'Abrir minha conta'
-                  : isBarber
-                    ? 'Abrir minha conta'
-                    : 'Abrir conta da barbearia'}
-              </Link>
+              {primaryHref && (
+                <Link
+                  href={primaryHref}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2 rounded-[0.85rem] px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)] hover:text-foreground"
+                >
+                  <Settings2 className="h-4 w-4" />
+                  {resolvedPrimaryLabel}
+                </Link>
+              )}
 
               <button
                 onClick={() => signOut({ callbackUrl: AUTH_ENTRY_PATH })}
