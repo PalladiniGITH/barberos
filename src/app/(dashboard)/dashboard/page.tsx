@@ -204,11 +204,11 @@ function ExecutiveCard({
 function AlertBanner({ alert }: { alert: DashboardAlert }) {
   const toneClass = {
     critical:
-      'border-[rgba(244,63,94,0.2)] bg-[radial-gradient(circle_at_top_left,rgba(244,63,94,0.18),transparent_34%),linear-gradient(180deg,rgba(35,20,30,0.98),rgba(21,24,33,0.98))] shadow-[0_24px_44px_-30px_rgba(2,6,23,0.9)]',
+      'border-[rgba(244,63,94,0.12)] bg-[radial-gradient(circle_at_top_left,rgba(244,63,94,0.1),transparent_34%),linear-gradient(180deg,rgba(33,22,28,0.96),rgba(21,24,33,0.98))] shadow-[0_18px_36px_-30px_rgba(2,6,23,0.74)]',
     warning:
-      'border-[rgba(245,158,11,0.2)] bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.17),transparent_34%),linear-gradient(180deg,rgba(40,28,20,0.98),rgba(21,24,33,0.98))] shadow-[0_24px_44px_-30px_rgba(2,6,23,0.9)]',
+      'border-[rgba(245,158,11,0.12)] bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.1),transparent_34%),linear-gradient(180deg,rgba(37,29,22,0.96),rgba(21,24,33,0.98))] shadow-[0_18px_36px_-30px_rgba(2,6,23,0.74)]',
     positive:
-      'border-[rgba(22,163,74,0.2)] bg-[radial-gradient(circle_at_top_left,rgba(22,163,74,0.16),transparent_34%),linear-gradient(180deg,rgba(18,32,26,0.98),rgba(21,24,33,0.98))] shadow-[0_24px_44px_-30px_rgba(2,6,23,0.9)]',
+      'border-[rgba(22,163,74,0.12)] bg-[radial-gradient(circle_at_top_left,rgba(22,163,74,0.1),transparent_34%),linear-gradient(180deg,rgba(20,31,25,0.96),rgba(21,24,33,0.98))] shadow-[0_18px_36px_-30px_rgba(2,6,23,0.74)]',
   }[alert.tone]
 
   const iconClass = {

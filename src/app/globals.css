@@ -209,16 +209,16 @@
   .panel-card,
   .metric-card {
     @apply rounded-[1.12rem] border text-card-foreground;
-    border-color: rgba(255, 255, 255, 0.055);
+    border-color: rgba(255, 255, 255, 0.042);
     box-shadow:
-      0 30px 54px -42px rgba(2, 6, 23, 0.92),
-      0 14px 28px -26px rgba(15, 23, 42, 0.28),
-      inset 0 1px 0 rgba(255, 255, 255, 0.025);
+      0 26px 48px -42px rgba(2, 6, 23, 0.82),
+      0 12px 24px -24px rgba(15, 23, 42, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.018);
   }
 
   .dashboard-panel {
     background:
-      linear-gradient(180deg, rgba(31, 31, 34, 0.98), rgba(19, 19, 22, 0.99));
+      linear-gradient(180deg, rgba(29, 29, 32, 0.98), rgba(20, 20, 23, 0.99));
   }
 
   .dashboard-spotlight {
@@ -239,12 +239,12 @@
 
   .premium-block {
     background:
-      linear-gradient(180deg, rgba(19, 19, 22, 0.98), rgba(14, 14, 17, 0.99));
+      linear-gradient(180deg, rgba(22, 22, 25, 0.98), rgba(16, 16, 19, 0.99));
   }
 
   .premium-rail {
     background:
-      linear-gradient(180deg, rgba(42, 42, 45, 0.92), rgba(27, 27, 30, 0.96));
+      linear-gradient(180deg, rgba(37, 37, 40, 0.9), rgba(24, 24, 27, 0.96));
   }
 
   .surface-soft {
@@ -259,14 +259,14 @@
 
   .surface-tier-low {
     @apply rounded-[1.1rem] border;
-    border-color: rgba(255, 255, 255, 0.05);
-    background: linear-gradient(180deg, rgba(27, 27, 30, 0.98), rgba(19, 19, 22, 0.99));
+    border-color: rgba(255, 255, 255, 0.04);
+    background: linear-gradient(180deg, rgba(30, 30, 33, 0.94), rgba(22, 22, 25, 0.98));
   }
 
   .surface-tier-high {
     @apply rounded-[1.1rem] border;
-    border-color: rgba(255, 255, 255, 0.06);
-    background: linear-gradient(180deg, rgba(42, 42, 45, 0.95), rgba(31, 31, 34, 0.98));
+    border-color: rgba(255, 255, 255, 0.045);
+    background: linear-gradient(180deg, rgba(38, 38, 42, 0.9), rgba(28, 28, 31, 0.96));
   }
 
   .surface-floating {
@@ -282,9 +282,9 @@
 
   .hero-stat-card {
     @apply rounded-[1rem] border p-5 backdrop-blur-sm;
-    border-color: rgba(255, 255, 255, 0.055);
-    background: rgba(255, 255, 255, 0.024);
-    box-shadow: 0 20px 34px -28px rgba(2, 6, 23, 0.56);
+    border-color: rgba(255, 255, 255, 0.04);
+    background: rgba(255, 255, 255, 0.02);
+    box-shadow: 0 18px 30px -28px rgba(2, 6, 23, 0.48);
   }
 
   .hero-stat-card strong,
@@ -327,10 +327,10 @@
 
   .executive-metric {
     @apply rounded-[1rem] border p-5;
-    border-color: rgba(255, 255, 255, 0.055);
+    border-color: rgba(255, 255, 255, 0.042);
     background:
-      linear-gradient(180deg, rgba(42, 42, 45, 0.9), rgba(27, 27, 30, 0.98));
-    box-shadow: 0 20px 34px -28px rgba(2, 6, 23, 0.6);
+      linear-gradient(180deg, rgba(38, 38, 42, 0.84), rgba(27, 27, 30, 0.96));
+    box-shadow: 0 18px 30px -28px rgba(2, 6, 23, 0.52);
   }
 
   .executive-label {
@@ -406,8 +406,8 @@
 
   .panel-soft {
     @apply rounded-[0.95rem] border p-4;
-    border-color: rgba(255, 255, 255, 0.055);
-    background: linear-gradient(180deg, rgba(42, 42, 45, 0.4), rgba(27, 27, 30, 0.72));
+    border-color: rgba(255, 255, 255, 0.04);
+    background: linear-gradient(180deg, rgba(38, 38, 42, 0.28), rgba(27, 27, 30, 0.64));
   }
 
   .premium-dialog,
@@ -504,16 +504,16 @@
 
   .tonal-note {
     @apply rounded-[1rem] border p-4;
-    border-color: rgba(255, 255, 255, 0.055);
-    background: linear-gradient(180deg, rgba(42, 42, 45, 0.32), rgba(27, 27, 30, 0.76));
+    border-color: rgba(255, 255, 255, 0.038);
+    background: linear-gradient(180deg, rgba(38, 38, 42, 0.2), rgba(27, 27, 30, 0.62));
   }
 
   .tonal-note-strong {
     @apply rounded-[1rem] border p-4;
-    border-color: rgba(255, 255, 255, 0.065);
+    border-color: rgba(255, 255, 255, 0.045);
     background:
-      radial-gradient(circle at top left, rgba(124, 92, 255, 0.09), transparent 38%),
-      linear-gradient(180deg, rgba(42, 42, 45, 0.5), rgba(27, 27, 30, 0.84));
+      radial-gradient(circle at top left, rgba(124, 92, 255, 0.06), transparent 38%),
+      linear-gradient(180deg, rgba(38, 38, 42, 0.34), rgba(27, 27, 30, 0.72));
   }
 
   .chart-tooltip {

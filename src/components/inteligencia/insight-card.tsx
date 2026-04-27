@@ -17,34 +17,34 @@ function getSeverityMeta(severity: BusinessInsight['severity']) {
       return {
         Icon: ShieldAlert,
         badge: 'Prioridade alta',
-        panelClass: 'border-[rgba(244,63,94,0.14)]',
+        panelClass: 'border-[rgba(244,63,94,0.1)]',
         iconClass: 'bg-[rgba(244,63,94,0.14)] text-rose-100',
-        badgeClass: 'border-[rgba(244,63,94,0.18)] bg-[rgba(244,63,94,0.12)] text-rose-100',
+        badgeClass: 'border-[rgba(244,63,94,0.14)] bg-[rgba(244,63,94,0.08)] text-rose-100',
       }
     case 'warning':
       return {
         Icon: AlertTriangle,
         badge: 'Atencao',
-        panelClass: 'border-[rgba(245,158,11,0.14)]',
+        panelClass: 'border-[rgba(245,158,11,0.1)]',
         iconClass: 'bg-[rgba(245,158,11,0.14)] text-amber-100',
-        badgeClass: 'border-[rgba(245,158,11,0.18)] bg-[rgba(245,158,11,0.12)] text-amber-100',
+        badgeClass: 'border-[rgba(245,158,11,0.14)] bg-[rgba(245,158,11,0.08)] text-amber-100',
       }
     case 'opportunity':
       return {
         Icon: Lightbulb,
         badge: 'Oportunidade',
-        panelClass: 'border-[rgba(91,33,182,0.12)]',
+        panelClass: 'border-[rgba(91,33,182,0.09)]',
         iconClass: 'bg-[rgba(91,33,182,0.14)] text-violet-100',
-        badgeClass: 'border-[rgba(91,33,182,0.18)] bg-[rgba(91,33,182,0.12)] text-violet-100',
+        badgeClass: 'border-[rgba(91,33,182,0.14)] bg-[rgba(91,33,182,0.08)] text-violet-100',
       }
     case 'positive':
     default:
       return {
         Icon: TrendingUp,
         badge: 'Bom sinal',
-        panelClass: 'border-[rgba(16,185,129,0.14)]',
+        panelClass: 'border-[rgba(16,185,129,0.1)]',
         iconClass: 'bg-[rgba(16,185,129,0.14)] text-emerald-100',
-        badgeClass: 'border-[rgba(16,185,129,0.18)] bg-[rgba(16,185,129,0.12)] text-emerald-100',
+        badgeClass: 'border-[rgba(16,185,129,0.14)] bg-[rgba(16,185,129,0.08)] text-emerald-100',
       }
   }
 }
@@ -103,13 +103,13 @@ export function InsightCard({
   return (
     <article
       className={cn(
-        'surface-inverse relative isolate overflow-hidden rounded-[1.45rem] border bg-[linear-gradient(180deg,rgba(28,32,48,0.98),rgba(15,17,21,0.96))] p-5 shadow-[0_24px_44px_-34px_rgba(2,6,23,0.72)]',
+        'surface-inverse relative isolate overflow-hidden rounded-[1.45rem] border bg-[linear-gradient(180deg,rgba(26,28,34,0.97),rgba(18,20,24,0.95))] p-5 shadow-[0_20px_36px_-34px_rgba(2,6,23,0.56)]',
         meta.panelClass
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <span className={cn('mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl', meta.iconClass)}>
+          <span className={cn('mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl border border-[rgba(255,255,255,0.04)]', meta.iconClass)}>
             <meta.Icon className="h-4 w-4" />
           </span>
           <div className="min-w-0">
@@ -121,7 +121,7 @@ export function InsightCard({
         </div>
 
         {insight.metric && (
-          <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-right shadow-[0_14px_26px_-24px_rgba(2,6,23,0.56)]">
+          <div className="rounded-[1rem] border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.025)] px-3 py-2 text-right shadow-[0_10px_22px_-24px_rgba(2,6,23,0.4)]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               {insight.metric.label}
             </p>
@@ -133,7 +133,7 @@ export function InsightCard({
       <p className="mt-4 text-sm leading-7 text-muted-foreground">{insight.explanation}</p>
 
       {!compact && (
-        <div className="mt-4 rounded-[1.2rem] border border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] p-4">
+        <div className="mt-4 rounded-[1.15rem] bg-[rgba(255,255,255,0.028)] px-4 py-3.5">
           <p className="text-sm font-semibold text-foreground">Proximo passo</p>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">{insight.recommendedAction}</p>
         </div>
@@ -141,7 +141,7 @@ export function InsightCard({
 
       <Link
         href={insight.href}
-        className="mt-5 inline-flex items-center gap-1 rounded-full border border-[rgba(91,33,182,0.08)] bg-[rgba(91,33,182,0.04)] px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-[rgba(91,33,182,0.08)]"
+        className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-primary transition-colors hover:text-violet-200"
       >
         Abrir pagina relacionada
         <ArrowUpRight className="h-4 w-4" />
@@ -156,7 +156,7 @@ export function DashboardInsightsPreview({ report }: { report: BusinessIntellige
   return (
     <section className="dashboard-panel overflow-hidden p-0">
       <div className="flex h-full flex-col">
-        <div className="premium-rail border-b border-[rgba(255,255,255,0.06)] p-5">
+        <div className="premium-rail border-b border-[rgba(255,255,255,0.04)] p-5">
           <div className="flex flex-wrap items-center gap-2">
             <div className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
               <CircleDollarSign className="h-4 w-4 text-primary" />
@@ -181,7 +181,7 @@ export function DashboardInsightsPreview({ report }: { report: BusinessIntellige
           </div>
         </div>
 
-        <div className="p-5">
+        <div className="p-5 pt-4">
           <div className="mb-4">
             <p className="text-sm font-semibold text-foreground">
               Os sinais mais relevantes para agir sem perder tempo.

@@ -19,13 +19,16 @@ function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
 
   return (
-    <div className="rounded-[1.2rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.98),rgba(15,17,21,0.96))] p-3.5 text-foreground shadow-[0_28px_44px_-28px_rgba(2,6,23,0.68)]">
+    <div className="chart-tooltip">
       <p className="text-sm font-semibold text-foreground">{label}</p>
-      <div className="mt-2.5 space-y-1.5 text-sm">
+      <div className="mt-2.5 space-y-2 text-sm">
         {payload.map((entry: any) => (
-          <p key={entry.name} className="font-medium" style={{ color: entry.color }}>
-            {entry.name === 'receitas' ? 'Receitas' : 'Despesas'}: {formatCurrency(entry.value)}
-          </p>
+          <div key={entry.name} className="flex items-center justify-between gap-3">
+            <p className="font-medium" style={{ color: entry.color }}>
+              {entry.name === 'receitas' ? 'Receitas' : 'Despesas'}
+            </p>
+            <p className="font-semibold text-foreground">{formatCurrency(entry.value)}</p>
+          </div>
         ))}
       </div>
     </div>
@@ -52,7 +55,7 @@ export function RevenueChart({ data }: RevenueChartProps) {
       </div>
 
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
-        <div className="surface-tier-low p-4">
+        <div className="surface-tier-low p-5">
           <p className="executive-label">Ultimo fechamento</p>
           <p className="mt-3 text-lg font-semibold text-foreground">
             {latestPoint ? formatCurrency(latestPoint.receitas) : 'Sem leitura'}
@@ -62,20 +65,20 @@ export function RevenueChart({ data }: RevenueChartProps) {
           </p>
         </div>
 
-        <div className="surface-tier-low p-4">
+        <div className="surface-tier-low p-5">
           <p className="executive-label">Pico de receita</p>
           <p className="mt-3 text-lg font-semibold text-foreground">{formatCurrency(highestRevenue)}</p>
           <p className="mt-2 text-sm text-muted-foreground">Maior patamar de caixa observado na serie recente.</p>
         </div>
 
-        <div className="surface-tier-low p-4">
+        <div className="surface-tier-low p-5">
           <p className="executive-label">Menor pressao de custo</p>
           <p className="mt-3 text-lg font-semibold text-foreground">{formatCurrency(lowestExpenseValue)}</p>
           <p className="mt-2 text-sm text-muted-foreground">Referencia util para medir folga do caixa ao longo do periodo.</p>
         </div>
       </div>
 
-      <div className="rounded-[1.65rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(35,38,58,0.94),rgba(21,24,33,0.98))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div className="rounded-[1.65rem] border border-[rgba(255,255,255,0.05)] bg-[linear-gradient(180deg,rgba(33,35,46,0.92),rgba(22,24,30,0.97))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
         <ResponsiveContainer width="100%" height={320}>
           <AreaChart data={data} margin={{ top: 8, right: 10, left: -18, bottom: 0 }}>
             <defs>

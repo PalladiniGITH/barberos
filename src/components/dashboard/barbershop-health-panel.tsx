@@ -15,7 +15,7 @@ function HealthMetricCard({
   icon: typeof Users
 }) {
   return (
-    <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
+    <div className="rounded-[1rem] border border-[rgba(255,255,255,0.045)] bg-[rgba(255,255,255,0.025)] p-4">
       <div className="flex items-center gap-3">
         <span className="flex h-10 w-10 items-center justify-center rounded-[0.95rem] border border-[rgba(91,33,182,0.12)] bg-[rgba(91,33,182,0.08)] text-primary">
           <Icon className="h-4 w-4" />
@@ -86,15 +86,15 @@ export function BarbershopHealthPanel({ health }: { health: BarbershopHealthSnap
           </div>
 
           <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-            <div className="rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
+            <div className="tonal-note">
               <p className="font-semibold text-foreground">Retorno dos assinantes</p>
               <p className="mt-2 leading-6">{health.methodology.subscriberReturnRate}</p>
             </div>
-            <div className="rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
+            <div className="tonal-note">
               <p className="font-semibold text-foreground">Retorno dos avulsos</p>
               <p className="mt-2 leading-6">{health.methodology.walkInReturnRate}</p>
             </div>
-            <div className="rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
+            <div className="tonal-note">
               <p className="font-semibold text-foreground">Score de saude</p>
               <p className="mt-2 leading-6">{health.methodology.healthScore}</p>
             </div>

@@ -28,7 +28,7 @@ export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
 
   return (
     <section className="dashboard-panel p-6">
-      <div className="flex flex-col gap-4 border-b border-[rgba(255,255,255,0.06)] pb-5 xl:flex-row xl:items-start xl:justify-between">
+      <div className="flex flex-col gap-4 border-b border-[rgba(255,255,255,0.04)] pb-5 xl:flex-row xl:items-start xl:justify-between">
         <div>
           <h3 className="mt-2 text-[1.55rem] font-semibold tracking-tight text-foreground">Ranking dos profissionais</h3>
           <p className="mt-2 max-w-xl text-sm leading-7 text-muted-foreground">
@@ -141,7 +141,7 @@ export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
                       </p>
                     </div>
 
-                    <div className="rounded-[0.95rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-3.5 py-2.5 text-right">
+                    <div className="rounded-[0.95rem] border border-[rgba(255,255,255,0.045)] bg-[rgba(255,255,255,0.022)] px-3.5 py-2.5 text-right">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Receita</p>
                       <p className="mt-1 text-base font-semibold tabular-nums text-foreground">
                         {formatCurrency(entry.revenue)}
@@ -170,7 +170,7 @@ export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
                       <TrendingUp className="h-3.5 w-3.5" />
                       {hasGoal ? 'Progresso da meta' : 'Participacao na equipe'}
                     </span>
-                    <span className="rounded-full bg-[rgba(91,33,182,0.06)] px-2.5 py-1 font-medium text-foreground">
+                    <span className="rounded-full bg-[rgba(91,33,182,0.04)] px-2.5 py-1 font-medium text-foreground">
                       {hasGoal
                         ? goalProgress >= 100
                           ? 'Meta batida'
