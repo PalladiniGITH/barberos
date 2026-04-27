@@ -1,6 +1,5 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { requireSession } from '@/lib/auth'
 import { buildAssistantFailureResult } from '@/lib/assistant-chat-guards'
 import type { AiAssistantSendResult } from '@/lib/ai/assistant-chat-types'
@@ -53,10 +52,6 @@ export async function askAssistant(input: {
       question: input.question,
       pathname: input.pathname ?? null,
     })
-
-    if (result.ok) {
-      revalidatePath('/assistente')
-    }
 
     return result
   } catch (error) {

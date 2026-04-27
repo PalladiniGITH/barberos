@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from 'react'
 import { BrainCircuit, Loader2, MessageSquarePlus, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { askAssistant, loadAssistantThread } from '@/actions/assistant-chat'
+import { AssistantMessageContent } from '@/components/assistente/assistant-message-content'
 import type {
   AiAssistantWorkspaceView,
   AiChatMessageView,
@@ -47,7 +48,11 @@ function MessageBubble({ message }: { message: AiChatMessageView }) {
           </p>
           <span className="text-[11px] text-muted-foreground">{message.createdAtLabel}</span>
         </div>
-        <p className="mt-2 whitespace-pre-line text-sm leading-7">{message.content}</p>
+        {isUser ? (
+          <p className="mt-2 whitespace-pre-line text-sm leading-7">{message.content}</p>
+        ) : (
+          <AssistantMessageContent content={message.content} />
+        )}
         {!isUser && (
           <div className="mt-3 space-y-1 text-[11px] text-muted-foreground">
             {message.metadata.statusNote && <p>{message.metadata.statusNote}</p>}
