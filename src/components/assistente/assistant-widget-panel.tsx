@@ -226,7 +226,6 @@ export function AssistantWidgetPanel() {
     [errorAssistantMessage, optimisticMessages, pendingAssistantMessage, persistedMessages]
   )
 
-  const helperDescription = screenContext.subtitle
   const helperSuggestions = screenContext.suggestions.length > 0 ? screenContext.suggestions : (workspace?.suggestions ?? [])
   const helperPlaceholder = screenContext.placeholder || workspace?.placeholder || 'Pergunte sobre a operacao da barbearia.'
   const hasActiveConversation = Boolean(
@@ -236,6 +235,18 @@ export function AssistantWidgetPanel() {
     || inlineErrorMessage
   )
   const activeConversationTitle = selectedThread?.title ?? optimisticThreadTitle ?? 'Nova conversa'
+  const compactConversationView = hasActiveConversation
+  const headerDescription = compactConversationView
+    ? 'Agenda, clientes, metas e numeros.'
+    : 'Pergunte sobre agenda, clientes, metas e numeros.'
+  const compactContextLine = [
+    getScopeLabel(workspace?.roleScope),
+    screenContext.label,
+    workspace?.dataWindowLabel ?? null,
+  ].filter(Boolean).join(' / ')
+  const footerNote = compactConversationView
+    ? 'Baseado nos dados disponiveis do periodo e no seu escopo.'
+    : 'Respostas baseadas nos dados disponiveis do periodo. O backend continua sendo a autoridade do seu escopo.'
 
   useEffect(() => {
     if (process.env.NODE_ENV === 'production' || !isOpen) {
@@ -277,7 +288,7 @@ export function AssistantWidgetPanel() {
       setWorkspace(result)
       setThreadSummaries(result.threadSummaries)
       setSelectedThread(result.selectedThread)
-      setShowRecentThreads(!(result.selectedThread && result.selectedThread.messages.length > 0))
+      setShowRecentThreads(!result.selectedThread)
       setOptimisticMessages([])
       setOptimisticThreadTitle(null)
       setInlineErrorMessage(null)
@@ -333,6 +344,16 @@ export function AssistantWidgetPanel() {
     resetTransientConversation()
     setIsLoadingThread(true)
     setShowRecentThreads(false)
+    const selectedSummary = threadSummaries.find((thread) => thread.id === threadId)
+
+    if (selectedSummary) {
+      setSelectedThread({
+        id: selectedSummary.id,
+        title: selectedSummary.title,
+        roleScope: selectedSummary.roleScope,
+        messages: [],
+      })
+    }
 
     startTransition(() => {
       void (async () => {
@@ -431,18 +452,21 @@ export function AssistantWidgetPanel() {
           bottom: 'max(0.75rem, env(safe-area-inset-bottom))',
         }}
       >
-        <header className="shrink-0 border-b border-[rgba(255,255,255,0.08)] px-4 py-4 sm:px-5">
+        <header className={cn(
+          'shrink-0 border-b border-[rgba(255,255,255,0.08)] px-4 sm:px-5',
+          compactConversationView ? 'py-3' : 'py-4'
+        )}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <BrainCircuit className="h-4 w-4 text-primary" />
                 <h2 className="text-lg font-semibold tracking-tight text-foreground">BarberEX IA</h2>
               </div>
-              <p className="mt-2 text-sm leading-6 text-foreground">
-                Pergunte sobre agenda, clientes, metas e numeros.
-              </p>
-              <p className="mt-1 text-xs leading-6 text-muted-foreground">
-                {getScopeLabel(workspace?.roleScope)} / {screenContext.label}
+              <p className={cn(
+                'text-foreground',
+                compactConversationView ? 'mt-1 text-xs leading-5 text-muted-foreground' : 'mt-2 text-sm leading-6'
+              )}>
+                {headerDescription}
               </p>
             </div>
 
@@ -450,7 +474,10 @@ export function AssistantWidgetPanel() {
               <button
                 type="button"
                 onClick={handleNewConversation}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)] hover:text-foreground"
+                className={cn(
+                  'inline-flex items-center justify-center rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)] hover:text-foreground',
+                  compactConversationView ? 'h-9 w-9' : 'h-10 w-10'
+                )}
                 aria-label="Nova conversa"
                 title="Nova conversa"
               >
@@ -459,7 +486,10 @@ export function AssistantWidgetPanel() {
               <button
                 type="button"
                 onClick={closeAssistant}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)] hover:text-foreground"
+                className={cn(
+                  'inline-flex items-center justify-center rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)] hover:text-foreground',
+                  compactConversationView ? 'h-9 w-9' : 'h-10 w-10'
+                )}
                 aria-label="Minimizar assistente"
                 title="Minimizar"
               >
@@ -468,15 +498,30 @@ export function AssistantWidgetPanel() {
             </div>
           </div>
 
-          <div className="mt-3 text-xs leading-6 text-muted-foreground">
-            <p>{workspace?.dataWindowLabel ?? 'Carregando base do periodo...'}</p>
-            {latestAssistantMessage?.metadata.dataFreshnessLabel && (
-              <p>{latestAssistantMessage.metadata.dataFreshnessLabel}</p>
+          <div className={cn(
+            'text-xs text-muted-foreground',
+            compactConversationView ? 'mt-2 truncate leading-5' : 'mt-3 space-y-1 leading-6'
+          )}>
+            {compactConversationView ? (
+              <p className="truncate">
+                {compactContextLine}
+              </p>
+            ) : (
+              <>
+                <p>{workspace?.dataWindowLabel ?? 'Carregando base do periodo...'}</p>
+                <p>{getScopeLabel(workspace?.roleScope)} / {screenContext.label}</p>
+                {latestAssistantMessage?.metadata.dataFreshnessLabel && (
+                  <p>{latestAssistantMessage.metadata.dataFreshnessLabel}</p>
+                )}
+              </>
             )}
           </div>
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-4 sm:px-5">
+        <div className={cn(
+          'flex min-h-0 flex-1 flex-col overflow-hidden px-4 sm:px-5',
+          compactConversationView ? 'py-2.5' : 'py-4'
+        )}>
           {loadState === 'loading' && !workspace ? (
             <div className="flex min-h-0 flex-1 items-center justify-center">
               <div className="rounded-[1.4rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-5 py-4 text-center">
@@ -506,26 +551,41 @@ export function AssistantWidgetPanel() {
           ) : (
             <>
               {hasActiveConversation ? (
-                <div className="relative mb-3 shrink-0 rounded-[1.05rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-3.5 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                        Conversa atual
+                <div className="relative mb-2 shrink-0">
+                  <div className="flex items-center gap-3 rounded-[1rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-3 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-foreground">
+                        <span className="mr-2 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                          Conversa atual
+                        </span>
+                        {activeConversationTitle}
                       </p>
-                      <p className="mt-1 truncate text-sm font-semibold text-foreground">{activeConversationTitle}</p>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">{helperDescription}</p>
                     </div>
                     {threadSummaries.length > 0 && (
                       <button
                         type="button"
                         onClick={() => setShowRecentThreads((current) => !current)}
-                        className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-[rgba(255,255,255,0.06)]"
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-2.5 py-1 text-[11px] font-semibold text-slate-300 transition-colors hover:bg-[rgba(255,255,255,0.06)]"
                       >
-                        <span>{showRecentThreads ? 'Ocultar conversas' : 'Ver conversas'}</span>
-                        <ChevronDown className={cn('h-4 w-4 transition-transform', showRecentThreads && 'rotate-180')} />
+                        <span>{showRecentThreads ? 'Ocultar' : 'Ver conversas'}</span>
+                        <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', showRecentThreads && 'rotate-180')} />
                       </button>
                     )}
                   </div>
+
+                  {showRecentThreads && threadSummaries.length > 0 && (
+                    <div className="absolute inset-x-0 top-full z-10 mt-2 overflow-hidden rounded-[1.05rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(24,27,40,0.98),rgba(13,15,22,0.98))] shadow-[0_26px_48px_-30px_rgba(2,6,23,0.9)]">
+                      <div className="max-h-60 overflow-y-auto p-2.5">
+                        <RecentThreadsList
+                          threadSummaries={threadSummaries}
+                          selectedThreadId={selectedThread?.id ?? null}
+                          onSelect={handleThreadSelect}
+                          disabled={isPending}
+                          compact
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="mb-3 shrink-0 rounded-[1.15rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-4 py-4">
@@ -552,25 +612,16 @@ export function AssistantWidgetPanel() {
                 </div>
               )}
 
-              {hasActiveConversation && showRecentThreads && threadSummaries.length > 0 && (
-                <div className="mb-3 shrink-0 rounded-[1.05rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.035)] p-3">
-                  <RecentThreadsList
-                    threadSummaries={threadSummaries}
-                    selectedThreadId={selectedThread?.id ?? null}
-                    onSelect={handleThreadSelect}
-                    disabled={isPending}
-                    compact
-                  />
-                </div>
-              )}
-
               <div className="min-h-0 flex-1 overflow-hidden rounded-[1.3rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(15,18,27,0.9),rgba(12,14,20,0.96))] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                 <div
                   ref={messagesViewportRef}
-                  className="flex h-full min-h-0 flex-col overflow-y-auto px-3 py-3 sm:px-4 sm:py-4"
+                  className={cn(
+                    'flex h-full min-h-0 flex-col overflow-y-auto px-3 sm:px-4',
+                    compactConversationView ? 'py-3 sm:py-3.5' : 'py-3 sm:py-4'
+                  )}
                 >
                   {hasActiveConversation ? (
-                    <div className="space-y-4">
+                    <div className="space-y-3.5">
                       {isLoadingThread ? (
                         <div className="flex min-h-[220px] items-center justify-center">
                           <div className="rounded-[1.15rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-4 py-3 text-sm text-muted-foreground">
@@ -625,13 +676,16 @@ export function AssistantWidgetPanel() {
           )}
         </div>
 
-        <footer className="shrink-0 border-t border-[rgba(255,255,255,0.08)] px-4 py-4 sm:px-5">
+        <footer className={cn(
+          'shrink-0 border-t border-[rgba(255,255,255,0.08)] px-4 sm:px-5',
+          compactConversationView ? 'py-3' : 'py-4'
+        )}>
           <form
             onSubmit={(event) => {
               event.preventDefault()
               submitQuestion(draft)
             }}
-            className="space-y-3"
+            className={cn('space-y-3', compactConversationView && 'space-y-2.5')}
           >
             <textarea
               value={draft}
@@ -642,14 +696,20 @@ export function AssistantWidgetPanel() {
                   submitQuestion(draft)
                 }
               }}
-              rows={3}
+              rows={compactConversationView ? 2 : 3}
               placeholder={helperPlaceholder}
-              className="auth-input min-h-[104px] w-full resize-none rounded-[1.1rem] px-4 py-3 text-sm leading-6"
+              className={cn(
+                'auth-input w-full resize-none rounded-[1.1rem] px-4 text-sm leading-6',
+                compactConversationView ? 'min-h-[84px] py-2.5' : 'min-h-[104px] py-3'
+              )}
               disabled={isPending || loadState !== 'ready'}
             />
             <div className="flex items-end justify-between gap-3">
-              <p className="max-w-[70%] text-xs leading-6 text-muted-foreground">
-                Respostas baseadas nos dados disponiveis do periodo. O backend continua sendo a autoridade do seu escopo.
+              <p className={cn(
+                'max-w-[70%] text-muted-foreground',
+                compactConversationView ? 'text-[11px] leading-5' : 'text-xs leading-6'
+              )}>
+                {footerNote}
               </p>
               <button
                 type="submit"
