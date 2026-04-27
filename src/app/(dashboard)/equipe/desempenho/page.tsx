@@ -91,7 +91,7 @@ export default async function DesempenhoPage({ searchParams }: Props) {
           <section className="dashboard-panel p-6">
             <h2 className="text-lg font-semibold text-foreground">Painel indisponivel</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Sua agenda continua acessivel. Vale revisar o vinculo do barbeiro e os dados do periodo antes do deploy.
+              Sua agenda continua acessivel. Vale revisar o vinculo do barbeiro e os dados do periodo antes de tentar novamente.
             </p>
           </section>
         </div>
@@ -249,7 +249,7 @@ export default async function DesempenhoPage({ searchParams }: Props) {
                     </p>
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-border bg-secondary/20 p-4 text-sm text-muted-foreground">
+                  <div className="empty-state-shell-subtle text-sm text-muted-foreground">
                     Nenhuma campanha ativa para o seu cadastro neste periodo.
                   </div>
                 )}
@@ -588,8 +588,8 @@ export default async function DesempenhoPage({ searchParams }: Props) {
                 </p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
                   {rankedProfessionals.some((professional) => professional.goalValue > 0 && professional.progress < 80)
-                    ? 'Existem profissionais abaixo de 80% da meta. Isso cria uma boa conversa de suporte e cobranca inteligente na demo.'
-                    : 'A equipe esta com leitura positiva de ritmo e o painel ja sustenta uma narrativa de escala.'}
+                    ? 'Existem profissionais abaixo de 80% da meta. Vale alinhar suporte, agenda e ritmo comercial com esse grupo.'
+                    : 'A equipe esta com leitura positiva de ritmo, com boa distribuicao de resultado no periodo.'}
                 </p>
               </div>
 
@@ -615,8 +615,8 @@ export default async function DesempenhoPage({ searchParams }: Props) {
 
             <div className="mt-4 space-y-3">
               {challengeRows.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-border bg-secondary/20 p-5 text-sm text-muted-foreground">
-                  Nenhum desafio ativo neste periodo. A area continua pronta para mostrar metas de time quando houver campanha.
+                <div className="empty-state-shell-subtle text-sm text-muted-foreground">
+                  Nenhum desafio ativo neste periodo. Quando uma nova campanha entrar, o acompanhamento aparece aqui com meta, progresso e recompensa.
                 </div>
               ) : (
                 challengeRows.map((challenge) => (

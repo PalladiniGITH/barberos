@@ -88,16 +88,11 @@ export default async function ConfiguracoesPage() {
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_360px]">
           <section className="dashboard-panel p-6">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-semibold text-foreground">Meu perfil profissional</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Informacoes do seu acesso e do seu cadastro profissional, sem misturar configuracoes administrativas da barbearia.
-                </p>
-              </div>
-              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                Conta pessoal
-              </span>
+            <div>
+              <h2 className="text-xl font-semibold text-foreground">Meu perfil profissional</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Informacoes do seu acesso e do seu cadastro profissional, sem misturar configuracoes administrativas da barbearia.
+              </p>
             </div>
 
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
@@ -161,7 +156,7 @@ export default async function ConfiguracoesPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-4 rounded-2xl border border-dashed border-border bg-background/40 p-4 text-sm text-muted-foreground">
+                  <div className="empty-state-shell-subtle mt-4 text-sm text-muted-foreground">
                     Seu usuario ainda nao esta ligado a um cadastro profissional ativo.
                   </div>
                 )}
@@ -320,22 +315,17 @@ export default async function ConfiguracoesPage() {
         <div className="dashboard-panel p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Campanhas internas</p>
           <p className="mt-3 text-3xl font-semibold text-foreground">{challengeCount}</p>
-          <p className="mt-2 text-sm text-muted-foreground">Desafios cadastrados para reforcar narrativa de performance.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Campanhas internas configuradas para metas, incentivo e acompanhamento do time.</p>
         </div>
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_360px]">
         <section className="dashboard-panel p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-semibold text-foreground">Perfil da barbearia</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Resumo da conta, da estrutura operacional e dos módulos já configurados na barbearia.
-              </p>
-            </div>
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-              Conta configurada
-            </span>
+          <div>
+            <h2 className="text-xl font-semibold text-foreground">Perfil da barbearia</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Resumo da conta, da estrutura operacional e dos modulos ja configurados na barbearia.
+            </p>
           </div>
 
           <div className="mt-6 grid gap-4 lg:grid-cols-2">
@@ -420,7 +410,7 @@ export default async function ConfiguracoesPage() {
               </p>
               <p className="inline-flex items-start gap-2">
                 <ShieldCheck className="mt-0.5 h-4 w-4 text-primary" />
-                A estrutura ja nasce pronta para escalar como SaaS sem misturar operacoes.
+                A estrutura separa conta, equipe e dados sem misturar operacoes da barbearia.
               </p>
               <p className="inline-flex items-start gap-2">
                 <Globe2 className="mt-0.5 h-4 w-4 text-primary" />
@@ -454,7 +444,7 @@ export default async function ConfiguracoesPage() {
           </section>
 
           <section className="dashboard-panel p-6">
-            <h2 className="text-lg font-semibold text-foreground">Navegacao util na demo</h2>
+            <h2 className="text-lg font-semibold text-foreground">Atalhos da operacao</h2>
             <div className="mt-4 space-y-3">
               <Link
                 href="/dashboard"

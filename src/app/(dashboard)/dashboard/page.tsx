@@ -431,7 +431,7 @@ export default async function DashboardPage({ searchParams }: Props) {
           <section className="dashboard-panel p-6">
             <h2 className="text-[1.4rem] font-semibold tracking-tight text-foreground">Tivemos um problema ao consolidar seus indicadores.</h2>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">
-              A agenda e o restante do sistema continuam acessiveis. Vale revisar o cadastro do barbeiro e as metas do periodo antes do deploy.
+              A agenda e o restante do sistema continuam acessiveis. Vale revisar o cadastro do barbeiro e as metas do periodo antes de tentar novamente.
             </p>
           </section>
         </div>

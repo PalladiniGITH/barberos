@@ -62,17 +62,18 @@ export function AddExpenseButton({ categories }: Props) {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <div className="premium-dialog relative w-full max-w-md p-6 animate-fade-in">
-            <div className="flex items-center justify-between mb-5">
+          <div className="modal-shell relative w-full max-w-md animate-fade-in">
+            <div className="flex items-center justify-between border-b border-[rgba(255,255,255,0.08)] px-5 py-4 sm:px-6">
               <h2 className="text-lg font-semibold text-foreground">Nova Despesa</h2>
               <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
+              <div className="modal-shell-body space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">Descrição</label>
                 <input
@@ -133,7 +134,8 @@ export function AddExpenseButton({ categories }: Props) {
                 <span className="text-sm text-foreground">Despesa recorrente (mensal)</span>
               </label>
 
-              <div className="flex gap-3 pt-2">
+              </div>
+              <div className="modal-shell-footer">
                 <button
                   type="button" onClick={() => setOpen(false)}
                   className="action-button flex-1"

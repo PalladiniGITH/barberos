@@ -113,41 +113,42 @@ export function ProfessionalModal({ professional }: Props) {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <div className="relative w-full max-w-2xl rounded-xl border border-border bg-card p-6 shadow-2xl animate-fade-in">
-            <div className="mb-5 flex items-center justify-between">
+          <div className="modal-shell relative w-full max-w-2xl animate-fade-in">
+            <div className="flex items-center justify-between border-b border-[rgba(255,255,255,0.08)] px-5 py-4 sm:px-6">
               <div>
-                <h2 className="text-lg font-semibold">{isEdit ? 'Editar Profissional' : 'Novo Profissional'}</h2>
+                <h2 className="text-lg font-semibold text-foreground">{isEdit ? 'Editar profissional' : 'Novo profissional'}</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Configure atendimento, comissao e precos operacionais do barbeiro sem mexer no catalogo base.
                 </p>
               </div>
 
-              <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">
+              <button onClick={() => setOpen(false)} className="rounded-[0.9rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-2 text-muted-foreground transition-colors hover:text-foreground">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
+              <div className="modal-shell-body space-y-5">
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium">Nome *</label>
+                  <label className="mb-1.5 block text-sm font-medium text-foreground">Nome *</label>
                   <input
                     {...register('name')}
                     placeholder="Ex: Joao Silva"
-                    className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="auth-input px-3 py-2.5"
                   />
                   {errors.name && <p className="mt-1 text-xs text-destructive">{errors.name.message}</p>}
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium">Email</label>
+                  <label className="mb-1.5 block text-sm font-medium text-foreground">Email</label>
                   <input
                     {...register('email')}
                     type="email"
                     placeholder="joao@barbearia.com"
-                    className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="auth-input px-3 py-2.5"
                   />
                   {errors.email && <p className="mt-1 text-xs text-destructive">{errors.email.message}</p>}
                 </div>
@@ -155,19 +156,19 @@ export function ProfessionalModal({ professional }: Props) {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium">Telefone</label>
+                  <label className="mb-1.5 block text-sm font-medium text-foreground">Telefone</label>
                   <input
                     {...register('phone')}
                     placeholder="(11) 99999-9999"
-                    className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="auth-input px-3 py-2.5"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium">Escopo de atendimento</label>
+                  <label className="mb-1.5 block text-sm font-medium text-foreground">Escopo de atendimento</label>
                   <select
                     {...register('attendanceScope')}
-                    className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="auth-input px-3 py-2.5"
                   >
                     {Object.entries(PROFESSIONAL_ATTENDANCE_SCOPE_LABELS).map(([value, label]) => (
                       <option key={value} value={value}>
@@ -178,7 +179,7 @@ export function ProfessionalModal({ professional }: Props) {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-border/70 bg-secondary/20 p-4">
+              <div className="surface-tier-low p-4">
                 <div className="mb-3">
                   <h3 className="text-sm font-semibold text-foreground">Configuracao comercial</h3>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">
@@ -188,66 +189,67 @@ export function ProfessionalModal({ professional }: Props) {
 
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium">Comissao (%)</label>
+                    <label className="mb-1.5 block text-sm font-medium text-foreground">Comissao (%)</label>
                     <input
                       {...register('commissionRate')}
                       inputMode="decimal"
                       placeholder="40"
-                      className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      className="auth-input px-3 py-2.5"
                     />
                     {errors.commissionRate && <p className="mt-1 text-xs text-destructive">{errors.commissionRate.message}</p>}
                   </div>
 
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium">Corte</label>
+                    <label className="mb-1.5 block text-sm font-medium text-foreground">Corte</label>
                     <input
                       {...register('haircutPrice')}
                       inputMode="decimal"
                       placeholder="55"
-                      className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      className="auth-input px-3 py-2.5"
                     />
                     {errors.haircutPrice && <p className="mt-1 text-xs text-destructive">{errors.haircutPrice.message}</p>}
                   </div>
 
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium">Barba</label>
+                    <label className="mb-1.5 block text-sm font-medium text-foreground">Barba</label>
                     <input
                       {...register('beardPrice')}
                       inputMode="decimal"
                       placeholder="35"
-                      className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      className="auth-input px-3 py-2.5"
                     />
                     {errors.beardPrice && <p className="mt-1 text-xs text-destructive">{errors.beardPrice.message}</p>}
                   </div>
 
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium">Combo</label>
+                    <label className="mb-1.5 block text-sm font-medium text-foreground">Combo</label>
                     <input
                       {...register('comboPrice')}
                       inputMode="decimal"
                       placeholder="80"
-                      className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      className="auth-input px-3 py-2.5"
                     />
                     {errors.comboPrice && <p className="mt-1 text-xs text-destructive">{errors.comboPrice.message}</p>}
                   </div>
                 </div>
               </div>
+              </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="modal-shell-footer">
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="flex-1 rounded-lg border border-border py-2 text-sm text-foreground transition-colors hover:bg-secondary"
+                  className="action-button flex-1"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  className="action-button-primary flex flex-1 items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {isSubmitting ? 'Salvando...' : 'Salvar'}
+                  {isSubmitting ? 'Salvando...' : 'Salvar profissional'}
                 </button>
               </div>
             </form>

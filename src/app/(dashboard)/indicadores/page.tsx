@@ -99,7 +99,7 @@ function TrendIndicator({
 }) {
   if (change === null) {
     return (
-      <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-slate-200">
+      <span className="inline-flex items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-xs font-semibold text-slate-200">
         Sem base anterior
       </span>
     )
@@ -108,7 +108,7 @@ function TrendIndicator({
   const positive = invert ? change < 0 : change > 0
 
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${positive ? 'bg-emerald-500/12 text-emerald-700' : 'bg-rose-500/12 text-rose-700'}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold ${positive ? 'border-[rgba(34,197,94,0.2)] bg-emerald-500/12 text-emerald-100' : 'border-[rgba(244,63,94,0.18)] bg-rose-500/12 text-rose-100'}`}>
       {change >= 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
       {change >= 0 ? '+' : ''}{change.toFixed(1)}%
     </span>
@@ -217,10 +217,7 @@ export default async function IndicadoresPage({ searchParams }: Props) {
       <section className="dashboard-panel dashboard-spotlight overflow-hidden p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary/80">
-              Sala de leitura
-            </p>
-            <h2 className="mt-4 text-4xl font-semibold tracking-tight text-white">
+            <h2 className="text-4xl font-semibold tracking-tight text-white">
               {formatCurrency(current.revenue)}
             </h2>
             <p className="mt-3 text-sm leading-6 text-slate-300">
@@ -231,32 +228,32 @@ export default async function IndicadoresPage({ searchParams }: Props) {
           <div className="flex flex-wrap gap-2">
             <TrendIndicator change={revenueChange} />
             <TrendIndicator change={profitChange} />
-            <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-slate-200">
+            <span className="inline-flex items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-xs font-semibold text-slate-200">
               {formatPercent(current.profitMargin, 0)} de margem estimada
             </span>
           </div>
         </div>
 
         <div className="mt-6 grid gap-3 md:grid-cols-4">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="surface-tier-low p-4">
             <p className="text-sm text-slate-300">Lucro estimado</p>
             <p className="mt-3 text-2xl font-semibold text-white">{formatCurrency(current.profit)}</p>
             <p className="mt-1 text-xs text-slate-400">Quanto o faturamento realmente deixou.</p>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="surface-tier-low p-4">
             <p className="text-sm text-slate-300">Ticket médio</p>
             <p className="mt-3 text-2xl font-semibold text-white">{formatCurrency(current.ticket)}</p>
             <p className="mt-1 text-xs text-slate-400">Leitura rápida de preço, mix e upsell.</p>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="surface-tier-low p-4">
             <p className="text-sm text-slate-300">% Despesas sobre receita</p>
             <p className="mt-3 text-2xl font-semibold text-white">{formatPercent(current.expensePercent, 0)}</p>
             <p className="mt-1 text-xs text-slate-400">Quanto do faturamento está sendo consumido pela operação.</p>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="surface-tier-low p-4">
             <p className="text-sm text-slate-300">Média de 6 meses</p>
             <p className="mt-3 text-2xl font-semibold text-white">{formatCurrency(averageRevenue)}</p>
             <p className="mt-1 text-xs text-slate-400">Base para comparar o mês atual com a própria operação.</p>
@@ -309,7 +306,7 @@ export default async function IndicadoresPage({ searchParams }: Props) {
 
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             {insights.map((insight) => (
-              <div key={insight.title} className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
+              <div key={insight.title} className="tonal-note">
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <insight.icon className="h-4 w-4" />
                 </span>
@@ -324,7 +321,7 @@ export default async function IndicadoresPage({ searchParams }: Props) {
           <section className="dashboard-panel p-6">
             <h2 className="text-lg font-semibold text-foreground">Leituras-chave</h2>
             <div className="mt-4 space-y-3">
-              <div className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
+              <div className="tonal-note">
                 <p className="text-sm font-semibold text-foreground">Melhor mês recente</p>
                 <p className="mt-2 text-2xl font-semibold text-foreground">{bestMonth.label}</p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -332,7 +329,7 @@ export default async function IndicadoresPage({ searchParams }: Props) {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
+              <div className="tonal-note">
                 <p className="text-sm font-semibold text-foreground">Margem média de 6 meses</p>
                 <p className="mt-2 text-2xl font-semibold text-foreground">{formatPercent(averageMargin, 0)}</p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">

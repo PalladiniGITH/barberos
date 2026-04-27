@@ -77,10 +77,8 @@ function FilterLink({
     <Link
       href={href}
       className={cn(
-        'inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
-        active
-          ? 'border-[rgba(91,33,182,0.22)] bg-[rgba(91,33,182,0.16)] text-violet-100'
-          : 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-slate-300 hover:bg-[rgba(91,33,182,0.12)] hover:text-slate-100'
+        'filter-pill',
+        active && 'filter-pill-active'
       )}
     >
       {label}
@@ -227,8 +225,8 @@ function RankingList({
             </div>
           </div>
         )) : (
-          <div className="surface-inverse rounded-[1rem] border border-dashed border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.03)] p-4 text-sm text-muted-foreground">
-            Ainda nao ha dados suficientes para montar este ranking no filtro atual.
+          <div className="empty-state-shell-subtle surface-inverse text-sm text-muted-foreground">
+            Ainda nao ha dados suficientes para montar este ranking no filtro atual. Ajuste o recorte ou aguarde mais movimentacao.
           </div>
         )}
       </div>
@@ -586,8 +584,8 @@ export function CustomerIntelligenceSection({
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">{insight.explanation}</p>
                 </div>
               )) : (
-                <div className="surface-inverse rounded-[1rem] border border-dashed border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.03)] p-4 text-sm text-muted-foreground">
-                  Ainda nao ha leitura suficiente para montar alertas de clientes neste recorte.
+                <div className="empty-state-shell-subtle surface-inverse text-sm text-muted-foreground">
+                  Ainda nao ha leitura suficiente para montar alertas de clientes neste recorte. Assim que o periodo ganhar volume, esta area prioriza os sinais mais relevantes.
                 </div>
               )}
             </div>
@@ -628,8 +626,9 @@ export function CustomerIntelligenceSection({
             </p>
           </div>
 
-          <div className="mt-5 overflow-x-auto">
-            <table className="min-w-full text-sm">
+          <div className="table-shell mt-5 overflow-hidden">
+            <div className="overflow-x-auto">
+            <table className="data-table min-w-full text-sm">
               <thead>
                 <tr className="border-b border-[rgba(255,255,255,0.08)] text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   <th className="pb-3 pr-4">Cliente</th>
@@ -642,7 +641,7 @@ export function CustomerIntelligenceSection({
                   <th className="pb-3">Leitura</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[rgba(255,255,255,0.06)]">
+              <tbody className="divide-y divide-[rgba(255,255,255,0.05)]">
                 {customers.table.length > 0 ? customers.table.slice(0, 12).map((customer) => (
                   <tr key={customer.id} className="align-top">
                     <td className="py-4 pr-4">
@@ -700,12 +699,13 @@ export function CustomerIntelligenceSection({
                 )) : (
                   <tr>
                     <td colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
-                      Ainda nao ha clientes suficientes para exibir a tabela neste recorte.
+                      Ainda nao ha clientes suficientes para exibir a tabela neste recorte. Ajuste o filtro ou aguarde novos atendimentos.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </section>
 

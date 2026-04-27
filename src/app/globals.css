@@ -522,6 +522,44 @@
     background: linear-gradient(180deg, rgba(31, 31, 34, 0.94), rgba(19, 19, 22, 0.98));
   }
 
+  .empty-state-shell {
+    @apply rounded-[1.08rem] border p-5;
+    border-color: rgba(255, 255, 255, 0.05);
+    background:
+      linear-gradient(180deg, rgba(33, 33, 37, 0.54), rgba(19, 19, 22, 0.88));
+    box-shadow:
+      0 18px 34px -30px rgba(2, 6, 23, 0.7),
+      inset 0 1px 0 rgba(255, 255, 255, 0.018);
+  }
+
+  .empty-state-shell-subtle {
+    @apply rounded-[1rem] border p-4;
+    border-color: rgba(255, 255, 255, 0.045);
+    background:
+      linear-gradient(180deg, rgba(28, 28, 31, 0.4), rgba(17, 17, 20, 0.72));
+  }
+
+  .empty-state-title {
+    @apply text-sm font-semibold text-foreground;
+  }
+
+  .empty-state-copy {
+    @apply mt-2 text-sm leading-6 text-muted-foreground;
+  }
+
+  .modal-shell {
+    @apply premium-dialog flex max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden p-0;
+  }
+
+  .modal-shell-body {
+    @apply min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6;
+  }
+
+  .modal-shell-footer {
+    @apply flex items-center gap-3 border-t px-5 py-4 sm:px-6;
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
   .auth-shell {
     background:
       radial-gradient(circle at 10% 4%, rgba(139, 92, 246, 0.11), transparent 24%),

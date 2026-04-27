@@ -128,7 +128,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
               </h2>
               <p className="spotlight-copy max-w-2xl">{report.summary.body}</p>
 
-              <div className="mt-5 rounded-[1.7rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.05)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+              <div className="tonal-note-strong mt-5">
                 <p className="text-sm font-semibold text-foreground">Prioridade agora</p>
                 <p className="mt-3 text-base leading-7 text-slate-100">{report.summary.focus}</p>
               </div>
@@ -190,8 +190,8 @@ export default async function InteligenciaPage({ searchParams }: Props) {
                     <InsightCard key={insight.id} insight={insight} />
                   ))
                 ) : (
-                  <div className="rounded-[1.35rem] border border-[rgba(52,211,153,0.18)] bg-[rgba(52,211,153,0.08)] p-5">
-                    <p className="text-sm font-semibold text-foreground">Sem alertas criticos neste periodo</p>
+                  <div className="empty-state-shell">
+                    <p className="empty-state-title">Sem alertas criticos neste periodo</p>
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">
                       O analista nao encontrou risco imediato de caixa ou meta. O melhor uso agora e acelerar ticket e margem.
                     </p>
@@ -268,7 +268,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
                 <h3 className="text-lg font-semibold text-foreground">Prioridades de acao</h3>
                 <div className="mt-4 space-y-3">
                   {topRecommendations.map((insight, index) => (
-                    <div key={insight.id} className="surface-inverse rounded-[1.25rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 shadow-[0_18px_34px_-26px_rgba(2,6,23,0.82)]">
+                    <div key={insight.id} className="surface-inverse tonal-note">
                       <p className="text-sm font-medium text-muted-foreground">
                         Prioridade {index + 1}
                       </p>
@@ -290,7 +290,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
                 </summary>
 
                 <div className="disclosure-body grid gap-3">
-                  <Link href="/financeiro/despesas" className="surface-inverse rounded-[1.25rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 transition-colors hover:bg-[rgba(255,255,255,0.06)]">
+                  <Link href="/financeiro/despesas" className="surface-inverse tonal-note transition-colors hover:bg-[rgba(255,255,255,0.06)]">
                     <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                       <TrendingDown className="h-4 w-4 text-primary" />
                       Revisar despesas
@@ -300,7 +300,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
                     </p>
                   </Link>
 
-                  <Link href="/equipe/desempenho" className="surface-inverse rounded-[1.25rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 transition-colors hover:bg-[rgba(255,255,255,0.06)]">
+                  <Link href="/equipe/desempenho" className="surface-inverse tonal-note transition-colors hover:bg-[rgba(255,255,255,0.06)]">
                     <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                       <Target className="h-4 w-4 text-primary" />
                       Ajustar time
@@ -310,7 +310,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
                     </p>
                   </Link>
 
-                  <Link href="/precificacao/resultado" className="surface-inverse rounded-[1.25rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 transition-colors hover:bg-[rgba(255,255,255,0.06)]">
+                  <Link href="/precificacao/resultado" className="surface-inverse tonal-note transition-colors hover:bg-[rgba(255,255,255,0.06)]">
                     <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                       <CircleDollarSign className="h-4 w-4 text-primary" />
                       Defender margem

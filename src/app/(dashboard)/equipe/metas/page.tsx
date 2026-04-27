@@ -385,16 +385,22 @@ export default async function MetasPage({ searchParams }: Props) {
           )
         })()
       ) : (
-        <div className="mb-6 rounded-xl border border-dashed border-border bg-card p-8 text-center">
+        <div className="empty-state-shell mb-6 text-center">
           <Target className="mx-auto mb-2 h-8 w-8 text-muted-foreground opacity-40" />
-          <p className="text-muted-foreground">Nenhuma meta definida para este mes</p>
+          <p className="text-sm font-semibold text-foreground">Nenhuma meta definida para este mes</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Defina a meta geral para acompanhar progresso, minimo saudavel e ritmo do periodo em uma leitura so.
+          </p>
         </div>
       )}
 
       <h3 className="mb-3 font-semibold text-foreground">Metas por Profissional</h3>
       {profGoals.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center">
-          <p className="text-muted-foreground">Nenhuma meta individual definida</p>
+        <div className="empty-state-shell text-center">
+          <p className="text-sm font-semibold text-foreground">Nenhuma meta individual definida</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Assim que as metas do time forem cadastradas, esta lista passa a mostrar realizado, objetivo e progresso por profissional.
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
