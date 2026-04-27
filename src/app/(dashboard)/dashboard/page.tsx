@@ -146,9 +146,14 @@ function TrendBadge({
   const config = getTrendConfig(change, positiveIsGood)
 
   return (
-    <span className={cn('inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold', config.className)}>
+    <span
+      className={cn(
+        'inline-flex max-w-full flex-wrap items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold leading-5 sm:px-3',
+        config.className
+      )}
+    >
       <config.Icon className="h-3.5 w-3.5" />
-      {config.label}
+      <span className="min-w-0 truncate">{config.label}</span>
     </span>
   )
 }
@@ -172,20 +177,24 @@ function ExecutiveCard({
 }) {
   return (
     <article className={cn(
-      'executive-metric',
+      'executive-metric overflow-hidden',
       emphasis && 'rounded-[1.2rem] p-5 sm:p-6',
       className
     )}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4">
+        <div className="min-w-0 flex-1">
           <p className="executive-label">{title}</p>
           <p className={cn('executive-value', emphasis && 'mt-3 text-[2.35rem] sm:text-[2.55rem]')}>
             {value}
           </p>
         </div>
-        {trend !== undefined && <TrendBadge change={trend} positiveIsGood={positiveIsGood} />}
+        {trend !== undefined && (
+          <div className="flex max-w-full flex-wrap items-start justify-start sm:justify-end">
+            <TrendBadge change={trend} positiveIsGood={positiveIsGood} />
+          </div>
+        )}
       </div>
-      <p className={cn('mt-2 text-sm leading-6 text-muted-foreground', emphasis && 'mt-3 max-w-sm text-[15px] leading-7')}>
+      <p className={cn('mt-3 text-sm leading-6 text-muted-foreground', emphasis && 'mt-4 max-w-sm text-[15px] leading-7')}>
         {helper}
       </p>
     </article>
@@ -232,13 +241,13 @@ function AlertBanner({ alert }: { alert: DashboardAlert }) {
 
 function ComparisonRow({ metric }: { metric: ComparisonMetric }) {
   return (
-    <div className="rounded-[1.2rem] border border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] px-4 py-3.5">
-      <div className="flex items-center justify-between gap-3">
-        <div>
+    <div className="rounded-[1.2rem] border border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] px-4 py-4 sm:px-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-foreground">{metric.label}</p>
           <p className="mt-1 text-xs text-muted-foreground">Antes: {formatCurrency(metric.previous)}</p>
         </div>
-        <div className="text-right">
+        <div className="min-w-[148px] text-left sm:text-right">
           <p className="text-sm font-semibold text-foreground">{formatCurrency(metric.current)}</p>
           <div className="mt-2">
             <TrendBadge change={metric.change} positiveIsGood={metric.positiveIsGood} />
@@ -487,7 +496,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         )}
       />
 
-      <section className="dashboard-spotlight overflow-hidden p-5 sm:p-6">
+      <section className="dashboard-spotlight overflow-hidden p-6 sm:p-7">
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_360px]">
           <div>
             <h2 className="spotlight-title mt-0">{formatCurrency(data.totalRevenue)}</h2>
@@ -527,9 +536,9 @@ export default async function DashboardPage({ searchParams }: Props) {
             </div>
           </div>
 
-          <aside className="premium-rail p-4">
-            <div className="space-y-3">
-              <div className="rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 shadow-[0_16px_24px_-18px_rgba(2,6,23,0.5)]">
+          <aside className="premium-rail p-5">
+            <div className="space-y-4">
+              <div className="panel-soft">
                 <p className="executive-label">Meta principal</p>
                 <p className="mt-3 text-[1.8rem] font-semibold tracking-tight text-foreground">
                   {data.goalValue > 0 ? formatPercent(data.goalAttainment, 0) : 'Sem meta'}
@@ -541,7 +550,7 @@ export default async function DashboardPage({ searchParams }: Props) {
                 </p>
               </div>
 
-              <div className="rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4 shadow-[0_16px_24px_-18px_rgba(2,6,23,0.5)]">
+              <div className="panel-soft">
                 <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
                   <span>Percentual atingido</span>
                   <span>{formatPercent(data.goalAttainment, 0)}</span>
@@ -564,7 +573,7 @@ export default async function DashboardPage({ searchParams }: Props) {
                 </p>
               </div>
 
-              <div className="rounded-[0.95rem] border border-[rgba(52,44,78,0.1)] bg-[rgba(91,33,182,0.05)] p-4">
+              <div className="tonal-note">
                 <p className="text-sm font-semibold text-foreground">Resumo do periodo</p>
                 <div className="mt-3 space-y-3 text-sm">
                   <div className="flex items-center justify-between gap-3">
@@ -589,7 +598,7 @@ export default async function DashboardPage({ searchParams }: Props) {
       {primaryAlert && <AlertBanner alert={primaryAlert} />}
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_330px]">
-        <div className="grid gap-4 xl:grid-cols-12">
+        <div className="grid gap-5 xl:grid-cols-12">
           <ExecutiveCard
             title="Lucro estimado"
             value={formatCurrency(data.profit)}
@@ -642,7 +651,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         </div>
 
         <aside className="premium-rail p-5">
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div>
               <h3 className="text-[1.4rem] font-semibold tracking-tight text-foreground">Leitura rapida do periodo</h3>
               <p className="mt-2 text-sm leading-7 text-muted-foreground">
@@ -650,7 +659,7 @@ export default async function DashboardPage({ searchParams }: Props) {
               </p>
             </div>
 
-            <div className="surface-tier-low p-4">
+            <div className="surface-tier-low p-5">
               <p className="executive-label">Comparacao usada</p>
               <p className="mt-3 text-base font-semibold text-foreground">{data.comparisonMonthLabel}</p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -658,7 +667,7 @@ export default async function DashboardPage({ searchParams }: Props) {
               </p>
             </div>
 
-            <div className="surface-tier-low p-4">
+            <div className="surface-tier-low p-5">
               <p className="executive-label">Pressao de caixa</p>
               <p className="mt-3 text-base font-semibold text-foreground">
                 {data.overdueExpenseCount > 0 ? `${data.overdueExpenseCount} despesa(s) em aberto` : 'Sem despesas vencidas'}
@@ -670,7 +679,7 @@ export default async function DashboardPage({ searchParams }: Props) {
               </p>
             </div>
 
-            <div className="surface-tier-low p-4">
+            <div className="surface-tier-low p-5">
               <p className="executive-label">Profissional em destaque</p>
               <p className="mt-3 text-base font-semibold text-foreground">
                 {data.ranking[0]?.name ?? 'Sem ranking ainda'}
@@ -706,7 +715,7 @@ export default async function DashboardPage({ searchParams }: Props) {
 
             {data.goalValue > 0 ? (
               <div className="mt-5 space-y-4">
-                <div className="rounded-[0.95rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
+                <div className="panel-soft">
                   <p className="executive-label">Realizado ate agora</p>
                   <p className="mt-3 text-[2rem] font-semibold tracking-tight text-foreground">
                     {formatCurrency(data.totalRevenue)}
@@ -729,7 +738,7 @@ export default async function DashboardPage({ searchParams }: Props) {
                 </div>
               </div>
             ) : (
-              <div className="mt-5 rounded-[1.2rem] border border-dashed border-[rgba(58,47,86,0.12)] bg-[rgba(91,33,182,0.04)] p-5">
+              <div className="tonal-note mt-5 border-dashed p-5">
                 <p className="text-sm font-semibold text-foreground">Meta ainda nao configurada</p>
                 <p className="mt-2 text-sm leading-7 text-muted-foreground">
                   Defina a meta e o painel deixa de ser so historico para virar direcao comercial.
@@ -767,7 +776,7 @@ export default async function DashboardPage({ searchParams }: Props) {
           <ProfessionalRanking data={data.ranking.slice(0, 5)} />
         ) : (
           <section className="dashboard-panel flex min-h-[280px] flex-col justify-center p-6">
-              <div className="rounded-[0.95rem] border border-dashed border-[rgba(52,44,78,0.12)] bg-[rgba(91,33,182,0.035)] p-5 text-center">
+              <div className="tonal-note border-dashed p-5 text-center">
               <p className="text-sm font-semibold text-foreground">Ranking ainda indisponivel</p>
               <p className="mt-2 text-sm leading-7 text-muted-foreground">
                 Assim que as receitas forem lancadas por profissional, o time aparece aqui com hierarquia e comparacao real.
@@ -798,7 +807,7 @@ export default async function DashboardPage({ searchParams }: Props) {
             {secondaryAlerts.length > 0 && (
               <div className="mt-5 space-y-3">
                 {secondaryAlerts.map((alert) => (
-                  <Link key={alert.title} href={alert.href} className="block rounded-[1.2rem] border border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] p-4 transition-colors hover:bg-[rgba(91,33,182,0.06)]">
+                  <Link key={alert.title} href={alert.href} className="tonal-note block transition-colors hover:bg-[rgba(91,33,182,0.06)]">
                     <p className="text-sm font-semibold text-foreground">{alert.title}</p>
                     <p className="mt-1 text-sm leading-7 text-muted-foreground">{alert.body}</p>
                   </Link>

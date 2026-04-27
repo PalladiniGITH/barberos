@@ -281,7 +281,7 @@
   }
 
   .hero-stat-card {
-    @apply rounded-[1rem] border p-4 backdrop-blur-sm;
+    @apply rounded-[1rem] border p-5 backdrop-blur-sm;
     border-color: rgba(255, 255, 255, 0.055);
     background: rgba(255, 255, 255, 0.024);
     box-shadow: 0 20px 34px -28px rgba(2, 6, 23, 0.56);
@@ -326,7 +326,7 @@
   }
 
   .executive-metric {
-    @apply rounded-[1rem] border p-4;
+    @apply rounded-[1rem] border p-5;
     border-color: rgba(255, 255, 255, 0.055);
     background:
       linear-gradient(180deg, rgba(42, 42, 45, 0.9), rgba(27, 27, 30, 0.98));
@@ -405,7 +405,7 @@
   }
 
   .panel-soft {
-    @apply rounded-[0.95rem] border p-3;
+    @apply rounded-[0.95rem] border p-4;
     border-color: rgba(255, 255, 255, 0.055);
     background: linear-gradient(180deg, rgba(42, 42, 45, 0.4), rgba(27, 27, 30, 0.72));
   }
