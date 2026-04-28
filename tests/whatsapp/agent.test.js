@@ -14,6 +14,11 @@ const AMBIGUOUS_SERVICES = [
   { id: 'svc-corte-barba-premium', name: 'Corte + Barba Premium', duration: 60, price: 95 },
 ]
 
+const CORRECTION_SERVICES = [
+  SERVICES[0],
+  ...AMBIGUOUS_SERVICES,
+]
+
 const PROFESSIONALS = [
   { id: 'pro-matheus', name: 'Matheus' },
   { id: 'pro-lucas', name: 'Lucas' },
@@ -213,6 +218,237 @@ test('data enviada antes do servico fica preservada enquanto o servico ambiguo e
   assert.equal(memory.pendingServiceOptions.length, 2)
   assert.match(reply, /14\/04/)
   assert.match(reply, /Barba Terapia/i)
+})
+
+test('correcao explicita troca Corte Classic por Corte + Barba Premium sem relistar todos os servicos', async () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.state = 'WAITING_DATE'
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+
+  const correctionIntent = await interpretMessageAt('nao e corte e barba', memory, {
+    todayIsoDate: '2026-04-13',
+    currentLocalDateTime: '2026-04-13 10:30',
+    services: CORRECTION_SERVICES,
+  })
+
+  agentTesting.promoteIntentContextToMemory({
+    memory,
+    intent: correctionIntent,
+    services: CORRECTION_SERVICES,
+    professionals: PROFESSIONALS,
+    inboundText: 'nao e corte e barba',
+  })
+
+  const nextAction = agentTesting.enforceNextActionFromMemory(
+    'ASK_DATE',
+    memory,
+    false,
+    createAgentInput().nowContext
+  )
+
+  const reply = agentTesting.buildGuardrailReplyText({
+    nextAction,
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    serviceNames: CORRECTION_SERVICES.map((service) => service.name),
+    professionalNames: PROFESSIONALS.map((professional) => professional.name),
+    nowContext: createAgentInput().nowContext,
+  })
+
+  assert.equal(correctionIntent.correctionTarget, 'SERVICE')
+  assert.equal(memory.selectedServiceId, 'svc-corte-barba-premium')
+  assert.equal(memory.selectedServiceName, 'Corte + Barba Premium')
+  assert.equal(nextAction, 'ASK_DATE')
+  assert.match(reply, /Qual dia voce prefere/i)
+  assert.doesNotMatch(reply, /Temos estes servicos disponiveis/i)
+})
+
+test('aliases de combo resolvem Corte + Barba Premium com prioridade sobre Corte Classic', async () => {
+  const samples = [
+    'corte e barba',
+    'corte com barba',
+    'cabelo e barba',
+    'corte mais barba',
+  ]
+
+  for (const message of samples) {
+    const memory = agentTesting.buildInitialMemory(createAgentInput())
+    memory.state = 'WAITING_SERVICE'
+
+    const interpreted = await interpretMessageAt(message, memory, {
+      todayIsoDate: '2026-04-13',
+      currentLocalDateTime: '2026-04-13 10:30',
+      services: CORRECTION_SERVICES,
+    })
+
+    agentTesting.promoteIntentContextToMemory({
+      memory,
+      intent: interpreted,
+      services: CORRECTION_SERVICES,
+      professionals: PROFESSIONALS,
+      inboundText: message,
+    })
+
+    assert.equal(memory.selectedServiceId, 'svc-corte-barba-premium', message)
+    assert.equal(memory.selectedServiceName, 'Corte + Barba Premium', message)
+  }
+})
+
+test('corte sozinho continua resolvendo para Corte Classic', async () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.state = 'WAITING_SERVICE'
+
+  const interpreted = await interpretMessageAt('quero corte', memory, {
+    todayIsoDate: '2026-04-13',
+    currentLocalDateTime: '2026-04-13 10:30',
+    services: CORRECTION_SERVICES,
+  })
+
+  agentTesting.promoteIntentContextToMemory({
+    memory,
+    intent: interpreted,
+    services: CORRECTION_SERVICES,
+    professionals: PROFESSIONALS,
+    inboundText: 'quero corte',
+  })
+
+  assert.equal(memory.selectedServiceId, 'svc-classic')
+  assert.equal(memory.selectedServiceName, 'Corte Classic')
+})
+
+test('correcao de servico preserva data e horario, mas limpa slot e alternativas antigas', async () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.state = 'WAITING_CONFIRMATION'
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.requestedDateIso = '2026-04-14'
+  memory.requestedTimeLabel = '19:00'
+  memory.selectedSlot = {
+    key: 'pro-matheus:2026-04-14T22:00:00.000Z',
+    professionalId: 'pro-matheus',
+    professionalName: 'Matheus',
+    dateIso: '2026-04-14',
+    timeLabel: '19:00',
+    startAtIso: '2026-04-14T22:00:00.000Z',
+    endAtIso: '2026-04-14T22:35:00.000Z',
+  }
+  memory.offeredSlots = [memory.selectedSlot]
+
+  const correctionIntent = await interpretMessageAt('nao, corte e barba', memory, {
+    todayIsoDate: '2026-04-13',
+    currentLocalDateTime: '2026-04-13 10:30',
+    services: CORRECTION_SERVICES,
+  })
+
+  agentTesting.promoteIntentContextToMemory({
+    memory,
+    intent: correctionIntent,
+    services: CORRECTION_SERVICES,
+    professionals: PROFESSIONALS,
+    inboundText: 'nao, corte e barba',
+  })
+
+  assert.equal(memory.selectedServiceId, 'svc-corte-barba-premium')
+  assert.equal(memory.requestedDateIso, '2026-04-14')
+  assert.equal(memory.requestedTimeLabel, '19:00')
+  assert.equal(memory.selectedSlot, null)
+  assert.equal(memory.offeredSlots.length, 0)
+})
+
+test('correcao ambigua de servico continua perguntando entre barba terapia e combo', async () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.state = 'WAITING_DATE'
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+
+  const correctionIntent = await interpretMessageAt('nao, barba', memory, {
+    todayIsoDate: '2026-04-13',
+    currentLocalDateTime: '2026-04-13 10:30',
+    services: CORRECTION_SERVICES,
+  })
+
+  agentTesting.promoteIntentContextToMemory({
+    memory,
+    intent: correctionIntent,
+    services: CORRECTION_SERVICES,
+    professionals: PROFESSIONALS,
+    inboundText: 'nao, barba',
+  })
+
+  const reply = agentTesting.buildGuardrailReplyText({
+    nextAction: 'ASK_SERVICE',
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    serviceNames: CORRECTION_SERVICES.map((service) => service.name),
+    professionalNames: PROFESSIONALS.map((professional) => professional.name),
+    nowContext: createAgentInput().nowContext,
+  })
+
+  assert.equal(memory.selectedServiceId, null)
+  assert.deepEqual(
+    memory.pendingServiceOptions.map((option) => option.name),
+    ['Barba Terapia', 'Corte + Barba Premium']
+  )
+  assert.match(reply, /1\. Barba Terapia/i)
+  assert.match(reply, /2\. Corte \+ Barba Premium/i)
+})
+
+test('sequencia real preserva o servico corrigido nas mensagens seguintes', async () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.state = 'WAITING_DATE'
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+
+  const correctionIntent = await interpretMessageAt('nao e corte e barba', memory, {
+    todayIsoDate: '2026-04-13',
+    currentLocalDateTime: '2026-04-13 10:30',
+    services: CORRECTION_SERVICES,
+  })
+
+  agentTesting.promoteIntentContextToMemory({
+    memory,
+    intent: correctionIntent,
+    services: CORRECTION_SERVICES,
+    professionals: PROFESSIONALS,
+    inboundText: 'nao e corte e barba',
+  })
+
+  const dateIntent = await interpretMessageAt('amanha', memory, {
+    todayIsoDate: '2026-04-13',
+    currentLocalDateTime: '2026-04-13 10:30',
+    services: CORRECTION_SERVICES,
+  })
+
+  agentTesting.promoteIntentContextToMemory({
+    memory,
+    intent: dateIntent,
+    services: CORRECTION_SERVICES,
+    professionals: PROFESSIONALS,
+    inboundText: 'amanha',
+  })
+
+  const timeIntent = await interpretMessageAt('19hr', memory, {
+    todayIsoDate: '2026-04-13',
+    currentLocalDateTime: '2026-04-13 10:30',
+    services: CORRECTION_SERVICES,
+  })
+
+  agentTesting.promoteIntentContextToMemory({
+    memory,
+    intent: timeIntent,
+    services: CORRECTION_SERVICES,
+    professionals: PROFESSIONALS,
+    inboundText: '19hr',
+  })
+
+  assert.equal(memory.selectedServiceId, 'svc-corte-barba-premium')
+  assert.equal(memory.selectedServiceName, 'Corte + Barba Premium')
+  assert.equal(memory.requestedDateIso, '2026-04-14')
+  assert.equal(memory.requestedTimeLabel, '19:00')
+  assert.equal(memory.pendingServiceOptions.length, 0)
 })
 
 test('preferencia de barbeiro vira etapa explicita antes de listar horarios mistos', () => {

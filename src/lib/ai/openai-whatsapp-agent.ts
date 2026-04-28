@@ -33,6 +33,7 @@ import { extractOpenAIUsage } from '@/lib/ai/openai-usage'
 import {
   buildNamedProfessionalOptionsFromSlots,
   findNamedOptionCandidates,
+  findServiceCandidates,
   pickNamedOptionBySelection,
 } from '@/lib/whatsapp-option-resolution'
 
@@ -1932,7 +1933,7 @@ function findServiceByIdOrName(input: {
     return null
   }
 
-  const candidates = findNamedOptionCandidates(input.services, input.serviceName)
+  const candidates = findServiceCandidates(input.services, input.serviceName)
   return candidates.length === 1 ? candidates[0] ?? null : null
 }
 
@@ -2082,6 +2083,7 @@ function promoteIntentContextToMemory(input: {
 
   const baseline = {
     selectedServiceId: memory.selectedServiceId,
+    selectedServiceName: memory.selectedServiceName,
     selectedProfessionalId: memory.selectedProfessionalId,
     allowAnyProfessional: memory.allowAnyProfessional,
     requestedDateIso: memory.requestedDateIso,
@@ -2090,6 +2092,16 @@ function promoteIntentContextToMemory(input: {
 
   if (intent.correctionTarget !== 'NONE') {
     applyCorrectionTargetToMemory(memory, intent.correctionTarget)
+  }
+
+  if (intent.correctionTarget === 'SERVICE') {
+    console.info('[whatsapp-service-correction] detected', {
+      previousServiceId: baseline.selectedServiceId,
+      previousServiceName: baseline.selectedServiceName,
+      requestedDateIso: baseline.requestedDateIso,
+      requestedTimeLabel: baseline.requestedTimeLabel,
+      inboundText,
+    })
   }
 
   const selectedPendingService = pickNamedOptionBySelection({
@@ -2108,18 +2120,41 @@ function promoteIntentContextToMemory(input: {
     memory.selectedServiceId = service.id
     memory.selectedServiceName = service.name
     clearPendingServiceOptions(memory)
+    if (intent.correctionTarget === 'SERVICE') {
+      console.info('[whatsapp-service-correction] new service matched', {
+        previousServiceId: baseline.selectedServiceId,
+        previousServiceName: baseline.selectedServiceName,
+        nextServiceId: service.id,
+        nextServiceName: service.name,
+      })
+    }
   } else if (!memory.selectedServiceId) {
-    const serviceCandidates = findNamedOptionCandidates(services, inboundText)
+    const serviceCandidates = findServiceCandidates(services, inboundText)
     if (serviceCandidates.length === 1) {
       memory.selectedServiceId = serviceCandidates[0].id
       memory.selectedServiceName = serviceCandidates[0].name
       clearPendingServiceOptions(memory)
+      if (intent.correctionTarget === 'SERVICE') {
+        console.info('[whatsapp-service-correction] new service matched', {
+          previousServiceId: baseline.selectedServiceId,
+          previousServiceName: baseline.selectedServiceName,
+          nextServiceId: serviceCandidates[0].id,
+          nextServiceName: serviceCandidates[0].name,
+        })
+      }
     } else if (serviceCandidates.length > 1) {
       memory.pendingServiceOptions = serviceCandidates
         .slice(0, 4)
         .map((candidate) => ({ id: candidate.id, name: candidate.name }))
       clearPendingProfessionalOptions(memory)
       clearPromotedAvailability(memory)
+      if (intent.correctionTarget === 'SERVICE') {
+        console.info('[whatsapp-service-correction] ambiguous correction', {
+          previousServiceId: baseline.selectedServiceId,
+          previousServiceName: baseline.selectedServiceName,
+          candidateNames: memory.pendingServiceOptions.map((candidate) => candidate.name),
+        })
+      }
     }
   }
 
@@ -2188,6 +2223,23 @@ function promoteIntentContextToMemory(input: {
   }
 
   if (serviceChanged || professionalChanged || dateChanged || timeChanged || intent.correctionTarget !== 'NONE') {
+    if (serviceChanged && (previousSelectedSlot || previousOfferedSlots.length > 0)) {
+      console.info('[whatsapp-service-correction] cleared selected slot due to service change', {
+        previousServiceId: baseline.selectedServiceId,
+        previousServiceName: baseline.selectedServiceName,
+        nextServiceId: memory.selectedServiceId,
+        nextServiceName: memory.selectedServiceName,
+        previousSelectedSlot: previousSelectedSlot
+          ? {
+              dateIso: previousSelectedSlot.dateIso,
+              timeLabel: previousSelectedSlot.timeLabel,
+              professionalName: previousSelectedSlot.professionalName,
+            }
+          : null,
+        previousOfferedSlots: previousOfferedSlots.length,
+      })
+    }
+
     clearPromotedAvailability(memory)
   }
 
@@ -2864,7 +2916,7 @@ async function executeAgentTool(input: {
   if (toolName === 'list_services') {
     const query = typeof args.query === 'string' ? args.query : null
     const filteredServices = query
-      ? findNamedOptionCandidates(agentInput.services, query)
+      ? findServiceCandidates(agentInput.services, query)
       : agentInput.services
     const services = filteredServices.length > 0 ? filteredServices : agentInput.services
     const includePrice = hasExplicitPriceQuestion(agentInput.inboundText)
@@ -2919,7 +2971,7 @@ async function executeAgentTool(input: {
     })
 
     if (!service) {
-      const serviceCandidates = findNamedOptionCandidates(
+      const serviceCandidates = findServiceCandidates(
         agentInput.services,
         requestedServiceName ?? agentInput.inboundText
       )
@@ -3185,7 +3237,7 @@ async function executeAgentTool(input: {
       memory.selectedServiceName = service.name
       clearPendingServiceOptions(memory)
     } else if (!memory.selectedServiceId) {
-      const serviceCandidates = findNamedOptionCandidates(
+      const serviceCandidates = findServiceCandidates(
         agentInput.services,
         requestedServiceName ?? agentInput.inboundText
       )

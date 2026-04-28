@@ -21,6 +21,12 @@ export function normalizeNamedOptionText(value: string) {
     .trim()
 }
 
+function normalizeServiceQuery(value: string) {
+  return normalizeNamedOptionText(value)
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function optionNameTokens(value: string) {
   return normalizeNamedOptionText(value)
     .split(/[^a-z0-9]+/)
@@ -39,6 +45,76 @@ function dedupeNamedOptions<T extends NamedOptionLike>(options: T[]) {
     seen.add(key)
     return true
   })
+}
+
+function hasHaircutKeyword(value: string) {
+  return /\b(corte|cabelo|cortar)\b/.test(value)
+}
+
+function hasBeardKeyword(value: string) {
+  return /\bbarba\b/.test(value)
+}
+
+function isComboServiceOption(option: NamedOptionLike) {
+  const normalizedName = normalizeServiceQuery(option.name)
+  return hasBeardKeyword(normalizedName)
+    && (hasHaircutKeyword(normalizedName) || normalizedName.includes('combo'))
+}
+
+function isHaircutOnlyServiceOption(option: NamedOptionLike) {
+  const normalizedName = normalizeServiceQuery(option.name)
+  return hasHaircutKeyword(normalizedName)
+    && !hasBeardKeyword(normalizedName)
+    && !normalizedName.includes('combo')
+}
+
+function isComboServiceIntent(query: string) {
+  const normalizedQuery = normalizeServiceQuery(query)
+
+  if (!normalizedQuery) {
+    return false
+  }
+
+  return (
+    /\bcorte\s*(?:\+|mais|com)?\s*barba\b/.test(normalizedQuery)
+    || /\bcabelo\s+e\s+barba\b/.test(normalizedQuery)
+    || /\bcortar\s+cabelo\s+e\s+barba\b/.test(normalizedQuery)
+    || /\bcombo\s+(?:de\s+)?corte\s+e\s+barba\b/.test(normalizedQuery)
+    || /\bpacote\s+(?:de\s+)?corte\s+e\s+barba\b/.test(normalizedQuery)
+    || /\bcorte\s+barba\b/.test(normalizedQuery)
+    || (hasHaircutKeyword(normalizedQuery) && hasBeardKeyword(normalizedQuery))
+  )
+}
+
+function isHaircutOnlyServiceIntent(query: string) {
+  const normalizedQuery = normalizeServiceQuery(query)
+  return hasHaircutKeyword(normalizedQuery)
+    && !hasBeardKeyword(normalizedQuery)
+    && !normalizedQuery.includes('combo')
+}
+
+export function extractExplicitServiceCorrectionQuery(message: string) {
+  const normalizedMessage = normalizeServiceQuery(message)
+  if (!normalizedMessage) {
+    return null
+  }
+
+  const explicitReplacement =
+    normalizedMessage.match(/\b(?:nao e|nao eh)\s+.+?,\s*(?:e|eh)\s+(.+)$/)
+    || normalizedMessage.match(/\b(?:nao e|nao eh)\s+.+?\s+mas\s+(.+)$/)
+
+  if (explicitReplacement?.[1]) {
+    return explicitReplacement[1].trim()
+  }
+
+  const stripped = normalizedMessage.replace(
+    /^(?:nao e|nao eh|nao,?|na verdade|troca(?:r)?(?:\s+para)?|quero dizer|quis dizer|seria|eh)\s+/,
+    ''
+  ).trim()
+
+  return stripped && stripped !== normalizedMessage
+    ? stripped
+    : null
 }
 
 function scoreNamedOptionMatch<T extends NamedOptionLike>(option: T, queryTokens: string[]) {
@@ -106,6 +182,50 @@ export function findNamedOptionCandidates<T extends NamedOptionLike>(options: T[
       .filter((entry) => entry.score === bestScore)
       .map((entry) => entry.option)
   )
+}
+
+export function findServiceCandidates<T extends NamedOptionLike>(options: T[], query: string) {
+  const normalizedQuery = normalizeServiceQuery(query)
+  if (!normalizedQuery) {
+    return []
+  }
+
+  const candidateQueries = Array.from(new Set([
+    extractExplicitServiceCorrectionQuery(query),
+    normalizedQuery,
+  ].filter((value): value is string => Boolean(value && value.trim()))))
+
+  for (const candidateQuery of candidateQueries) {
+    const directCandidates = findNamedOptionCandidates(options, candidateQuery)
+
+    if (isComboServiceIntent(candidateQuery)) {
+      const comboCandidates = dedupeNamedOptions(
+        (directCandidates.length > 0 ? directCandidates : options)
+          .filter((option) => isComboServiceOption(option))
+      )
+
+      if (comboCandidates.length > 0) {
+        return comboCandidates
+      }
+    }
+
+    if (isHaircutOnlyServiceIntent(candidateQuery)) {
+      const haircutCandidates = dedupeNamedOptions(
+        (directCandidates.length > 0 ? directCandidates : options)
+          .filter((option) => isHaircutOnlyServiceOption(option))
+      )
+
+      if (haircutCandidates.length > 0) {
+        return haircutCandidates
+      }
+    }
+
+    if (directCandidates.length > 0) {
+      return directCandidates
+    }
+  }
+
+  return []
 }
 
 export function pickNamedOptionBySelection<T extends NamedOptionLike>(input: {

@@ -381,6 +381,25 @@ test('copy de barbeiro no fluxo legado nao usa markdown com dois asteriscos', ()
   assert.doesNotMatch(reply, /\*\*.+\*\*/)
 })
 
+test('correcao de servico no fluxo legado preserva horario preferido e limpa slots antigos', () => {
+  const draft = conversationTesting.buildEmptyConversationDraft()
+  draft.selectedServiceId = 'svc-classic'
+  draft.selectedServiceName = 'Corte Classic'
+  draft.requestedDateIso = '2026-04-14'
+  draft.requestedTimeLabel = '19:00'
+  draft.offeredSlots = [buildSlot()]
+  draft.selectedStoredSlot = buildSlot()
+
+  conversationTesting.applyCorrectionTarget(draft, 'SERVICE')
+
+  assert.equal(draft.selectedServiceId, null)
+  assert.equal(draft.selectedServiceName, null)
+  assert.equal(draft.requestedDateIso, '2026-04-14')
+  assert.equal(draft.requestedTimeLabel, '19:00')
+  assert.equal(draft.offeredSlots.length, 0)
+  assert.equal(draft.selectedStoredSlot, null)
+})
+
 test('contagem de opcoes prioriza servico pendente, depois barbeiro e por fim horarios', () => {
   const draft = conversationTesting.buildEmptyConversationDraft()
 

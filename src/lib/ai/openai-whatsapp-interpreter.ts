@@ -10,7 +10,7 @@ import {
 } from '@/lib/timezone'
 import { recordAiUsage } from '@/lib/ai/usage-log'
 import { extractOpenAIUsage } from '@/lib/ai/openai-usage'
-import { findNamedOptionCandidates } from '@/lib/whatsapp-option-resolution'
+import { findServiceCandidates } from '@/lib/whatsapp-option-resolution'
 
 const DEFAULT_OPENAI_MODEL = 'gpt-4.1-mini'
 const DEFAULT_TIMEOUT_MS = 15000
@@ -833,7 +833,7 @@ function inferTimePreference(message: string, conversationState?: string) {
 }
 
 function findBestNamedMatch(options: Array<{ name: string }>, message: string) {
-  const candidates = findNamedOptionCandidates(options, message)
+  const candidates = findServiceCandidates(options, message)
   return candidates.length === 1 ? candidates[0]?.name ?? null : null
 }
 
@@ -1304,7 +1304,7 @@ function inferCorrectionTarget(input: {
     return 'FLOW' as const
   }
 
-  const hasCorrectionCue = /\b(mas|nao|na verdade|quis dizer|corrig|melhor|troca|trocar|outro|ajusta)\b/.test(
+  const hasCorrectionCue = /\b(mas|nao|na verdade|quis dizer|quero dizer|corrig|melhor|troca|trocar|outro|ajusta|seria|eh)\b/.test(
     normalized
   )
 

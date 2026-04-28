@@ -74,7 +74,7 @@ import {
 } from '@/lib/whatsapp-appointment-reminders'
 import {
   buildNamedProfessionalOptionsFromSlots,
-  findNamedOptionCandidates,
+  findServiceCandidates,
   pickNamedOptionBySelection,
 } from '@/lib/whatsapp-option-resolution'
 
@@ -1927,7 +1927,6 @@ function applyCorrectionTarget(draft: ConversationDraft, target: string) {
   if (target === 'SERVICE') {
     draft.selectedServiceId = null
     draft.selectedServiceName = null
-    draft.requestedTimeLabel = null
     draft.pendingServiceOptions = []
     draft.pendingProfessionalOptions = []
     clearDraftAvailability(draft)
@@ -4785,11 +4784,11 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     message: inboundText,
   })
   const interpretedServiceCandidates = interpreted.serviceName
-    ? findNamedOptionCandidates(services, interpreted.serviceName)
+    ? findServiceCandidates(services, interpreted.serviceName)
     : []
   const matchedService = selectedPendingService
     ?? (interpretedServiceCandidates.length === 1 ? interpretedServiceCandidates[0] ?? null : null)
-  const serviceCandidates = findNamedOptionCandidates(services, inboundText)
+  const serviceCandidates = findServiceCandidates(services, inboundText)
   const requestedDateForResolution = interpreted.requestedDateIso ?? baselineDraft.requestedDateIso
   const nameResolution = await resolveMentionedName({
     rawName: normalizeOptionalText(interpreted.mentionedName),
@@ -4824,6 +4823,17 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   const draft: ConversationDraft = { ...baselineDraft }
   applyCorrectionTarget(draft, interpreted.correctionTarget)
 
+  if (interpreted.correctionTarget === 'SERVICE') {
+    console.info('[whatsapp-service-correction] detected', {
+      customerId: input.customer.id,
+      previousServiceId: baselineDraft.selectedServiceId,
+      previousServiceName: baselineDraft.selectedServiceName,
+      requestedDateIso: baselineDraft.requestedDateIso,
+      requestedTimeLabel: baselineDraft.requestedTimeLabel,
+      inboundText,
+    })
+  }
+
   if (matchedService) {
     draft.selectedServiceId = matchedService.id
     draft.selectedServiceName = matchedService.name
@@ -4831,16 +4841,42 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     if (baselineDraft.selectedServiceId !== matchedService.id) {
       draft.pendingProfessionalOptions = []
     }
+    if (interpreted.correctionTarget === 'SERVICE') {
+      console.info('[whatsapp-service-correction] new service matched', {
+        customerId: input.customer.id,
+        previousServiceId: baselineDraft.selectedServiceId,
+        previousServiceName: baselineDraft.selectedServiceName,
+        nextServiceId: matchedService.id,
+        nextServiceName: matchedService.name,
+      })
+    }
   } else if (!draft.selectedServiceId && serviceCandidates.length === 1) {
     draft.selectedServiceId = serviceCandidates[0].id
     draft.selectedServiceName = serviceCandidates[0].name
     draft.pendingServiceOptions = []
+    if (interpreted.correctionTarget === 'SERVICE') {
+      console.info('[whatsapp-service-correction] new service matched', {
+        customerId: input.customer.id,
+        previousServiceId: baselineDraft.selectedServiceId,
+        previousServiceName: baselineDraft.selectedServiceName,
+        nextServiceId: serviceCandidates[0].id,
+        nextServiceName: serviceCandidates[0].name,
+      })
+    }
   } else if (!draft.selectedServiceId && serviceCandidates.length > 1) {
     draft.pendingServiceOptions = serviceCandidates
       .slice(0, 4)
       .map((candidate) => ({ id: candidate.id, name: candidate.name }))
     draft.pendingProfessionalOptions = []
     clearDraftAvailability(draft)
+    if (interpreted.correctionTarget === 'SERVICE') {
+      console.info('[whatsapp-service-correction] ambiguous correction', {
+        customerId: input.customer.id,
+        previousServiceId: baselineDraft.selectedServiceId,
+        previousServiceName: baselineDraft.selectedServiceName,
+        candidateNames: draft.pendingServiceOptions.map((candidate) => candidate.name),
+      })
+    }
   }
 
   const selectedAnyProfessionalByOption =
@@ -4919,7 +4955,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     && Boolean(baselineDraft.requestedTimeLabel)
 
   if (!hasNewTimePreference && serviceChanged) {
-    draft.requestedTimeLabel = null
+    draft.requestedTimeLabel = baselineDraft.requestedTimeLabel
     clearDraftAvailability(draft)
   } else if (shouldPreserveRequestedTimeOnDateCorrection) {
     draft.requestedTimeLabel = baselineDraft.requestedTimeLabel
@@ -5008,6 +5044,24 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   }
 
   if (serviceChanged || professionalChanged || dateChanged || interpreted.correctionTarget !== 'NONE') {
+    if (serviceChanged && (baselineDraft.selectedStoredSlot || baselineDraft.offeredSlots.length > 0)) {
+      console.info('[whatsapp-service-correction] cleared selected slot due to service change', {
+        customerId: input.customer.id,
+        previousServiceId: baselineDraft.selectedServiceId,
+        previousServiceName: baselineDraft.selectedServiceName,
+        nextServiceId: draft.selectedServiceId,
+        nextServiceName: draft.selectedServiceName,
+        previousSelectedSlot: baselineDraft.selectedStoredSlot
+          ? {
+              dateIso: baselineDraft.selectedStoredSlot.dateIso,
+              timeLabel: baselineDraft.selectedStoredSlot.timeLabel,
+              professionalName: baselineDraft.selectedStoredSlot.professionalName,
+            }
+          : null,
+        previousOfferedSlots: baselineDraft.offeredSlots.length,
+      })
+    }
+
     clearDraftAvailability(draft)
     console.info('[whatsapp-conversation] cleared stale availability context', {
       customerId: input.customer.id,
