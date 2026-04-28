@@ -33,6 +33,7 @@ export interface BlockingAppointment {
   professionalId: string
   startAt: Date
   endAt: Date
+  sourceReference: string | null
 }
 
 export class AvailabilityInfrastructureError extends Error {
@@ -310,6 +311,7 @@ export async function listBlockingAppointmentsForDay(input: {
         professionalId: true,
         startAt: true,
         endAt: true,
+        sourceReference: true,
       },
     }),
   })

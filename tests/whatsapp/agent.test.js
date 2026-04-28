@@ -1879,3 +1879,110 @@ test('horario pedido sem slot real responde de forma objetiva e sem loop', () =>
   assert.match(override.replyText, /13:15 com Matheus/)
   assert.doesNotMatch(override.replyText, /Qual servico|Qual dia/i)
 })
+
+test('bloqueio operacional em horario exato nao vira falha generica e mantem alternativas validas', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.selectedProfessionalId = 'pro-matheus'
+  memory.selectedProfessionalName = 'Matheus Lima'
+  memory.requestedDateIso = '2026-04-30'
+  memory.requestedTimeLabel = '09:00'
+  memory.selectedSlot = {
+    key: 'pro-matheus:2026-04-30T12:00:00.000Z',
+    professionalId: 'pro-matheus',
+    professionalName: 'Matheus Lima',
+    dateIso: '2026-04-30',
+    timeLabel: '09:00',
+    startAtIso: '2026-04-30T12:00:00.000Z',
+    endAtIso: '2026-04-30T13:00:00.000Z',
+  }
+
+  const nearbySlots = [
+    {
+      key: 'pro-matheus:2026-04-30T11:00:00.000Z',
+      professionalId: 'pro-matheus',
+      professionalName: 'Matheus Lima',
+      dateIso: '2026-04-30',
+      timeLabel: '08:00',
+      startAtIso: '2026-04-30T11:00:00.000Z',
+      endAtIso: '2026-04-30T12:00:00.000Z',
+    },
+    {
+      key: 'pro-matheus:2026-04-30T14:00:00.000Z',
+      professionalId: 'pro-matheus',
+      professionalName: 'Matheus Lima',
+      dateIso: '2026-04-30',
+      timeLabel: '11:00',
+      startAtIso: '2026-04-30T14:00:00.000Z',
+      endAtIso: '2026-04-30T15:00:00.000Z',
+    },
+    {
+      key: 'pro-lucas:2026-04-30T12:00:00.000Z',
+      professionalId: 'pro-lucas',
+      professionalName: 'Lucas Ribeiro',
+      dateIso: '2026-04-30',
+      timeLabel: '09:00',
+      startAtIso: '2026-04-30T12:00:00.000Z',
+      endAtIso: '2026-04-30T13:00:00.000Z',
+    },
+  ]
+
+  const override = agentTesting.resolveToolFailureOverride({
+    toolTrace: [
+      {
+        name: 'confirm_booking',
+        arguments: {
+          requestedTime: '09:00',
+        },
+        result: {
+          status: 'error',
+          reason: 'exact_time_unavailable',
+          nearbySlots,
+          diagnostics: {
+            professionalId: 'pro-matheus',
+            professionalName: 'Matheus Lima',
+            date: '2026-04-30',
+            period: 'EXACT',
+            periodWindow: 'horario_exato',
+            serviceDuration: 60,
+            bufferMinutes: 0,
+            leadTimeMinutes: 20,
+            firstEligibleSlotTime: '08:00',
+            busyAppointmentsFound: 1,
+            freeSlotsReturned: 0,
+            finalReason: 'exact_time_unavailable',
+            requestedSlot: {
+              exactTime: '09:00',
+              status: 'blocked',
+              blockStartTime: '09:00',
+              blockEndTime: '11:00',
+              isOperationalBlock: true,
+            },
+          },
+        },
+      },
+    ],
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    preferredProfessionalName: null,
+    serviceNames: SERVICES.map((service) => service.name),
+    nowContext: createAgentInput().nowContext,
+  })
+
+  const nextState = agentTesting.inferConversationState(
+    override.nextAction,
+    memory,
+    createAgentInput().nowContext
+  )
+
+  assert.equal(override.nextAction, 'OFFER_SLOTS')
+  assert.match(override.replyText, /agenda dele esta bloqueada das 09:00 as 11:00/i)
+  assert.match(override.replyText, /08:00 com Matheus Lima/i)
+  assert.match(override.replyText, /09:00 com Lucas Ribeiro/i)
+  assert.doesNotMatch(override.replyText, /Nao consegui verificar os horarios agora/i)
+  assert.equal(memory.selectedSlot, null)
+  assert.deepEqual(memory.offeredSlots, nearbySlots)
+  assert.equal(nextState, 'WAITING_TIME')
+})

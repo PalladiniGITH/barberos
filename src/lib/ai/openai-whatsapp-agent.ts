@@ -3,9 +3,11 @@ import 'server-only'
 import { MessagingProvider, type Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import {
+  type WhatsAppAvailabilityDiagnostics,
   type WhatsAppBookingSlot,
   findExactAvailableWhatsAppSlot,
   getAvailableWhatsAppSlots,
+  resolveExactWhatsAppSlot,
 } from '@/lib/agendamentos/whatsapp-booking'
 import { AvailabilityInfrastructureError } from '@/lib/agendamentos/availability'
 import {
@@ -1727,6 +1729,39 @@ function clearPromotedAvailability(memory: WorkingMemory) {
   memory.selectedSlot = null
 }
 
+function replacePromotedAvailabilityWithAlternatives(input: {
+  memory: WorkingMemory
+  nearbySlots: WhatsAppBookingSlot[]
+  diagnostics?: WhatsAppAvailabilityDiagnostics | null
+  logContext: {
+    customerId: string
+    conversationId: string
+    barbershopId: string
+    serviceId: string | null
+    professionalId: string | null
+    requestedDateIso: string | null
+    requestedTime: string | null
+  }
+}) {
+  input.memory.selectedSlot = null
+  input.memory.offeredSlots = input.nearbySlots.slice(0, 4)
+
+  console.info('[whatsapp-booking] selected slot cleared due to unavailability', {
+    ...input.logContext,
+    alternatives: input.memory.offeredSlots.map((slot) => `${slot.timeLabel} com ${slot.professionalName}`),
+    requestedSlotStatus: input.diagnostics?.requestedSlot?.status ?? null,
+  })
+
+  if (input.diagnostics?.requestedSlot?.status === 'blocked') {
+    console.info('[whatsapp-booking] blocked slot rejected', {
+      ...input.logContext,
+      blockStartTime: input.diagnostics.requestedSlot.blockStartTime,
+      blockEndTime: input.diagnostics.requestedSlot.blockEndTime,
+      reason: 'operational_block',
+    })
+  }
+}
+
 function selectedSlotMatchesCurrentContext(memory: WorkingMemory, slot: WhatsAppBookingSlot | null) {
   if (!slot) {
     return false
@@ -2314,6 +2349,66 @@ function buildNearbySlotsMessage(slots: WhatsAppBookingSlot[]) {
     : null
 }
 
+function buildOptionSelectionPrompt(slots: WhatsAppBookingSlot[]) {
+  const labels = slots
+    .slice(0, 4)
+    .map((slot, index) => `${index + 1}. ${slot.timeLabel} com ${slot.professionalName}`)
+
+  return labels.length > 0
+    ? `Antes de confirmar, preciso que voce escolha uma das opcoes disponiveis:\n\n${labels.join('\n')}\n\nQual voce prefere?`
+    : null
+}
+
+function buildExactTimeUnavailableReply(input: {
+  diagnostics?: WhatsAppAvailabilityDiagnostics | null
+  nearbySlots: WhatsAppBookingSlot[]
+  timezone?: string | null
+  fallbackProfessionalName?: string | null
+}) {
+  const requestedSlot = input.diagnostics?.requestedSlot ?? null
+  const dateIso = input.diagnostics?.date ?? null
+  const exactTime = requestedSlot?.exactTime ?? null
+  const professionalName = input.diagnostics?.professionalName ?? input.fallbackProfessionalName ?? null
+  const dayLabel = dateIso && input.timezone
+    ? formatDayLabelFromIsoDate(dateIso, input.timezone).toLowerCase()
+    : null
+
+  let lead = exactTime
+    ? `${exactTime} nao esta disponivel.`
+    : 'Esse horario nao esta disponivel.'
+
+  if (requestedSlot?.status === 'blocked' && exactTime && professionalName) {
+    const interval = requestedSlot.blockStartTime && requestedSlot.blockEndTime
+      ? ` A agenda dele esta bloqueada das ${requestedSlot.blockStartTime} as ${requestedSlot.blockEndTime}.`
+      : ' A agenda dele esta bloqueada nesse periodo.'
+    lead = dayLabel
+      ? `${professionalName} esta indisponivel ${dayLabel}, as ${exactTime}.${interval}`
+      : `${professionalName} esta indisponivel as ${exactTime}.${interval}`
+  } else if (requestedSlot?.status === 'occupied' && exactTime && professionalName) {
+    lead = dayLabel
+      ? `${professionalName} nao esta disponivel ${dayLabel}, as ${exactTime}. Ja existe atendimento nesse horario.`
+      : `${professionalName} nao esta disponivel as ${exactTime}. Ja existe atendimento nesse horario.`
+  } else if (requestedSlot?.status === 'outside_working_hours' && professionalName) {
+    lead = dayLabel
+      ? `${professionalName} nao atende nesse horario ${dayLabel}.`
+      : `${professionalName} nao atende nesse horario.`
+  } else if (requestedSlot?.status === 'outside_lead_time') {
+    lead = dayLabel
+      ? `Esse horario ${dayLabel} ficou muito em cima para confirmar agora.`
+      : 'Esse horario ficou muito em cima para confirmar agora.'
+  } else if (exactTime && professionalName) {
+    lead = dayLabel
+      ? `${professionalName} nao esta disponivel ${dayLabel}, as ${exactTime}.`
+      : `${professionalName} nao esta disponivel as ${exactTime}.`
+  }
+
+  const optionPrompt = buildOptionSelectionPrompt(input.nearbySlots)
+
+  return optionPrompt
+    ? `${lead}\n\n${optionPrompt}`
+    : `${lead}\n\nSe quiser, eu posso procurar outro horario para voce.`
+}
+
 function resolveToolFailureOverride(input: {
   toolTrace: ToolTraceEntry[]
   memory: WorkingMemory
@@ -2429,8 +2524,33 @@ function resolveToolFailureOverride(input: {
 
     return {
       nextAction: nearbySlots.length > 0 ? 'OFFER_SLOTS' as const : 'ASK_CLARIFICATION' as const,
-      replyText: buildNearbySlotsMessage(nearbySlots)
+      replyText: buildOptionSelectionPrompt(nearbySlots)
         ?? 'Nao encontrei esse horario nas opcoes atuais. Vou buscar de novo para voce.',
+    }
+  }
+
+  if (reason === 'exact_time_unavailable') {
+    const nearbySlots = Array.isArray(latestAvailabilityError.result.nearbySlots)
+      ? latestAvailabilityError.result.nearbySlots as WhatsAppBookingSlot[]
+      : input.memory.offeredSlots
+    const diagnostics =
+      latestAvailabilityError.result.diagnostics
+      && typeof latestAvailabilityError.result.diagnostics === 'object'
+      && !Array.isArray(latestAvailabilityError.result.diagnostics)
+        ? latestAvailabilityError.result.diagnostics as WhatsAppAvailabilityDiagnostics
+        : null
+
+    input.memory.selectedSlot = null
+    input.memory.offeredSlots = nearbySlots.slice(0, 4)
+
+    return {
+      nextAction: nearbySlots.length > 0 ? 'OFFER_SLOTS' as const : 'ASK_CLARIFICATION' as const,
+      replyText: buildExactTimeUnavailableReply({
+        diagnostics,
+        nearbySlots,
+        timezone: input.timezone,
+        fallbackProfessionalName: input.memory.selectedProfessionalName,
+      }),
     }
   }
 
@@ -2663,6 +2783,30 @@ async function executeAgentTool(input: {
         ?? null
     }
 
+    if (exactTime && availability.slots.length === 0 && availability.diagnostics.finalReason === 'exact_time_unavailable') {
+      replacePromotedAvailabilityWithAlternatives({
+        memory,
+        nearbySlots: availability.suggestedSlots,
+        diagnostics: availability.diagnostics,
+        logContext: {
+          customerId: agentInput.customer.id,
+          conversationId: agentInput.conversation.id,
+          barbershopId: agentInput.barbershop.id,
+          serviceId: service.id,
+          professionalId: allowAnyProfessional ? null : professionalId,
+          requestedDateIso: dateIso,
+          requestedTime: exactTime,
+        },
+      })
+
+      return {
+        status: 'error',
+        reason: 'exact_time_unavailable',
+        nearbySlots: availability.suggestedSlots,
+        diagnostics: availability.diagnostics,
+      }
+    }
+
     return {
       status: 'ok',
       diagnostics: availability.diagnostics,
@@ -2746,8 +2890,9 @@ async function executeAgentTool(input: {
       }
 
       if (memory.selectedProfessionalId) {
+        let exactSlotResolution
         try {
-          memory.selectedSlot = await findExactAvailableWhatsAppSlot({
+          exactSlotResolution = await resolveExactWhatsAppSlot({
             barbershopId: agentInput.barbershop.id,
             serviceId: memory.selectedServiceId,
             professionalId: memory.selectedProfessionalId,
@@ -2764,6 +2909,32 @@ async function executeAgentTool(input: {
           }
 
           throw error
+        }
+
+        memory.selectedSlot = exactSlotResolution.slot
+
+        if (!memory.selectedSlot && exactSlotResolution.diagnostics.finalReason === 'exact_time_unavailable') {
+          replacePromotedAvailabilityWithAlternatives({
+            memory,
+            nearbySlots: exactSlotResolution.suggestedSlots,
+            diagnostics: exactSlotResolution.diagnostics,
+            logContext: {
+              customerId: agentInput.customer.id,
+              conversationId: agentInput.conversation.id,
+              barbershopId: agentInput.barbershop.id,
+              serviceId: memory.selectedServiceId,
+              professionalId: memory.selectedProfessionalId,
+              requestedDateIso: memory.requestedDateIso,
+              requestedTime: args.requestedTime,
+            },
+          })
+
+          return {
+            status: 'error',
+            reason: 'exact_time_unavailable',
+            nearbySlots: exactSlotResolution.suggestedSlots,
+            diagnostics: exactSlotResolution.diagnostics,
+          }
         }
       } else if (memory.allowAnyProfessional) {
         let exactAvailability
@@ -2796,6 +2967,28 @@ async function executeAgentTool(input: {
             status: 'error',
             reason: 'multiple_professionals_for_exact_time',
             slots: exactAvailability.slots,
+          }
+        } else if (exactAvailability.diagnostics.finalReason === 'exact_time_unavailable') {
+          replacePromotedAvailabilityWithAlternatives({
+            memory,
+            nearbySlots: exactAvailability.suggestedSlots,
+            diagnostics: exactAvailability.diagnostics,
+            logContext: {
+              customerId: agentInput.customer.id,
+              conversationId: agentInput.conversation.id,
+              barbershopId: agentInput.barbershop.id,
+              serviceId: memory.selectedServiceId,
+              professionalId: null,
+              requestedDateIso: memory.requestedDateIso,
+              requestedTime: args.requestedTime,
+            },
+          })
+
+          return {
+            status: 'error',
+            reason: 'exact_time_unavailable',
+            nearbySlots: exactAvailability.suggestedSlots,
+            diagnostics: exactAvailability.diagnostics,
           }
         }
       } else {
@@ -2868,8 +3061,9 @@ async function executeAgentTool(input: {
       }
 
       if (memory.selectedProfessionalId) {
+        let exactSlotResolution
         try {
-          memory.selectedSlot = await findExactAvailableWhatsAppSlot({
+          exactSlotResolution = await resolveExactWhatsAppSlot({
             barbershopId: agentInput.barbershop.id,
             serviceId: memory.selectedServiceId,
             professionalId: memory.selectedProfessionalId,
@@ -2887,6 +3081,33 @@ async function executeAgentTool(input: {
           }
 
           throw error
+        }
+
+        memory.selectedSlot = exactSlotResolution.slot
+
+        if (!memory.selectedSlot && exactSlotResolution.diagnostics.finalReason === 'exact_time_unavailable') {
+          replacePromotedAvailabilityWithAlternatives({
+            memory,
+            nearbySlots: exactSlotResolution.suggestedSlots,
+            diagnostics: exactSlotResolution.diagnostics,
+            logContext: {
+              customerId: agentInput.customer.id,
+              conversationId: agentInput.conversation.id,
+              barbershopId: agentInput.barbershop.id,
+              serviceId: memory.selectedServiceId,
+              professionalId: memory.selectedProfessionalId,
+              requestedDateIso: memory.requestedDateIso,
+              requestedTime,
+            },
+          })
+
+          return {
+            status: 'error',
+            reason: 'exact_time_unavailable',
+            nearbySlots: exactSlotResolution.suggestedSlots,
+            diagnostics: exactSlotResolution.diagnostics,
+            explicitConfirmationDetected: pureExplicitConfirmation,
+          }
         }
       } else if (memory.allowAnyProfessional) {
         let exactAvailability
@@ -2920,6 +3141,29 @@ async function executeAgentTool(input: {
             status: 'error',
             reason: 'multiple_professionals_for_exact_time',
             slots: exactAvailability.slots,
+            explicitConfirmationDetected: pureExplicitConfirmation,
+          }
+        } else if (exactAvailability.diagnostics.finalReason === 'exact_time_unavailable') {
+          replacePromotedAvailabilityWithAlternatives({
+            memory,
+            nearbySlots: exactAvailability.suggestedSlots,
+            diagnostics: exactAvailability.diagnostics,
+            logContext: {
+              customerId: agentInput.customer.id,
+              conversationId: agentInput.conversation.id,
+              barbershopId: agentInput.barbershop.id,
+              serviceId: memory.selectedServiceId,
+              professionalId: null,
+              requestedDateIso: memory.requestedDateIso,
+              requestedTime,
+            },
+          })
+
+          return {
+            status: 'error',
+            reason: 'exact_time_unavailable',
+            nearbySlots: exactAvailability.suggestedSlots,
+            diagnostics: exactAvailability.diagnostics,
             explicitConfirmationDetected: pureExplicitConfirmation,
           }
         }

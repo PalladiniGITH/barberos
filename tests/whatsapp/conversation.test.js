@@ -645,3 +645,99 @@ test('quando o horario exato nao existe a resposta avanca com alternativas proxi
   assert.match(reply, /Matheus/)
   assert.doesNotMatch(reply, /10h e manha|10:00 e manha/i)
 })
+
+test('horario bloqueado gera resposta operacional explicita com intervalo do bloqueio', () => {
+  const slots = [
+    {
+      key: 'pro-matheus:2026-04-30T11:00:00.000Z',
+      professionalId: 'pro-matheus',
+      professionalName: 'Matheus Lima',
+      dateIso: '2026-04-30',
+      timeLabel: '08:00',
+      startAtIso: '2026-04-30T11:00:00.000Z',
+      endAtIso: '2026-04-30T12:00:00.000Z',
+    },
+    {
+      key: 'pro-matheus:2026-04-30T14:00:00.000Z',
+      professionalId: 'pro-matheus',
+      professionalName: 'Matheus Lima',
+      dateIso: '2026-04-30',
+      timeLabel: '11:00',
+      startAtIso: '2026-04-30T14:00:00.000Z',
+      endAtIso: '2026-04-30T15:00:00.000Z',
+    },
+    {
+      key: 'pro-lucas:2026-04-30T12:00:00.000Z',
+      professionalId: 'pro-lucas',
+      professionalName: 'Lucas Ribeiro',
+      dateIso: '2026-04-30',
+      timeLabel: '09:00',
+      startAtIso: '2026-04-30T12:00:00.000Z',
+      endAtIso: '2026-04-30T13:00:00.000Z',
+    },
+  ]
+
+  const reply = conversationTesting.buildExactTimeFallbackResponse({
+    exactTime: '09:00',
+    timezone: 'America/Sao_Paulo',
+    dateIso: '2026-04-30',
+    slots,
+    professionalName: 'Matheus Lima',
+    diagnostics: {
+      professionalId: 'pro-matheus',
+      professionalName: 'Matheus Lima',
+      date: '2026-04-30',
+      period: 'EXACT',
+      periodWindow: 'horario_exato',
+      serviceDuration: 60,
+      bufferMinutes: 0,
+      leadTimeMinutes: 20,
+      firstEligibleSlotTime: '08:00',
+      busyAppointmentsFound: 1,
+      freeSlotsReturned: 0,
+      finalReason: 'exact_time_unavailable',
+      requestedSlot: {
+        exactTime: '09:00',
+        status: 'blocked',
+        blockStartTime: '09:00',
+        blockEndTime: '11:00',
+        isOperationalBlock: true,
+      },
+    },
+  })
+
+  assert.match(reply, /Matheus Lima esta indisponivel/i)
+  assert.match(reply, /bloqueada das 09:00 as 11:00/i)
+  assert.match(reply, /08:00/)
+  assert.match(reply, /11:00/)
+  assert.match(reply, /Lucas Ribeiro/)
+  assert.doesNotMatch(reply, /Nao consegui verificar os horarios agora/i)
+})
+
+test('quando o cliente responde vagamente apos alternativas o fluxo pede a escolha de uma opcao', () => {
+  const reply = conversationTesting.buildOfferedSlotSelectionPrompt([
+    {
+      key: 'pro-matheus:2026-04-30T11:00:00.000Z',
+      professionalId: 'pro-matheus',
+      professionalName: 'Matheus Lima',
+      dateIso: '2026-04-30',
+      timeLabel: '08:00',
+      startAtIso: '2026-04-30T11:00:00.000Z',
+      endAtIso: '2026-04-30T12:00:00.000Z',
+    },
+    {
+      key: 'pro-lucas:2026-04-30T12:00:00.000Z',
+      professionalId: 'pro-lucas',
+      professionalName: 'Lucas Ribeiro',
+      dateIso: '2026-04-30',
+      timeLabel: '09:00',
+      startAtIso: '2026-04-30T12:00:00.000Z',
+      endAtIso: '2026-04-30T13:00:00.000Z',
+    },
+  ])
+
+  assert.match(reply, /Antes de confirmar, preciso que voce escolha uma das opcoes disponiveis/i)
+  assert.match(reply, /1\. 08:00 com Matheus Lima/i)
+  assert.match(reply, /2\. 09:00 com Lucas Ribeiro/i)
+  assert.match(reply, /Qual voce prefere/i)
+})

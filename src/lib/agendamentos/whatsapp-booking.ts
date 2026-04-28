@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import {
   AvailabilityInfrastructureError,
+  type BlockingAppointment,
   SCHEDULE_END_HOUR,
   SCHEDULE_SLOT_STEP_MINUTES,
   SCHEDULE_START_HOUR,
@@ -20,6 +21,7 @@ import {
   matchesTimePreference,
   runAvailabilityDbQueryWithRetry,
 } from '@/lib/agendamentos/availability'
+import { isOperationalBlockSourceReference } from '@/lib/agendamentos/operational-blocks'
 import {
   formatDateTimeInTimezone,
   formatIsoDateInTimezone,
@@ -62,6 +64,14 @@ export interface WhatsAppBookingSlot {
   endAtIso: string
 }
 
+export interface WhatsAppRequestedSlotDiagnostic {
+  exactTime: string
+  status: 'available' | 'blocked' | 'occupied' | 'outside_working_hours' | 'outside_lead_time' | 'unknown'
+  blockStartTime: string | null
+  blockEndTime: string | null
+  isOperationalBlock: boolean
+}
+
 export interface WhatsAppAvailabilityDiagnostics {
   professionalId: string | null
   professionalName: string | null
@@ -83,6 +93,7 @@ export interface WhatsAppAvailabilityDiagnostics {
     | 'no_slots_in_requested_period'
     | 'exact_time_unavailable'
     | 'infrastructure_error'
+  requestedSlot: WhatsAppRequestedSlotDiagnostic | null
 }
 
 interface SchedulingServiceOption {
@@ -95,6 +106,13 @@ interface SchedulingServiceOption {
 export interface WhatsAppAvailabilityResult {
   service: SchedulingServiceOption | null
   slots: WhatsAppBookingSlot[]
+  suggestedSlots: WhatsAppBookingSlot[]
+  diagnostics: WhatsAppAvailabilityDiagnostics
+}
+
+export interface WhatsAppExactSlotResolution {
+  slot: WhatsAppBookingSlot | null
+  suggestedSlots: WhatsAppBookingSlot[]
   diagnostics: WhatsAppAvailabilityDiagnostics
 }
 
@@ -117,6 +135,209 @@ function normalizeTimePreference(value?: string | null) {
   return normalized && normalized !== 'NONE' ? normalized : 'NONE'
 }
 
+function parseTimeLabel(value: string) {
+  const [hours, minutes] = value.split(':').map((part) => Number.parseInt(part, 10))
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return null
+  }
+
+  return { hours, minutes }
+}
+
+function toTimeDistanceMinutes(slot: WhatsAppBookingSlot, requestedStartAt: Date) {
+  const slotStart = new Date(slot.startAtIso).getTime()
+  return Math.abs(slotStart - requestedStartAt.getTime()) / 60_000
+}
+
+function dedupeSuggestedSlots(slots: WhatsAppBookingSlot[]) {
+  const seen = new Set<string>()
+  const unique: WhatsAppBookingSlot[] = []
+
+  for (const slot of slots) {
+    const key = `${slot.professionalId}:${slot.dateIso}:${slot.timeLabel}`
+    if (seen.has(key)) {
+      continue
+    }
+
+    seen.add(key)
+    unique.push(slot)
+  }
+
+  return unique
+}
+
+function buildExactRequestedSlotAlternatives(input: {
+  openSlots: WhatsAppBookingSlot[]
+  requestedStartAt: Date
+  exactTime: string
+  requestedProfessionalId?: string | null
+}) {
+  const sortedOpenSlots = dedupeSuggestedSlots(input.openSlots)
+  const sameProfessionalNearby = input.requestedProfessionalId
+    ? sortedOpenSlots
+      .filter((slot) =>
+        slot.professionalId === input.requestedProfessionalId
+        && slot.timeLabel !== input.exactTime
+      )
+      .sort((left, right) =>
+        toTimeDistanceMinutes(left, input.requestedStartAt) - toTimeDistanceMinutes(right, input.requestedStartAt)
+        || new Date(left.startAtIso).getTime() - new Date(right.startAtIso).getTime()
+      )
+    : []
+
+  const sameTimeOtherProfessionals = sortedOpenSlots
+    .filter((slot) =>
+      slot.timeLabel === input.exactTime
+      && slot.professionalId !== input.requestedProfessionalId
+    )
+    .sort((left, right) => left.professionalName.localeCompare(right.professionalName, 'pt-BR'))
+
+  const remaining = sortedOpenSlots
+    .filter((slot) =>
+      !sameProfessionalNearby.includes(slot)
+      && !sameTimeOtherProfessionals.includes(slot)
+    )
+    .sort((left, right) =>
+      toTimeDistanceMinutes(left, input.requestedStartAt) - toTimeDistanceMinutes(right, input.requestedStartAt)
+      || new Date(left.startAtIso).getTime() - new Date(right.startAtIso).getTime()
+    )
+
+  return dedupeSuggestedSlots([
+    ...sameProfessionalNearby,
+    ...sameTimeOtherProfessionals,
+    ...remaining,
+  ]).slice(0, 4)
+}
+
+function buildRequestedSlotDiagnostic(input: {
+  exactTime: string
+  dateIso: string
+  timezone: string
+  serviceDuration: number
+  operationalBufferMinutes: number
+  dayOpen: Date
+  dayClose: Date
+  firstEligibleStartAt: Date
+  isToday: boolean
+  professionalId?: string | null
+  blockedSlots: BlockingAppointment[]
+  openSlots: WhatsAppBookingSlot[]
+}) {
+  const parsedTime = parseTimeLabel(input.exactTime)
+
+  if (!parsedTime) {
+    return {
+      requestedSlot: {
+        exactTime: input.exactTime,
+        status: 'unknown',
+        blockStartTime: null,
+        blockEndTime: null,
+        isOperationalBlock: false,
+      } satisfies WhatsAppRequestedSlotDiagnostic,
+      suggestedSlots: [] as WhatsAppBookingSlot[],
+    }
+  }
+
+  const requestedStartAt = buildLocalDate(
+    input.dateIso,
+    parsedTime.hours,
+    parsedTime.minutes,
+    input.timezone,
+  )
+  const requestedEndAt = new Date(requestedStartAt.getTime() + input.serviceDuration * 60_000)
+  const bufferedEndAt = new Date(requestedEndAt.getTime() + input.operationalBufferMinutes * 60_000)
+
+  const exactMatch = input.openSlots.find((slot) => (
+    slot.timeLabel === input.exactTime
+    && (!input.professionalId || slot.professionalId === input.professionalId)
+  ))
+
+  if (exactMatch) {
+    return {
+      requestedSlot: {
+        exactTime: input.exactTime,
+        status: 'available',
+        blockStartTime: null,
+        blockEndTime: null,
+        isOperationalBlock: false,
+      } satisfies WhatsAppRequestedSlotDiagnostic,
+      suggestedSlots: [] as WhatsAppBookingSlot[],
+    }
+  }
+
+  if (requestedStartAt < input.dayOpen || bufferedEndAt > input.dayClose) {
+    return {
+      requestedSlot: {
+        exactTime: input.exactTime,
+        status: 'outside_working_hours',
+        blockStartTime: null,
+        blockEndTime: null,
+        isOperationalBlock: false,
+      } satisfies WhatsAppRequestedSlotDiagnostic,
+      suggestedSlots: buildExactRequestedSlotAlternatives({
+        openSlots: input.openSlots,
+        requestedStartAt,
+        exactTime: input.exactTime,
+        requestedProfessionalId: input.professionalId,
+      }),
+    }
+  }
+
+  if (input.isToday && requestedStartAt < input.firstEligibleStartAt) {
+    return {
+      requestedSlot: {
+        exactTime: input.exactTime,
+        status: 'outside_lead_time',
+        blockStartTime: null,
+        blockEndTime: null,
+        isOperationalBlock: false,
+      } satisfies WhatsAppRequestedSlotDiagnostic,
+      suggestedSlots: buildExactRequestedSlotAlternatives({
+        openSlots: input.openSlots,
+        requestedStartAt,
+        exactTime: input.exactTime,
+        requestedProfessionalId: input.professionalId,
+      }),
+    }
+  }
+
+  const conflictingAppointment = input.blockedSlots.find((appointment) =>
+    hasBufferedConflict({
+      candidateStart: requestedStartAt,
+      candidateEnd: requestedEndAt,
+      blockedStart: appointment.startAt,
+      blockedEnd: appointment.endAt,
+      bufferMinutes: input.operationalBufferMinutes,
+    })
+  )
+
+  const isOperationalBlock = conflictingAppointment
+    ? isOperationalBlockSourceReference(conflictingAppointment.sourceReference)
+    : false
+
+  return {
+    requestedSlot: {
+      exactTime: input.exactTime,
+      status: conflictingAppointment
+        ? (isOperationalBlock ? 'blocked' : 'occupied')
+        : 'unknown',
+      blockStartTime: conflictingAppointment
+        ? formatTimeLabel(conflictingAppointment.startAt, input.timezone)
+        : null,
+      blockEndTime: conflictingAppointment
+        ? formatTimeLabel(conflictingAppointment.endAt, input.timezone)
+        : null,
+      isOperationalBlock,
+    } satisfies WhatsAppRequestedSlotDiagnostic,
+    suggestedSlots: buildExactRequestedSlotAlternatives({
+      openSlots: input.openSlots,
+      requestedStartAt,
+      exactTime: input.exactTime,
+      requestedProfessionalId: input.professionalId,
+    }),
+  }
+}
+
 function buildDiagnostics(input: {
   professionalId?: string | null
   professionalName?: string | null
@@ -129,6 +350,7 @@ function buildDiagnostics(input: {
   busyAppointmentsFound?: number
   freeSlotsReturned?: number
   finalReason: WhatsAppAvailabilityDiagnostics['finalReason']
+  requestedSlot?: WhatsAppRequestedSlotDiagnostic | null
 }): WhatsAppAvailabilityDiagnostics {
   const period = normalizeTimePreference(input.period)
 
@@ -145,6 +367,7 @@ function buildDiagnostics(input: {
     busyAppointmentsFound: input.busyAppointmentsFound ?? 0,
     freeSlotsReturned: input.freeSlotsReturned ?? 0,
     finalReason: input.finalReason,
+    requestedSlot: input.requestedSlot ?? null,
   }
 }
 
@@ -153,6 +376,7 @@ function logAvailabilityLookup(input: {
   serviceId: string
   diagnostics: WhatsAppAvailabilityDiagnostics
   slots: WhatsAppBookingSlot[]
+  suggestedSlots?: WhatsAppBookingSlot[]
 }) {
   console.info('[whatsapp-booking] availability computed', {
     barbershopId: input.barbershopId,
@@ -169,7 +393,9 @@ function logAvailabilityLookup(input: {
     busyAppointmentsFound: input.diagnostics.busyAppointmentsFound,
     freeSlotsReturned: input.diagnostics.freeSlotsReturned,
     finalReason: input.diagnostics.finalReason,
+    requestedSlot: input.diagnostics.requestedSlot,
     slotsReturned: input.slots.map((slot) => `${slot.timeLabel} com ${slot.professionalName}`),
+    suggestedSlots: (input.suggestedSlots ?? []).map((slot) => `${slot.timeLabel} com ${slot.professionalName}`),
   })
 }
 
@@ -266,11 +492,13 @@ export async function getAvailableWhatsAppSlots(input: {
       serviceId: input.serviceId,
       diagnostics,
       slots: [],
+      suggestedSlots: [],
     })
 
     return {
       service: null,
       slots: [],
+      suggestedSlots: [],
       diagnostics,
     }
   }
@@ -307,6 +535,7 @@ export async function getAvailableWhatsAppSlots(input: {
       serviceId: input.serviceId,
       diagnostics,
       slots: [],
+      suggestedSlots: [],
     })
 
     return {
@@ -317,6 +546,7 @@ export async function getAvailableWhatsAppSlots(input: {
         price: Number(service.price),
       },
       slots: [],
+      suggestedSlots: [],
       diagnostics,
     }
   }
@@ -418,6 +648,7 @@ export async function getAvailableWhatsAppSlots(input: {
     }
   }
 
+  const dedupedOpenSlots = dedupeWhatsAppSlots(openSlotsBeforePeriodFilter)
   const dedupedSlots = dedupeWhatsAppSlots(openSlotsAfterPeriodFilter)
   console.info('[availability] slots after period filter', {
     barbershopId: input.barbershopId,
@@ -429,6 +660,75 @@ export async function getAvailableWhatsAppSlots(input: {
   const slots = dedupedSlots
     .sort((left, right) => new Date(left.startAtIso).getTime() - new Date(right.startAtIso).getTime())
     .slice(0, input.limit ?? 4)
+
+  let requestedSlot: WhatsAppRequestedSlotDiagnostic | null = null
+  let suggestedSlots: WhatsAppBookingSlot[] = []
+
+  if (normalizedPeriod === 'EXACT' && input.exactTime) {
+    const requestedSlotResolution = buildRequestedSlotDiagnostic({
+      exactTime: input.exactTime,
+      dateIso: input.dateIso,
+      timezone: resolvedTimezone,
+      serviceDuration: service.duration,
+      operationalBufferMinutes,
+      dayOpen,
+      dayClose,
+      firstEligibleStartAt,
+      isToday,
+      professionalId: professionals.length === 1 ? professionals[0].id : input.professionalId ?? null,
+      blockedSlots: input.professionalId && professionals.length === 1
+        ? (appointmentsByProfessional.get(professionals[0].id) ?? [])
+        : blockingAppointments,
+      openSlots: dedupedOpenSlots,
+    })
+
+    requestedSlot = requestedSlotResolution.requestedSlot
+    suggestedSlots = requestedSlotResolution.suggestedSlots
+
+    if (requestedSlot.status === 'blocked') {
+      console.info('[availability] requested slot blocked', {
+        barbershopId: input.barbershopId,
+        professionalId: professionals.length === 1 ? professionals[0].id : input.professionalId ?? null,
+        serviceId: input.serviceId,
+        requestedDateIso: input.dateIso,
+        requestedTime: input.exactTime,
+        blockStartTime: requestedSlot.blockStartTime,
+        blockEndTime: requestedSlot.blockEndTime,
+        reason: 'operational_block',
+      })
+    } else if (requestedSlot.status === 'occupied') {
+      console.info('[availability] requested slot occupied', {
+        barbershopId: input.barbershopId,
+        professionalId: professionals.length === 1 ? professionals[0].id : input.professionalId ?? null,
+        serviceId: input.serviceId,
+        requestedDateIso: input.dateIso,
+        requestedTime: input.exactTime,
+        blockStartTime: requestedSlot.blockStartTime,
+        blockEndTime: requestedSlot.blockEndTime,
+        reason: 'appointment_conflict',
+      })
+    } else if (requestedSlot.status === 'outside_working_hours') {
+      console.info('[availability] requested slot outside working hours', {
+        barbershopId: input.barbershopId,
+        professionalId: professionals.length === 1 ? professionals[0].id : input.professionalId ?? null,
+        serviceId: input.serviceId,
+        requestedDateIso: input.dateIso,
+        requestedTime: input.exactTime,
+        reason: 'outside_working_hours',
+      })
+    }
+
+    if (suggestedSlots.length > 0) {
+      console.info('[availability] alternatives generated', {
+        barbershopId: input.barbershopId,
+        professionalId: professionals.length === 1 ? professionals[0].id : input.professionalId ?? null,
+        serviceId: input.serviceId,
+        requestedDateIso: input.dateIso,
+        requestedTime: input.exactTime,
+        alternatives: suggestedSlots.map((slot) => `${slot.timeLabel} com ${slot.professionalName}`),
+      })
+    }
+  }
 
   let finalReason: WhatsAppAvailabilityDiagnostics['finalReason'] = 'success'
   if (slots.length === 0) {
@@ -453,6 +753,7 @@ export async function getAvailableWhatsAppSlots(input: {
     busyAppointmentsFound: blockingAppointments.length,
     freeSlotsReturned: slots.length,
     finalReason,
+    requestedSlot,
   })
 
   logAvailabilityLookup({
@@ -460,6 +761,7 @@ export async function getAvailableWhatsAppSlots(input: {
     serviceId: input.serviceId,
     diagnostics,
     slots,
+    suggestedSlots,
   })
 
   if (dedupedSlots.length !== openSlotsAfterPeriodFilter.length) {
@@ -481,6 +783,7 @@ export async function getAvailableWhatsAppSlots(input: {
       price: Number(service.price),
     },
     slots,
+    suggestedSlots,
     diagnostics,
   }
 }
@@ -493,6 +796,18 @@ export async function findExactAvailableWhatsAppSlot(input: {
   timeLabel: string
   timezone?: string | null
 }) {
+  const resolution = await resolveExactWhatsAppSlot(input)
+  return resolution.slot
+}
+
+export async function resolveExactWhatsAppSlot(input: {
+  barbershopId: string
+  serviceId: string
+  professionalId: string
+  dateIso: string
+  timeLabel: string
+  timezone?: string | null
+}): Promise<WhatsAppExactSlotResolution> {
   try {
     const availability = await getAvailableWhatsAppSlots({
       barbershopId: input.barbershopId,
@@ -505,14 +820,18 @@ export async function findExactAvailableWhatsAppSlot(input: {
       limit: 8,
     })
 
-    return availability.slots.find((slot) => (
-      slot.professionalId === input.professionalId
-      && slot.dateIso === input.dateIso
-      && slot.timeLabel === input.timeLabel
-    )) ?? null
+    return {
+      slot: availability.slots.find((slot) => (
+        slot.professionalId === input.professionalId
+        && slot.dateIso === input.dateIso
+        && slot.timeLabel === input.timeLabel
+      )) ?? null,
+      suggestedSlots: availability.suggestedSlots,
+      diagnostics: availability.diagnostics,
+    }
   } catch (error) {
     if (isTransientAvailabilityDbError(error)) {
-      throw new AvailabilityInfrastructureError('find_exact_available_whatsapp_slot', error)
+      throw new AvailabilityInfrastructureError('resolve_exact_whatsapp_slot', error)
     }
 
     throw error
@@ -730,5 +1049,6 @@ export function resolveWhatsAppAppointmentStartAt(input: {
 
 export const __testing = {
   dedupeWhatsAppSlots,
+  buildRequestedSlotDiagnostic,
   resolveWhatsAppAppointmentStartAt,
 }
