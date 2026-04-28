@@ -381,6 +381,27 @@ test('copy de barbeiro no fluxo legado nao usa markdown com dois asteriscos', ()
   assert.doesNotMatch(reply, /\*\*.+\*\*/)
 })
 
+test('explica por que o barbeiro foi sugerido no fluxo legado sem perder o contexto', () => {
+  const draft = conversationTesting.buildEmptyConversationDraft()
+  draft.selectedServiceId = 'svc-pigmentacao'
+  draft.selectedServiceName = 'Pigmentacao Natural'
+  draft.selectedProfessionalId = 'pro-lucas'
+  draft.selectedProfessionalName = 'Lucas Ribeiro'
+  draft.professionalSelectionReason = 'only_available_professional'
+  draft.requestedDateIso = '2026-05-01'
+  draft.requestedTimeLabel = '12:00'
+
+  const reply = conversationTesting.buildProfessionalSelectionExplanationReply({
+    draft,
+    timezone: 'America/Sao_Paulo',
+  })
+
+  assert.equal(conversationTesting.isProfessionalSelectionWhyQuestion('por que com Lucas?'), true)
+  assert.match(reply, /12:00/)
+  assert.match(reply, /Lucas Ribeiro/)
+  assert.match(reply, /apenas o Lucas Ribeiro esta disponivel/i)
+})
+
 test('correcao de servico no fluxo legado preserva horario preferido e limpa slots antigos', () => {
   const draft = conversationTesting.buildEmptyConversationDraft()
   draft.selectedServiceId = 'svc-classic'
@@ -398,6 +419,21 @@ test('correcao de servico no fluxo legado preserva horario preferido e limpa slo
   assert.equal(draft.requestedTimeLabel, '19:00')
   assert.equal(draft.offeredSlots.length, 0)
   assert.equal(draft.selectedStoredSlot, null)
+})
+
+test('correcao de barbeiro limpa o motivo anterior da selecao no fluxo legado', () => {
+  const draft = conversationTesting.buildEmptyConversationDraft()
+  draft.selectedProfessionalId = 'pro-lucas'
+  draft.selectedProfessionalName = 'Lucas Ribeiro'
+  draft.professionalSelectionReason = 'recent_booking_professional'
+  draft.requestedTimeLabel = '12:00'
+
+  conversationTesting.applyCorrectionTarget(draft, 'PROFESSIONAL')
+
+  assert.equal(draft.selectedProfessionalId, null)
+  assert.equal(draft.selectedProfessionalName, null)
+  assert.equal(draft.professionalSelectionReason, null)
+  assert.equal(draft.requestedTimeLabel, '12:00')
 })
 
 test('contagem de opcoes prioriza servico pendente, depois barbeiro e por fim horarios', () => {

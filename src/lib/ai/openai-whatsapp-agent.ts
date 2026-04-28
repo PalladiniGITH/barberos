@@ -36,6 +36,12 @@ import {
   findServiceCandidates,
   pickNamedOptionBySelection,
 } from '@/lib/whatsapp-option-resolution'
+import {
+  buildProfessionalSelectionExplanation,
+  isProfessionalSelectionWhyQuestion,
+  parseProfessionalSelectionReason,
+  type ProfessionalSelectionReason,
+} from '@/lib/whatsapp-professional-selection'
 
 const DEFAULT_OPENAI_MODEL = 'gpt-4.1-mini'
 const DEFAULT_TIMEOUT_MS = 20000
@@ -105,6 +111,7 @@ interface WorkingMemory {
   selectedServiceName: string | null
   selectedProfessionalId: string | null
   selectedProfessionalName: string | null
+  professionalSelectionReason: ProfessionalSelectionReason | null
   allowAnyProfessional: boolean
   requestedDateIso: string | null
   requestedTimeLabel: string | null
@@ -172,6 +179,7 @@ export interface WhatsAppAgentInput {
     phone?: string | null
     preferredProfessionalId?: string | null
     preferredProfessionalName?: string | null
+    preferredProfessionalReason?: ProfessionalSelectionReason | null
   }
   inboundText: string
   rawMessages?: string[]
@@ -568,6 +576,13 @@ function buildInitialMemory(input: WhatsAppAgentInput): WorkingMemory {
     selectedServiceName: input.conversation.selectedServiceName,
     selectedProfessionalId: input.conversation.selectedProfessionalId,
     selectedProfessionalName: input.conversation.selectedProfessionalName,
+    professionalSelectionReason: parseProfessionalSelectionReason(
+      input.conversation.bookingDraft
+      && typeof input.conversation.bookingDraft === 'object'
+      && !Array.isArray(input.conversation.bookingDraft)
+        ? (input.conversation.bookingDraft as Record<string, unknown>).professionalSelectionReason
+        : null
+    ),
     allowAnyProfessional: input.conversation.allowAnyProfessional,
     requestedDateIso: input.conversation.requestedDate ? formatDateIso(input.conversation.requestedDate) : null,
     requestedTimeLabel: input.conversation.requestedTimeLabel,
@@ -610,6 +625,7 @@ function hasUsefulProgressInMemory(memory: WorkingMemory) {
   return Boolean(
     memory.selectedServiceId
     || memory.selectedProfessionalId
+    || memory.professionalSelectionReason
     || memory.allowAnyProfessional
     || memory.requestedDateIso
     || memory.requestedTimeLabel
@@ -1667,6 +1683,28 @@ function buildConfirmationReminderMessage() {
   return 'Para confirmar, me responda: pode marcar.'
 }
 
+function buildProfessionalSelectionExplanationReply(input: {
+  memory: WorkingMemory
+  timezone?: string | null
+}) {
+  const professionalName =
+    input.memory.selectedProfessionalName
+    ?? input.memory.selectedSlot?.professionalName
+    ?? null
+
+  if (!professionalName) {
+    return null
+  }
+
+  return buildProfessionalSelectionExplanation({
+    professionalName,
+    reason: input.memory.professionalSelectionReason,
+    requestedDateIso: input.memory.selectedSlot?.dateIso ?? input.memory.requestedDateIso,
+    requestedTimeLabel: input.memory.selectedSlot?.timeLabel ?? input.memory.requestedTimeLabel,
+    timezone: input.timezone ?? 'America/Sao_Paulo',
+  })
+}
+
 function formatExplicitResolvedDateLabel(dateIso: string, timezone: string) {
   return buildDateAnchorUtc(dateIso).toLocaleDateString('pt-BR', {
     timeZone: timezone,
@@ -1810,12 +1848,35 @@ function assignPreferredProfessionalToMemory(input: {
   memory: WorkingMemory
   preferredProfessionalId: string
   preferredProfessionalName: string
+  reason?: ProfessionalSelectionReason | null
 }) {
   input.memory.allowAnyProfessional = false
   input.memory.selectedProfessionalId = input.preferredProfessionalId
   input.memory.selectedProfessionalName = input.preferredProfessionalName
+  input.memory.professionalSelectionReason = input.reason ?? 'customer_preferred_professional'
   clearPendingProfessionalOptions(input.memory)
   clearPromotedAvailability(input.memory)
+}
+
+function selectProfessionalInMemory(input: {
+  memory: WorkingMemory
+  professionalId: string
+  professionalName: string
+  reason: ProfessionalSelectionReason
+}) {
+  input.memory.allowAnyProfessional = false
+  input.memory.selectedProfessionalId = input.professionalId
+  input.memory.selectedProfessionalName = input.professionalName
+  input.memory.professionalSelectionReason = input.reason
+  clearPendingProfessionalOptions(input.memory)
+}
+
+function selectAnyProfessionalInMemory(memory: WorkingMemory) {
+  memory.allowAnyProfessional = true
+  memory.selectedProfessionalId = null
+  memory.selectedProfessionalName = null
+  memory.professionalSelectionReason = 'any_professional_requested'
+  clearPendingProfessionalOptions(memory)
 }
 
 function buildBookingDraft(memory: WorkingMemory) {
@@ -1824,6 +1885,7 @@ function buildBookingDraft(memory: WorkingMemory) {
     selectedServiceName: memory.selectedServiceName,
     selectedProfessionalId: memory.selectedProfessionalId,
     selectedProfessionalName: memory.selectedProfessionalName,
+    professionalSelectionReason: memory.professionalSelectionReason,
     allowAnyProfessional: memory.allowAnyProfessional,
     requestedDateIso: memory.requestedDateIso,
     requestedTimeLabel: memory.requestedTimeLabel,
@@ -1909,6 +1971,7 @@ function resetWorkingMemory(memory: WorkingMemory) {
   memory.selectedServiceName = null
   memory.selectedProfessionalId = null
   memory.selectedProfessionalName = null
+  memory.professionalSelectionReason = null
   memory.allowAnyProfessional = false
   memory.requestedDateIso = null
   memory.requestedTimeLabel = null
@@ -2025,6 +2088,7 @@ function applyCorrectionTargetToMemory(memory: WorkingMemory, correctionTarget: 
   if (correctionTarget === 'PROFESSIONAL') {
     memory.selectedProfessionalId = null
     memory.selectedProfessionalName = null
+    memory.professionalSelectionReason = null
     memory.allowAnyProfessional = false
     clearPendingProfessionalOptions(memory)
     clearPromotedAvailability(memory)
@@ -2169,22 +2233,23 @@ function promoteIntentContextToMemory(input: {
   })
 
   if (intent.allowAnyProfessional || selectedAnyProfessionalByOption) {
-    memory.allowAnyProfessional = true
-    memory.selectedProfessionalId = null
-    memory.selectedProfessionalName = null
-    clearPendingProfessionalOptions(memory)
+    selectAnyProfessionalInMemory(memory)
   } else if (selectedPendingProfessional) {
-    memory.allowAnyProfessional = false
-    memory.selectedProfessionalId = selectedPendingProfessional.id
-    memory.selectedProfessionalName = selectedPendingProfessional.name
-    clearPendingProfessionalOptions(memory)
+    selectProfessionalInMemory({
+      memory,
+      professionalId: selectedPendingProfessional.id,
+      professionalName: selectedPendingProfessional.name,
+      reason: 'explicit_customer_choice',
+    })
   } else if (intent.mentionedName) {
     const professionalCandidates = findProfessionalCandidates(professionals, intent.mentionedName)
     if (professionalCandidates.length === 1) {
-      memory.allowAnyProfessional = false
-      memory.selectedProfessionalId = professionalCandidates[0].id
-      memory.selectedProfessionalName = professionalCandidates[0].name
-      clearPendingProfessionalOptions(memory)
+      selectProfessionalInMemory({
+        memory,
+        professionalId: professionalCandidates[0].id,
+        professionalName: professionalCandidates[0].name,
+        reason: 'explicit_customer_choice',
+      })
     }
   }
 
@@ -3002,6 +3067,7 @@ async function executeAgentTool(input: {
 
     let professionalId = typeof args.professionalId === 'string' ? args.professionalId : memory.selectedProfessionalId
     let professionalName = typeof args.professionalName === 'string' ? args.professionalName : memory.selectedProfessionalName
+    let professionalSelectionReason = memory.professionalSelectionReason
     const allowAnyProfessional = Boolean(
       memory.allowAnyProfessional
       || (
@@ -3016,6 +3082,7 @@ async function executeAgentTool(input: {
       if (candidates.length === 1) {
         professionalId = candidates[0].id
         professionalName = candidates[0].name
+        professionalSelectionReason = 'explicit_customer_choice'
       }
     }
 
@@ -3053,10 +3120,21 @@ async function executeAgentTool(input: {
         if (professionalOptions.length === 1) {
           professionalId = professionalOptions[0].id
           professionalName = professionalOptions[0].name
+          professionalSelectionReason = 'only_available_professional'
           clearPendingProfessionalOptions(memory)
         } else if (professionalOptions.length > 1) {
           memory.pendingProfessionalOptions = professionalOptions
           clearPromotedAvailability(memory)
+          console.info('[whatsapp-professional-selection] automatic selection blocked', {
+            customerId: agentInput.customer.id,
+            conversationId: agentInput.conversation.id,
+            barbershopId: agentInput.barbershop.id,
+            serviceId: service.id,
+            requestedDateIso: dateIso,
+            requestedTimeLabel: exactTime,
+            selectionReason: 'multiple_available_professionals',
+            professionals: professionalOptions.map((option) => option.name),
+          })
           return {
             status: 'error',
             reason: 'professional_choice_required',
@@ -3179,18 +3257,20 @@ async function executeAgentTool(input: {
     memory.offeredSlots = availability.slots
 
     if (allowAnyProfessional) {
-      memory.allowAnyProfessional = true
-      memory.selectedProfessionalId = null
-      memory.selectedProfessionalName = null
-      clearPendingProfessionalOptions(memory)
+      selectAnyProfessionalInMemory(memory)
     } else if (professionalId) {
-      memory.allowAnyProfessional = false
-      memory.selectedProfessionalId = professionalId
-      memory.selectedProfessionalName =
+      const resolvedProfessionalName =
         professionalName
         ?? agentInput.professionals.find((professional) => professional.id === professionalId)?.name
         ?? null
-      clearPendingProfessionalOptions(memory)
+      if (resolvedProfessionalName) {
+        selectProfessionalInMemory({
+          memory,
+          professionalId,
+          professionalName: resolvedProfessionalName,
+          reason: professionalSelectionReason ?? 'explicit_customer_choice',
+        })
+      }
     }
 
     if (exactTime && availability.slots.length === 0 && availability.diagnostics.finalReason === 'exact_time_unavailable') {
@@ -3265,10 +3345,7 @@ async function executeAgentTool(input: {
     )
 
     if (allowAnyProfessional) {
-      memory.allowAnyProfessional = true
-      memory.selectedProfessionalId = null
-      memory.selectedProfessionalName = null
-      clearPendingProfessionalOptions(memory)
+      selectAnyProfessionalInMemory(memory)
     } else {
       const professionalId = typeof args.professionalId === 'string' ? args.professionalId : null
       const professionalName = typeof args.professionalName === 'string' ? args.professionalName : null
@@ -3277,10 +3354,12 @@ async function executeAgentTool(input: {
         : (professionalName ? findProfessionalCandidates(agentInput.professionals, professionalName) : [])
 
       if (candidates.length === 1) {
-        memory.allowAnyProfessional = false
-        memory.selectedProfessionalId = candidates[0].id
-        memory.selectedProfessionalName = candidates[0].name
-        clearPendingProfessionalOptions(memory)
+        selectProfessionalInMemory({
+          memory,
+          professionalId: candidates[0].id,
+          professionalName: candidates[0].name,
+          reason: 'explicit_customer_choice',
+        })
       }
     }
 
@@ -3448,11 +3527,13 @@ async function executeAgentTool(input: {
 
         const professionalOptions = buildNamedProfessionalOptionsFromSlots(exactAvailability.slots).slice(0, 4)
         if (professionalOptions.length === 1) {
-          memory.selectedProfessionalId = professionalOptions[0].id
-          memory.selectedProfessionalName = professionalOptions[0].name
-          memory.allowAnyProfessional = false
+          selectProfessionalInMemory({
+            memory,
+            professionalId: professionalOptions[0].id,
+            professionalName: professionalOptions[0].name,
+            reason: 'only_available_professional',
+          })
           memory.selectedSlot = exactAvailability.slots[0] ?? null
-          clearPendingProfessionalOptions(memory)
 
           return {
             status: 'ok',
@@ -3464,6 +3545,16 @@ async function executeAgentTool(input: {
         if (professionalOptions.length > 1) {
           memory.pendingProfessionalOptions = professionalOptions
           clearPromotedAvailability(memory)
+          console.info('[whatsapp-professional-selection] automatic selection blocked', {
+            customerId: agentInput.customer.id,
+            conversationId: agentInput.conversation.id,
+            barbershopId: agentInput.barbershop.id,
+            serviceId: memory.selectedServiceId,
+            requestedDateIso: memory.requestedDateIso,
+            requestedTimeLabel: args.requestedTime,
+            selectionReason: 'multiple_available_professionals',
+            professionals: professionalOptions.map((option) => option.name),
+          })
         } else if (exactAvailability.diagnostics.finalReason === 'exact_time_unavailable') {
           replacePromotedAvailabilityWithAlternatives({
             memory,
@@ -3694,15 +3785,27 @@ async function executeAgentTool(input: {
 
         const professionalOptions = buildNamedProfessionalOptionsFromSlots(exactAvailability.slots).slice(0, 4)
         if (professionalOptions.length === 1) {
-          memory.selectedProfessionalId = professionalOptions[0].id
-          memory.selectedProfessionalName = professionalOptions[0].name
-          memory.allowAnyProfessional = false
+          selectProfessionalInMemory({
+            memory,
+            professionalId: professionalOptions[0].id,
+            professionalName: professionalOptions[0].name,
+            reason: 'only_available_professional',
+          })
           memory.selectedSlot = exactAvailability.slots[0] ?? null
-          clearPendingProfessionalOptions(memory)
         } else
         if (professionalOptions.length > 1) {
           memory.pendingProfessionalOptions = professionalOptions
           clearPromotedAvailability(memory)
+          console.info('[whatsapp-professional-selection] automatic selection blocked', {
+            customerId: agentInput.customer.id,
+            conversationId: agentInput.conversation.id,
+            barbershopId: agentInput.barbershop.id,
+            serviceId: memory.selectedServiceId,
+            requestedDateIso: memory.requestedDateIso,
+            requestedTimeLabel: requestedTime,
+            selectionReason: 'multiple_available_professionals',
+            professionals: professionalOptions.map((option) => option.name),
+          })
           return {
             status: 'error',
             reason: 'professional_choice_required',
@@ -3813,10 +3916,70 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     requestedDateIso: memory.requestedDateIso,
     requestedTimeLabel: memory.requestedTimeLabel,
   } satisfies PromotedSchedulingSnapshot
+  const professionalBeforeTurn = {
+    selectedProfessionalId: memory.selectedProfessionalId,
+    selectedProfessionalName: memory.selectedProfessionalName,
+    professionalSelectionReason: memory.professionalSelectionReason,
+  }
   const recentMessages = await loadRecentMessages({
     barbershopId: input.barbershop.id,
     customerId: input.customer.id,
   })
+
+  if (
+    memory.state === 'WAITING_CONFIRMATION'
+    && isProfessionalSelectionWhyQuestion(input.inboundText)
+    && (memory.selectedProfessionalName || memory.selectedSlot?.professionalName)
+  ) {
+    const responseText = buildProfessionalSelectionExplanationReply({
+      memory,
+      timezone: input.barbershop.timezone,
+    })
+
+    if (responseText) {
+      console.info('[whatsapp-professional-selection] customer asked why', {
+        customerId: input.customer.id,
+        conversationId: input.conversation.id,
+        barbershopId: input.barbershop.id,
+        serviceId: memory.selectedServiceId,
+        requestedDateIso: memory.requestedDateIso,
+        requestedTimeLabel: memory.requestedTimeLabel,
+        selectedProfessionalId: memory.selectedProfessionalId ?? memory.selectedSlot?.professionalId ?? null,
+        selectionReason: memory.professionalSelectionReason,
+      })
+
+      memory.conversationSummary = buildRuntimeSummary(memory)
+
+      console.info('[whatsapp-professional-selection] explanation sent', {
+        customerId: input.customer.id,
+        conversationId: input.conversation.id,
+        selectedProfessionalId: memory.selectedProfessionalId ?? memory.selectedSlot?.professionalId ?? null,
+        selectionReason: memory.professionalSelectionReason,
+      })
+
+      return {
+        responseText,
+        flow: 'await_confirmation',
+        conversationState: 'WAITING_CONFIRMATION',
+        shouldCreateAppointment: false,
+        memory,
+        structured: {
+          intent: 'UNKNOWN',
+          correctionTarget: 'NONE',
+          mentionedName: memory.selectedProfessionalName ?? memory.selectedSlot?.professionalName ?? null,
+          preferredPeriod: null,
+          requestedDate: memory.requestedDateIso,
+          requestedTime: memory.selectedSlot?.timeLabel ?? memory.requestedTimeLabel,
+          confidence: 0.99,
+          nextAction: 'ASK_CONFIRMATION',
+          replyText: responseText,
+          summary: memory.conversationSummary,
+        },
+        toolTrace: [],
+        usedAI: false,
+      }
+    }
+  }
 
   const canUseImmediateDeterministicConfirmation =
     shouldUseDeterministicConfirmationShortcut({
@@ -3901,6 +4064,25 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     requestedTimeAfterPromotion: memory.requestedTimeLabel,
   })
 
+  if (
+    professionalBeforeTurn.selectedProfessionalId !== memory.selectedProfessionalId
+    || professionalBeforeTurn.professionalSelectionReason !== memory.professionalSelectionReason
+  ) {
+    console.info('[whatsapp-professional-selection] customer requested change', {
+      customerId: input.customer.id,
+      conversationId: input.conversation.id,
+      barbershopId: input.barbershop.id,
+      serviceId: memory.selectedServiceId,
+      requestedDateIso: memory.requestedDateIso,
+      requestedTimeLabel: memory.requestedTimeLabel,
+      selectedProfessionalId: memory.selectedProfessionalId,
+      selectedProfessionalName: memory.selectedProfessionalName,
+      selectionReason: memory.professionalSelectionReason,
+      previousProfessionalId: professionalBeforeTurn.selectedProfessionalId,
+      previousProfessionalName: professionalBeforeTurn.selectedProfessionalName,
+    })
+  }
+
   if (hasBroadPeriodSchedulingFilter(memory.requestedTimeLabel) && (
     fallbackIntent.preferredPeriod
     || (fallbackIntent.timePreference && fallbackIntent.timePreference !== 'NONE' && fallbackIntent.timePreference !== 'EXACT')
@@ -3940,6 +4122,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
       memory,
       preferredProfessionalId: input.customer.preferredProfessionalId,
       preferredProfessionalName: input.customer.preferredProfessionalName,
+      reason: input.customer.preferredProfessionalReason ?? 'customer_preferred_professional',
     })
   }
 
@@ -4549,4 +4732,6 @@ export const __testing = {
   pickPresentedOfferedSlot,
   resolveAuthoritativeRequestedDateIso,
   shouldUseDeterministicScheduleReply,
+  isProfessionalSelectionWhyQuestion,
+  buildProfessionalSelectionExplanationReply,
 }

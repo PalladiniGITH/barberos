@@ -77,6 +77,13 @@ import {
   findServiceCandidates,
   pickNamedOptionBySelection,
 } from '@/lib/whatsapp-option-resolution'
+import {
+  buildProfessionalSelectionExplanation,
+  inferProfessionalSelectionReasonFromContextualSource,
+  isProfessionalSelectionWhyQuestion,
+  parseProfessionalSelectionReason,
+  type ProfessionalSelectionReason,
+} from '@/lib/whatsapp-professional-selection'
 
 type ConversationState =
   | 'IDLE'
@@ -154,6 +161,7 @@ interface ConversationDraft {
   selectedServiceName: string | null
   selectedProfessionalId: string | null
   selectedProfessionalName: string | null
+  professionalSelectionReason: ProfessionalSelectionReason | null
   allowAnyProfessional: boolean
   requestedDateIso: string | null
   requestedTimeLabel: string | null
@@ -385,6 +393,7 @@ function buildEmptyConversationDraft(): ConversationDraft {
     selectedServiceName: null,
     selectedProfessionalId: null,
     selectedProfessionalName: null,
+    professionalSelectionReason: null,
     allowAnyProfessional: false,
     requestedDateIso: null,
     requestedTimeLabel: null,
@@ -399,6 +408,7 @@ function hasUsefulConversationProgress(draft: ConversationDraft) {
   return Boolean(
     draft.selectedServiceId
     || draft.selectedProfessionalId
+    || draft.professionalSelectionReason
     || draft.allowAnyProfessional
     || draft.requestedDateIso
     || draft.requestedTimeLabel
@@ -443,12 +453,22 @@ function parseDraftNamedOptions(
     .slice(0, 6)
 }
 
+function parseDraftProfessionalSelectionReason(raw: Prisma.JsonValue | null) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return null
+  }
+
+  const draft = raw as Record<string, unknown>
+  return parseProfessionalSelectionReason(draft.professionalSelectionReason)
+}
+
 function buildSchedulingDraftPayload(draft: ConversationDraft) {
   return {
     selectedServiceId: draft.selectedServiceId,
     selectedServiceName: draft.selectedServiceName,
     selectedProfessionalId: draft.selectedProfessionalId,
     selectedProfessionalName: draft.selectedProfessionalName,
+    professionalSelectionReason: draft.professionalSelectionReason,
     allowAnyProfessional: draft.allowAnyProfessional,
     requestedDateIso: draft.requestedDateIso,
     requestedTimeLabel: draft.requestedTimeLabel,
@@ -923,6 +943,28 @@ function buildProfessionalQuestion(
     : `${baseLead}\n\n`
 
   return `${lead}${lines.join('\n')}\n\nSe quiser, tambem pode responder com o nome do barbeiro.`
+}
+
+function buildProfessionalSelectionExplanationReply(input: {
+  draft: ConversationDraft
+  timezone: string
+}) {
+  const professionalName =
+    input.draft.selectedProfessionalName
+    ?? input.draft.selectedStoredSlot?.professionalName
+    ?? null
+
+  if (!professionalName) {
+    return null
+  }
+
+  return buildProfessionalSelectionExplanation({
+    professionalName,
+    reason: input.draft.professionalSelectionReason,
+    requestedDateIso: input.draft.selectedStoredSlot?.dateIso ?? input.draft.requestedDateIso,
+    requestedTimeLabel: input.draft.selectedStoredSlot?.timeLabel ?? input.draft.requestedTimeLabel,
+    timezone: input.timezone,
+  })
 }
 
 function getActiveSelectableOptionCount(draft: ConversationDraft) {
@@ -1915,6 +1957,7 @@ function applyCorrectionTarget(draft: ConversationDraft, target: string) {
     draft.selectedServiceName = null
     draft.selectedProfessionalId = null
     draft.selectedProfessionalName = null
+    draft.professionalSelectionReason = null
     draft.allowAnyProfessional = false
     draft.requestedDateIso = null
     draft.requestedTimeLabel = null
@@ -1936,6 +1979,7 @@ function applyCorrectionTarget(draft: ConversationDraft, target: string) {
   if (target === 'PROFESSIONAL') {
     draft.selectedProfessionalId = null
     draft.selectedProfessionalName = null
+    draft.professionalSelectionReason = null
     draft.allowAnyProfessional = false
     draft.pendingProfessionalOptions = []
     clearDraftAvailability(draft)
@@ -3579,6 +3623,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     selectedServiceName: conversation.selectedServiceName ?? null,
     selectedProfessionalId: conversation.selectedProfessionalId ?? null,
     selectedProfessionalName: conversation.selectedProfessionalName ?? null,
+    professionalSelectionReason: parseDraftProfessionalSelectionReason(conversation.bookingDraft),
     allowAnyProfessional: conversation.allowAnyProfessional,
     requestedDateIso: conversationRequestedDateIso,
     requestedTimeLabel: conversation.requestedTimeLabel ?? null,
@@ -4043,9 +4088,12 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
             selectedServiceName: draftForInterpreter.selectedServiceName,
             selectedProfessionalId: draftForInterpreter.selectedProfessionalId,
             selectedProfessionalName: draftForInterpreter.selectedProfessionalName,
+            professionalSelectionReason: draftForInterpreter.professionalSelectionReason,
             allowAnyProfessional: draftForInterpreter.allowAnyProfessional,
             requestedDateIso: draftForInterpreter.requestedDateIso,
             requestedTimeLabel: draftForInterpreter.requestedTimeLabel,
+            pendingServiceOptions: draftForInterpreter.pendingServiceOptions,
+            pendingProfessionalOptions: draftForInterpreter.pendingProfessionalOptions,
           }),
           lastInboundText: inboundText,
           lastIntent: buildJsonValue({
@@ -4159,10 +4207,13 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
             selectedServiceName: draftForInterpreter.selectedServiceName,
             selectedProfessionalId: confirmedSlot.professionalId,
             selectedProfessionalName: confirmedSlot.professionalName,
+            professionalSelectionReason: draftForInterpreter.professionalSelectionReason ?? 'only_available_professional',
             allowAnyProfessional: false,
             requestedDateIso: confirmedSlot.dateIso,
             requestedTimeLabel: confirmedSlot.timeLabel,
             selectedSlot: confirmedSlot,
+            pendingServiceOptions: draftForInterpreter.pendingServiceOptions,
+            pendingProfessionalOptions: draftForInterpreter.pendingProfessionalOptions,
           }),
           lastInboundText: inboundText,
           lastIntent: buildJsonValue({
@@ -4202,6 +4253,75 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       nowDateIso: nowContext.dateIso,
       previousQuery: previousBookingStatusQuery,
     })
+  }
+
+  if (
+    effectiveState === 'WAITING_CONFIRMATION'
+    && isProfessionalSelectionWhyQuestion(inboundText)
+    && (draftForInterpreter.selectedProfessionalName || draftForInterpreter.selectedStoredSlot?.professionalName)
+  ) {
+    const responseText = buildProfessionalSelectionExplanationReply({
+      draft: draftForInterpreter,
+      timezone,
+    })
+
+    if (responseText) {
+      console.info('[whatsapp-professional-selection] customer asked why', {
+        conversationId: conversation.id,
+        customerId: input.customer.id,
+        barbershopId: input.barbershop.id,
+        serviceId: draftForInterpreter.selectedServiceId,
+        requestedDateIso: draftForInterpreter.requestedDateIso,
+        requestedTimeLabel: draftForInterpreter.requestedTimeLabel,
+        selectedProfessionalId: draftForInterpreter.selectedProfessionalId ?? draftForInterpreter.selectedStoredSlot?.professionalId ?? null,
+        selectionReason: draftForInterpreter.professionalSelectionReason,
+      })
+
+      await prisma.whatsappConversation.update({
+        where: { id: conversation.id },
+        data: {
+          state: 'WAITING_CONFIRMATION',
+          selectedServiceId: draftForInterpreter.selectedServiceId,
+          selectedServiceName: draftForInterpreter.selectedServiceName,
+          selectedProfessionalId: draftForInterpreter.selectedProfessionalId,
+          selectedProfessionalName: draftForInterpreter.selectedProfessionalName,
+          allowAnyProfessional: draftForInterpreter.allowAnyProfessional,
+          requestedDate: draftForInterpreter.requestedDateIso
+            ? buildDateAnchorUtc(draftForInterpreter.requestedDateIso)
+            : null,
+          requestedTimeLabel: draftForInterpreter.requestedTimeLabel,
+          slotOptions: draftForInterpreter.offeredSlots.length
+            ? buildJsonValue(draftForInterpreter.offeredSlots)
+            : JSON_NULL,
+          selectedSlot: draftForInterpreter.selectedStoredSlot
+            ? buildJsonValue(draftForInterpreter.selectedStoredSlot)
+            : JSON_NULL,
+          bookingDraft: buildJsonValue(buildSchedulingDraftPayload(draftForInterpreter)),
+          lastInboundText: inboundText,
+          lastIntent: buildJsonValue({
+            source: 'professional_selection_explanation',
+            intent: 'UNKNOWN',
+            selectionReason: draftForInterpreter.professionalSelectionReason,
+          }),
+          lastAssistantText: responseText,
+        },
+      })
+
+      console.info('[whatsapp-professional-selection] explanation sent', {
+        conversationId: conversation.id,
+        customerId: input.customer.id,
+        selectedProfessionalId: draftForInterpreter.selectedProfessionalId ?? draftForInterpreter.selectedStoredSlot?.professionalId ?? null,
+        selectionReason: draftForInterpreter.professionalSelectionReason,
+      })
+
+      return {
+        responseText,
+        flow: 'await_confirmation',
+        conversationId: conversation.id,
+        conversationState: 'WAITING_CONFIRMATION',
+        usedAI: false,
+      }
+    }
   }
 
   if (isAcknowledgementMessage(inboundText)) {
@@ -4270,6 +4390,9 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       ...input.customer,
       preferredProfessionalId: contextualProfessionalPreference?.professionalId ?? null,
       preferredProfessionalName: contextualProfessionalPreference?.professionalName ?? null,
+      preferredProfessionalReason: inferProfessionalSelectionReasonFromContextualSource(
+        contextualProfessionalPreference?.source ?? null
+      ),
     },
     inboundText,
     rawMessages: input.rawMessages,
@@ -4309,6 +4432,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       selectedServiceName: agentResult.memory.selectedServiceName,
       selectedProfessionalId: agentResult.memory.selectedProfessionalId,
       selectedProfessionalName: agentResult.memory.selectedProfessionalName,
+      professionalSelectionReason: agentResult.memory.professionalSelectionReason,
       allowAnyProfessional: agentResult.memory.allowAnyProfessional,
       requestedDateIso: agentResult.memory.requestedDateIso,
       requestedTimeLabel: agentResult.memory.requestedTimeLabel,
@@ -4518,10 +4642,13 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
               selectedServiceName: agentResult.memory.selectedServiceName,
               selectedProfessionalId: agentResult.memory.selectedProfessionalId,
               selectedProfessionalName: agentResult.memory.selectedProfessionalName,
+              professionalSelectionReason: agentResult.memory.professionalSelectionReason,
               allowAnyProfessional: agentResult.memory.allowAnyProfessional,
               requestedDateIso: agentResult.memory.requestedDateIso,
               requestedTimeLabel: agentResult.memory.requestedTimeLabel,
               selectedSlot: agentResult.memory.selectedSlot,
+              pendingServiceOptions: agentResult.memory.pendingServiceOptions,
+              pendingProfessionalOptions: agentResult.memory.pendingProfessionalOptions,
             }),
             recentCorrections: agentResult.memory.recentCorrections.length
               ? buildJsonValue(agentResult.memory.recentCorrections)
@@ -4580,10 +4707,13 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
                 selectedServiceName: agentResult.memory.selectedServiceName,
                 selectedProfessionalId: agentResult.memory.selectedProfessionalId,
                 selectedProfessionalName: agentResult.memory.selectedProfessionalName,
+                professionalSelectionReason: agentResult.memory.professionalSelectionReason,
                 allowAnyProfessional: agentResult.memory.allowAnyProfessional,
                 requestedDateIso: agentResult.memory.requestedDateIso,
                 requestedTimeLabel: agentResult.memory.requestedTimeLabel,
                 selectedSlot: agentResult.memory.selectedSlot,
+                pendingServiceOptions: agentResult.memory.pendingServiceOptions,
+                pendingProfessionalOptions: agentResult.memory.pendingProfessionalOptions,
               })
             : JSON_NULL,
           recentCorrections: agentResult.memory.recentCorrections.length
@@ -4891,11 +5021,13 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   if (nameResolution.action === 'professional' && nameResolution.resolvedProfessional) {
     draft.selectedProfessionalId = nameResolution.resolvedProfessional.id
     draft.selectedProfessionalName = nameResolution.resolvedProfessional.name
+    draft.professionalSelectionReason = 'explicit_customer_choice'
     draft.allowAnyProfessional = false
     draft.pendingProfessionalOptions = []
   } else if (selectedPendingProfessional) {
     draft.selectedProfessionalId = selectedPendingProfessional.id
     draft.selectedProfessionalName = selectedPendingProfessional.name
+    draft.professionalSelectionReason = 'explicit_customer_choice'
     draft.allowAnyProfessional = false
     draft.pendingProfessionalOptions = []
   }
@@ -4907,12 +5039,16 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   ) {
     draft.selectedProfessionalId = contextualProfessionalPreference.professionalId
     draft.selectedProfessionalName = contextualProfessionalPreference.professionalName
+    draft.professionalSelectionReason = inferProfessionalSelectionReasonFromContextualSource(
+      contextualProfessionalPreference.source
+    )
     draft.allowAnyProfessional = false
   }
 
   if (interpreted.allowAnyProfessional || acceptedAlternativeProfessional || selectedAnyProfessionalByOption) {
     draft.selectedProfessionalId = null
     draft.selectedProfessionalName = null
+    draft.professionalSelectionReason = 'any_professional_requested'
     draft.allowAnyProfessional = true
     draft.pendingProfessionalOptions = []
   }
@@ -4980,6 +5116,20 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       professionalBefore: baselineDraft.selectedProfessionalName,
       professionalAfter: draft.selectedProfessionalName,
       correctionTarget: interpreted.correctionTarget,
+    })
+  }
+
+  if (professionalChanged) {
+    console.info('[whatsapp-professional-selection] professional changed', {
+      customerId: input.customer.id,
+      conversationId: conversation.id,
+      barbershopId: input.barbershop.id,
+      serviceId: draft.selectedServiceId,
+      requestedDateIso: draft.requestedDateIso,
+      requestedTimeLabel: draft.requestedTimeLabel,
+      selectedProfessionalId: draft.selectedProfessionalId,
+      selectedProfessionalName: draft.selectedProfessionalName,
+      selectionReason: draft.professionalSelectionReason,
     })
   }
 
@@ -5300,10 +5450,21 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       if (professionalOptions.length === 1) {
         draft.selectedProfessionalId = professionalOptions[0].id
         draft.selectedProfessionalName = professionalOptions[0].name
+        draft.professionalSelectionReason = 'only_available_professional'
         draft.pendingProfessionalOptions = []
       } else if (professionalOptions.length > 1) {
         draft.pendingProfessionalOptions = professionalOptions
         clearDraftAvailability(draft)
+        console.info('[whatsapp-professional-selection] automatic selection blocked', {
+          customerId: input.customer.id,
+          conversationId: conversation.id,
+          barbershopId: input.barbershop.id,
+          serviceId: draft.selectedServiceId,
+          requestedDateIso: draft.requestedDateIso,
+          requestedTimeLabel: requestedExactTimeWithoutProfessional,
+          selectionReason: 'multiple_available_professionals',
+          professionals: professionalOptions.map((professional) => professional.name),
+        })
 
         const responseText = withLeadIn(
           buildProfessionalQuestion(
@@ -5384,6 +5545,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
           ...draft,
           selectedProfessionalId: professionals.length === 1 ? professionals[0].id : draft.selectedProfessionalId,
           selectedProfessionalName: professionals.length === 1 ? professionals[0].name : draft.selectedProfessionalName,
+          professionalSelectionReason: professionals.length === 1 ? 'only_available_professional' : draft.professionalSelectionReason,
           pendingProfessionalOptions: professionals.length === 1 ? [] : draft.pendingProfessionalOptions,
         })),
         slotOptions: JSON_NULL,
@@ -5451,10 +5613,10 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   })
   const professionalIdForExactSearch = draft.allowAnyProfessional
     ? null
-    : draft.selectedProfessionalId ?? contextualProfessionalPreference?.professionalId ?? null
+    : draft.selectedProfessionalId ?? null
   const professionalNameForExactSearch = draft.allowAnyProfessional
     ? null
-    : draft.selectedProfessionalName ?? contextualProfessionalPreference?.professionalName ?? null
+    : draft.selectedProfessionalName ?? null
 
   if (draft.requestedDateIso && detectRelativeDateExpression(inboundText)) {
     console.info('[availability] using requestedDateIso from relative date', {
@@ -5983,6 +6145,7 @@ export const __testing = {
   buildServiceQuestion,
   buildServiceSelectionQuestion,
   buildProfessionalQuestion,
+  buildProfessionalSelectionExplanationReply,
   buildHumanSlotOfferMessage,
   getActiveSelectableOptionCount,
   hasUsefulConversationProgress,
@@ -6003,4 +6166,5 @@ export const __testing = {
   resolveContextualProfessionalPreference,
   resolveConversationRuntimeContext,
   shouldResetConversationOnGreeting,
+  isProfessionalSelectionWhyQuestion,
 }

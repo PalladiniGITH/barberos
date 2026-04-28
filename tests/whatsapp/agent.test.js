@@ -2036,9 +2036,87 @@ test('troca de barbeiro preserva o horario ja escolhido na memoria do agente', (
 
   assert.equal(memory.selectedProfessionalId, 'pro-matheus')
   assert.equal(memory.selectedProfessionalName, 'Matheus')
+  assert.equal(memory.professionalSelectionReason, 'explicit_customer_choice')
   assert.equal(memory.requestedTimeLabel, '09:30')
   assert.equal(memory.selectedSlot, null)
   assert.deepEqual(memory.offeredSlots, [])
+})
+
+test('resposta "tanto faz" grava o motivo para qualquer barbeiro no agente', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.state = 'WAITING_PROFESSIONAL'
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.requestedDateIso = '2026-04-16'
+  memory.pendingProfessionalOptions = PROFESSIONALS.map((professional) => ({
+    id: professional.id,
+    name: professional.name,
+  }))
+
+  agentTesting.promoteIntentContextToMemory({
+    memory,
+    intent: {
+      intent: 'BOOK_APPOINTMENT',
+      correctionTarget: 'NONE',
+      serviceName: null,
+      mentionedName: null,
+      allowAnyProfessional: true,
+      requestedDateIso: null,
+      timePreference: 'NONE',
+      preferredPeriod: null,
+      exactTime: null,
+      selectedOptionNumber: null,
+      confidence: 0.91,
+      greetingOnly: false,
+      restartConversation: false,
+      reasoning: 'any professional requested',
+    },
+    services: SERVICES,
+    professionals: PROFESSIONALS,
+    inboundText: 'tanto faz',
+  })
+
+  assert.equal(memory.allowAnyProfessional, true)
+  assert.equal(memory.selectedProfessionalId, null)
+  assert.equal(memory.professionalSelectionReason, 'any_professional_requested')
+})
+
+test('explica por que o barbeiro foi sugerido quando ele e o unico disponivel', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.state = 'WAITING_CONFIRMATION'
+  memory.selectedServiceId = 'svc-pigmentacao'
+  memory.selectedServiceName = 'Pigmentacao Natural'
+  memory.selectedProfessionalId = 'pro-lucas'
+  memory.selectedProfessionalName = 'Lucas Ribeiro'
+  memory.professionalSelectionReason = 'only_available_professional'
+  memory.requestedDateIso = '2026-05-01'
+  memory.requestedTimeLabel = '12:00'
+
+  const reply = agentTesting.buildProfessionalSelectionExplanationReply({
+    memory,
+    timezone: 'America/Sao_Paulo',
+  })
+
+  assert.equal(agentTesting.isProfessionalSelectionWhyQuestion('por que com Lucas?'), true)
+  assert.match(reply, /12:00/)
+  assert.match(reply, /Lucas Ribeiro/)
+  assert.match(reply, /apenas o Lucas Ribeiro esta disponivel/i)
+})
+
+test('explica por que o barbeiro foi sugerido quando veio do historico', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.state = 'WAITING_CONFIRMATION'
+  memory.selectedProfessionalId = 'pro-lucas'
+  memory.selectedProfessionalName = 'Lucas Ribeiro'
+  memory.professionalSelectionReason = 'recent_booking_professional'
+
+  const reply = agentTesting.buildProfessionalSelectionExplanationReply({
+    memory,
+    timezone: 'America/Sao_Paulo',
+  })
+
+  assert.match(reply, /atendimento mais recente/i)
+  assert.match(reply, /Lucas Ribeiro/)
 })
 
 test('interpreta consulta de agendamento ja confirmado como CHECK_EXISTING_BOOKING', async () => {
