@@ -11,6 +11,9 @@ const AUTOMATION_BOOT_DELAY_MS = 15000
 const AUTOMATION_HEARTBEAT_MS = 60000
 const AUTOMATION_ROUTE_PATH = '/api/internal/campaign-automation/run'
 const AUTOMATION_SECRET_HEADER = 'x-automation-secret'
+const WHATSAPP_APPOINTMENT_CONFIRMATION_BOOT_DELAY_MS = 20000
+const WHATSAPP_APPOINTMENT_CONFIRMATION_HEARTBEAT_MS = 300000
+const WHATSAPP_APPOINTMENT_CONFIRMATION_ROUTE_PATH = '/api/internal/whatsapp-appointment-confirmations/run'
 
 function getMissingEnvVars(names) {
   return names.filter((name) => !process.env[name]?.trim())
@@ -51,6 +54,16 @@ function summarizeCampaignAutomationReasons(summary) {
   }
 
   return reasons
+}
+
+function isWhatsAppAppointmentConfirmationEnabled() {
+  const rawValue = process.env.WHATSAPP_APPOINTMENT_CONFIRMATIONS_ENABLED?.trim()
+
+  if (!rawValue) {
+    return true
+  }
+
+  return rawValue.toLowerCase() === 'true'
 }
 
 function startCampaignAutomationHeartbeat({ host, port }) {
@@ -164,6 +177,94 @@ function startCampaignAutomationHeartbeat({ host, port }) {
   }
 }
 
+function startWhatsAppAppointmentConfirmationHeartbeat({ host, port }) {
+  if (!isWhatsAppAppointmentConfirmationEnabled()) {
+    logBoot('whatsapp_appointment_confirmation_disabled')
+    return () => undefined
+  }
+
+  const sharedSecret = getAutomationRunnerSecret()
+
+  if (!sharedSecret) {
+    logBootError('whatsapp_appointment_confirmation_missing_secret')
+    return () => undefined
+  }
+
+  const baseUrl = getInternalBaseUrl(host, port)
+  let timer = null
+  let stopped = false
+  let inFlight = false
+
+  const tick = async () => {
+    if (stopped || inFlight) {
+      return
+    }
+
+    inFlight = true
+
+    try {
+      const response = await fetch(`${baseUrl}${WHATSAPP_APPOINTMENT_CONFIRMATION_ROUTE_PATH}`, {
+        method: 'POST',
+        headers: {
+          [AUTOMATION_SECRET_HEADER]: sharedSecret,
+        },
+      })
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => '')
+        logBootError('whatsapp_appointment_confirmation_tick_failed', {
+          status: response.status,
+          body: text || response.statusText,
+        })
+        return
+      }
+
+      const payload = await response.json().catch(() => null)
+      const summary = payload?.summary ?? null
+
+      logBoot('whatsapp_appointment_confirmation_tick_completed', {
+        scannedAppointments: summary?.scannedAppointments ?? 0,
+        dueAppointmentsFound: summary?.dueAppointmentsFound ?? 0,
+        sent: summary?.sent ?? 0,
+        skipped: summary?.skipped ?? 0,
+        failed: summary?.failed ?? 0,
+      })
+    } catch (error) {
+      logBootError('whatsapp_appointment_confirmation_tick_error', {
+        message: error instanceof Error ? error.message : String(error),
+      })
+    } finally {
+      inFlight = false
+    }
+  }
+
+  const initialTimer = setTimeout(() => {
+    if (stopped) {
+      return
+    }
+
+    tick().catch(() => undefined)
+    timer = setInterval(() => {
+      tick().catch(() => undefined)
+    }, WHATSAPP_APPOINTMENT_CONFIRMATION_HEARTBEAT_MS)
+  }, WHATSAPP_APPOINTMENT_CONFIRMATION_BOOT_DELAY_MS)
+
+  logBoot('whatsapp_appointment_confirmation_heartbeat_started', {
+    baseUrl,
+    route: WHATSAPP_APPOINTMENT_CONFIRMATION_ROUTE_PATH,
+    bootDelayMs: WHATSAPP_APPOINTMENT_CONFIRMATION_BOOT_DELAY_MS,
+    intervalMs: WHATSAPP_APPOINTMENT_CONFIRMATION_HEARTBEAT_MS,
+  })
+
+  return () => {
+    stopped = true
+    clearTimeout(initialTimer)
+    if (timer) {
+      clearInterval(timer)
+    }
+  }
+}
+
 async function verifyPrismaConnection() {
   const { PrismaClient } = await import('@prisma/client')
   const prisma = new PrismaClient({ log: ['error'] })
@@ -219,6 +320,10 @@ async function main() {
     host,
     port,
   })
+  const stopWhatsAppAppointmentConfirmationHeartbeat = startWhatsAppAppointmentConfirmationHeartbeat({
+    host,
+    port,
+  })
 
   logBoot('next_started', {
     pid: child.pid,
@@ -241,6 +346,7 @@ async function main() {
     }
 
     stopCampaignAutomationHeartbeat()
+    stopWhatsAppAppointmentConfirmationHeartbeat()
   }
 
   process.on('SIGTERM', () => forwardSignal('SIGTERM'))
@@ -260,6 +366,7 @@ async function main() {
 
   child.on('exit', (code, signal) => {
     stopCampaignAutomationHeartbeat()
+    stopWhatsAppAppointmentConfirmationHeartbeat()
     console.warn('[boot] next_exited', { code, signal })
     process.exit(code ?? (signal ? 1 : 0))
   })

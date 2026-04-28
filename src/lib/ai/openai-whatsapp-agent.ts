@@ -18,6 +18,7 @@ import {
   interpretWhatsAppMessage,
 } from '@/lib/ai/openai-whatsapp-interpreter'
 import {
+  buildDateAnchorUtc,
   formatDayLabelFromIsoDate,
   formatWeekdayFromIsoDate,
   getAvailableBusinessPeriodsForDate,
@@ -1548,6 +1549,15 @@ function buildConfirmationReminderMessage() {
   return 'Para confirmar, me responda: pode marcar.'
 }
 
+function formatExplicitResolvedDateLabel(dateIso: string, timezone: string) {
+  return buildDateAnchorUtc(dateIso).toLocaleDateString('pt-BR', {
+    timeZone: timezone,
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+  }).toLowerCase()
+}
+
 function sanitizeReplyTextAgainstProfessionalVocative(input: {
   replyText: string
   customerName: string
@@ -2193,7 +2203,9 @@ function buildGuardrailReplyText(input: {
 
   if (input.nextAction === 'ASK_PROFESSIONAL') {
     if (input.memory.selectedServiceName && input.memory.requestedDateIso) {
-      const intentLead = `Entendi. Voce quer ${input.memory.selectedServiceName} para ${formatDayLabelFromIsoDate(input.memory.requestedDateIso, input.timezone).toLowerCase()}.`
+      const timezone = input.timezone ?? 'America/Sao_Paulo'
+      const requestedDateIso = input.memory.requestedDateIso as string
+      const intentLead = `Entendi. Voce quer ${input.memory.selectedServiceName} para ${formatExplicitResolvedDateLabel(requestedDateIso, timezone)}.`
 
       if (input.preferredProfessionalName) {
         return `${intentLead}\n\nQuer marcar com ${input.preferredProfessionalName} de novo ou prefere outro barbeiro?`
@@ -2219,7 +2231,8 @@ function buildGuardrailReplyText(input: {
     }
 
     if (input.memory.selectedServiceName && input.memory.requestedDateIso) {
-      const dateLabel = formatDayLabelFromIsoDate(input.memory.requestedDateIso, input.timezone).toLowerCase()
+      const timezone = input.timezone ?? 'America/Sao_Paulo'
+      const dateLabel = formatExplicitResolvedDateLabel(input.memory.requestedDateIso, timezone)
       const serviceLead = input.memory.selectedProfessionalName
         ? `Perfeito. Vou considerar ${input.memory.selectedServiceName} para ${dateLabel} com ${input.memory.selectedProfessionalName}.`
         : `Perfeito. Vou considerar ${input.memory.selectedServiceName} para ${dateLabel}.`

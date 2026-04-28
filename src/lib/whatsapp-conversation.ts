@@ -18,6 +18,12 @@ import {
   loadBarbershopSchedulingOptions,
   type WhatsAppBookingSlot,
 } from '@/lib/agendamentos/whatsapp-booking'
+import {
+  cancelAppointmentFromWhatsApp,
+  listFutureCustomerAppointmentsForWhatsApp,
+  rescheduleAppointmentFromWhatsApp,
+  type WhatsAppManagedAppointment,
+} from '@/lib/agendamentos/whatsapp-appointment-operations'
 import { AvailabilityInfrastructureError } from '@/lib/agendamentos/availability'
 import {
   buildExistingCustomerBookingResponse,
@@ -36,6 +42,35 @@ import {
   thisOrNextWeekdayIsoDate,
 } from '@/lib/timezone'
 import { resolveCustomerPreferredProfessional } from '@/lib/customers/preferred-professional'
+import {
+  buildCancellationConfirmationMessage,
+  buildCancellationSelectionMessage,
+  buildCancellationStrictConfirmationMessage,
+  buildEmptyOperationalDraft,
+  buildNoFutureAppointmentMessage,
+  buildReminderResponseClarificationMessage,
+  buildRescheduleConfirmationMessage,
+  buildReschedulePromptMessage,
+  buildRescheduleSelectionMessage,
+  buildRescheduleStrictConfirmationMessage,
+  buildRescheduleSuccessMessage,
+  isCancellationIntentMessage,
+  isExplicitCancellationConfirmationMessage,
+  isExplicitRescheduleConfirmationMessage,
+  isNegativeOperationalResponse,
+  isRescheduleIntentMessage,
+  parseOperationalDraft,
+  parseOperationalSelectionNumber,
+  parseReminderResponseAction,
+  selectOperationalAppointment,
+  type WhatsAppOperationalDraft,
+} from '@/lib/whatsapp-appointment-flow'
+import {
+  confirmAppointmentPresenceFromReminder,
+  findPendingReminderAppointmentForCustomer,
+  markAppointmentReminderResponse,
+  type ReminderAppointmentContext,
+} from '@/lib/whatsapp-appointment-reminders'
 
 type ConversationState =
   | 'IDLE'
@@ -44,6 +79,12 @@ type ConversationState =
   | 'WAITING_DATE'
   | 'WAITING_TIME'
   | 'WAITING_CONFIRMATION'
+  | 'WAITING_CANCEL_SELECTION'
+  | 'WAITING_CANCEL_CONFIRMATION'
+  | 'WAITING_RESCHEDULE_SELECTION'
+  | 'WAITING_RESCHEDULE_TIME'
+  | 'WAITING_RESCHEDULE_CONFIRMATION'
+  | 'WAITING_REMINDER_RESPONSE'
 
 interface ConversationServiceInput {
   barbershop: {
@@ -77,6 +118,7 @@ interface ConversationServiceResult {
     | 'await_confirmation'
     | 'appointment_created'
     | 'reschedule'
+    | 'appointment_cancelled'
   conversationId: string
   conversationState: ConversationState
   appointmentId?: string
@@ -1136,6 +1178,103 @@ function parseSelectedSlot(raw: Prisma.JsonValue | null): ConversationSlot | nul
   return parseConversationSlots(raw ? [raw] : null)[0] ?? null
 }
 
+function isOperationalConversationState(state: ConversationState) {
+  return (
+    state === 'WAITING_CANCEL_SELECTION'
+    || state === 'WAITING_CANCEL_CONFIRMATION'
+    || state === 'WAITING_RESCHEDULE_SELECTION'
+    || state === 'WAITING_RESCHEDULE_TIME'
+    || state === 'WAITING_RESCHEDULE_CONFIRMATION'
+    || state === 'WAITING_REMINDER_RESPONSE'
+  )
+}
+
+function mapReminderAppointmentToManagedAppointment(
+  appointment: ReminderAppointmentContext
+): WhatsAppManagedAppointment {
+  return {
+    id: appointment.id,
+    barbershopId: appointment.barbershopId,
+    customerId: appointment.customerId,
+    serviceId: appointment.serviceId,
+    serviceName: appointment.serviceName,
+    professionalId: appointment.professionalId,
+    professionalName: appointment.professionalName,
+    status: appointment.status,
+    startAtIso: appointment.startAt.toISOString(),
+    endAtIso: appointment.startAt.toISOString(),
+    dateIso: appointment.dateIso,
+    dateLabel: appointment.dateLabel,
+    timeLabel: appointment.timeLabel,
+  }
+}
+
+function buildOperationalLastIntent(input: {
+  source: 'whatsapp_cancel' | 'whatsapp_reschedule' | 'whatsapp_reminder'
+  stage: string
+  draft: WhatsAppOperationalDraft
+}) {
+  return {
+    source: input.source,
+    stage: input.stage,
+    selectedAppointmentId: input.draft.selectedAppointmentId,
+    requestedDateIso: input.draft.requestedDateIso,
+    requestedTimeLabel: input.draft.requestedTimeLabel,
+    selectedProfessionalId: input.draft.selectedProfessionalId,
+    selectedProfessionalName: input.draft.selectedProfessionalName,
+    allowAnyProfessional: input.draft.allowAnyProfessional,
+    offeredSlots: input.draft.offeredSlots.length,
+    hasSelectedSlot: Boolean(input.draft.selectedSlot),
+    triggeredByReminder: input.draft.triggeredByReminder,
+  } satisfies Record<string, unknown>
+}
+
+async function persistOperationalConversationState(input: {
+  conversationId: string
+  inboundText: string
+  responseText: string
+  state: ConversationState
+  draft: WhatsAppOperationalDraft | null
+  source: 'whatsapp_cancel' | 'whatsapp_reschedule' | 'whatsapp_reminder'
+  stage: string
+  completedAt?: Date | null
+  lastIntentExtras?: Record<string, unknown>
+}) {
+  await prisma.whatsappConversation.update({
+    where: { id: input.conversationId },
+    data: {
+      state: input.state,
+      selectedServiceId: null,
+      selectedServiceName: null,
+      selectedProfessionalId: null,
+      selectedProfessionalName: null,
+      allowAnyProfessional: false,
+      requestedDate: null,
+      requestedTimeLabel: null,
+      slotOptions: JSON_NULL,
+      selectedSlot: JSON_NULL,
+      conversationSummary: null,
+      bookingDraft: input.draft ? buildJsonValue(input.draft) : JSON_NULL,
+      recentCorrections: JSON_NULL,
+      lastInboundText: input.inboundText,
+      lastIntent: buildJsonValue({
+        ...(
+          input.draft
+            ? buildOperationalLastIntent({
+                source: input.source,
+                stage: input.stage,
+                draft: input.draft,
+              })
+            : { source: input.source, stage: input.stage }
+        ),
+        ...(input.lastIntentExtras ?? {}),
+      }),
+      lastAssistantText: input.responseText,
+      completedAt: input.completedAt ?? null,
+    },
+  })
+}
+
 function resolveRequestedTimeLabel(input: {
   exactTime: string | null
   timePreference: string
@@ -1184,6 +1323,12 @@ function normalizeConversationState(state: string): ConversationState {
     || state === 'WAITING_DATE'
     || state === 'WAITING_TIME'
     || state === 'WAITING_CONFIRMATION'
+    || state === 'WAITING_CANCEL_SELECTION'
+    || state === 'WAITING_CANCEL_CONFIRMATION'
+    || state === 'WAITING_RESCHEDULE_SELECTION'
+    || state === 'WAITING_RESCHEDULE_TIME'
+    || state === 'WAITING_RESCHEDULE_CONFIRMATION'
+    || state === 'WAITING_REMINDER_RESPONSE'
   ) {
     return state
   }
@@ -1197,6 +1342,9 @@ function getFlowForState(state: ConversationState): ConversationServiceResult['f
   if (state === 'WAITING_DATE') return 'collect_date'
   if (state === 'WAITING_TIME') return 'collect_period'
   if (state === 'WAITING_CONFIRMATION') return 'await_confirmation'
+  if (state === 'WAITING_CANCEL_SELECTION' || state === 'WAITING_CANCEL_CONFIRMATION') return 'booking_status'
+  if (state === 'WAITING_RESCHEDULE_SELECTION' || state === 'WAITING_RESCHEDULE_TIME' || state === 'WAITING_RESCHEDULE_CONFIRMATION') return 'reschedule'
+  if (state === 'WAITING_REMINDER_RESPONSE') return 'booking_status'
   return 'greeting'
 }
 
@@ -1749,6 +1897,1261 @@ function resolveConversationRuntimeContext(input: {
   }
 }
 
+function buildOperationalAbortMessage() {
+  return 'Sem problema. Se quiser ajustar outro horario, e so me chamar por aqui.'
+}
+
+function buildOperationalSelectionClarificationMessage(kind: 'cancel' | 'reschedule') {
+  return kind === 'cancel'
+    ? 'Me diga o numero do agendamento que voce quer cancelar.'
+    : 'Me diga o numero do agendamento que voce quer remarcar.'
+}
+
+function buildReminderConfirmedMessage() {
+  return 'Perfeito, presenca confirmada. Te esperamos no horario combinado.'
+}
+
+function buildReminderNotFoundMessage() {
+  return 'Nao encontrei um horario pendente de confirmacao agora. Se quiser, eu posso verificar seus proximos agendamentos por aqui.'
+}
+
+function buildRescheduleDateTimeClarificationMessage() {
+  return 'Me diga o novo dia e horario desejados, por exemplo: amanha as 15:00.'
+}
+
+function buildRescheduleUnavailableMessage() {
+  return 'Esse horario nao esta mais disponivel. Me diga outro dia ou horario que eu procuro novamente.'
+}
+
+function buildOperationalDraftWithAppointment(input: {
+  kind: 'cancel' | 'reschedule'
+  appointment: WhatsAppManagedAppointment
+  triggeredByReminder?: boolean
+}) {
+  const draft = buildEmptyOperationalDraft(input.kind, [input.appointment])
+  draft.selectedAppointmentId = input.appointment.id
+  draft.selectedProfessionalId = input.appointment.professionalId
+  draft.selectedProfessionalName = input.appointment.professionalName
+  draft.triggeredByReminder = input.triggeredByReminder === true
+  return draft
+}
+
+function buildOperationalDraftWithAppointments(input: {
+  kind: 'cancel' | 'reschedule'
+  appointments: WhatsAppManagedAppointment[]
+  triggeredByReminder?: boolean
+}) {
+  const draft = buildEmptyOperationalDraft(input.kind, input.appointments)
+  draft.triggeredByReminder = input.triggeredByReminder === true
+  return draft
+}
+
+async function handleOperationalConversationState(input: {
+  state: ConversationState
+  conversationId: string
+  inboundText: string
+  barbershop: {
+    id: string
+    name: string
+    slug: string
+    timezone: string
+  }
+  customer: {
+    id: string
+    name: string
+    created: boolean
+    phone?: string | null
+  }
+  eventId: string
+  operationalDraft: WhatsAppOperationalDraft | null
+  timezone: string
+  nowContext: {
+    dateIso: string
+    dateTimeLabel: string
+    hour: number
+    minute: number
+  }
+  services: Array<{ id: string, name: string }>
+  professionals: Array<{ id: string, name: string }>
+  lastCustomerMessage?: string | null
+  lastAssistantMessage?: string | null
+}) {
+  const operationDraft = input.operationalDraft
+    ?? buildEmptyOperationalDraft(
+      input.state === 'WAITING_CANCEL_SELECTION' || input.state === 'WAITING_CANCEL_CONFIRMATION'
+        ? 'cancel'
+        : input.state === 'WAITING_REMINDER_RESPONSE'
+          ? 'reminder'
+          : 'reschedule'
+    )
+
+  if (input.state === 'WAITING_REMINDER_RESPONSE') {
+    const pendingReminder = await findPendingReminderAppointmentForCustomer({
+      barbershopId: input.barbershop.id,
+      customerId: input.customer.id,
+    })
+
+    const activeReminderAppointment =
+      selectOperationalAppointment(operationDraft)
+      ?? (pendingReminder ? mapReminderAppointmentToManagedAppointment(pendingReminder) : null)
+
+    if (!activeReminderAppointment) {
+      return null
+    }
+
+    const reminderAction = parseReminderResponseAction(input.inboundText)
+    const reminderDraft = buildEmptyOperationalDraft('reminder', [activeReminderAppointment])
+    reminderDraft.selectedAppointmentId = activeReminderAppointment.id
+    reminderDraft.triggeredByReminder = true
+
+    if (reminderAction === 'confirm') {
+      const confirmation = await confirmAppointmentPresenceFromReminder({
+        appointmentId: activeReminderAppointment.id,
+        barbershopId: input.barbershop.id,
+      })
+
+      if (confirmation.count === 0) {
+        const responseText = buildReminderNotFoundMessage()
+
+        await persistOperationalConversationState({
+          conversationId: input.conversationId,
+          inboundText: input.inboundText,
+          responseText,
+          state: 'IDLE',
+          draft: null,
+          source: 'whatsapp_reminder',
+          stage: 'confirm_missing',
+        })
+
+        return {
+          responseText,
+          flow: 'booking_status' as const,
+          conversationId: input.conversationId,
+          conversationState: 'IDLE' as const,
+          usedAI: false,
+        }
+      }
+
+      const responseText = buildReminderConfirmedMessage()
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'IDLE',
+        draft: null,
+        source: 'whatsapp_reminder',
+        stage: 'confirmed',
+        completedAt: new Date(),
+      })
+
+      return {
+        responseText,
+        flow: 'acknowledgement' as const,
+        conversationId: input.conversationId,
+        conversationState: 'IDLE' as const,
+        usedAI: false,
+      }
+    }
+
+    if (reminderAction === 'reschedule') {
+      await markAppointmentReminderResponse({
+        appointmentId: activeReminderAppointment.id,
+        barbershopId: input.barbershop.id,
+        responseStatus: 'RESCHEDULE_REQUESTED',
+      })
+
+      const draft = buildOperationalDraftWithAppointment({
+        kind: 'reschedule',
+        appointment: activeReminderAppointment,
+        triggeredByReminder: true,
+      })
+      const responseText = buildReschedulePromptMessage(activeReminderAppointment)
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'WAITING_RESCHEDULE_TIME',
+        draft,
+        source: 'whatsapp_reminder',
+        stage: 'reschedule_requested',
+      })
+
+      return {
+        responseText,
+        flow: 'reschedule' as const,
+        conversationId: input.conversationId,
+        conversationState: 'WAITING_RESCHEDULE_TIME' as const,
+        usedAI: false,
+      }
+    }
+
+    if (reminderAction === 'cancel') {
+      await markAppointmentReminderResponse({
+        appointmentId: activeReminderAppointment.id,
+        barbershopId: input.barbershop.id,
+        responseStatus: 'CANCELLATION_REQUESTED',
+      })
+
+      const draft = buildOperationalDraftWithAppointment({
+        kind: 'cancel',
+        appointment: activeReminderAppointment,
+        triggeredByReminder: true,
+      })
+      const responseText = buildCancellationConfirmationMessage(activeReminderAppointment)
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'WAITING_CANCEL_CONFIRMATION',
+        draft,
+        source: 'whatsapp_reminder',
+        stage: 'cancel_requested',
+      })
+
+      return {
+        responseText,
+        flow: 'booking_status' as const,
+        conversationId: input.conversationId,
+        conversationState: 'WAITING_CANCEL_CONFIRMATION' as const,
+        usedAI: false,
+      }
+    }
+
+    if (reminderAction === 'ambiguous') {
+      const responseText = buildReminderResponseClarificationMessage()
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'WAITING_REMINDER_RESPONSE',
+        draft: reminderDraft,
+        source: 'whatsapp_reminder',
+        stage: 'clarification_requested',
+      })
+
+      return {
+        responseText,
+        flow: 'booking_status' as const,
+        conversationId: input.conversationId,
+        conversationState: 'WAITING_REMINDER_RESPONSE' as const,
+        usedAI: false,
+      }
+    }
+
+    return null
+  }
+
+  if (input.state === 'WAITING_CANCEL_SELECTION') {
+    if (isNegativeOperationalResponse(input.inboundText)) {
+      const responseText = buildOperationalAbortMessage()
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'IDLE',
+        draft: null,
+        source: 'whatsapp_cancel',
+        stage: 'aborted',
+      })
+
+      return {
+        responseText,
+        flow: 'acknowledgement' as const,
+        conversationId: input.conversationId,
+        conversationState: 'IDLE' as const,
+        usedAI: false,
+      }
+    }
+
+    const selection = parseOperationalSelectionNumber(
+      input.inboundText,
+      operationDraft.appointments.length,
+    )
+
+    if (!selection) {
+      const responseText = buildOperationalSelectionClarificationMessage('cancel')
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'WAITING_CANCEL_SELECTION',
+        draft: operationDraft,
+        source: 'whatsapp_cancel',
+        stage: 'selection_requested',
+      })
+
+      return {
+        responseText,
+        flow: 'booking_status' as const,
+        conversationId: input.conversationId,
+        conversationState: 'WAITING_CANCEL_SELECTION' as const,
+        usedAI: false,
+      }
+    }
+
+    const selectedAppointment = operationDraft.appointments[selection - 1] ?? null
+
+    if (!selectedAppointment) {
+      const responseText = buildOperationalSelectionClarificationMessage('cancel')
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'WAITING_CANCEL_SELECTION',
+        draft: operationDraft,
+        source: 'whatsapp_cancel',
+        stage: 'selection_invalid',
+      })
+
+      return {
+        responseText,
+        flow: 'booking_status' as const,
+        conversationId: input.conversationId,
+        conversationState: 'WAITING_CANCEL_SELECTION' as const,
+        usedAI: false,
+      }
+    }
+
+    const nextDraft = {
+      ...operationDraft,
+      selectedAppointmentId: selectedAppointment.id,
+    }
+    const responseText = buildCancellationConfirmationMessage(selectedAppointment)
+
+    console.info('[whatsapp-cancel] appointment selected', {
+      conversationId: input.conversationId,
+      appointmentId: selectedAppointment.id,
+    })
+    console.info('[whatsapp-cancel] confirmation requested', {
+      conversationId: input.conversationId,
+      appointmentId: selectedAppointment.id,
+    })
+
+    await persistOperationalConversationState({
+      conversationId: input.conversationId,
+      inboundText: input.inboundText,
+      responseText,
+      state: 'WAITING_CANCEL_CONFIRMATION',
+      draft: nextDraft,
+      source: 'whatsapp_cancel',
+      stage: 'confirmation_requested',
+    })
+
+    return {
+      responseText,
+      flow: 'booking_status' as const,
+      conversationId: input.conversationId,
+      conversationState: 'WAITING_CANCEL_CONFIRMATION' as const,
+      usedAI: false,
+    }
+  }
+
+  if (input.state === 'WAITING_CANCEL_CONFIRMATION') {
+    const selectedAppointment = selectOperationalAppointment(operationDraft)
+
+    if (!selectedAppointment) {
+      const responseText = buildReminderNotFoundMessage()
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'IDLE',
+        draft: null,
+        source: 'whatsapp_cancel',
+        stage: 'missing_selection',
+      })
+
+      return {
+        responseText,
+        flow: 'booking_status' as const,
+        conversationId: input.conversationId,
+        conversationState: 'IDLE' as const,
+        usedAI: false,
+      }
+    }
+
+    if (isNegativeOperationalResponse(input.inboundText)) {
+      const responseText = buildOperationalAbortMessage()
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'IDLE',
+        draft: null,
+        source: 'whatsapp_cancel',
+        stage: 'aborted',
+      })
+
+      return {
+        responseText,
+        flow: 'acknowledgement' as const,
+        conversationId: input.conversationId,
+        conversationState: 'IDLE' as const,
+        usedAI: false,
+      }
+    }
+
+    if (!isExplicitCancellationConfirmationMessage(input.inboundText)) {
+      const responseText = buildCancellationStrictConfirmationMessage()
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'WAITING_CANCEL_CONFIRMATION',
+        draft: operationDraft,
+        source: 'whatsapp_cancel',
+        stage: 'strict_confirmation_requested',
+      })
+
+      return {
+        responseText,
+        flow: 'booking_status' as const,
+        conversationId: input.conversationId,
+        conversationState: 'WAITING_CANCEL_CONFIRMATION' as const,
+        usedAI: false,
+      }
+    }
+
+    const cancelledAppointment = await cancelAppointmentFromWhatsApp({
+      appointmentId: selectedAppointment.id,
+      barbershopId: input.barbershop.id,
+      timezone: input.timezone,
+    })
+
+    if (!cancelledAppointment) {
+      console.warn('[whatsapp-cancel] failed', {
+        conversationId: input.conversationId,
+        appointmentId: selectedAppointment.id,
+        reason: 'appointment_not_found',
+      })
+
+      const responseText = buildReminderNotFoundMessage()
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'IDLE',
+        draft: null,
+        source: 'whatsapp_cancel',
+        stage: 'cancel_missing',
+      })
+
+      return {
+        responseText,
+        flow: 'booking_status' as const,
+        conversationId: input.conversationId,
+        conversationState: 'IDLE' as const,
+        usedAI: false,
+      }
+    }
+
+    console.info('[whatsapp-cancel] completed', {
+      conversationId: input.conversationId,
+      appointmentId: cancelledAppointment.id,
+    })
+
+    const responseText = 'Pronto, seu horario foi cancelado.\n\nSe quiser marcar outro horario, e so me chamar por aqui.'
+
+    await persistOperationalConversationState({
+      conversationId: input.conversationId,
+      inboundText: input.inboundText,
+      responseText,
+      state: 'IDLE',
+      draft: null,
+      source: 'whatsapp_cancel',
+      stage: 'completed',
+      completedAt: new Date(),
+    })
+
+    return {
+      responseText,
+      flow: 'appointment_cancelled' as const,
+      conversationId: input.conversationId,
+      conversationState: 'IDLE' as const,
+      appointmentId: cancelledAppointment.id,
+      usedAI: false,
+    }
+  }
+
+  if (input.state === 'WAITING_RESCHEDULE_SELECTION') {
+    if (isNegativeOperationalResponse(input.inboundText)) {
+      const responseText = buildOperationalAbortMessage()
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'IDLE',
+        draft: null,
+        source: 'whatsapp_reschedule',
+        stage: 'aborted',
+      })
+
+      return {
+        responseText,
+        flow: 'acknowledgement' as const,
+        conversationId: input.conversationId,
+        conversationState: 'IDLE' as const,
+        usedAI: false,
+      }
+    }
+
+    const selection = parseOperationalSelectionNumber(
+      input.inboundText,
+      operationDraft.appointments.length,
+    )
+
+    if (!selection) {
+      const responseText = buildOperationalSelectionClarificationMessage('reschedule')
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'WAITING_RESCHEDULE_SELECTION',
+        draft: operationDraft,
+        source: 'whatsapp_reschedule',
+        stage: 'selection_requested',
+      })
+
+      return {
+        responseText,
+        flow: 'reschedule' as const,
+        conversationId: input.conversationId,
+        conversationState: 'WAITING_RESCHEDULE_SELECTION' as const,
+        usedAI: false,
+      }
+    }
+
+    const selectedAppointment = operationDraft.appointments[selection - 1] ?? null
+
+    if (!selectedAppointment) {
+      const responseText = buildOperationalSelectionClarificationMessage('reschedule')
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'WAITING_RESCHEDULE_SELECTION',
+        draft: operationDraft,
+        source: 'whatsapp_reschedule',
+        stage: 'selection_invalid',
+      })
+
+      return {
+        responseText,
+        flow: 'reschedule' as const,
+        conversationId: input.conversationId,
+        conversationState: 'WAITING_RESCHEDULE_SELECTION' as const,
+        usedAI: false,
+      }
+    }
+
+    const nextDraft = buildOperationalDraftWithAppointment({
+      kind: 'reschedule',
+      appointment: selectedAppointment,
+      triggeredByReminder: operationDraft.triggeredByReminder,
+    })
+    const responseText = buildReschedulePromptMessage(selectedAppointment)
+
+    console.info('[whatsapp-reschedule] current appointment selected', {
+      conversationId: input.conversationId,
+      appointmentId: selectedAppointment.id,
+    })
+
+    await persistOperationalConversationState({
+      conversationId: input.conversationId,
+      inboundText: input.inboundText,
+      responseText,
+      state: 'WAITING_RESCHEDULE_TIME',
+      draft: nextDraft,
+      source: 'whatsapp_reschedule',
+      stage: 'date_time_requested',
+    })
+
+    return {
+      responseText,
+      flow: 'reschedule' as const,
+      conversationId: input.conversationId,
+      conversationState: 'WAITING_RESCHEDULE_TIME' as const,
+      usedAI: false,
+    }
+  }
+
+  if (input.state === 'WAITING_RESCHEDULE_TIME') {
+    const selectedAppointment = selectOperationalAppointment(operationDraft)
+
+    if (!selectedAppointment) {
+      const responseText = buildReminderNotFoundMessage()
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'IDLE',
+        draft: null,
+        source: 'whatsapp_reschedule',
+        stage: 'missing_selection',
+      })
+
+      return {
+        responseText,
+        flow: 'booking_status' as const,
+        conversationId: input.conversationId,
+        conversationState: 'IDLE' as const,
+        usedAI: false,
+      }
+    }
+
+    if (isNegativeOperationalResponse(input.inboundText)) {
+      const responseText = buildOperationalAbortMessage()
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'IDLE',
+        draft: null,
+        source: 'whatsapp_reschedule',
+        stage: 'aborted',
+      })
+
+      return {
+        responseText,
+        flow: 'acknowledgement' as const,
+        conversationId: input.conversationId,
+        conversationState: 'IDLE' as const,
+        usedAI: false,
+      }
+    }
+
+    const interpreted = await interpretWhatsAppMessage({
+      barbershopId: input.barbershop.id,
+      message: input.inboundText,
+      barbershopName: input.barbershop.name,
+      barbershopTimezone: input.timezone,
+      conversationState: 'WAITING_TIME',
+      offeredSlotCount: operationDraft.offeredSlots.length,
+      services: input.services.map((service) => ({ name: service.name })),
+      professionals: input.professionals.map((professional) => ({ name: professional.name })),
+      todayIsoDate: input.nowContext.dateIso,
+      currentLocalDateTime: input.nowContext.dateTimeLabel,
+      conversationSummary: {
+        selectedServiceName: selectedAppointment.serviceName,
+        selectedProfessionalName: operationDraft.selectedProfessionalName ?? selectedAppointment.professionalName,
+        requestedDateIso: operationDraft.requestedDateIso,
+        requestedTimeLabel: operationDraft.requestedTimeLabel,
+        allowAnyProfessional: operationDraft.allowAnyProfessional,
+        lastCustomerMessage: input.lastCustomerMessage ?? null,
+        lastAssistantMessage: input.lastAssistantMessage ?? null,
+      },
+    })
+
+    if (operationDraft.offeredSlots.length > 0) {
+      const pickedSlot = pickOfferedSlot({
+        offeredSlots: operationDraft.offeredSlots,
+        selectedOptionNumber: interpreted.selectedOptionNumber,
+        exactTime: interpreted.exactTime,
+        message: input.inboundText,
+      })
+
+      if (pickedSlot) {
+        const nextDraft = {
+          ...operationDraft,
+          selectedSlot: pickedSlot,
+          selectedProfessionalId: pickedSlot.professionalId,
+          selectedProfessionalName: pickedSlot.professionalName,
+          requestedDateIso: pickedSlot.dateIso,
+          requestedTimeLabel: pickedSlot.timeLabel,
+          offeredSlots: [],
+        }
+        const responseText = buildRescheduleConfirmationMessage({
+          appointment: selectedAppointment,
+          slot: pickedSlot,
+          timezone: input.timezone,
+        })
+
+        await persistOperationalConversationState({
+          conversationId: input.conversationId,
+          inboundText: input.inboundText,
+          responseText,
+          state: 'WAITING_RESCHEDULE_CONFIRMATION',
+          draft: nextDraft,
+          source: 'whatsapp_reschedule',
+          stage: 'confirmation_requested',
+        })
+
+        console.info('[whatsapp-reschedule] confirmation requested', {
+          conversationId: input.conversationId,
+          appointmentId: selectedAppointment.id,
+          selectedSlot: pickedSlot,
+        })
+
+        return {
+          responseText,
+          flow: 'reschedule' as const,
+          conversationId: input.conversationId,
+          conversationState: 'WAITING_RESCHEDULE_CONFIRMATION' as const,
+          usedAI: interpreted.source === 'openai',
+        }
+      }
+    }
+
+    let requestedProfessionalId: string | null = operationDraft.selectedProfessionalId ?? selectedAppointment.professionalId
+    let requestedProfessionalName: string | null = operationDraft.selectedProfessionalName ?? selectedAppointment.professionalName
+    let allowAnyProfessional = operationDraft.allowAnyProfessional
+
+    if (interpreted.allowAnyProfessional) {
+      requestedProfessionalId = null
+      requestedProfessionalName = null
+      allowAnyProfessional = true
+    } else if (interpreted.mentionedName) {
+      const nameResolution = await resolveMentionedName({
+        rawName: interpreted.mentionedName,
+        barbershopId: input.barbershop.id,
+        requestedDateIso: interpreted.requestedDateIso ?? operationDraft.requestedDateIso,
+        professionals: input.professionals.map((professional) => ({
+          id: professional.id,
+          name: professional.name,
+        })),
+      })
+
+      if (nameResolution.action === 'customer_reference' && nameResolution.customerMatches[0]) {
+        const responseText = buildCustomerReferenceMessage(
+          nameResolution.customerMatches[0],
+          input.professionals.map((professional) => ({
+            id: professional.id,
+            name: professional.name,
+          })),
+        )
+
+        await persistOperationalConversationState({
+          conversationId: input.conversationId,
+          inboundText: input.inboundText,
+          responseText,
+          state: 'WAITING_RESCHEDULE_TIME',
+          draft: operationDraft,
+          source: 'whatsapp_reschedule',
+          stage: 'customer_reference',
+        })
+
+        return {
+          responseText,
+          flow: 'reschedule' as const,
+          conversationId: input.conversationId,
+          conversationState: 'WAITING_RESCHEDULE_TIME' as const,
+          usedAI: interpreted.source === 'openai',
+        }
+      }
+
+      if (nameResolution.action === 'ambiguous') {
+        const responseText = buildAmbiguousNameMessage(
+          interpreted.mentionedName,
+          input.professionals.map((professional) => ({
+            id: professional.id,
+            name: professional.name,
+          })),
+        )
+
+        await persistOperationalConversationState({
+          conversationId: input.conversationId,
+          inboundText: input.inboundText,
+          responseText,
+          state: 'WAITING_RESCHEDULE_TIME',
+          draft: operationDraft,
+          source: 'whatsapp_reschedule',
+          stage: 'ambiguous_name',
+        })
+
+        return {
+          responseText,
+          flow: 'reschedule' as const,
+          conversationId: input.conversationId,
+          conversationState: 'WAITING_RESCHEDULE_TIME' as const,
+          usedAI: interpreted.source === 'openai',
+        }
+      }
+
+      if (nameResolution.action === 'not_found') {
+        const responseText = buildProfessionalNotFoundMessage(
+          interpreted.mentionedName,
+          input.professionals.map((professional) => ({
+            id: professional.id,
+            name: professional.name,
+          })),
+        )
+
+        await persistOperationalConversationState({
+          conversationId: input.conversationId,
+          inboundText: input.inboundText,
+          responseText,
+          state: 'WAITING_RESCHEDULE_TIME',
+          draft: operationDraft,
+          source: 'whatsapp_reschedule',
+          stage: 'professional_not_found',
+        })
+
+        return {
+          responseText,
+          flow: 'reschedule' as const,
+          conversationId: input.conversationId,
+          conversationState: 'WAITING_RESCHEDULE_TIME' as const,
+          usedAI: interpreted.source === 'openai',
+        }
+      }
+
+      if (nameResolution.action === 'professional' && nameResolution.resolvedProfessional) {
+        requestedProfessionalId = nameResolution.resolvedProfessional.id
+        requestedProfessionalName = nameResolution.resolvedProfessional.name
+        allowAnyProfessional = false
+      }
+    }
+
+    if (!interpreted.requestedDateIso) {
+      const responseText = buildRescheduleDateTimeClarificationMessage()
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'WAITING_RESCHEDULE_TIME',
+        draft: operationDraft,
+        source: 'whatsapp_reschedule',
+        stage: 'date_missing',
+      })
+
+      return {
+        responseText,
+        flow: 'reschedule' as const,
+        conversationId: input.conversationId,
+        conversationState: 'WAITING_RESCHEDULE_TIME' as const,
+        usedAI: interpreted.source === 'openai',
+      }
+    }
+
+    const nextRequestedTimeLabel = resolveRequestedTimeLabel({
+      exactTime: interpreted.exactTime,
+      timePreference: interpreted.timePreference,
+      preferredPeriod: interpreted.preferredPeriod,
+      existingValue: operationDraft.requestedTimeLabel,
+    })
+
+    if (!hasResolvedTimePreference(nextRequestedTimeLabel)) {
+      const responseText = buildRescheduleDateTimeClarificationMessage()
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'WAITING_RESCHEDULE_TIME',
+        draft: operationDraft,
+        source: 'whatsapp_reschedule',
+        stage: 'time_missing',
+      })
+
+      return {
+        responseText,
+        flow: 'reschedule' as const,
+        conversationId: input.conversationId,
+        conversationState: 'WAITING_RESCHEDULE_TIME' as const,
+        usedAI: interpreted.source === 'openai',
+      }
+    }
+
+    let availability
+    try {
+      availability = await getAvailableWhatsAppSlots({
+        barbershopId: input.barbershop.id,
+        serviceId: selectedAppointment.serviceId,
+        dateIso: interpreted.requestedDateIso,
+        timezone: input.timezone,
+        professionalId: allowAnyProfessional ? null : requestedProfessionalId,
+        timePreference: interpreted.exactTime ? 'EXACT' : nextRequestedTimeLabel,
+        exactTime: interpreted.exactTime,
+        limit: 4,
+      })
+    } catch (error) {
+      if (error instanceof AvailabilityInfrastructureError) {
+        return emitAvailabilityInfrastructureFallback({
+          conversationId: input.conversationId,
+          baseUpdate: {
+            lastInboundText: input.inboundText,
+            lastIntent: buildJsonValue({
+              source: 'whatsapp_reschedule',
+              stage: 'availability_failed',
+            }),
+            selectedServiceId: null,
+            selectedServiceName: null,
+            selectedProfessionalId: null,
+            selectedProfessionalName: null,
+            allowAnyProfessional: false,
+            requestedDate: null,
+            requestedTimeLabel: null,
+          },
+          fallbackState: 'WAITING_RESCHEDULE_TIME',
+          fallbackFlow: 'reschedule',
+          usedAI: interpreted.source === 'openai',
+          error,
+          source: 'reschedule',
+        })
+      }
+
+      throw error
+    }
+
+    console.info('[whatsapp-reschedule] availability checked', {
+      conversationId: input.conversationId,
+      appointmentId: selectedAppointment.id,
+      requestedDateIso: interpreted.requestedDateIso,
+      requestedTimeLabel: nextRequestedTimeLabel,
+      slotsFound: availability.slots.length,
+      professionalId: allowAnyProfessional ? null : requestedProfessionalId,
+    })
+
+    if (availability.slots.length === 0) {
+      if (interpreted.exactTime) {
+        const nearbyAvailability = await getAvailableWhatsAppSlots({
+          barbershopId: input.barbershop.id,
+          serviceId: selectedAppointment.serviceId,
+          dateIso: interpreted.requestedDateIso,
+          timezone: input.timezone,
+          professionalId: allowAnyProfessional ? null : requestedProfessionalId,
+          limit: 4,
+        })
+
+        const responseText = nearbyAvailability.slots.length > 0
+          ? buildExactTimeFallbackResponse({
+              exactTime: interpreted.exactTime,
+              timezone: input.timezone,
+              dateIso: interpreted.requestedDateIso,
+              slots: nearbyAvailability.slots,
+              professionalName: allowAnyProfessional ? null : requestedProfessionalName,
+              allowAlternativeProfessionalSuggestion: allowAnyProfessional === false,
+              previousAssistantText: input.lastAssistantMessage ?? null,
+            })
+          : buildRescheduleUnavailableMessage()
+
+        const nextDraft = {
+          ...operationDraft,
+          offeredSlots: nearbyAvailability.slots,
+          requestedDateIso: interpreted.requestedDateIso,
+          requestedTimeLabel: nextRequestedTimeLabel,
+          selectedProfessionalId: allowAnyProfessional ? null : requestedProfessionalId,
+          selectedProfessionalName: allowAnyProfessional ? null : requestedProfessionalName,
+          allowAnyProfessional,
+          selectedSlot: null,
+        }
+
+        await persistOperationalConversationState({
+          conversationId: input.conversationId,
+          inboundText: input.inboundText,
+          responseText,
+          state: 'WAITING_RESCHEDULE_TIME',
+          draft: nextDraft,
+          source: 'whatsapp_reschedule',
+          stage: 'nearby_slots_offered',
+        })
+
+        return {
+          responseText,
+          flow: 'reschedule' as const,
+          conversationId: input.conversationId,
+          conversationState: 'WAITING_RESCHEDULE_TIME' as const,
+          usedAI: interpreted.source === 'openai',
+        }
+      }
+
+      const responseText = buildRescheduleUnavailableMessage()
+      const nextDraft = {
+        ...operationDraft,
+        requestedDateIso: interpreted.requestedDateIso,
+        requestedTimeLabel: nextRequestedTimeLabel,
+        selectedProfessionalId: allowAnyProfessional ? null : requestedProfessionalId,
+        selectedProfessionalName: allowAnyProfessional ? null : requestedProfessionalName,
+        allowAnyProfessional,
+        offeredSlots: [],
+        selectedSlot: null,
+      }
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'WAITING_RESCHEDULE_TIME',
+        draft: nextDraft,
+        source: 'whatsapp_reschedule',
+        stage: 'unavailable',
+      })
+
+      return {
+        responseText,
+        flow: 'reschedule' as const,
+        conversationId: input.conversationId,
+        conversationState: 'WAITING_RESCHEDULE_TIME' as const,
+        usedAI: interpreted.source === 'openai',
+      }
+    }
+
+    const exactMatch = interpreted.exactTime
+      ? availability.slots.find((slot) => slot.timeLabel === interpreted.exactTime) ?? availability.slots[0]
+      : availability.slots.length === 1
+        ? availability.slots[0]
+        : null
+
+    if (exactMatch) {
+      const nextDraft = {
+        ...operationDraft,
+        offeredSlots: [],
+        selectedSlot: exactMatch,
+        requestedDateIso: exactMatch.dateIso,
+        requestedTimeLabel: exactMatch.timeLabel,
+        selectedProfessionalId: exactMatch.professionalId,
+        selectedProfessionalName: exactMatch.professionalName,
+        allowAnyProfessional: false,
+      }
+      const responseText = buildRescheduleConfirmationMessage({
+        appointment: selectedAppointment,
+        slot: exactMatch,
+        timezone: input.timezone,
+      })
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'WAITING_RESCHEDULE_CONFIRMATION',
+        draft: nextDraft,
+        source: 'whatsapp_reschedule',
+        stage: 'confirmation_requested',
+      })
+
+      console.info('[whatsapp-reschedule] confirmation requested', {
+        conversationId: input.conversationId,
+        appointmentId: selectedAppointment.id,
+        selectedSlot: exactMatch,
+      })
+
+      return {
+        responseText,
+        flow: 'reschedule' as const,
+        conversationId: input.conversationId,
+        conversationState: 'WAITING_RESCHEDULE_CONFIRMATION' as const,
+        usedAI: interpreted.source === 'openai',
+      }
+    }
+
+    const nextDraft = {
+      ...operationDraft,
+      offeredSlots: availability.slots,
+      selectedSlot: null,
+      requestedDateIso: interpreted.requestedDateIso,
+      requestedTimeLabel: nextRequestedTimeLabel,
+      selectedProfessionalId: allowAnyProfessional ? null : requestedProfessionalId,
+      selectedProfessionalName: allowAnyProfessional ? null : requestedProfessionalName,
+      allowAnyProfessional,
+    }
+    const responseText = buildHumanSlotOfferMessage(
+      availability.slots,
+      selectedAppointment.serviceName,
+      input.timezone,
+      nextRequestedTimeLabel,
+    )
+
+    await persistOperationalConversationState({
+      conversationId: input.conversationId,
+      inboundText: input.inboundText,
+      responseText,
+      state: 'WAITING_RESCHEDULE_TIME',
+      draft: nextDraft,
+      source: 'whatsapp_reschedule',
+      stage: 'slots_offered',
+    })
+
+    return {
+      responseText,
+      flow: 'offer_slots' as const,
+      conversationId: input.conversationId,
+      conversationState: 'WAITING_RESCHEDULE_TIME' as const,
+      usedAI: interpreted.source === 'openai',
+    }
+  }
+
+  if (input.state === 'WAITING_RESCHEDULE_CONFIRMATION') {
+    const selectedAppointment = selectOperationalAppointment(operationDraft)
+    const selectedSlot = operationDraft.selectedSlot
+
+    if (!selectedAppointment || !selectedSlot) {
+      const responseText = buildRescheduleUnavailableMessage()
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'WAITING_RESCHEDULE_TIME',
+        draft: {
+          ...operationDraft,
+          selectedSlot: null,
+        },
+        source: 'whatsapp_reschedule',
+        stage: 'missing_confirmation_context',
+      })
+
+      return {
+        responseText,
+        flow: 'reschedule' as const,
+        conversationId: input.conversationId,
+        conversationState: 'WAITING_RESCHEDULE_TIME' as const,
+        usedAI: false,
+      }
+    }
+
+    if (isNegativeOperationalResponse(input.inboundText)) {
+      const rollbackDraft = {
+        ...operationDraft,
+        selectedSlot: null,
+      }
+      const responseText = buildReschedulePromptMessage(selectedAppointment)
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'WAITING_RESCHEDULE_TIME',
+        draft: rollbackDraft,
+        source: 'whatsapp_reschedule',
+        stage: 'confirmation_declined',
+      })
+
+      return {
+        responseText,
+        flow: 'reschedule' as const,
+        conversationId: input.conversationId,
+        conversationState: 'WAITING_RESCHEDULE_TIME' as const,
+        usedAI: false,
+      }
+    }
+
+    if (!isExplicitRescheduleConfirmationMessage(input.inboundText)) {
+      const responseText = buildRescheduleStrictConfirmationMessage()
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'WAITING_RESCHEDULE_CONFIRMATION',
+        draft: operationDraft,
+        source: 'whatsapp_reschedule',
+        stage: 'strict_confirmation_requested',
+      })
+
+      return {
+        responseText,
+        flow: 'reschedule' as const,
+        conversationId: input.conversationId,
+        conversationState: 'WAITING_RESCHEDULE_CONFIRMATION' as const,
+        usedAI: false,
+      }
+    }
+
+    const rescheduled = await rescheduleAppointmentFromWhatsApp({
+      appointmentId: selectedAppointment.id,
+      barbershopId: input.barbershop.id,
+      timezone: input.timezone,
+      professionalId: selectedSlot.professionalId,
+      dateIso: selectedSlot.dateIso,
+      timeLabel: selectedSlot.timeLabel,
+      startAtIso: selectedSlot.startAtIso,
+      endAtIso: selectedSlot.endAtIso,
+    })
+
+    if (!rescheduled.ok || !rescheduled.appointment) {
+      const responseText = buildRescheduleUnavailableMessage()
+      const rollbackDraft = {
+        ...operationDraft,
+        offeredSlots: [],
+        selectedSlot: null,
+      }
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'WAITING_RESCHEDULE_TIME',
+        draft: rollbackDraft,
+        source: 'whatsapp_reschedule',
+        stage: 'slot_lost',
+      })
+
+      console.warn('[whatsapp-reschedule] failed', {
+        conversationId: input.conversationId,
+        appointmentId: selectedAppointment.id,
+        reason: rescheduled.reason,
+      })
+
+      return {
+        responseText,
+        flow: 'reschedule' as const,
+        conversationId: input.conversationId,
+        conversationState: 'WAITING_RESCHEDULE_TIME' as const,
+        usedAI: false,
+      }
+    }
+
+    console.info('[whatsapp-reschedule] completed', {
+      conversationId: input.conversationId,
+      appointmentId: rescheduled.appointment.id,
+      selectedSlot,
+    })
+
+    const responseText = buildRescheduleSuccessMessage({
+      appointment: selectedAppointment,
+      slot: selectedSlot,
+      timezone: input.timezone,
+    })
+
+    await persistOperationalConversationState({
+      conversationId: input.conversationId,
+      inboundText: input.inboundText,
+      responseText,
+      state: 'IDLE',
+      draft: null,
+      source: 'whatsapp_reschedule',
+      stage: 'completed',
+      completedAt: new Date(),
+      lastIntentExtras: {
+        recentBooking: {
+          serviceName: selectedAppointment.serviceName,
+          professionalName: selectedSlot.professionalName,
+          dateIso: selectedSlot.dateIso,
+          timeLabel: selectedSlot.timeLabel,
+        },
+      },
+    })
+
+    return {
+      responseText,
+      flow: 'reschedule' as const,
+      conversationId: input.conversationId,
+      conversationState: 'IDLE' as const,
+      appointmentId: rescheduled.appointment.id,
+      usedAI: false,
+    }
+  }
+
+  return null
+}
+
 async function offerFreshSlots(input: {
   conversationId: string
   customerId: string
@@ -1927,6 +3330,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   }
 
   const currentState = normalizeConversationState(conversation.state)
+  const operationalDraft = parseOperationalDraft(conversation.bookingDraft)
   const conversationRequestedDateIso = conversation.requestedDate
     ? formatDateIso(conversation.requestedDate)
     : null
@@ -1941,6 +3345,35 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     offeredSlots: parseConversationSlots(conversation.slotOptions),
     selectedStoredSlot: parseSelectedSlot(conversation.selectedSlot),
   }
+
+  if (isOperationalConversationState(currentState)) {
+    const operationalResult = await handleOperationalConversationState({
+      state: currentState,
+      conversationId: conversation.id,
+      inboundText,
+      barbershop: input.barbershop,
+      customer: input.customer,
+      eventId: input.eventId,
+      operationalDraft,
+      timezone,
+      nowContext,
+      services: services.map((service) => ({
+        id: service.id,
+        name: service.name,
+      })),
+      professionals: professionals.map((professional) => ({
+        id: professional.id,
+        name: professional.name,
+      })),
+      lastCustomerMessage: conversation.lastInboundText ?? null,
+      lastAssistantMessage: conversation.lastAssistantText ?? null,
+    })
+
+    if (operationalResult) {
+      return operationalResult
+    }
+  }
+
   const runtimeContext = resolveConversationRuntimeContext({
     state: currentState,
     updatedAt: conversation.updatedAt,
@@ -2007,6 +3440,236 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       offeredSlots: conversationDraft.offeredSlots.length,
       hasSelectedSlot: Boolean(conversationDraft.selectedStoredSlot),
     })
+  }
+
+  const reminderResponseAction = parseReminderResponseAction(inboundText)
+  if (reminderResponseAction !== 'none') {
+    const pendingReminderAppointment = await findPendingReminderAppointmentForCustomer({
+      barbershopId: input.barbershop.id,
+      customerId: input.customer.id,
+    })
+
+    if (pendingReminderAppointment) {
+      const reminderDraft = buildEmptyOperationalDraft('reminder', [
+        mapReminderAppointmentToManagedAppointment(pendingReminderAppointment),
+      ])
+      reminderDraft.selectedAppointmentId = pendingReminderAppointment.id
+      reminderDraft.triggeredByReminder = true
+
+      const reminderResult = await handleOperationalConversationState({
+        state: 'WAITING_REMINDER_RESPONSE',
+        conversationId: conversation.id,
+        inboundText,
+        barbershop: input.barbershop,
+        customer: input.customer,
+        eventId: input.eventId,
+        operationalDraft: reminderDraft,
+        timezone,
+        nowContext,
+        services: services.map((service) => ({
+          id: service.id,
+          name: service.name,
+        })),
+        professionals: professionals.map((professional) => ({
+          id: professional.id,
+          name: professional.name,
+        })),
+        lastCustomerMessage: conversation.lastInboundText ?? null,
+        lastAssistantMessage: conversation.lastAssistantText ?? null,
+      })
+
+      if (reminderResult) {
+        return reminderResult
+      }
+    }
+  }
+
+  if (isCancellationIntentMessage(inboundText)) {
+    console.info('[whatsapp-cancel] intent detected', {
+      conversationId: conversation.id,
+      customerId: input.customer.id,
+      inboundText,
+    })
+
+    const appointments = await listFutureCustomerAppointmentsForWhatsApp({
+      barbershopId: input.barbershop.id,
+      customerId: input.customer.id,
+      timezone,
+    })
+
+    if (appointments.length === 0) {
+      const responseText = buildNoFutureAppointmentMessage()
+
+      await persistOperationalConversationState({
+        conversationId: conversation.id,
+        inboundText,
+        responseText,
+        state: 'IDLE',
+        draft: null,
+        source: 'whatsapp_cancel',
+        stage: 'not_found',
+      })
+
+      return {
+        responseText,
+        flow: 'booking_status',
+        conversationId: conversation.id,
+        conversationState: 'IDLE',
+        usedAI: false,
+      }
+    }
+
+    if (appointments.length === 1) {
+      const appointment = appointments[0]
+      const draft = buildOperationalDraftWithAppointment({
+        kind: 'cancel',
+        appointment,
+      })
+      const responseText = buildCancellationConfirmationMessage(appointment)
+
+      console.info('[whatsapp-cancel] appointment selected', {
+        conversationId: conversation.id,
+        appointmentId: appointment.id,
+      })
+      console.info('[whatsapp-cancel] confirmation requested', {
+        conversationId: conversation.id,
+        appointmentId: appointment.id,
+      })
+
+      await persistOperationalConversationState({
+        conversationId: conversation.id,
+        inboundText,
+        responseText,
+        state: 'WAITING_CANCEL_CONFIRMATION',
+        draft,
+        source: 'whatsapp_cancel',
+        stage: 'confirmation_requested',
+      })
+
+      return {
+        responseText,
+        flow: 'booking_status',
+        conversationId: conversation.id,
+        conversationState: 'WAITING_CANCEL_CONFIRMATION',
+        usedAI: false,
+      }
+    }
+
+    const draft = buildOperationalDraftWithAppointments({
+      kind: 'cancel',
+      appointments,
+    })
+    const responseText = buildCancellationSelectionMessage(appointments)
+
+    await persistOperationalConversationState({
+      conversationId: conversation.id,
+      inboundText,
+      responseText,
+      state: 'WAITING_CANCEL_SELECTION',
+      draft,
+      source: 'whatsapp_cancel',
+      stage: 'selection_requested',
+    })
+
+    return {
+      responseText,
+      flow: 'booking_status',
+      conversationId: conversation.id,
+      conversationState: 'WAITING_CANCEL_SELECTION',
+      usedAI: false,
+    }
+  }
+
+  if (isRescheduleIntentMessage(inboundText)) {
+    console.info('[whatsapp-reschedule] intent detected', {
+      conversationId: conversation.id,
+      customerId: input.customer.id,
+      inboundText,
+    })
+
+    const appointments = await listFutureCustomerAppointmentsForWhatsApp({
+      barbershopId: input.barbershop.id,
+      customerId: input.customer.id,
+      timezone,
+    })
+
+    if (appointments.length === 0) {
+      const responseText = buildNoFutureAppointmentMessage()
+
+      await persistOperationalConversationState({
+        conversationId: conversation.id,
+        inboundText,
+        responseText,
+        state: 'IDLE',
+        draft: null,
+        source: 'whatsapp_reschedule',
+        stage: 'not_found',
+      })
+
+      return {
+        responseText,
+        flow: 'booking_status',
+        conversationId: conversation.id,
+        conversationState: 'IDLE',
+        usedAI: false,
+      }
+    }
+
+    if (appointments.length === 1) {
+      const appointment = appointments[0]
+      const draft = buildOperationalDraftWithAppointment({
+        kind: 'reschedule',
+        appointment,
+      })
+      const responseText = buildReschedulePromptMessage(appointment)
+
+      console.info('[whatsapp-reschedule] current appointment selected', {
+        conversationId: conversation.id,
+        appointmentId: appointment.id,
+      })
+
+      await persistOperationalConversationState({
+        conversationId: conversation.id,
+        inboundText,
+        responseText,
+        state: 'WAITING_RESCHEDULE_TIME',
+        draft,
+        source: 'whatsapp_reschedule',
+        stage: 'date_time_requested',
+      })
+
+      return {
+        responseText,
+        flow: 'reschedule',
+        conversationId: conversation.id,
+        conversationState: 'WAITING_RESCHEDULE_TIME',
+        usedAI: false,
+      }
+    }
+
+    const draft = buildOperationalDraftWithAppointments({
+      kind: 'reschedule',
+      appointments,
+    })
+    const responseText = buildRescheduleSelectionMessage(appointments)
+
+    await persistOperationalConversationState({
+      conversationId: conversation.id,
+      inboundText,
+      responseText,
+      state: 'WAITING_RESCHEDULE_SELECTION',
+      draft,
+      source: 'whatsapp_reschedule',
+      stage: 'selection_requested',
+    })
+
+    return {
+      responseText,
+      flow: 'reschedule',
+      conversationId: conversation.id,
+      conversationState: 'WAITING_RESCHEDULE_SELECTION',
+      usedAI: false,
+    }
   }
 
   const canUseDeterministicStoredSlotConfirmation =

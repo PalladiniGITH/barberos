@@ -371,6 +371,12 @@ model Appointment {
   notes           String?
   sourceReference String?
   confirmedAt     DateTime?
+  confirmationReminderSentAt DateTime?
+  confirmationReminderStatus AppointmentReminderStatus?
+  confirmationReminderError  String?
+  confirmationRequestedAt    DateTime?
+  confirmationResponseAt     DateTime?
+  confirmationResponseStatus AppointmentConfirmationResponseStatus?
   cancelledAt     DateTime?
   completedAt     DateTime?
   createdAt       DateTime                @default(now())
@@ -393,6 +399,17 @@ enum AppointmentStatus {
 enum AppointmentSource {
   MANUAL
   WHATSAPP
+}
+
+enum AppointmentReminderStatus {
+  SENT
+  FAILED
+}
+
+enum AppointmentConfirmationResponseStatus {
+  CONFIRMED
+  RESCHEDULE_REQUESTED
+  CANCELLATION_REQUESTED
 }
 
 enum AppointmentBillingModel {
@@ -491,6 +508,12 @@ enum WhatsappConversationState {
   WAITING_DATE
   WAITING_TIME
   WAITING_CONFIRMATION
+  WAITING_CANCEL_SELECTION
+  WAITING_CANCEL_CONFIRMATION
+  WAITING_RESCHEDULE_SELECTION
+  WAITING_RESCHEDULE_TIME
+  WAITING_RESCHEDULE_CONFIRMATION
+  WAITING_REMINDER_RESPONSE
 }
 
 model Supply {
