@@ -72,6 +72,10 @@ import {
   markAppointmentReminderResponse,
   type ReminderAppointmentContext,
 } from '@/lib/whatsapp-appointment-reminders'
+import {
+  findNamedOptionCandidates,
+  pickNamedOptionBySelection,
+} from '@/lib/whatsapp-option-resolution'
 
 type ConversationState =
   | 'IDLE'
@@ -154,6 +158,8 @@ interface ConversationDraft {
   requestedTimeLabel: string | null
   offeredSlots: ConversationSlot[]
   selectedStoredSlot: ConversationSlot | null
+  pendingServiceOptions: NameMatch[]
+  pendingProfessionalOptions: NameMatch[]
 }
 
 interface ConversationBaseUpdate {
@@ -166,6 +172,7 @@ interface ConversationBaseUpdate {
   allowAnyProfessional: boolean
   requestedDate: Date | null
   requestedTimeLabel: string | null
+  bookingDraft?: Prisma.InputJsonValue
 }
 
 type ConversationSlot = WhatsAppBookingSlot
@@ -382,6 +389,8 @@ function buildEmptyConversationDraft(): ConversationDraft {
     requestedTimeLabel: null,
     offeredSlots: [],
     selectedStoredSlot: null,
+    pendingServiceOptions: [],
+    pendingProfessionalOptions: [],
   }
 }
 
@@ -394,7 +403,58 @@ function hasUsefulConversationProgress(draft: ConversationDraft) {
     || draft.requestedTimeLabel
     || draft.offeredSlots.length > 0
     || draft.selectedStoredSlot
+    || draft.pendingServiceOptions.length > 0
+    || draft.pendingProfessionalOptions.length > 0
   )
+}
+
+function parseDraftNamedOptions(
+  raw: Prisma.JsonValue | null,
+  key: 'pendingServiceOptions' | 'pendingProfessionalOptions'
+) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return []
+  }
+
+  const draft = raw as Record<string, unknown>
+  const options = draft[key]
+  if (!Array.isArray(options)) {
+    return []
+  }
+
+  return options
+    .map((item) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        return null
+      }
+
+      const option = item as Record<string, unknown>
+      if (typeof option.id !== 'string' || typeof option.name !== 'string') {
+        return null
+      }
+
+      return {
+        id: option.id,
+        name: option.name,
+      } satisfies NameMatch
+    })
+    .filter((option): option is NameMatch => Boolean(option))
+    .slice(0, 6)
+}
+
+function buildSchedulingDraftPayload(draft: ConversationDraft) {
+  return {
+    selectedServiceId: draft.selectedServiceId,
+    selectedServiceName: draft.selectedServiceName,
+    selectedProfessionalId: draft.selectedProfessionalId,
+    selectedProfessionalName: draft.selectedProfessionalName,
+    allowAnyProfessional: draft.allowAnyProfessional,
+    requestedDateIso: draft.requestedDateIso,
+    requestedTimeLabel: draft.requestedTimeLabel,
+    selectedSlot: draft.selectedStoredSlot,
+    pendingServiceOptions: draft.pendingServiceOptions,
+    pendingProfessionalOptions: draft.pendingProfessionalOptions,
+  }
 }
 
 function nameTokens(value: string) {
@@ -809,17 +869,70 @@ function buildServiceQuestion(serviceNames: string[]) {
   return `Perfeito! Temos estes servicos disponiveis:\n\n${preview}\n\nQual voce gostaria de agendar?`
 }
 
-function buildProfessionalQuestion(
-  professionalNames: string[],
-  preferredProfessionalName?: string | null
-) {
-  if (preferredProfessionalName) {
-    return `Quer marcar com ${preferredProfessionalName} de novo ou prefere outro barbeiro?`
+function buildServiceSelectionQuestion(input: {
+  serviceNames: string[]
+  requestedDateIso?: string | null
+  timezone?: string | null
+}) {
+  const lines = input.serviceNames
+    .slice(0, 4)
+    .map((serviceName, index) => `${index + 1}. ${serviceName}`)
+
+  if (lines.length === 0) {
+    return buildServiceQuestion([])
   }
 
-  return professionalNames.length > 0
-    ? 'Voce tem algum barbeiro de preferencia ou pode ser qualquer um?'
-    : 'Tem algum barbeiro de preferencia?'
+  const lead = input.requestedDateIso && input.timezone
+    ? `Perfeito, ${formatDayLabel(input.requestedDateIso, input.timezone).toLowerCase()} ficou anotado.\n\n`
+    : ''
+
+  return `${lead}Para seguir, me diga qual servico voce quer:\n\n${lines.join('\n')}\n\nSe preferir, tambem pode responder com o nome do servico.`
+}
+
+function buildProfessionalQuestion(
+  professionalNames: string[],
+  preferredProfessionalName?: string | null,
+  options?: {
+    requestedDateIso?: string | null
+    timezone?: string | null
+    serviceName?: string | null
+  }
+) {
+  if (professionalNames.length === 0) {
+    return preferredProfessionalName
+      ? `Quer marcar com ${preferredProfessionalName} de novo ou prefere outro barbeiro?`
+      : 'Tem algum barbeiro de preferencia?'
+  }
+
+  const lines = professionalNames
+    .slice(0, 4)
+    .map((professionalName, index) => `${index + 1}. ${professionalName}`)
+
+  lines.push(`${lines.length + 1}. Tanto faz`)
+
+  const baseLead = options?.requestedDateIso && options.timezone
+    ? options.serviceName
+      ? `Perfeito. Para ${options.serviceName} em ${formatDayLabel(options.requestedDateIso, options.timezone).toLowerCase()}, voce tem preferencia de barbeiro?`
+      : `Perfeito. Para ${formatDayLabel(options.requestedDateIso, options.timezone).toLowerCase()}, voce tem preferencia de barbeiro?`
+    : 'Voce tem algum barbeiro de preferencia ou pode ser qualquer um?'
+
+  const lead = preferredProfessionalName
+    ? `${baseLead} Seu ultimo atendimento foi com ${preferredProfessionalName}. Quer seguir com ele de novo ou prefere outro barbeiro?\n\n`
+    : `${baseLead}\n\n`
+
+  return `${lead}${lines.join('\n')}\n\nSe quiser, tambem pode responder com o nome do barbeiro.`
+}
+
+function getActiveSelectableOptionCount(draft: ConversationDraft) {
+  if (draft.pendingServiceOptions.length > 0) {
+    return Math.min(draft.pendingServiceOptions.length, 6)
+  }
+
+  if (draft.pendingProfessionalOptions.length > 0) {
+    return Math.min(draft.pendingProfessionalOptions.length + 1, 6)
+  }
+
+  return draft.offeredSlots.length
 }
 
 function resolveContextualProfessionalPreference(input: {
@@ -1056,13 +1169,26 @@ function buildResumeMessage(input: {
   preferredProfessionalName?: string | null
 }) {
   if (input.state === 'WAITING_SERVICE') {
-    return `Oi! Posso continuar por aqui. ${buildServiceQuestion([])}`
+    return `Oi! Posso continuar por aqui. ${input.draft.pendingServiceOptions.length > 0
+      ? buildServiceSelectionQuestion({
+          serviceNames: input.draft.pendingServiceOptions.map((service) => service.name),
+          requestedDateIso: input.draft.requestedDateIso,
+          timezone: input.timezone,
+        })
+      : buildServiceQuestion([])}`
   }
 
   if (input.state === 'WAITING_PROFESSIONAL') {
     return `Oi! Posso continuar por aqui. ${buildProfessionalQuestion(
-      input.professionals.map((professional) => professional.name),
-      input.preferredProfessionalName
+      input.draft.pendingProfessionalOptions.length > 0
+        ? input.draft.pendingProfessionalOptions.map((professional) => professional.name)
+        : input.professionals.map((professional) => professional.name),
+      input.preferredProfessionalName,
+      {
+        requestedDateIso: input.draft.requestedDateIso,
+        timezone: input.timezone,
+        serviceName: input.draft.selectedServiceName,
+      }
     )}`
   }
 
@@ -1790,6 +1916,8 @@ function applyCorrectionTarget(draft: ConversationDraft, target: string) {
     draft.allowAnyProfessional = false
     draft.requestedDateIso = null
     draft.requestedTimeLabel = null
+    draft.pendingServiceOptions = []
+    draft.pendingProfessionalOptions = []
     clearDraftAvailability(draft)
     return
   }
@@ -1798,6 +1926,8 @@ function applyCorrectionTarget(draft: ConversationDraft, target: string) {
     draft.selectedServiceId = null
     draft.selectedServiceName = null
     draft.requestedTimeLabel = null
+    draft.pendingServiceOptions = []
+    draft.pendingProfessionalOptions = []
     clearDraftAvailability(draft)
     return
   }
@@ -1806,6 +1936,7 @@ function applyCorrectionTarget(draft: ConversationDraft, target: string) {
     draft.selectedProfessionalId = null
     draft.selectedProfessionalName = null
     draft.allowAnyProfessional = false
+    draft.pendingProfessionalOptions = []
     clearDraftAvailability(draft)
     return
   }
@@ -3452,6 +3583,8 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     requestedTimeLabel: conversation.requestedTimeLabel ?? null,
     offeredSlots: parseConversationSlots(conversation.slotOptions),
     selectedStoredSlot: parseSelectedSlot(conversation.selectedSlot),
+    pendingServiceOptions: parseDraftNamedOptions(conversation.bookingDraft, 'pendingServiceOptions'),
+    pendingProfessionalOptions: parseDraftNamedOptions(conversation.bookingDraft, 'pendingProfessionalOptions'),
   }
 
   if (isOperationalConversationState(currentState)) {
@@ -4180,6 +4313,8 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       requestedTimeLabel: agentResult.memory.requestedTimeLabel,
       offeredSlots: agentResult.memory.offeredSlots,
       selectedStoredSlot: agentResult.memory.selectedSlot,
+      pendingServiceOptions: agentResult.memory.pendingServiceOptions,
+      pendingProfessionalOptions: agentResult.memory.pendingProfessionalOptions,
     })
     const shouldResetPersistedContext =
       (
@@ -4487,7 +4622,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     barbershopName: input.barbershop.name,
     barbershopTimezone: timezone,
     conversationState: effectiveState,
-    offeredSlotCount: draftForInterpreter.offeredSlots.length,
+    offeredSlotCount: getActiveSelectableOptionCount(draftForInterpreter),
     services: services.map((service) => ({ name: service.name })),
     professionals: professionals.map((professional) => ({ name: professional.name })),
     todayIsoDate: nowContext.dateIso,
@@ -4641,13 +4776,18 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     }
   }
 
-  const matchedService = interpreted.serviceName
-    ? services.find((service) => normalizeText(service.name) === normalizeText(interpreted.serviceName ?? ''))
-      ?? services.find((service) => normalizeText(interpreted.serviceName ?? '').includes(normalizeText(service.name)))
-      ?? null
-    : null
-
   const baselineDraft = draftForInterpreter
+  const selectedPendingService = pickNamedOptionBySelection({
+    options: baselineDraft.pendingServiceOptions,
+    selectedOptionNumber: interpreted.selectedOptionNumber,
+    message: inboundText,
+  })
+  const interpretedServiceCandidates = interpreted.serviceName
+    ? findNamedOptionCandidates(services, interpreted.serviceName)
+    : []
+  const matchedService = selectedPendingService
+    ?? (interpretedServiceCandidates.length === 1 ? interpretedServiceCandidates[0] ?? null : null)
+  const serviceCandidates = findNamedOptionCandidates(services, inboundText)
   const requestedDateForResolution = interpreted.requestedDateIso ?? baselineDraft.requestedDateIso
   const nameResolution = await resolveMentionedName({
     rawName: normalizeOptionalText(interpreted.mentionedName),
@@ -4685,12 +4825,41 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   if (matchedService) {
     draft.selectedServiceId = matchedService.id
     draft.selectedServiceName = matchedService.name
+    draft.pendingServiceOptions = []
+    if (baselineDraft.selectedServiceId !== matchedService.id) {
+      draft.pendingProfessionalOptions = []
+    }
+  } else if (!draft.selectedServiceId && serviceCandidates.length === 1) {
+    draft.selectedServiceId = serviceCandidates[0].id
+    draft.selectedServiceName = serviceCandidates[0].name
+    draft.pendingServiceOptions = []
+  } else if (!draft.selectedServiceId && serviceCandidates.length > 1) {
+    draft.pendingServiceOptions = serviceCandidates
+      .slice(0, 4)
+      .map((candidate) => ({ id: candidate.id, name: candidate.name }))
+    draft.pendingProfessionalOptions = []
+    clearDraftAvailability(draft)
   }
+
+  const selectedAnyProfessionalByOption =
+    draft.pendingProfessionalOptions.length > 0
+    && interpreted.selectedOptionNumber === draft.pendingProfessionalOptions.length + 1
+  const selectedPendingProfessional = pickNamedOptionBySelection({
+    options: draft.pendingProfessionalOptions,
+    selectedOptionNumber: selectedAnyProfessionalByOption ? null : interpreted.selectedOptionNumber,
+    message: inboundText,
+  })
 
   if (nameResolution.action === 'professional' && nameResolution.resolvedProfessional) {
     draft.selectedProfessionalId = nameResolution.resolvedProfessional.id
     draft.selectedProfessionalName = nameResolution.resolvedProfessional.name
     draft.allowAnyProfessional = false
+    draft.pendingProfessionalOptions = []
+  } else if (selectedPendingProfessional) {
+    draft.selectedProfessionalId = selectedPendingProfessional.id
+    draft.selectedProfessionalName = selectedPendingProfessional.name
+    draft.allowAnyProfessional = false
+    draft.pendingProfessionalOptions = []
   }
 
   if (
@@ -4703,10 +4872,11 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     draft.allowAnyProfessional = false
   }
 
-  if (interpreted.allowAnyProfessional || acceptedAlternativeProfessional) {
+  if (interpreted.allowAnyProfessional || acceptedAlternativeProfessional || selectedAnyProfessionalByOption) {
     draft.selectedProfessionalId = null
     draft.selectedProfessionalName = null
     draft.allowAnyProfessional = true
+    draft.pendingProfessionalOptions = []
   }
 
   console.info('[whatsapp-conversation] professional routing decision', {
@@ -4858,6 +5028,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     allowAnyProfessional: draft.allowAnyProfessional,
     requestedDate: draft.requestedDateIso ? buildDateAnchorUtc(draft.requestedDateIso) : null,
     requestedTimeLabel: draft.requestedTimeLabel,
+    bookingDraft: buildJsonValue(buildSchedulingDraftPayload(draft)),
   }
 
   if (nameResolution.action === 'customer_reference') {
@@ -4957,7 +5128,16 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   }
 
   if (!draft.selectedServiceId || !draft.selectedServiceName) {
-    const responseText = withLeadIn(buildServiceQuestion(services.map((service) => service.name)), responseLeadIn)
+    const responseText = withLeadIn(
+      draft.pendingServiceOptions.length > 0
+        ? buildServiceSelectionQuestion({
+            serviceNames: draft.pendingServiceOptions.map((service) => service.name),
+            requestedDateIso: draft.requestedDateIso,
+            timezone,
+          })
+        : buildServiceQuestion(services.map((service) => service.name)),
+      responseLeadIn
+    )
 
     await prisma.whatsappConversation.update({
       where: { id: conversation.id },
@@ -5026,6 +5206,12 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   }
 
   if (!draft.allowAnyProfessional && !draft.selectedProfessionalId) {
+    if (professionals.length > 1 && draft.pendingProfessionalOptions.length === 0) {
+      draft.pendingProfessionalOptions = professionals
+        .slice(0, 4)
+        .map((professional) => ({ id: professional.id, name: professional.name }))
+    }
+
     const responseText = professionals.length === 1
       ? withLeadIn(
           `Perfeito. Vou buscar com ${professionals[0].name}. ${buildSpecificTimeQuestion({
@@ -5037,8 +5223,15 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
         )
       : withLeadIn(
           buildProfessionalQuestion(
-            professionals.map((professional) => professional.name),
-            contextualProfessionalPreference?.professionalName ?? null
+            draft.pendingProfessionalOptions.length > 0
+              ? draft.pendingProfessionalOptions.map((professional) => professional.name)
+              : professionals.map((professional) => professional.name),
+            contextualProfessionalPreference?.professionalName ?? null,
+            {
+              requestedDateIso: draft.requestedDateIso,
+              timezone,
+              serviceName: draft.selectedServiceName,
+            }
           ),
           responseLeadIn
         )
@@ -5051,6 +5244,12 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
         selectedProfessionalId: professionals.length === 1 ? professionals[0].id : null,
         selectedProfessionalName: professionals.length === 1 ? professionals[0].name : null,
         allowAnyProfessional: draft.allowAnyProfessional,
+        bookingDraft: buildJsonValue(buildSchedulingDraftPayload({
+          ...draft,
+          selectedProfessionalId: professionals.length === 1 ? professionals[0].id : draft.selectedProfessionalId,
+          selectedProfessionalName: professionals.length === 1 ? professionals[0].name : draft.selectedProfessionalName,
+          pendingProfessionalOptions: professionals.length === 1 ? [] : draft.pendingProfessionalOptions,
+        })),
         slotOptions: JSON_NULL,
         selectedSlot: JSON_NULL,
         lastAssistantText: responseText,
@@ -5646,8 +5845,10 @@ export const __testing = {
   buildOfferedSlotSelectionPrompt,
   buildRecentConfirmedGreeting,
   buildServiceQuestion,
+  buildServiceSelectionQuestion,
   buildProfessionalQuestion,
   buildHumanSlotOfferMessage,
+  getActiveSelectableOptionCount,
   hasUsefulConversationProgress,
   hasRecentCompletedBookingContext,
   isAcknowledgementMessage,

@@ -10,6 +10,7 @@ import {
 } from '@/lib/timezone'
 import { recordAiUsage } from '@/lib/ai/usage-log'
 import { extractOpenAIUsage } from '@/lib/ai/openai-usage'
+import { findNamedOptionCandidates } from '@/lib/whatsapp-option-resolution'
 
 const DEFAULT_OPENAI_MODEL = 'gpt-4.1-mini'
 const DEFAULT_TIMEOUT_MS = 15000
@@ -832,34 +833,8 @@ function inferTimePreference(message: string, conversationState?: string) {
 }
 
 function findBestNamedMatch(options: Array<{ name: string }>, message: string) {
-  const normalizedMessage = normalizeText(message)
-  const messageTokens = normalizedMessage.split(/[^a-z0-9]+/).filter(Boolean)
-
-  const exactMatch = options.find((option) => normalizeText(option.name) === normalizedMessage)
-  if (exactMatch) {
-    return exactMatch.name
-  }
-
-  const includedMatch = options.find((option) => normalizedMessage.includes(normalizeText(option.name)))
-  if (includedMatch) {
-    return includedMatch.name
-  }
-
-  const tokenMatch = options.find((option) =>
-    normalizeText(option.name)
-      .split(/[^a-z0-9]+/)
-      .filter(Boolean)
-      .some((token) => {
-        if (token.length > 2 && normalizedMessage.includes(token)) {
-          return true
-        }
-
-        const tokenStem = token.slice(0, 4)
-        return tokenStem.length >= 4 && messageTokens.some((messageToken) => messageToken.startsWith(tokenStem))
-      })
-  )
-
-  return tokenMatch?.name ?? null
+  const candidates = findNamedOptionCandidates(options, message)
+  return candidates.length === 1 ? candidates[0]?.name ?? null : null
 }
 
 function isGreetingOnly(message: string) {

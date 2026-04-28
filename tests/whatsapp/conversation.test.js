@@ -219,10 +219,17 @@ test('follow-up curto como "e domingo?" nao cai em novo agendamento', () => {
 test('sem barbeiro definido a conversa pergunta preferencia antes de sugerir horarios', () => {
   const reply = conversationTesting.buildProfessionalQuestion(
     ['Lucas Ribeiro', 'Matheus Lima', 'Rafael Costa'],
-    null
+    null,
+    {
+      requestedDateIso: '2026-04-14',
+      timezone: 'America/Sao_Paulo',
+      serviceName: 'Barba Terapia',
+    }
   )
 
   assert.match(reply, /preferencia de barbeiro|qualquer um/i)
+  assert.match(reply, /1\. Lucas Ribeiro/i)
+  assert.match(reply, /4\. Tanto faz/i)
   assert.doesNotMatch(reply, /09:30|09:45/)
 })
 
@@ -311,14 +318,54 @@ test('lista de servicos fica formatada em multiplas linhas com bullets', () => {
   assert.doesNotMatch(reply, /R\$|55|35/)
 })
 
+test('selecao de servico pendente reaproveita a data enviada fora de ordem', () => {
+  const reply = conversationTesting.buildServiceSelectionQuestion({
+    serviceNames: ['Barba Terapia', 'Corte + Barba Premium'],
+    requestedDateIso: '2026-04-14',
+    timezone: 'America/Sao_Paulo',
+  })
+
+  assert.match(reply, /14\/04/)
+  assert.match(reply, /1\. Barba Terapia/i)
+  assert.match(reply, /2\. Corte \+ Barba Premium/i)
+  assert.doesNotMatch(reply, /Qual dia voce prefere/i)
+})
+
 test('com barbeiro recente ou preferencial a conversa usa pergunta mais contextual', () => {
   const reply = conversationTesting.buildProfessionalQuestion(
     ['Lucas Ribeiro', 'Matheus Lima', 'Rafael Costa'],
-    'Matheus Lima'
+    'Matheus Lima',
+    {
+      requestedDateIso: '2026-04-14',
+      timezone: 'America/Sao_Paulo',
+      serviceName: 'Barba Terapia',
+    }
   )
 
   assert.match(reply, /Matheus Lima/)
   assert.match(reply, /de novo|prefere outro/i)
+  assert.match(reply, /Tanto faz/i)
+})
+
+test('contagem de opcoes prioriza servico pendente, depois barbeiro e por fim horarios', () => {
+  const draft = conversationTesting.buildEmptyConversationDraft()
+
+  draft.pendingServiceOptions = [
+    { id: 'svc-1', name: 'Barba Terapia' },
+    { id: 'svc-2', name: 'Corte + Barba Premium' },
+  ]
+  assert.equal(conversationTesting.getActiveSelectableOptionCount(draft), 2)
+
+  draft.pendingServiceOptions = []
+  draft.pendingProfessionalOptions = [
+    { id: 'pro-1', name: 'Lucas Ribeiro' },
+    { id: 'pro-2', name: 'Matheus Lima' },
+  ]
+  assert.equal(conversationTesting.getActiveSelectableOptionCount(draft), 3)
+
+  draft.pendingProfessionalOptions = []
+  draft.offeredSlots = [buildSlot()]
+  assert.equal(conversationTesting.getActiveSelectableOptionCount(draft), 1)
 })
 
 test('lista de horarios com o mesmo barbeiro ainda exibe o nome do profissional em cada linha', () => {

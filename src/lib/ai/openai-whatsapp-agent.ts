@@ -30,6 +30,10 @@ import {
 } from '@/lib/timezone'
 import { recordAiUsage } from '@/lib/ai/usage-log'
 import { extractOpenAIUsage } from '@/lib/ai/openai-usage'
+import {
+  findNamedOptionCandidates,
+  pickNamedOptionBySelection,
+} from '@/lib/whatsapp-option-resolution'
 
 const DEFAULT_OPENAI_MODEL = 'gpt-4.1-mini'
 const DEFAULT_TIMEOUT_MS = 20000
@@ -88,6 +92,11 @@ interface ConversationCorrection {
   createdAt: string
 }
 
+interface PendingNamedOption {
+  id: string
+  name: string
+}
+
 interface WorkingMemory {
   state: WhatsAppAgentConversationState
   selectedServiceId: string | null
@@ -99,6 +108,8 @@ interface WorkingMemory {
   requestedTimeLabel: string | null
   offeredSlots: WhatsAppBookingSlot[]
   selectedSlot: WhatsAppBookingSlot | null
+  pendingServiceOptions: PendingNamedOption[]
+  pendingProfessionalOptions: PendingNamedOption[]
   conversationSummary: string | null
   recentCorrections: ConversationCorrection[]
 }
@@ -514,6 +525,40 @@ function parseRecentCorrections(raw: Prisma.JsonValue | null): ConversationCorre
     .slice(-5)
 }
 
+function parsePendingNamedOptions(
+  raw: Prisma.JsonValue | null,
+  key: 'pendingServiceOptions' | 'pendingProfessionalOptions'
+) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return []
+  }
+
+  const draft = raw as Record<string, unknown>
+  const options = draft[key]
+  if (!Array.isArray(options)) {
+    return []
+  }
+
+  return options
+    .map((item) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        return null
+      }
+
+      const option = item as Record<string, unknown>
+      if (typeof option.id !== 'string' || typeof option.name !== 'string') {
+        return null
+      }
+
+      return {
+        id: option.id,
+        name: option.name,
+      } satisfies PendingNamedOption
+    })
+    .filter((option): option is PendingNamedOption => Boolean(option))
+    .slice(0, 6)
+}
+
 function buildInitialMemory(input: WhatsAppAgentInput): WorkingMemory {
   return {
     state: normalizeConversationState(input.conversation.state),
@@ -526,6 +571,8 @@ function buildInitialMemory(input: WhatsAppAgentInput): WorkingMemory {
     requestedTimeLabel: input.conversation.requestedTimeLabel,
     offeredSlots: parseConversationSlots(input.conversation.slotOptions),
     selectedSlot: parseSelectedSlot(input.conversation.selectedSlot),
+    pendingServiceOptions: parsePendingNamedOptions(input.conversation.bookingDraft, 'pendingServiceOptions'),
+    pendingProfessionalOptions: parsePendingNamedOptions(input.conversation.bookingDraft, 'pendingProfessionalOptions'),
     conversationSummary: input.conversation.conversationSummary,
     recentCorrections: parseRecentCorrections(input.conversation.recentCorrections),
   }
@@ -566,6 +613,8 @@ function hasUsefulProgressInMemory(memory: WorkingMemory) {
     || memory.requestedTimeLabel
     || memory.offeredSlots.length > 0
     || memory.selectedSlot
+    || memory.pendingServiceOptions.length > 0
+    || memory.pendingProfessionalOptions.length > 0
   )
 }
 
@@ -1273,8 +1322,10 @@ function buildRuntimeSummary(memory: WorkingMemory) {
   const slot = memory.selectedSlot
     ? `${memory.selectedSlot.dateIso} ${memory.selectedSlot.timeLabel} com ${memory.selectedSlot.professionalName}`
     : 'nao selecionado'
+  const pendingServiceOptions = memory.pendingServiceOptions.length
+  const pendingProfessionalOptions = memory.pendingProfessionalOptions.length
 
-  return `Estado=${memory.state}; servico=${service}; barbeiro=${barber}; data=${date}; horario_ou_periodo=${time}; slot=${slot}.`
+  return `Estado=${memory.state}; servico=${service}; barbeiro=${barber}; data=${date}; horario_ou_periodo=${time}; slot=${slot}; opcoes_servico=${pendingServiceOptions}; opcoes_barbeiro=${pendingProfessionalOptions}.`
 }
 
 function buildContextualConfirmationClassifierPrompt(input: {
@@ -1407,6 +1458,68 @@ function buildServiceQuestionFromNames(serviceNames: string[]) {
     .join('\n')
 
   return `Perfeito! Temos estes servicos disponiveis:\n\n${preview}\n\nQual voce gostaria de agendar?`
+}
+
+function buildServiceSelectionQuestion(input: {
+  serviceNames: string[]
+  requestedDateIso?: string | null
+  timezone?: string | null
+}) {
+  const lines = input.serviceNames
+    .slice(0, 4)
+    .map((serviceName, index) => `${index + 1}. ${serviceName}`)
+
+  if (lines.length === 0) {
+    return buildServiceQuestionFromNames([])
+  }
+
+  const lead = input.requestedDateIso && input.timezone
+    ? `Perfeito, ${formatExplicitResolvedDateLabel(input.requestedDateIso, input.timezone)} ficou anotado.\n\n`
+    : ''
+
+  return `${lead}Para seguir, me diga qual servico voce quer:\n\n${lines.join('\n')}\n\nSe preferir, tambem pode responder com o nome do servico.`
+}
+
+function buildProfessionalPreferenceQuestion(input: {
+  professionalNames: string[]
+  requestedDateIso?: string | null
+  timezone?: string | null
+  serviceName?: string | null
+  preferredProfessionalName?: string | null
+}) {
+  const lines = input.professionalNames
+    .slice(0, 4)
+    .map((professionalName, index) => `${index + 1}. ${professionalName}`)
+
+  if (lines.length === 0) {
+    return 'Voce tem algum barbeiro de preferencia ou pode ser qualquer um?'
+  }
+
+  lines.push(`${lines.length + 1}. Tanto faz`)
+
+  const baseLead = input.requestedDateIso && input.timezone
+    ? input.serviceName
+      ? `Perfeito. Para ${input.serviceName} em ${formatExplicitResolvedDateLabel(input.requestedDateIso, input.timezone)}, voce tem preferencia de barbeiro?`
+      : `Perfeito. Para ${formatExplicitResolvedDateLabel(input.requestedDateIso, input.timezone)}, voce tem preferencia de barbeiro?`
+    : 'Voce tem algum barbeiro de preferencia ou pode ser qualquer um?'
+
+  const lead = input.preferredProfessionalName
+    ? `${baseLead} Seu ultimo atendimento foi com ${input.preferredProfessionalName}. Quer seguir com ele de novo ou prefere outro barbeiro?\n\n`
+    : `${baseLead}\n\n`
+
+  return `${lead}${lines.join('\n')}\n\nSe quiser, tambem pode responder com o nome do barbeiro.`
+}
+
+function getActiveSelectableOptionCount(memory: WorkingMemory) {
+  if (memory.pendingServiceOptions.length > 0) {
+    return Math.min(memory.pendingServiceOptions.length, 6)
+  }
+
+  if (memory.pendingProfessionalOptions.length > 0) {
+    return Math.min(memory.pendingProfessionalOptions.length + 1, 6)
+  }
+
+  return memory.offeredSlots.length
 }
 
 function buildPresentedSlotConfirmationMessage(input: {
@@ -1629,6 +1742,7 @@ function sanitizePrematureConfirmationReply(input: {
   timezone?: string | null
   preferredProfessionalName?: string | null
   serviceNames: string[]
+  professionalNames?: string[]
   nowContext: WhatsAppAgentInput['nowContext']
 }) {
   if (input.shouldCreateAppointment) {
@@ -1684,6 +1798,7 @@ function sanitizePrematureConfirmationReply(input: {
     timezone: input.timezone,
     preferredProfessionalName: input.preferredProfessionalName ?? null,
     serviceNames: input.serviceNames,
+    professionalNames: input.professionalNames,
     nowContext: input.nowContext,
   }) ?? input.replyText
 }
@@ -1696,6 +1811,7 @@ function assignPreferredProfessionalToMemory(input: {
   input.memory.allowAnyProfessional = false
   input.memory.selectedProfessionalId = input.preferredProfessionalId
   input.memory.selectedProfessionalName = input.preferredProfessionalName
+  clearPendingProfessionalOptions(input.memory)
   clearPromotedAvailability(input.memory)
 }
 
@@ -1710,6 +1826,8 @@ function buildBookingDraft(memory: WorkingMemory) {
     requestedTimeLabel: memory.requestedTimeLabel,
     offeredSlots: memory.offeredSlots,
     selectedSlot: memory.selectedSlot,
+    pendingServiceOptions: memory.pendingServiceOptions,
+    pendingProfessionalOptions: memory.pendingProfessionalOptions,
   }
 }
 
@@ -1727,6 +1845,14 @@ function appendCorrection(memory: WorkingMemory, target: string, value: string |
 function clearPromotedAvailability(memory: WorkingMemory) {
   memory.offeredSlots = []
   memory.selectedSlot = null
+}
+
+function clearPendingServiceOptions(memory: WorkingMemory) {
+  memory.pendingServiceOptions = []
+}
+
+function clearPendingProfessionalOptions(memory: WorkingMemory) {
+  memory.pendingProfessionalOptions = []
 }
 
 function replacePromotedAvailabilityWithAlternatives(input: {
@@ -1783,6 +1909,8 @@ function resetWorkingMemory(memory: WorkingMemory) {
   memory.allowAnyProfessional = false
   memory.requestedDateIso = null
   memory.requestedTimeLabel = null
+  clearPendingServiceOptions(memory)
+  clearPendingProfessionalOptions(memory)
   clearPromotedAvailability(memory)
 }
 
@@ -1802,10 +1930,8 @@ function findServiceByIdOrName(input: {
     return null
   }
 
-  const normalizedQuery = normalizeText(input.serviceName)
-  return input.services.find((service) => normalizeText(service.name) === normalizedQuery)
-    ?? input.services.find((service) => normalizeText(service.name).includes(normalizedQuery))
-    ?? null
+  const candidates = findNamedOptionCandidates(input.services, input.serviceName)
+  return candidates.length === 1 ? candidates[0] ?? null : null
 }
 
 function nameTokens(value: string) {
@@ -1887,6 +2013,8 @@ function applyCorrectionTargetToMemory(memory: WorkingMemory, correctionTarget: 
   if (correctionTarget === 'SERVICE') {
     memory.selectedServiceId = null
     memory.selectedServiceName = null
+    clearPendingServiceOptions(memory)
+    clearPendingProfessionalOptions(memory)
     clearPromotedAvailability(memory)
     return
   }
@@ -1895,6 +2023,7 @@ function applyCorrectionTargetToMemory(memory: WorkingMemory, correctionTarget: 
     memory.selectedProfessionalId = null
     memory.selectedProfessionalName = null
     memory.allowAnyProfessional = false
+    clearPendingProfessionalOptions(memory)
     clearPromotedAvailability(memory)
     return
   }
@@ -1932,8 +2061,15 @@ function promoteIntentContextToMemory(input: {
   intent: Awaited<ReturnType<typeof interpretWhatsAppMessage>>
   services: WhatsAppAgentInput['services']
   professionals: WhatsAppAgentInput['professionals']
+  inboundText?: string
 }) {
   const { memory, intent, services, professionals } = input
+  const inboundText = input.inboundText
+    ?? intent.serviceName
+    ?? intent.mentionedName
+    ?? intent.exactTime
+    ?? intent.preferredPeriod
+    ?? ''
   const previousSelectedSlot = memory.selectedSlot
   const previousOfferedSlots = memory.offeredSlots
 
@@ -1954,26 +2090,64 @@ function promoteIntentContextToMemory(input: {
     applyCorrectionTargetToMemory(memory, intent.correctionTarget)
   }
 
-  const service = findServiceByIdOrName({
-    serviceName: intent.serviceName,
-    services,
+  const selectedPendingService = pickNamedOptionBySelection({
+    options: memory.pendingServiceOptions,
+    selectedOptionNumber: intent.selectedOptionNumber,
+    message: inboundText,
   })
+
+  const service = selectedPendingService
+    ?? findServiceByIdOrName({
+      serviceName: intent.serviceName,
+      services,
+    })
 
   if (service) {
     memory.selectedServiceId = service.id
     memory.selectedServiceName = service.name
+    clearPendingServiceOptions(memory)
+  } else if (!memory.selectedServiceId) {
+    const serviceCandidates = findNamedOptionCandidates(services, inboundText)
+    if (serviceCandidates.length === 1) {
+      memory.selectedServiceId = serviceCandidates[0].id
+      memory.selectedServiceName = serviceCandidates[0].name
+      clearPendingServiceOptions(memory)
+    } else if (serviceCandidates.length > 1) {
+      memory.pendingServiceOptions = serviceCandidates
+        .slice(0, 4)
+        .map((candidate) => ({ id: candidate.id, name: candidate.name }))
+      clearPendingProfessionalOptions(memory)
+      clearPromotedAvailability(memory)
+    }
   }
 
-  if (intent.allowAnyProfessional) {
+  const selectedAnyProfessionalByOption =
+    memory.pendingProfessionalOptions.length > 0
+    && intent.selectedOptionNumber === memory.pendingProfessionalOptions.length + 1
+
+  const selectedPendingProfessional = pickNamedOptionBySelection({
+    options: memory.pendingProfessionalOptions,
+    selectedOptionNumber: selectedAnyProfessionalByOption ? null : intent.selectedOptionNumber,
+    message: inboundText,
+  })
+
+  if (intent.allowAnyProfessional || selectedAnyProfessionalByOption) {
     memory.allowAnyProfessional = true
     memory.selectedProfessionalId = null
     memory.selectedProfessionalName = null
+    clearPendingProfessionalOptions(memory)
+  } else if (selectedPendingProfessional) {
+    memory.allowAnyProfessional = false
+    memory.selectedProfessionalId = selectedPendingProfessional.id
+    memory.selectedProfessionalName = selectedPendingProfessional.name
+    clearPendingProfessionalOptions(memory)
   } else if (intent.mentionedName) {
     const professionalCandidates = findProfessionalCandidates(professionals, intent.mentionedName)
     if (professionalCandidates.length === 1) {
       memory.allowAnyProfessional = false
       memory.selectedProfessionalId = professionalCandidates[0].id
       memory.selectedProfessionalName = professionalCandidates[0].name
+      clearPendingProfessionalOptions(memory)
     }
   }
 
@@ -2013,6 +2187,10 @@ function promoteIntentContextToMemory(input: {
 
   if (serviceChanged || professionalChanged || dateChanged || timeChanged || intent.correctionTarget !== 'NONE') {
     clearPromotedAvailability(memory)
+  }
+
+  if (serviceChanged) {
+    clearPendingProfessionalOptions(memory)
   }
 }
 
@@ -2163,6 +2341,7 @@ function buildFallbackStructuredOutput(input: {
   timezone?: string | null
   preferredProfessionalName?: string | null
   services: WhatsAppAgentInput['services']
+  professionals: WhatsAppAgentInput['professionals']
   nowContext: WhatsAppAgentInput['nowContext']
 }) {
   const firstName = input.customerName.trim().split(' ')[0]
@@ -2191,6 +2370,7 @@ function buildFallbackStructuredOutput(input: {
       timezone: input.timezone,
       preferredProfessionalName: input.preferredProfessionalName ?? null,
       serviceNames: input.services.map((service) => service.name),
+      professionalNames: input.professionals.map((professional) => professional.name),
       nowContext: input.nowContext,
     })
     ?? replyText
@@ -2218,6 +2398,7 @@ function buildGuardrailReplyText(input: {
   timezone?: string | null
   preferredProfessionalName?: string | null
   serviceNames?: string[]
+  professionalNames?: string[]
   nowContext?: WhatsAppAgentInput['nowContext']
 }) {
   const firstName = input.customerName.trim().split(' ')[0]
@@ -2233,28 +2414,41 @@ function buildGuardrailReplyText(input: {
   }
 
   if (input.nextAction === 'ASK_SERVICE') {
+    if (input.memory.pendingServiceOptions.length > 0) {
+      return buildServiceSelectionQuestion({
+        serviceNames: input.memory.pendingServiceOptions.map((option) => option.name),
+        requestedDateIso: input.memory.requestedDateIso,
+        timezone: input.timezone ?? 'America/Sao_Paulo',
+      })
+    }
+
     return buildServiceQuestionFromNames(input.serviceNames ?? [])
   }
 
   if (input.nextAction === 'ASK_PROFESSIONAL') {
-    if (input.memory.selectedServiceName && input.memory.requestedDateIso) {
-      const timezone = input.timezone ?? 'America/Sao_Paulo'
-      const requestedDateIso = input.memory.requestedDateIso as string
-      const intentLead = `Entendi. Voce quer ${input.memory.selectedServiceName} para ${formatExplicitResolvedDateLabel(requestedDateIso, timezone)}.`
+    const professionalNames = input.memory.pendingProfessionalOptions.length > 0
+      ? input.memory.pendingProfessionalOptions.map((option) => option.name)
+      : input.professionalNames ?? []
 
-      if (input.preferredProfessionalName) {
-        return `${intentLead}\n\nQuer marcar com ${input.preferredProfessionalName} de novo ou prefere outro barbeiro?`
-      }
-
-      return `${intentLead}\n\nVoce tem algum barbeiro de preferencia ou pode ser qualquer um?`
+    if (professionalNames.length > 0) {
+      return buildProfessionalPreferenceQuestion({
+        professionalNames,
+        requestedDateIso: input.memory.requestedDateIso,
+        timezone: input.timezone ?? 'America/Sao_Paulo',
+        serviceName: input.memory.selectedServiceName,
+        preferredProfessionalName: input.preferredProfessionalName ?? null,
+      })
     }
 
     if (input.preferredProfessionalName) {
       return `Quer marcar com ${input.preferredProfessionalName} de novo ou prefere outro barbeiro?`
     }
 
-    if (input.memory.selectedProfessionalName) {
-      return `Posso buscar com ${input.memory.selectedProfessionalName} ou, se preferir, vejo outro barbeiro.`
+    if (input.memory.selectedServiceName && input.memory.requestedDateIso) {
+      const timezone = input.timezone ?? 'America/Sao_Paulo'
+      return input.memory.selectedProfessionalName
+        ? `Perfeito. Para ${input.memory.selectedServiceName} em ${formatExplicitResolvedDateLabel(input.memory.requestedDateIso, timezone)}, posso buscar com ${input.memory.selectedProfessionalName} ou, se preferir, vejo outro barbeiro.`
+        : `Perfeito. Para ${input.memory.selectedServiceName} em ${formatExplicitResolvedDateLabel(input.memory.requestedDateIso, timezone)}, voce tem algum barbeiro de preferencia ou pode ser qualquer um?`
     }
 
     return 'Voce tem algum barbeiro de preferencia ou pode ser qualquer um?'
@@ -2417,6 +2611,7 @@ function resolveToolFailureOverride(input: {
   timezone?: string | null
   preferredProfessionalName?: string | null
   serviceNames: string[]
+  professionalNames: string[]
   nowContext: WhatsAppAgentInput['nowContext']
 }) {
   const latestAvailabilityError =
@@ -2430,6 +2625,48 @@ function resolveToolFailureOverride(input: {
 
   const reason = String(latestAvailabilityError.result.reason)
 
+  if (reason === 'service_choice_required') {
+    const services = Array.isArray(latestAvailabilityError.result.services)
+      ? latestAvailabilityError.result.services
+        .map((service) => {
+          if (!service || typeof service !== 'object' || Array.isArray(service)) {
+            return null
+          }
+
+          const candidate = service as Record<string, unknown>
+          if (typeof candidate.id !== 'string' || typeof candidate.name !== 'string') {
+            return null
+          }
+
+          return {
+            id: candidate.id,
+            name: candidate.name,
+          } satisfies PendingNamedOption
+        })
+        .filter((service): service is PendingNamedOption => Boolean(service))
+      : []
+
+    if (services.length > 0) {
+      input.memory.pendingServiceOptions = services
+    }
+
+    const nextAction = 'ASK_SERVICE' as const
+    return {
+      nextAction,
+      replyText: buildGuardrailReplyText({
+        nextAction,
+        memory: input.memory,
+        customerName: input.customerName,
+        barbershopName: input.barbershopName,
+        timezone: input.timezone,
+        preferredProfessionalName: input.preferredProfessionalName ?? null,
+        serviceNames: input.serviceNames,
+        professionalNames: input.professionalNames,
+        nowContext: input.nowContext,
+      }) ?? buildServiceQuestionFromNames(input.serviceNames),
+    }
+  }
+
   if (reason === 'service_not_found') {
     const nextAction = 'ASK_SERVICE' as const
     return {
@@ -2442,6 +2679,7 @@ function resolveToolFailureOverride(input: {
         timezone: input.timezone,
         preferredProfessionalName: input.preferredProfessionalName ?? null,
         serviceNames: input.serviceNames,
+        professionalNames: input.professionalNames,
         nowContext: input.nowContext,
       }) ?? buildServiceQuestionFromNames(input.serviceNames),
     }
@@ -2459,6 +2697,7 @@ function resolveToolFailureOverride(input: {
         timezone: input.timezone,
         preferredProfessionalName: input.preferredProfessionalName ?? null,
         serviceNames: input.serviceNames,
+        professionalNames: input.professionalNames,
         nowContext: input.nowContext,
       }) ?? 'Voce tem algum barbeiro de preferencia ou pode ser qualquer um?',
     }
@@ -2476,6 +2715,7 @@ function resolveToolFailureOverride(input: {
         timezone: input.timezone,
         preferredProfessionalName: input.preferredProfessionalName ?? null,
         serviceNames: input.serviceNames,
+        professionalNames: input.professionalNames,
         nowContext: input.nowContext,
       }) ?? 'Qual dia voce prefere?',
     }
@@ -2493,6 +2733,7 @@ function resolveToolFailureOverride(input: {
         timezone: input.timezone,
         preferredProfessionalName: input.preferredProfessionalName ?? null,
         serviceNames: input.serviceNames,
+        professionalNames: input.professionalNames,
         nowContext: input.nowContext,
       }) ?? 'Perfeito. Que horas voce gostaria?',
     }
@@ -2596,7 +2837,7 @@ async function executeAgentTool(input: {
   if (toolName === 'list_services') {
     const query = typeof args.query === 'string' ? args.query : null
     const filteredServices = query
-      ? agentInput.services.filter((service) => normalizeText(service.name).includes(normalizeText(query)))
+      ? findNamedOptionCandidates(agentInput.services, query)
       : agentInput.services
     const services = filteredServices.length > 0 ? filteredServices : agentInput.services
     const includePrice = hasExplicitPriceQuestion(agentInput.inboundText)
@@ -2643,13 +2884,31 @@ async function executeAgentTool(input: {
   }
 
   if (toolName === 'search_availability') {
+    const requestedServiceName = typeof args.serviceName === 'string' ? args.serviceName : memory.selectedServiceName
     const service = findServiceByIdOrName({
       serviceId: typeof args.serviceId === 'string' ? args.serviceId : null,
-      serviceName: typeof args.serviceName === 'string' ? args.serviceName : memory.selectedServiceName,
+      serviceName: requestedServiceName,
       services: agentInput.services,
     })
 
     if (!service) {
+      const serviceCandidates = findNamedOptionCandidates(
+        agentInput.services,
+        requestedServiceName ?? agentInput.inboundText
+      )
+
+      if (serviceCandidates.length > 1) {
+        memory.pendingServiceOptions = serviceCandidates
+          .slice(0, 4)
+          .map((candidate) => ({ id: candidate.id, name: candidate.name }))
+
+        return {
+          status: 'error',
+          reason: 'service_choice_required',
+          services: memory.pendingServiceOptions,
+        }
+      }
+
       return { status: 'error', reason: 'service_not_found' }
     }
 
@@ -2664,11 +2923,6 @@ async function executeAgentTool(input: {
       )
     )
 
-    if (!professionalId && !allowAnyProfessional && agentInput.customer.preferredProfessionalId) {
-      professionalId = agentInput.customer.preferredProfessionalId
-      professionalName = agentInput.customer.preferredProfessionalName ?? null
-    }
-
     if (!professionalId && professionalName) {
       const candidates = findProfessionalCandidates(agentInput.professionals, professionalName)
       if (candidates.length === 1) {
@@ -2678,6 +2932,9 @@ async function executeAgentTool(input: {
     }
 
     if (!professionalId && !allowAnyProfessional) {
+      memory.pendingProfessionalOptions = agentInput.professionals
+        .slice(0, 4)
+        .map((professional) => ({ id: professional.id, name: professional.name }))
       return {
         status: 'error',
         reason: 'professional_choice_required',
@@ -2774,6 +3031,7 @@ async function executeAgentTool(input: {
       memory.allowAnyProfessional = true
       memory.selectedProfessionalId = null
       memory.selectedProfessionalName = null
+      clearPendingProfessionalOptions(memory)
     } else if (professionalId) {
       memory.allowAnyProfessional = false
       memory.selectedProfessionalId = professionalId
@@ -2781,6 +3039,7 @@ async function executeAgentTool(input: {
         professionalName
         ?? agentInput.professionals.find((professional) => professional.id === professionalId)?.name
         ?? null
+      clearPendingProfessionalOptions(memory)
     }
 
     if (exactTime && availability.slots.length === 0 && availability.diagnostics.finalReason === 'exact_time_unavailable') {
@@ -2815,15 +3074,34 @@ async function executeAgentTool(input: {
   }
 
   if (toolName === 'create_booking_draft') {
+    const requestedServiceName = typeof args.serviceName === 'string' ? args.serviceName : memory.selectedServiceName
     const service = findServiceByIdOrName({
       serviceId: typeof args.serviceId === 'string' ? args.serviceId : memory.selectedServiceId,
-      serviceName: typeof args.serviceName === 'string' ? args.serviceName : memory.selectedServiceName,
+      serviceName: requestedServiceName,
       services: agentInput.services,
     })
 
     if (service) {
       memory.selectedServiceId = service.id
       memory.selectedServiceName = service.name
+      clearPendingServiceOptions(memory)
+    } else if (!memory.selectedServiceId) {
+      const serviceCandidates = findNamedOptionCandidates(
+        agentInput.services,
+        requestedServiceName ?? agentInput.inboundText
+      )
+
+      if (serviceCandidates.length > 1) {
+        memory.pendingServiceOptions = serviceCandidates
+          .slice(0, 4)
+          .map((candidate) => ({ id: candidate.id, name: candidate.name }))
+
+        return {
+          status: 'error',
+          reason: 'service_choice_required',
+          services: memory.pendingServiceOptions,
+        }
+      }
     }
 
     const allowAnyProfessional = Boolean(
@@ -2839,6 +3117,7 @@ async function executeAgentTool(input: {
       memory.allowAnyProfessional = true
       memory.selectedProfessionalId = null
       memory.selectedProfessionalName = null
+      clearPendingProfessionalOptions(memory)
     } else {
       const professionalId = typeof args.professionalId === 'string' ? args.professionalId : null
       const professionalName = typeof args.professionalName === 'string' ? args.professionalName : null
@@ -2850,6 +3129,7 @@ async function executeAgentTool(input: {
         memory.allowAnyProfessional = false
         memory.selectedProfessionalId = candidates[0].id
         memory.selectedProfessionalName = candidates[0].name
+        clearPendingProfessionalOptions(memory)
       }
     }
 
@@ -2992,6 +3272,9 @@ async function executeAgentTool(input: {
           }
         }
       } else {
+        memory.pendingProfessionalOptions = agentInput.professionals
+          .slice(0, 4)
+          .map((professional) => ({ id: professional.id, name: professional.name }))
         return {
           status: 'error',
           reason: 'professional_choice_required',
@@ -3295,7 +3578,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     barbershopName: input.barbershop.name,
     barbershopTimezone: input.barbershop.timezone,
     conversationState: memory.state,
-    offeredSlotCount: memory.offeredSlots.length,
+    offeredSlotCount: getActiveSelectableOptionCount(memory),
     services: input.services.map((service) => ({ name: service.name })),
     professionals: input.professionals.map((professional) => ({ name: professional.name })),
     todayIsoDate: input.nowContext.dateIso,
@@ -3316,6 +3599,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     intent: fallbackIntent,
     services: input.services,
     professionals: input.professionals,
+    inboundText: input.inboundText,
   })
 
   console.info('[whatsapp-agent] scheduling context promotion', {
@@ -3479,6 +3763,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
     timezone: input.barbershop.timezone,
     preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
     services: input.services,
+    professionals: input.professionals,
     nowContext: input.nowContext,
   })
 
@@ -3637,6 +3922,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
       },
       services: input.services,
       professionals: input.professionals,
+      inboundText: input.inboundText,
     })
 
     preservePromotedSchedulingContext({
@@ -3776,6 +4062,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
       timezone: input.barbershop.timezone,
       preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
       serviceNames: input.services.map((service) => service.name),
+      professionalNames: input.professionals.map((professional) => professional.name),
       nowContext: input.nowContext,
     })
 
@@ -3801,6 +4088,18 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
       shouldCreateAppointment,
       input.nowContext
     )
+
+    if (
+      normalizedNextAction === 'ASK_PROFESSIONAL'
+      && !memory.selectedProfessionalId
+      && !memory.allowAnyProfessional
+      && memory.pendingProfessionalOptions.length === 0
+    ) {
+      memory.pendingProfessionalOptions = input.professionals
+        .slice(0, 4)
+        .map((professional) => ({ id: professional.id, name: professional.name }))
+    }
+
     const replyTextBeforeDateGuard =
       toolFailureOverride?.replyText
       ?? structuredDraft.replyText
@@ -3820,6 +4119,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
           timezone: input.barbershop.timezone,
           preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
           serviceNames: input.services.map((service) => service.name),
+          professionalNames: input.professionals.map((professional) => professional.name),
           nowContext: input.nowContext,
         })
       : null
@@ -3833,6 +4133,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
           timezone: input.barbershop.timezone,
           preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
           serviceNames: input.services.map((service) => service.name),
+          professionalNames: input.professionals.map((professional) => professional.name),
           nowContext: input.nowContext,
         })
       : null
@@ -3886,6 +4187,7 @@ export async function processWhatsAppConversationWithAgent(input: WhatsAppAgentI
       timezone: input.barbershop.timezone,
       preferredProfessionalName: input.customer.preferredProfessionalName ?? null,
       serviceNames: input.services.map((service) => service.name),
+      professionalNames: input.professionals.map((professional) => professional.name),
       nowContext: input.nowContext,
     })
     const structured = {
@@ -3937,6 +4239,9 @@ export const __testing = {
   resolveToolFailureOverride,
   buildGuardrailReplyText,
   buildServiceQuestionFromNames,
+  buildServiceSelectionQuestion,
+  buildProfessionalPreferenceQuestion,
+  getActiveSelectableOptionCount,
   referencesPreferredProfessional,
   hasExplicitPriceQuestion,
   isExplicitConfirmation,

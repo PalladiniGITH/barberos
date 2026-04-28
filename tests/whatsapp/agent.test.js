@@ -9,6 +9,11 @@ const SERVICES = [
   { id: 'svc-barba', name: 'Barba', duration: 20, price: 35 },
 ]
 
+const AMBIGUOUS_SERVICES = [
+  { id: 'svc-barba-terapia', name: 'Barba Terapia', duration: 30, price: 45 },
+  { id: 'svc-corte-barba-premium', name: 'Corte + Barba Premium', duration: 60, price: 95 },
+]
+
 const PROFESSIONALS = [
   { id: 'pro-matheus', name: 'Matheus' },
   { id: 'pro-lucas', name: 'Lucas' },
@@ -106,14 +111,192 @@ async function interpretMessageAt(message, memory, input) {
     barbershopName: 'Linha Nobre',
     barbershopTimezone: 'America/Sao_Paulo',
     conversationState: memory.state,
-    offeredSlotCount: memory.offeredSlots.length,
-    services: SERVICES.map((service) => ({ name: service.name })),
-    professionals: PROFESSIONALS.map((professional) => ({ name: professional.name })),
+    offeredSlotCount: agentTesting.getActiveSelectableOptionCount(memory),
+    services: (input.services ?? SERVICES).map((service) => ({ name: service.name })),
+    professionals: (input.professionals ?? PROFESSIONALS).map((professional) => ({ name: professional.name })),
     todayIsoDate: input.todayIsoDate,
     currentLocalDateTime: input.currentLocalDateTime,
     conversationSummary: getConversationSummaryFromMemory(memory),
   })
 }
+
+test('servico ambiguo pede escolha do servico e nao avanca para data no mesmo turno', async () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+
+  const intent = await interpretMessageAt('quero marcar barba', memory, {
+    todayIsoDate: '2026-04-13',
+    currentLocalDateTime: '2026-04-13 10:30',
+    services: AMBIGUOUS_SERVICES,
+  })
+
+  agentTesting.promoteIntentContextToMemory({
+    memory,
+    intent,
+    services: AMBIGUOUS_SERVICES,
+    professionals: PROFESSIONALS,
+    inboundText: 'quero marcar barba',
+  })
+
+  const nextAction = agentTesting.enforceNextActionFromMemory(
+    'ASK_DATE',
+    memory,
+    false,
+    createAgentInput().nowContext
+  )
+
+  const reply = agentTesting.buildGuardrailReplyText({
+    nextAction,
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    serviceNames: AMBIGUOUS_SERVICES.map((service) => service.name),
+    professionalNames: PROFESSIONALS.map((professional) => professional.name),
+    nowContext: createAgentInput().nowContext,
+  })
+
+  assert.equal(nextAction, 'ASK_SERVICE')
+  assert.equal(memory.selectedServiceId, null)
+  assert.deepEqual(
+    memory.pendingServiceOptions.map((option) => option.name),
+    ['Barba Terapia', 'Corte + Barba Premium']
+  )
+  assert.match(reply, /1\. Barba Terapia/i)
+  assert.match(reply, /2\. Corte \+ Barba Premium/i)
+  assert.doesNotMatch(reply, /Qual dia voce prefere/i)
+})
+
+test('data enviada antes do servico fica preservada enquanto o servico ambiguo e resolvido', async () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.state = 'WAITING_SERVICE'
+
+  const dateIntent = await interpretMessageAt('amanha', memory, {
+    todayIsoDate: '2026-04-13',
+    currentLocalDateTime: '2026-04-13 10:30',
+    services: AMBIGUOUS_SERVICES,
+  })
+
+  agentTesting.promoteIntentContextToMemory({
+    memory,
+    intent: dateIntent,
+    services: AMBIGUOUS_SERVICES,
+    professionals: PROFESSIONALS,
+    inboundText: 'amanha',
+  })
+
+  const serviceIntent = await interpretMessageAt('barba', memory, {
+    todayIsoDate: '2026-04-13',
+    currentLocalDateTime: '2026-04-13 10:30',
+    services: AMBIGUOUS_SERVICES,
+  })
+
+  agentTesting.promoteIntentContextToMemory({
+    memory,
+    intent: serviceIntent,
+    services: AMBIGUOUS_SERVICES,
+    professionals: PROFESSIONALS,
+    inboundText: 'barba',
+  })
+
+  const reply = agentTesting.buildGuardrailReplyText({
+    nextAction: 'ASK_SERVICE',
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    serviceNames: AMBIGUOUS_SERVICES.map((service) => service.name),
+    professionalNames: PROFESSIONALS.map((professional) => professional.name),
+    timezone: 'America/Sao_Paulo',
+    nowContext: createAgentInput().nowContext,
+  })
+
+  assert.equal(memory.requestedDateIso, '2026-04-14')
+  assert.equal(memory.selectedServiceId, null)
+  assert.equal(memory.pendingServiceOptions.length, 2)
+  assert.match(reply, /14\/04/)
+  assert.match(reply, /Barba Terapia/i)
+})
+
+test('preferencia de barbeiro vira etapa explicita antes de listar horarios mistos', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.selectedServiceId = 'svc-barba-terapia'
+  memory.selectedServiceName = 'Barba Terapia'
+  memory.requestedDateIso = '2026-04-14'
+  memory.pendingProfessionalOptions = PROFESSIONALS.map((professional) => ({
+    id: professional.id,
+    name: professional.name,
+  }))
+
+  const reply = agentTesting.buildGuardrailReplyText({
+    nextAction: 'ASK_PROFESSIONAL',
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    professionalNames: PROFESSIONALS.map((professional) => professional.name),
+    timezone: 'America/Sao_Paulo',
+    nowContext: createAgentInput().nowContext,
+  })
+
+  assert.match(reply, /preferencia de barbeiro/i)
+  assert.match(reply, /1\. Matheus/i)
+  assert.match(reply, /2\. Lucas/i)
+  assert.match(reply, /3\. Rafael Costa/i)
+  assert.match(reply, /4\. Tanto faz/i)
+  assert.doesNotMatch(reply, /08:00|09:00|13:15/)
+})
+
+test('mensagens curtas resolvem barbeiro e tanto faz no estado de preferencia', async () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.state = 'WAITING_PROFESSIONAL'
+  memory.selectedServiceId = 'svc-barba-terapia'
+  memory.selectedServiceName = 'Barba Terapia'
+  memory.requestedDateIso = '2026-04-14'
+  memory.pendingProfessionalOptions = PROFESSIONALS.map((professional) => ({
+    id: professional.id,
+    name: professional.name,
+  }))
+
+  const professionalIntent = await interpretMessageAt('Matheus', memory, {
+    todayIsoDate: '2026-04-13',
+    currentLocalDateTime: '2026-04-13 10:30',
+    services: AMBIGUOUS_SERVICES,
+  })
+
+  agentTesting.promoteIntentContextToMemory({
+    memory,
+    intent: professionalIntent,
+    services: AMBIGUOUS_SERVICES,
+    professionals: PROFESSIONALS,
+    inboundText: 'Matheus',
+  })
+
+  assert.equal(memory.selectedProfessionalName, 'Matheus')
+  assert.equal(memory.allowAnyProfessional, false)
+  assert.equal(memory.pendingProfessionalOptions.length, 0)
+
+  memory.selectedProfessionalId = null
+  memory.selectedProfessionalName = null
+  memory.pendingProfessionalOptions = PROFESSIONALS.map((professional) => ({
+    id: professional.id,
+    name: professional.name,
+  }))
+
+  const anyIntent = await interpretMessageAt('4', memory, {
+    todayIsoDate: '2026-04-13',
+    currentLocalDateTime: '2026-04-13 10:30',
+    services: AMBIGUOUS_SERVICES,
+  })
+
+  agentTesting.promoteIntentContextToMemory({
+    memory,
+    intent: anyIntent,
+    services: AMBIGUOUS_SERVICES,
+    professionals: PROFESSIONALS,
+    inboundText: '4',
+  })
+
+  assert.equal(memory.allowAnyProfessional, true)
+  assert.equal(memory.selectedProfessionalId, null)
+  assert.equal(memory.pendingProfessionalOptions.length, 0)
+})
 
 test('promove imediatamente data, servico e periodo para a memoria do agente', async () => {
   const memory = agentTesting.buildInitialMemory(createAgentInput())
