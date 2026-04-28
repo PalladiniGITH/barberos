@@ -31,6 +31,7 @@ import {
 import { recordAiUsage } from '@/lib/ai/usage-log'
 import { extractOpenAIUsage } from '@/lib/ai/openai-usage'
 import {
+  buildNamedProfessionalOptionsFromSlots,
   findNamedOptionCandidates,
   pickNamedOptionBySelection,
 } from '@/lib/whatsapp-option-resolution'
@@ -1486,6 +1487,7 @@ function buildProfessionalPreferenceQuestion(input: {
   timezone?: string | null
   serviceName?: string | null
   preferredProfessionalName?: string | null
+  requestedTimeLabel?: string | null
 }) {
   const lines = input.professionalNames
     .slice(0, 4)
@@ -1499,8 +1501,8 @@ function buildProfessionalPreferenceQuestion(input: {
 
   const baseLead = input.requestedDateIso && input.timezone
     ? input.serviceName
-      ? `Perfeito. Para ${input.serviceName} em ${formatExplicitResolvedDateLabel(input.requestedDateIso, input.timezone)}, voce tem preferencia de barbeiro?`
-      : `Perfeito. Para ${formatExplicitResolvedDateLabel(input.requestedDateIso, input.timezone)}, voce tem preferencia de barbeiro?`
+      ? `Perfeito. Para ${input.serviceName} em ${formatExplicitResolvedDateLabel(input.requestedDateIso, input.timezone)}${input.requestedTimeLabel && input.requestedTimeLabel.includes(':') ? `, as ${input.requestedTimeLabel}` : ''}, voce tem preferencia de barbeiro?`
+      : `Perfeito. Para ${formatExplicitResolvedDateLabel(input.requestedDateIso, input.timezone)}${input.requestedTimeLabel && input.requestedTimeLabel.includes(':') ? `, as ${input.requestedTimeLabel}` : ''}, voce tem preferencia de barbeiro?`
     : 'Voce tem algum barbeiro de preferencia ou pode ser qualquer um?'
 
   const lead = input.preferredProfessionalName
@@ -2437,6 +2439,7 @@ function buildGuardrailReplyText(input: {
         timezone: input.timezone ?? 'America/Sao_Paulo',
         serviceName: input.memory.selectedServiceName,
         preferredProfessionalName: input.preferredProfessionalName ?? null,
+        requestedTimeLabel: input.memory.requestedTimeLabel,
       })
     }
 
@@ -2751,6 +2754,30 @@ function resolveToolFailureOverride(input: {
     const slots = Array.isArray(latestAvailabilityError.result.slots)
       ? latestAvailabilityError.result.slots as WhatsAppBookingSlot[]
       : []
+    const professionalOptions = buildNamedProfessionalOptionsFromSlots(slots).slice(0, 4)
+
+    if (professionalOptions.length > 1) {
+      input.memory.pendingProfessionalOptions = professionalOptions
+      input.memory.offeredSlots = []
+      input.memory.selectedSlot = null
+
+      const nextAction = 'ASK_PROFESSIONAL' as const
+      return {
+        nextAction,
+        replyText: buildGuardrailReplyText({
+          nextAction,
+          memory: input.memory,
+          customerName: input.customerName,
+          barbershopName: input.barbershopName,
+          timezone: input.timezone,
+          preferredProfessionalName: input.preferredProfessionalName ?? null,
+          serviceNames: input.serviceNames,
+          professionalNames: professionalOptions.map((option) => option.name),
+          nowContext: input.nowContext,
+        }) ?? 'Tenho esse horario disponivel com mais de um barbeiro. Me diga qual voce prefere.',
+      }
+    }
+
     return {
       nextAction: 'OFFER_SLOTS' as const,
       replyText: buildNearbySlotsMessage(slots)
@@ -2912,6 +2939,15 @@ async function executeAgentTool(input: {
       return { status: 'error', reason: 'service_not_found' }
     }
 
+    const dateIso = typeof args.dateIso === 'string' && args.dateIso ? args.dateIso : memory.requestedDateIso
+    const requestedTimePreference = typeof args.preferredPeriod === 'string' && args.preferredPeriod
+      ? args.preferredPeriod
+      : memory.requestedTimeLabel
+    const exactTime = typeof args.exactTime === 'string' && args.exactTime
+      ? args.exactTime
+      : (requestedTimePreference && /^\d{2}:\d{2}$/.test(requestedTimePreference) ? requestedTimePreference : null)
+    const preferredPeriod = exactTime ? 'EXACT' : requestedTimePreference
+
     let professionalId = typeof args.professionalId === 'string' ? args.professionalId : memory.selectedProfessionalId
     let professionalName = typeof args.professionalName === 'string' ? args.professionalName : memory.selectedProfessionalName
     const allowAnyProfessional = Boolean(
@@ -2932,6 +2968,78 @@ async function executeAgentTool(input: {
     }
 
     if (!professionalId && !allowAnyProfessional) {
+      if (dateIso && exactTime) {
+        let exactAvailability
+        try {
+          exactAvailability = await getAvailableWhatsAppSlots({
+            barbershopId: agentInput.barbershop.id,
+            serviceId: service.id,
+            dateIso,
+            timezone: agentInput.barbershop.timezone,
+            professionalId: null,
+            timePreference: 'EXACT',
+            exactTime,
+            limit: 4,
+          })
+        } catch (error) {
+          if (error instanceof AvailabilityInfrastructureError) {
+            return {
+              status: 'error',
+              reason: 'availability_infrastructure_error',
+            }
+          }
+
+          throw error
+        }
+
+        memory.selectedServiceId = service.id
+        memory.selectedServiceName = service.name
+        memory.requestedDateIso = dateIso
+        memory.requestedTimeLabel = exactTime
+
+        const professionalOptions = buildNamedProfessionalOptionsFromSlots(exactAvailability.slots).slice(0, 4)
+        if (professionalOptions.length === 1) {
+          professionalId = professionalOptions[0].id
+          professionalName = professionalOptions[0].name
+          clearPendingProfessionalOptions(memory)
+        } else if (professionalOptions.length > 1) {
+          memory.pendingProfessionalOptions = professionalOptions
+          clearPromotedAvailability(memory)
+          return {
+            status: 'error',
+            reason: 'professional_choice_required',
+            preferredProfessional: agentInput.customer.preferredProfessionalId
+              ? {
+                  id: agentInput.customer.preferredProfessionalId,
+                  name: agentInput.customer.preferredProfessionalName,
+                }
+              : null,
+          }
+        } else if (exactAvailability.diagnostics.finalReason === 'exact_time_unavailable') {
+          replacePromotedAvailabilityWithAlternatives({
+            memory,
+            nearbySlots: exactAvailability.suggestedSlots,
+            diagnostics: exactAvailability.diagnostics,
+            logContext: {
+              customerId: agentInput.customer.id,
+              conversationId: agentInput.conversation.id,
+              barbershopId: agentInput.barbershop.id,
+              serviceId: service.id,
+              professionalId: null,
+              requestedDateIso: dateIso,
+              requestedTime: exactTime,
+            },
+          })
+
+          return {
+            status: 'error',
+            reason: 'exact_time_unavailable',
+            nearbySlots: exactAvailability.suggestedSlots,
+            diagnostics: exactAvailability.diagnostics,
+          }
+        }
+      }
+
       memory.pendingProfessionalOptions = agentInput.professionals
         .slice(0, 4)
         .map((professional) => ({ id: professional.id, name: professional.name }))
@@ -2947,18 +3055,9 @@ async function executeAgentTool(input: {
       }
     }
 
-    const dateIso = typeof args.dateIso === 'string' && args.dateIso ? args.dateIso : memory.requestedDateIso
     if (!dateIso) {
       return { status: 'error', reason: 'date_required' }
     }
-
-    const requestedTimePreference = typeof args.preferredPeriod === 'string' && args.preferredPeriod
-      ? args.preferredPeriod
-      : memory.requestedTimeLabel
-    const exactTime = typeof args.exactTime === 'string' && args.exactTime
-      ? args.exactTime
-      : (requestedTimePreference && /^\d{2}:\d{2}$/.test(requestedTimePreference) ? requestedTimePreference : null)
-    const preferredPeriod = exactTime ? 'EXACT' : requestedTimePreference
     const hasPeriodFilter = hasBroadPeriodSchedulingFilter(preferredPeriod)
 
     if (hasPeriodFilter) {
@@ -3272,9 +3371,75 @@ async function executeAgentTool(input: {
           }
         }
       } else {
-        memory.pendingProfessionalOptions = agentInput.professionals
-          .slice(0, 4)
-          .map((professional) => ({ id: professional.id, name: professional.name }))
+        let exactAvailability
+        try {
+          exactAvailability = await getAvailableWhatsAppSlots({
+            barbershopId: agentInput.barbershop.id,
+            serviceId: memory.selectedServiceId,
+            dateIso: memory.requestedDateIso,
+            timezone: agentInput.barbershop.timezone,
+            professionalId: null,
+            timePreference: 'EXACT',
+            exactTime: args.requestedTime,
+            limit: 4,
+          })
+        } catch (error) {
+          if (error instanceof AvailabilityInfrastructureError) {
+            return {
+              status: 'error',
+              reason: 'availability_infrastructure_error',
+            }
+          }
+
+          throw error
+        }
+
+        const professionalOptions = buildNamedProfessionalOptionsFromSlots(exactAvailability.slots).slice(0, 4)
+        if (professionalOptions.length === 1) {
+          memory.selectedProfessionalId = professionalOptions[0].id
+          memory.selectedProfessionalName = professionalOptions[0].name
+          memory.allowAnyProfessional = false
+          memory.selectedSlot = exactAvailability.slots[0] ?? null
+          clearPendingProfessionalOptions(memory)
+
+          return {
+            status: 'ok',
+            draft: buildBookingDraft(memory),
+            selectedSlot: memory.selectedSlot,
+          }
+        }
+
+        if (professionalOptions.length > 1) {
+          memory.pendingProfessionalOptions = professionalOptions
+          clearPromotedAvailability(memory)
+        } else if (exactAvailability.diagnostics.finalReason === 'exact_time_unavailable') {
+          replacePromotedAvailabilityWithAlternatives({
+            memory,
+            nearbySlots: exactAvailability.suggestedSlots,
+            diagnostics: exactAvailability.diagnostics,
+            logContext: {
+              customerId: agentInput.customer.id,
+              conversationId: agentInput.conversation.id,
+              barbershopId: agentInput.barbershop.id,
+              serviceId: memory.selectedServiceId,
+              professionalId: null,
+              requestedDateIso: memory.requestedDateIso,
+              requestedTime: args.requestedTime,
+            },
+          })
+
+          return {
+            status: 'error',
+            reason: 'exact_time_unavailable',
+            nearbySlots: exactAvailability.suggestedSlots,
+            diagnostics: exactAvailability.diagnostics,
+          }
+        } else {
+          memory.pendingProfessionalOptions = agentInput.professionals
+            .slice(0, 4)
+            .map((professional) => ({ id: professional.id, name: professional.name }))
+        }
+
         return {
           status: 'error',
           reason: 'professional_choice_required',
@@ -3451,6 +3616,79 @@ async function executeAgentTool(input: {
           }
         }
       } else {
+        let exactAvailability
+        try {
+          exactAvailability = await getAvailableWhatsAppSlots({
+            barbershopId: agentInput.barbershop.id,
+            serviceId: memory.selectedServiceId,
+            dateIso: memory.requestedDateIso,
+            timezone: agentInput.barbershop.timezone,
+            professionalId: null,
+            timePreference: 'EXACT',
+            exactTime: requestedTime,
+            limit: 4,
+          })
+        } catch (error) {
+          if (error instanceof AvailabilityInfrastructureError) {
+            return {
+              status: 'error',
+              reason: 'availability_infrastructure_error',
+              explicitConfirmationDetected: pureExplicitConfirmation,
+            }
+          }
+
+          throw error
+        }
+
+        const professionalOptions = buildNamedProfessionalOptionsFromSlots(exactAvailability.slots).slice(0, 4)
+        if (professionalOptions.length === 1) {
+          memory.selectedProfessionalId = professionalOptions[0].id
+          memory.selectedProfessionalName = professionalOptions[0].name
+          memory.allowAnyProfessional = false
+          memory.selectedSlot = exactAvailability.slots[0] ?? null
+          clearPendingProfessionalOptions(memory)
+        } else
+        if (professionalOptions.length > 1) {
+          memory.pendingProfessionalOptions = professionalOptions
+          clearPromotedAvailability(memory)
+          return {
+            status: 'error',
+            reason: 'professional_choice_required',
+            preferredProfessional: agentInput.customer.preferredProfessionalId
+              ? {
+                  id: agentInput.customer.preferredProfessionalId,
+                  name: agentInput.customer.preferredProfessionalName,
+                }
+              : null,
+            explicitConfirmationDetected: pureExplicitConfirmation,
+          }
+        }
+
+        if (exactAvailability.diagnostics.finalReason === 'exact_time_unavailable') {
+          replacePromotedAvailabilityWithAlternatives({
+            memory,
+            nearbySlots: exactAvailability.suggestedSlots,
+            diagnostics: exactAvailability.diagnostics,
+            logContext: {
+              customerId: agentInput.customer.id,
+              conversationId: agentInput.conversation.id,
+              barbershopId: agentInput.barbershop.id,
+              serviceId: memory.selectedServiceId,
+              professionalId: null,
+              requestedDateIso: memory.requestedDateIso,
+              requestedTime,
+            },
+          })
+
+          return {
+            status: 'error',
+            reason: 'exact_time_unavailable',
+            nearbySlots: exactAvailability.suggestedSlots,
+            diagnostics: exactAvailability.diagnostics,
+            explicitConfirmationDetected: pureExplicitConfirmation,
+          }
+        }
+
         return {
           status: 'error',
           reason: 'professional_choice_required',

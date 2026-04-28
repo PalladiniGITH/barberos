@@ -233,6 +233,25 @@ test('sem barbeiro definido a conversa pergunta preferencia antes de sugerir hor
   assert.doesNotMatch(reply, /09:30|09:45/)
 })
 
+test('quando o cliente informa horario antes do barbeiro a pergunta continua sendo de barbeiro, nao de slots mistos', () => {
+  const reply = conversationTesting.buildProfessionalQuestion(
+    ['Lucas Ribeiro', 'Matheus Lima', 'Rafael Costa'],
+    null,
+    {
+      requestedDateIso: '2026-05-01',
+      timezone: 'America/Sao_Paulo',
+      serviceName: 'Corte Classic',
+      requestedTimeLabel: '10:00',
+    }
+  )
+
+  assert.match(reply, /10:00/)
+  assert.match(reply, /1\. Lucas Ribeiro/i)
+  assert.match(reply, /2\. Matheus Lima/i)
+  assert.match(reply, /3\. Rafael Costa/i)
+  assert.doesNotMatch(reply, /10:00 com Lucas Ribeiro/)
+})
+
 test('resposta com nome do barbeiro seleciona a opcao ja apresentada sem depender de nova busca textual de horario', () => {
   const slot = conversationTesting.pickOfferedSlot({
     offeredSlots: [
@@ -345,6 +364,21 @@ test('com barbeiro recente ou preferencial a conversa usa pergunta mais contextu
   assert.match(reply, /Matheus Lima/)
   assert.match(reply, /de novo|prefere outro/i)
   assert.match(reply, /Tanto faz/i)
+})
+
+test('copy de barbeiro no fluxo legado nao usa markdown com dois asteriscos', () => {
+  const reply = conversationTesting.buildProfessionalQuestion(
+    ['Lucas Ribeiro', 'Matheus Lima'],
+    null,
+    {
+      requestedDateIso: '2026-05-01',
+      timezone: 'America/Sao_Paulo',
+      serviceName: 'Corte Classic',
+      requestedTimeLabel: '10:00',
+    }
+  )
+
+  assert.doesNotMatch(reply, /\*\*.+\*\*/)
 })
 
 test('contagem de opcoes prioriza servico pendente, depois barbeiro e por fim horarios', () => {

@@ -73,6 +73,7 @@ import {
   type ReminderAppointmentContext,
 } from '@/lib/whatsapp-appointment-reminders'
 import {
+  buildNamedProfessionalOptionsFromSlots,
   findNamedOptionCandidates,
   pickNamedOptionBySelection,
 } from '@/lib/whatsapp-option-resolution'
@@ -896,6 +897,7 @@ function buildProfessionalQuestion(
     requestedDateIso?: string | null
     timezone?: string | null
     serviceName?: string | null
+    requestedTimeLabel?: string | null
   }
 ) {
   if (professionalNames.length === 0) {
@@ -912,8 +914,8 @@ function buildProfessionalQuestion(
 
   const baseLead = options?.requestedDateIso && options.timezone
     ? options.serviceName
-      ? `Perfeito. Para ${options.serviceName} em ${formatDayLabel(options.requestedDateIso, options.timezone).toLowerCase()}, voce tem preferencia de barbeiro?`
-      : `Perfeito. Para ${formatDayLabel(options.requestedDateIso, options.timezone).toLowerCase()}, voce tem preferencia de barbeiro?`
+      ? `Perfeito. Para ${options.serviceName} em ${formatDayLabel(options.requestedDateIso, options.timezone).toLowerCase()}${options.requestedTimeLabel && options.requestedTimeLabel.includes(':') ? `, as ${options.requestedTimeLabel}` : ''}, voce tem preferencia de barbeiro?`
+      : `Perfeito. Para ${formatDayLabel(options.requestedDateIso, options.timezone).toLowerCase()}${options.requestedTimeLabel && options.requestedTimeLabel.includes(':') ? `, as ${options.requestedTimeLabel}` : ''}, voce tem preferencia de barbeiro?`
     : 'Voce tem algum barbeiro de preferencia ou pode ser qualquer um?'
 
   const lead = preferredProfessionalName
@@ -5206,6 +5208,85 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
   }
 
   if (!draft.allowAnyProfessional && !draft.selectedProfessionalId) {
+    const requestedExactTimeWithoutProfessional =
+      draft.requestedTimeLabel && draft.requestedTimeLabel.includes(':')
+        ? draft.requestedTimeLabel
+        : null
+
+    if (professionals.length > 1 && requestedExactTimeWithoutProfessional) {
+      let exactAvailability
+      try {
+        exactAvailability = await getAvailableWhatsAppSlots({
+          barbershopId: input.barbershop.id,
+          serviceId: draft.selectedServiceId,
+          dateIso: draft.requestedDateIso,
+          timezone,
+          professionalId: null,
+          timePreference: 'EXACT',
+          exactTime: requestedExactTimeWithoutProfessional,
+          limit: 4,
+        })
+      } catch (error) {
+        if (error instanceof AvailabilityInfrastructureError) {
+          return emitAvailabilityInfrastructureFallback({
+            conversationId: conversation.id,
+            baseUpdate,
+            fallbackState: 'WAITING_PROFESSIONAL',
+            fallbackFlow: 'collect_professional',
+            usedAI,
+            error,
+            source: 'professional_preference_exact_time',
+          })
+        }
+
+        throw error
+      }
+
+      const professionalOptions = buildNamedProfessionalOptionsFromSlots(exactAvailability.slots).slice(0, 4)
+      if (professionalOptions.length === 1) {
+        draft.selectedProfessionalId = professionalOptions[0].id
+        draft.selectedProfessionalName = professionalOptions[0].name
+        draft.pendingProfessionalOptions = []
+      } else if (professionalOptions.length > 1) {
+        draft.pendingProfessionalOptions = professionalOptions
+        clearDraftAvailability(draft)
+
+        const responseText = withLeadIn(
+          buildProfessionalQuestion(
+            professionalOptions.map((professional) => professional.name),
+            contextualProfessionalPreference?.professionalName ?? null,
+            {
+              requestedDateIso: draft.requestedDateIso,
+              timezone,
+              serviceName: draft.selectedServiceName,
+              requestedTimeLabel: requestedExactTimeWithoutProfessional,
+            }
+          ),
+          responseLeadIn
+        )
+
+        await prisma.whatsappConversation.update({
+          where: { id: conversation.id },
+          data: {
+            ...baseUpdate,
+            bookingDraft: buildJsonValue(buildSchedulingDraftPayload(draft)),
+            state: 'WAITING_PROFESSIONAL',
+            slotOptions: JSON_NULL,
+            selectedSlot: JSON_NULL,
+            lastAssistantText: responseText,
+          },
+        })
+
+        return {
+          responseText,
+          flow: 'collect_professional',
+          conversationId: conversation.id,
+          conversationState: 'WAITING_PROFESSIONAL',
+          usedAI,
+        }
+      }
+    }
+
     if (professionals.length > 1 && draft.pendingProfessionalOptions.length === 0) {
       draft.pendingProfessionalOptions = professionals
         .slice(0, 4)
@@ -5231,6 +5312,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
               requestedDateIso: draft.requestedDateIso,
               timezone,
               serviceName: draft.selectedServiceName,
+              requestedTimeLabel: requestedExactTimeWithoutProfessional,
             }
           ),
           responseLeadIn

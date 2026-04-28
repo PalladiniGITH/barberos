@@ -1017,6 +1017,98 @@ test('guardrail de barbeiro pergunta a preferencia antes de qualquer oferta de h
   assert.doesNotMatch(reply, /13:15|13:30|09:30|09:45/)
 })
 
+test('horario exato antes do barbeiro vira escolha de barbeiro, nao lista mista de horarios', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.requestedDateIso = '2026-05-01'
+  memory.requestedTimeLabel = '10:00'
+
+  const override = agentTesting.resolveToolFailureOverride({
+    toolTrace: [
+      {
+        name: 'create_booking_draft',
+        arguments: {},
+        result: {
+          status: 'error',
+          reason: 'multiple_professionals_for_exact_time',
+          slots: [
+            {
+              key: 'pro-lucas:2026-05-01T13:00:00.000Z',
+              professionalId: 'pro-lucas',
+              professionalName: 'Lucas Ribeiro',
+              dateIso: '2026-05-01',
+              timeLabel: '10:00',
+              startAtIso: '2026-05-01T13:00:00.000Z',
+              endAtIso: '2026-05-01T13:35:00.000Z',
+            },
+            {
+              key: 'pro-matheus:2026-05-01T13:00:00.000Z',
+              professionalId: 'pro-matheus',
+              professionalName: 'Matheus Lima',
+              dateIso: '2026-05-01',
+              timeLabel: '10:00',
+              startAtIso: '2026-05-01T13:00:00.000Z',
+              endAtIso: '2026-05-01T13:35:00.000Z',
+            },
+            {
+              key: 'pro-rafael:2026-05-01T13:00:00.000Z',
+              professionalId: 'pro-rafael',
+              professionalName: 'Rafael Costa',
+              dateIso: '2026-05-01',
+              timeLabel: '10:00',
+              startAtIso: '2026-05-01T13:00:00.000Z',
+              endAtIso: '2026-05-01T13:35:00.000Z',
+            },
+          ],
+        },
+      },
+    ],
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    preferredProfessionalName: null,
+    serviceNames: SERVICES.map((service) => service.name),
+    professionalNames: ['Lucas Ribeiro', 'Matheus Lima', 'Rafael Costa'],
+    timezone: 'America/Sao_Paulo',
+    nowContext: createAgentInput().nowContext,
+  })
+
+  assert.equal(override.nextAction, 'ASK_PROFESSIONAL')
+  assert.deepEqual(
+    memory.pendingProfessionalOptions.map((option) => option.name),
+    ['Lucas Ribeiro', 'Matheus Lima', 'Rafael Costa']
+  )
+  assert.match(override.replyText, /10:00/)
+  assert.match(override.replyText, /1\. Lucas Ribeiro/)
+  assert.match(override.replyText, /2\. Matheus Lima/)
+  assert.doesNotMatch(override.replyText, /10:00 com Lucas Ribeiro/)
+})
+
+test('copy do fluxo whatsapp nao usa markdown cru com dois asteriscos', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.requestedDateIso = '2026-05-01'
+  memory.requestedTimeLabel = '10:00'
+  memory.pendingProfessionalOptions = [
+    { id: 'pro-lucas', name: 'Lucas Ribeiro' },
+    { id: 'pro-matheus', name: 'Matheus Lima' },
+  ]
+
+  const reply = agentTesting.buildGuardrailReplyText({
+    nextAction: 'ASK_PROFESSIONAL',
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    professionalNames: ['Lucas Ribeiro', 'Matheus Lima'],
+    timezone: 'America/Sao_Paulo',
+    nowContext: createAgentInput().nowContext,
+  })
+
+  assert.doesNotMatch(reply, /\*\*.+\*\*/)
+})
+
 test('consentimento para qualquer barbeiro so vale quando o cliente fala isso explicitamente', () => {
   assert.equal(agentTesting.hasExplicitAnyProfessionalConsent('quero 16:00'), false)
   assert.equal(agentTesting.hasExplicitAnyProfessionalConsent('qualquer um'), true)

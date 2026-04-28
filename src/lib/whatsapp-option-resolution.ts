@@ -4,6 +4,15 @@ export interface NamedOptionLike {
   name: string
 }
 
+export interface NamedOptionWithId extends NamedOptionLike {
+  id: string
+}
+
+export interface ProfessionalSlotLike {
+  professionalId: string
+  professionalName: string
+}
+
 export function normalizeNamedOptionText(value: string) {
   return value
     .normalize('NFD')
@@ -114,4 +123,24 @@ export function pickNamedOptionBySelection<T extends NamedOptionLike>(input: {
 
   const candidates = findNamedOptionCandidates(input.options, input.message)
   return candidates.length === 1 ? candidates[0] ?? null : null
+}
+
+export function buildNamedProfessionalOptionsFromSlots<T extends ProfessionalSlotLike>(slots: T[]) {
+  const seen = new Set<string>()
+  const options: NamedOptionWithId[] = []
+
+  for (const slot of slots) {
+    const key = slot.professionalId || normalizeNamedOptionText(slot.professionalName)
+    if (!key || seen.has(key)) {
+      continue
+    }
+
+    seen.add(key)
+    options.push({
+      id: slot.professionalId,
+      name: slot.professionalName,
+    })
+  }
+
+  return options
 }
