@@ -329,13 +329,12 @@ export default async function AgendamentosPage({ searchParams }: Props) {
             selectedProfessionalId={schedule.selectedProfessionalId}
             hours={schedule.hours}
             schedulePxPerMinute={schedulePxPerMinute}
-            calendarHeight={calendarHeight}
-            minColumnWidth={minColumnWidth}
-            professionals={schedule.professionals}
-            services={schedule.services}
-            recentCustomers={schedule.recentCustomers}
-          />
-        </section>
+          calendarHeight={calendarHeight}
+          minColumnWidth={minColumnWidth}
+          professionals={schedule.professionals}
+          services={schedule.services}
+        />
+      </section>
 
         <aside className="space-y-4">
           <section className="premium-block p-5">

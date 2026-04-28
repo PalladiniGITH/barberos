@@ -1,18 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import * as Dialog from '@radix-ui/react-dialog'
 import * as Popover from '@radix-ui/react-popover'
 import {
-  CalendarClock,
-  Clock3,
   GripVertical,
   Move,
-  Phone,
-  Scissors,
-  Sparkles,
-  UserRound,
-  X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -20,11 +12,9 @@ import {
   moveScheduleBlock,
 } from '@/actions/agendamentos'
 import { AppointmentModal } from '@/components/agendamentos/appointment-modal'
-import { AppointmentStatusActions } from '@/components/agendamentos/appointment-status-actions'
 import { ScheduleBlockModal, type ScheduleBlockValue } from '@/components/agendamentos/schedule-block-modal'
 import type {
   ScheduleAppointmentItem,
-  ScheduleToolbarCustomer,
   ScheduleToolbarProfessional,
   ScheduleToolbarService,
   ScheduleView,
@@ -39,12 +29,11 @@ import {
 } from '@/lib/schedule-grid'
 import {
   APPOINTMENT_BILLING_MODEL_LABELS,
-  APPOINTMENT_SOURCE_LABELS,
   APPOINTMENT_STATUS_LABELS,
   CUSTOMER_TYPE_LABELS,
   cn,
-  formatCurrency,
 } from '@/lib/utils'
+import { shouldCommitAppointmentMove } from '@/lib/agendamentos/appointment-edit'
 
 interface PositionedAppointment extends ScheduleAppointmentItem {
   laneIndex: number
@@ -70,7 +59,6 @@ interface ScheduleCalendarProps {
   minColumnWidth: number
   professionals: ScheduleToolbarProfessional[]
   services: ScheduleToolbarService[]
-  recentCustomers: ScheduleToolbarCustomer[]
 }
 
 interface CommittedSelection {
@@ -106,8 +94,10 @@ interface DragState {
   item: PositionedAppointment
   sourceColumnKey: string
   sourceProfessionalId: string | null
+  pointerStartX: number
   pointerStartY: number
   originalStartMinutes: number
+  movedEnoughForDrag: boolean
 }
 
 const EVENT_GAP = 8
@@ -115,6 +105,7 @@ const MINIMUM_SELECTION_DURATION = 30
 const SCHEDULE_MAJOR_GRID_LINE = 'rgba(148, 163, 184, 0.14)'
 const SCHEDULE_MAJOR_GRID_LINE_SOFT = 'rgba(8, 10, 14, 0.52)'
 const SCHEDULE_MINOR_GRID_LINE = 'rgba(124, 58, 237, 0.1)'
+const APPOINTMENT_DRAG_THRESHOLD_PX = 8
 
 function getAppointmentStatusMeta(item: PositionedAppointment) {
   if (item.itemType === 'BLOCK') {
@@ -253,146 +244,27 @@ function AppointmentDetailsDialog({
   appointment,
   professionals,
   services,
-  recentCustomers,
   open,
   onOpenChange,
 }: {
   appointment: PositionedAppointment
   professionals: ScheduleToolbarProfessional[]
   services: ScheduleToolbarService[]
-  recentCustomers: ScheduleToolbarCustomer[]
   open: boolean
   onOpenChange: (value: boolean) => void
 }) {
-  const statusMeta = getAppointmentStatusMeta(appointment)
-
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-[rgba(17,24,39,0.42)] backdrop-blur-md" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,760px)] -translate-x-1/2 -translate-y-1/2 rounded-[1.6rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(28,32,48,0.99),rgba(15,17,21,0.98))] shadow-[0_56px_120px_-58px_rgba(2,6,23,0.9)] outline-none">
-          <div className="flex items-start justify-between gap-4 border-b border-[rgba(255,255,255,0.06)] px-6 py-5">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                {appointment.localDateLabel} - {appointment.startTimeLabel} - {appointment.endTimeLabel}
-              </p>
-              <Dialog.Title className="mt-2 truncate text-2xl font-semibold text-foreground">
-                {appointment.customerName}
-              </Dialog.Title>
-              <Dialog.Description className="mt-2 text-sm leading-6 text-muted-foreground">
-                {appointment.serviceName} com {appointment.professionalName}
-              </Dialog.Description>
-            </div>
-
-            <Dialog.Close asChild>
-              <button
-                type="button"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-muted-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)] hover:text-primary"
-                aria-label="Fechar"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </Dialog.Close>
-          </div>
-
-          <div className="space-y-6 px-6 py-6">
-            <div className="flex flex-wrap gap-2">
-              <span className={cn('inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold', statusMeta.badge)}>
-                {APPOINTMENT_STATUS_LABELS[appointment.status]}
-              </span>
-              <span className="inline-flex items-center rounded-full border border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
-                {CUSTOMER_TYPE_LABELS[appointment.customerType]}
-              </span>
-              <span className="inline-flex items-center rounded-full border border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
-                {APPOINTMENT_BILLING_MODEL_LABELS[appointment.billingModel]}
-              </span>
-              <span className="inline-flex items-center rounded-full border border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
-                {APPOINTMENT_SOURCE_LABELS[appointment.source]}
-              </span>
-            </div>
-
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="surface-soft p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Resumo do atendimento</p>
-                <div className="mt-4 space-y-3 text-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="inline-flex items-center gap-2 text-muted-foreground">
-                      <UserRound className="h-4 w-4" />
-                      Cliente
-                    </span>
-                    <span className="font-medium text-foreground text-right">{appointment.customerName}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="inline-flex items-center gap-2 text-muted-foreground">
-                      <Scissors className="h-4 w-4" />
-                      Servico
-                    </span>
-                    <span className="font-medium text-foreground text-right">{appointment.serviceName}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="inline-flex items-center gap-2 text-muted-foreground">
-                      <CalendarClock className="h-4 w-4" />
-                      Barbeiro
-                    </span>
-                    <span className="font-medium text-foreground text-right">{appointment.professionalName}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="surface-soft p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Valor e contato</p>
-                <div className="mt-4 space-y-3 text-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="inline-flex items-center gap-2 text-muted-foreground">
-                      <Clock3 className="h-4 w-4" />
-                      Duracao
-                    </span>
-                    <span className="font-medium text-foreground">{appointment.durationMinutes} min</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="inline-flex items-center gap-2 text-muted-foreground">
-                      <Sparkles className="h-4 w-4" />
-                      Valor do slot
-                    </span>
-                    <span className="font-medium text-foreground">{formatCurrency(appointment.priceSnapshot)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="inline-flex items-center gap-2 text-muted-foreground">
-                      <Phone className="h-4 w-4" />
-                      Contato
-                    </span>
-                    <span className="max-w-[220px] truncate font-medium text-right text-foreground">
-                      {appointment.customerPhone ?? appointment.customerEmail ?? 'Sem contato'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {appointment.notes && (
-              <div className="surface-soft p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Observacoes</p>
-                <p className="mt-3 text-sm leading-6 text-foreground">{appointment.notes}</p>
-              </div>
-            )}
-
-            <div className="rounded-[1.1rem] border border-[rgba(58,47,86,0.08)] bg-[rgba(91,33,182,0.04)] p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">Acoes do agendamento</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Edite, confirme, conclua ou ajuste sem sair da agenda.</p>
-                </div>
-                <AppointmentStatusActions
-                  appointment={buildAppointmentFormValue(appointment)}
-                  professionals={professionals}
-                  services={services}
-                />
-              </div>
-            </div>
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <AppointmentModal
+      hideTrigger
+      open={open}
+      onOpenChange={onOpenChange}
+      appointment={buildAppointmentFormValue(appointment)}
+      defaultDate={appointment.localDateIso}
+      defaultTime={appointment.startTimeLabel}
+      defaultProfessionalId={appointment.professionalId}
+      professionals={professionals}
+      services={services}
+    />
   )
 }
 
@@ -538,11 +410,11 @@ export function ScheduleCalendar({
   minColumnWidth,
   professionals,
   services,
-  recentCustomers,
 }: ScheduleCalendarProps) {
   const calendarRootRef = useRef<HTMLDivElement | null>(null)
   const columnRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const hoverPreviewClosersRef = useRef(new Set<() => void>())
+  const suppressAppointmentOpenRef = useRef<string | null>(null)
   const [pointerSelection, setPointerSelection] = useState<PointerSelectionState | null>(null)
   const [committedSelection, setCommittedSelection] = useState<CommittedSelection | null>(null)
   const [dragState, setDragState] = useState<DragState | null>(null)
@@ -648,6 +520,19 @@ export function ScheduleCalendar({
       }
 
       if (dragState) {
+        const pointerDistanceX = Math.abs(event.clientX - dragState.pointerStartX)
+        const pointerDistanceY = Math.abs(event.clientY - dragState.pointerStartY)
+        const movedEnoughForDrag = dragState.movedEnoughForDrag
+          || Math.max(pointerDistanceX, pointerDistanceY) >= APPOINTMENT_DRAG_THRESHOLD_PX
+
+        if (!movedEnoughForDrag) {
+          return
+        }
+
+        if (!dragState.movedEnoughForDrag) {
+          setDragState((current) => current ? { ...current, movedEnoughForDrag: true } : current)
+        }
+
         const candidateColumn = findColumnFromPointer(event.clientX) ?? getColumnByKey(dragState.sourceColumnKey)
         if (!candidateColumn) {
           return
@@ -716,7 +601,29 @@ export function ScheduleCalendar({
       }
 
       if (dragState) {
-        if (dragPreview && dragPreview.valid) {
+        if (dragState.movedEnoughForDrag) {
+          suppressAppointmentOpenRef.current = dragState.item.id
+        }
+
+        const shouldCommitMove = Boolean(
+          dragState.movedEnoughForDrag
+          && dragPreview
+          && dragPreview.valid
+          && shouldCommitAppointmentMove(
+            {
+              dateIso: dragState.item.localDateIso,
+              startMinutes: dragState.item.startMinutesOfDay,
+              professionalId: dragState.item.professionalId,
+            },
+            {
+              dateIso: dragPreview.dateIso,
+              startMinutes: dragPreview.startMinutes,
+              professionalId: dragPreview.professionalId,
+            },
+          )
+        )
+
+        if (shouldCommitMove && dragPreview) {
           const professionalId = dragPreview.professionalId ?? dragState.item.professionalId
           const date = dragPreview.dateIso
 
@@ -925,21 +832,21 @@ export function ScheduleCalendar({
                               item: currentItem,
                               sourceColumnKey: column.key,
                               sourceProfessionalId: column.professionalId,
+                              pointerStartX: event.clientX,
                               pointerStartY: event.clientY,
                               originalStartMinutes: currentItem.startMinutesOfDay,
+                              movedEnoughForDrag: false,
                             })
-                            setDragPreview({
-                              itemId: currentItem.id,
-                              columnKey: column.key,
-                              professionalId: column.professionalId ?? currentItem.professionalId,
-                              dateIso: column.dateIso,
-                              startMinutes: currentItem.startMinutesOfDay,
-                              endMinutes: currentItem.startMinutesOfDay + currentItem.durationMinutes,
-                              durationMinutes: currentItem.durationMinutes,
-                              valid: true,
-                            })
+                            setDragPreview(null)
                           }}
-                          onOpenAppointment={setActiveAppointment}
+                          onOpenAppointment={(item) => {
+                            if (suppressAppointmentOpenRef.current === item.id) {
+                              suppressAppointmentOpenRef.current = null
+                              return
+                            }
+
+                            setActiveAppointment(item)
+                          }}
                           onOpenBlock={setActiveBlock}
                         />
                       </div>
@@ -1109,7 +1016,6 @@ export function ScheduleCalendar({
           appointment={activeAppointment}
           professionals={professionals}
           services={services}
-          recentCustomers={recentCustomers}
           open={Boolean(activeAppointment)}
           onOpenChange={(value) => {
             if (!value) {

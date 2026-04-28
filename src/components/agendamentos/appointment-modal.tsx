@@ -23,6 +23,7 @@ import {
   searchCustomersForAppointment,
   updateAppointment,
 } from '@/actions/agendamentos'
+import { getAppointmentSaveSuccessMessage } from '@/lib/agendamentos/appointment-edit'
 import type {
   ScheduleToolbarProfessional,
   ScheduleToolbarService,
@@ -322,7 +323,19 @@ export function AppointmentModal({
       : await createAppointment(payload)
 
     if (result.success) {
-      toast.success(isEdit ? 'Agendamento atualizado.' : 'Agendamento criado.')
+      toast.success(getAppointmentSaveSuccessMessage({
+        isEdit,
+        originalAppointment: appointment ? {
+          date: appointment.date,
+          time: appointment.time,
+          professionalId: appointment.professionalId,
+        } : null,
+        currentAppointment: {
+          date: values.date,
+          time: values.time,
+          professionalId: values.professionalId,
+        },
+      }))
       setOpen(false)
       reset(defaultValues)
       router.refresh()
@@ -355,7 +368,7 @@ export function AppointmentModal({
         <div className="fixed inset-0 z-50 flex items-start justify-center p-3 pt-4 sm:items-center sm:p-4">
           <div className="absolute inset-0 bg-[rgba(9,10,14,0.58)] backdrop-blur-sm" onClick={() => setOpen(false)} />
 
-          <div className="premium-dialog relative z-10 grid h-[min(920px,calc(100vh-1rem))] w-full max-w-5xl min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[1.5rem]">
+          <div className="premium-dialog relative z-10 grid h-[min(920px,calc(100vh-1rem))] w-full max-w-[1180px] min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[1.5rem]">
             <div className="flex items-start justify-between gap-4 border-b border-[rgba(255,255,255,0.06)] px-5 py-4 sm:px-6">
               <div className="min-w-0">
                 <h2 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
@@ -375,7 +388,7 @@ export function AppointmentModal({
               </button>
             </div>
 
-            <div className="grid min-h-0 xl:grid-cols-[minmax(0,1.2fr)_minmax(300px,340px)]">
+            <div className="grid min-h-0 xl:grid-cols-[minmax(0,1fr)_288px] 2xl:grid-cols-[minmax(0,1.08fr)_320px]">
               <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 min-w-0 flex-col overflow-hidden px-5 py-5 sm:px-6">
                 <input type="hidden" {...register('customerId')} />
                 <input type="hidden" {...register('source')} />
@@ -387,7 +400,7 @@ export function AppointmentModal({
                       <p className="text-sm font-semibold text-foreground">Buscar cliente existente</p>
                     </div>
 
-                    <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-3">
+                    <div className="min-w-0 rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-3">
                       <div className="relative">
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <input
@@ -434,28 +447,28 @@ export function AppointmentModal({
                     </div>
                   </section>
 
-                  <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-12">
-                    <div className="lg:col-span-2 xl:col-span-6">
+                  <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                    <div className="min-w-0">
                       <Field label="Cliente *" error={errors.customerName?.message}>
                         <input {...customerNameField} placeholder="Ex: Carlos Mendes" className={fieldClassName} />
                       </Field>
                     </div>
 
-                    <div className="xl:col-span-3">
+                    <div className="min-w-0">
                       <Field label="Telefone">
                         <input {...customerPhoneField} placeholder="(11) 99999-0000" className={fieldClassName} />
                       </Field>
                     </div>
 
-                    <div className="xl:col-span-3">
+                    <div className="min-w-0">
                       <Field label="Email" error={errors.customerEmail?.message}>
                         <input {...customerEmailField} type="email" placeholder="cliente@email.com" className={fieldClassName} />
                       </Field>
                     </div>
                   </section>
 
-                  <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-12">
-                    <div className="xl:col-span-4">
+                  <section className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="min-w-0">
                       <Field label="Tipo do cliente">
                         <select {...register('customerType')} className={fieldClassName}>
                           <option value="WALK_IN">Cliente avulso</option>
@@ -464,7 +477,7 @@ export function AppointmentModal({
                       </Field>
                     </div>
 
-                    <div className="xl:col-span-4">
+                    <div className="min-w-0">
                       <Field label="Cobranca do atendimento">
                         <select {...register('billingModel')} className={fieldClassName}>
                           <option value="AVULSO">Cobrar avulso</option>
@@ -474,7 +487,7 @@ export function AppointmentModal({
                       </Field>
                     </div>
 
-                    <div className="xl:col-span-4">
+                    <div className="min-w-0">
                       <Field label="Mensalidade" error={errors.subscriptionPrice?.message}>
                         <input
                           {...register('subscriptionPrice')}
@@ -492,20 +505,20 @@ export function AppointmentModal({
                     </div>
                   </section>
 
-                  <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-12">
-                    <div className="xl:col-span-3">
+                  <section className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="min-w-0">
                       <Field label="Data *">
                         <input {...register('date')} type="date" className={fieldClassName} />
                       </Field>
                     </div>
 
-                    <div className="xl:col-span-3">
+                    <div className="min-w-0">
                       <Field label="Horario *">
                         <input {...register('time')} type="time" step="900" className={fieldClassName} />
                       </Field>
                     </div>
 
-                    <div className="xl:col-span-3">
+                    <div className="min-w-0">
                       <Field label="Barbeiro *" error={errors.professionalId?.message}>
                         <select {...register('professionalId')} className={fieldClassName}>
                           <option value="">Selecione</option>
@@ -528,7 +541,7 @@ export function AppointmentModal({
                       )}
                     </div>
 
-                    <div className="xl:col-span-3">
+                    <div className="min-w-0">
                       <Field label="Servico *" error={errors.serviceId?.message}>
                         <select {...register('serviceId')} className={fieldClassName}>
                           <option value="">Selecione</option>
@@ -548,19 +561,19 @@ export function AppointmentModal({
                     </div>
                   </section>
 
-                  <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px]">
-                    <div>
+                  <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_220px] 2xl:grid-cols-[minmax(0,1fr)_240px]">
+                    <div className="min-w-0">
                       <Field label="Observacoes">
                         <textarea
                           {...register('notes')}
-                          rows={4}
+                          rows={5}
                           placeholder="Recado rapido para a equipe..."
-                          className={cn(fieldClassName, 'resize-none')}
+                          className={cn(fieldClassName, 'min-h-[132px] resize-y leading-6')}
                         />
                       </Field>
                     </div>
 
-                    <div>
+                    <div className="min-w-0">
                       <Field label="Status" error={errors.status?.message}>
                         <select {...register('status')} className={fieldClassName}>
                           <option value="CONFIRMED">Confirmado</option>
@@ -593,7 +606,7 @@ export function AppointmentModal({
                 </div>
               </form>
 
-              <aside className="surface-soft min-h-0 min-w-0 overflow-y-auto border-t border-[rgba(255,255,255,0.05)] px-5 py-5 xl:border-l xl:border-t-0 xl:px-6">
+              <aside className="surface-soft min-h-0 min-w-0 overflow-y-auto border-t border-[rgba(255,255,255,0.05)] px-5 py-5 xl:border-l xl:border-t-0 xl:px-5 2xl:px-6">
                 <div className="space-y-4">
                   <div>
                     <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Resumo do horario</p>
