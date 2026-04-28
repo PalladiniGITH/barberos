@@ -226,7 +226,7 @@ function RankingList({
           </div>
         )) : (
           <div className="empty-state-shell-subtle surface-inverse text-sm text-muted-foreground">
-            Ainda nao ha dados suficientes para montar este ranking no filtro atual. Ajuste o recorte ou aguarde mais movimentacao.
+            Ainda não há dados suficientes para montar este ranking no filtro atual. Ajuste o recorte ou aguarde mais movimentação.
           </div>
         )}
       </div>
@@ -241,30 +241,30 @@ function renderPlanStatus(report: BusinessIntelligenceReport) {
     return {
       label: 'Sem base de assinatura',
       tone: 'neutral' as const,
-      helper: 'Cadastre clientes de assinatura para acompanhar saude, custo e sustentabilidade do plano.',
+      helper: 'Cadastre clientes de assinatura para acompanhar saúde, custo e sustentabilidade do plano.',
     }
   }
 
   if (plan.margin < 0 || (plan.averageCostCoverage !== null && plan.averageCostCoverage >= 100)) {
     return {
-      label: 'Plano em prejuizo',
+      label: 'Plano em prejuízo',
       tone: 'warning' as const,
-      helper: 'A recorrencia atual ja consome mais custo do que a mensalidade devolve.',
+      helper: 'A recorrência atual já consome mais custo do que a mensalidade devolve.',
     }
   }
 
   if (plan.averageCostCoverage !== null && plan.averageCostCoverage >= 82) {
     return {
-      label: 'Plano em observacao',
+      label: 'Plano em observação',
       tone: 'warning' as const,
-      helper: 'A cobertura de custo esta apertando e pede revisao antes de ganhar mais volume.',
+      helper: 'A cobertura de custo está apertando e pede revisão antes de ganhar mais volume.',
     }
   }
 
   return {
     label: 'Plano saudavel',
     tone: 'positive' as const,
-    helper: 'A assinatura ainda preserva margem e pode ser escalada com mais seguranca.',
+      helper: 'A assinatura ainda preserva margem e pode ser escalada com mais segurança.',
   }
 }
 
@@ -585,7 +585,7 @@ export function CustomerIntelligenceSection({
                 </div>
               )) : (
                 <div className="empty-state-shell-subtle surface-inverse text-sm text-muted-foreground">
-                  Ainda nao ha leitura suficiente para montar alertas de clientes neste recorte. Assim que o periodo ganhar volume, esta area prioriza os sinais mais relevantes.
+                  Ainda não há leitura suficiente para montar alertas de clientes neste recorte. Assim que o período ganhar volume, esta área prioriza os sinais mais relevantes.
                 </div>
               )}
             </div>
@@ -699,7 +699,7 @@ export function CustomerIntelligenceSection({
                 )) : (
                   <tr>
                     <td colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
-                      Ainda nao ha clientes suficientes para exibir a tabela neste recorte. Ajuste o filtro ou aguarde novos atendimentos.
+                      Ainda não há clientes suficientes para exibir a tabela neste recorte. Ajuste o filtro ou aguarde novos atendimentos.
                     </td>
                   </tr>
                 )}
@@ -733,13 +733,13 @@ export function CustomerIntelligenceSection({
               </div>
 
               <div className="surface-inverse tonal-note p-4">
-                <p className="font-semibold text-foreground">O plano atual esta saudavel?</p>
+                <p className="font-semibold text-foreground">O plano atual está saudável?</p>
                 <p className="mt-2 leading-6">
                   {customers.plan.enabled
                     ? customers.plan.margin < 0 || (customers.plan.averageCostCoverage !== null && customers.plan.averageCostCoverage >= 92)
-                      ? 'Nao. O plano ja esta apertando margem e merece revisao de preco, limite operacional e extras cobrados a parte.'
-                      : 'Sim, mas o acompanhamento de risco e subutilizacao deve orientar o proximo ajuste comercial.'
-                    : 'Ainda nao ha base de assinatura suficiente para responder com confianca.'}
+                      ? 'Não. O plano já está apertando margem e merece revisão de preço, limite operacional e extras cobrados à parte.'
+                      : 'Sim, mas o acompanhamento de risco e subutilização deve orientar o próximo ajuste comercial.'
+                    : 'Ainda não há base de assinatura suficiente para responder com confiança.'}
                 </p>
               </div>
 

@@ -80,7 +80,7 @@ export default async function PrecificacaoPage() {
     <div className="page-section mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
         title="Precificação"
-        description="Uma navegação comercial que deixa claro onde está a margem, onde está o custo e onde está o ganho."
+        description="Organize preço, custo e margem para tomar decisões mais seguras sobre o catálogo."
       />
 
       <SectionTabs
@@ -89,22 +89,22 @@ export default async function PrecificacaoPage() {
           {
             href: '/precificacao',
             label: 'Visão geral',
-            helper: 'Resumo do catálogo, custos e atalhos de navegação.',
+            helper: 'Resumo do catálogo, custos e atalhos principais.',
           },
           {
             href: '/precificacao/servicos',
             label: 'Serviços',
-            helper: 'Preço, custo e leitura de lucro por serviço.',
+            helper: 'Preço, custo e leitura de margem por serviço.',
           },
           {
             href: '/precificacao/insumos',
             label: 'Insumos',
-            helper: 'Base de custo e relação com os serviços.',
+            helper: 'Base de custo ligada aos serviços.',
           },
           {
             href: '/precificacao/resultado',
             label: 'Resultado',
-            helper: 'Margem consolidada e leitura de resultado.',
+            helper: 'Margem consolidada e leitura final do catálogo.',
           },
         ]}
       />
@@ -119,7 +119,7 @@ export default async function PrecificacaoPage() {
               {formatCurrency(averagePrice)}
             </h2>
             <p className="mt-3 text-sm leading-6 text-slate-300">
-              A tela de entrada resume quanto o catálogo vale, quanto custa operar e para onde a margem está indo.
+              A tela de entrada resume quanto o catálogo vale, quanto custa operar e onde a margem merece atenção.
             </p>
           </div>
 
@@ -205,9 +205,9 @@ export default async function PrecificacaoPage() {
         <section className="dashboard-panel p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-xl font-semibold text-foreground">Leitura comercial do catálogo</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Um caminho curto para mostrar que precificação no produto é decisão financeira, não cadastro solto.
+            <h2 className="text-xl font-semibold text-foreground">Leitura comercial do catálogo</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+                Um caminho curto para revisar margem, custo e potencial de ganho sem depender de planilha.
               </p>
             </div>
           </div>
@@ -270,20 +270,20 @@ export default async function PrecificacaoPage() {
               <div className="tonal-note">
                 <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                   <Wallet className="h-4 w-4 text-primary" />
-                  O que vende aqui
+                  O que esta área organiza
                 </p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Preço, custo e margem aparecem na mesma narrativa comercial, sem depender de planilha.
+                  Preço, custo e margem aparecem na mesma leitura, sem separar cadastro de resultado.
                 </p>
               </div>
 
               <div className="tonal-note">
                 <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                   <ShieldCheck className="h-4 w-4 text-primary" />
-                  Por que importa
+                  Por que isso importa
                 </p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  O salão enxerga onde dá para proteger lucro antes de negociar preço no escuro.
+                  A barbearia entende onde proteger lucro antes de ajustar preço no escuro.
                 </p>
               </div>
 
@@ -293,7 +293,7 @@ export default async function PrecificacaoPage() {
                   Próximo passo
                 </p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  A aba de resultado fecha o ciclo e transforma a precificação em decisão de margem.
+                  A aba de resultado fecha a leitura e mostra onde o catálogo sustenta ou pressiona a margem.
                 </p>
               </div>
             </div>
@@ -312,7 +312,7 @@ export default async function PrecificacaoPage() {
                   : 'Nenhum serviço abaixo de 20% de margem'}
               </p>
               <p className="mt-2 text-sm leading-6 text-rose-100/85">
-                Quando existe pressão de margem, a tela já entrega o discurso de ajuste de preço, comissão ou insumo.
+                Quando existe pressão de margem, vale revisar preço, comissão ou composição de insumos.
               </p>
             </div>
           </section>

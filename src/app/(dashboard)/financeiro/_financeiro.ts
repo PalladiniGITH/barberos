@@ -6,8 +6,8 @@ import { capitalize } from '@/lib/utils'
 export const FINANCE_SECTION_TABS = [
   {
     href: '/financeiro',
-    label: 'Visao geral',
-    helper: 'Resumo executivo, tendencia e pontos de atencao.',
+    label: 'Visão geral',
+    helper: 'Resumo executivo, tendência e pontos de atenção.',
   },
   {
     href: '/financeiro/receitas',
@@ -17,7 +17,7 @@ export const FINANCE_SECTION_TABS = [
   {
     href: '/financeiro/despesas',
     label: 'Despesas',
-    helper: 'Custos fixos, variaveis e contas a pagar.',
+    helper: 'Custos fixos, variáveis e contas a pagar.',
   },
   {
     href: '/financeiro/categorias',
@@ -27,7 +27,7 @@ export const FINANCE_SECTION_TABS = [
   {
     href: '/financeiro/fluxo-caixa',
     label: 'Fluxo de caixa',
-    helper: 'Tendencia, saldo e previsao simples.',
+    helper: 'Tendência, saldo e previsão simples.',
   },
 ]
 
@@ -43,7 +43,7 @@ export const CATEGORY_TYPE_META: Record<CategoryType, { label: string; tone: str
     border: 'border-sky-500/20',
   },
   EXPENSE_VARIABLE: {
-    label: 'Despesa variavel',
+    label: 'Despesa variável',
     tone: 'text-amber-700 bg-amber-500/10',
     border: 'border-amber-500/20',
   },

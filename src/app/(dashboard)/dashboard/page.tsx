@@ -425,7 +425,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         <div className="page-section flex flex-col gap-5">
           <PageHeader
             title="Meu painel"
-            description="Nao foi possivel montar sua leitura individual agora."
+            description="Não foi possível montar sua leitura individual agora."
           />
 
           <section className="dashboard-panel p-6">

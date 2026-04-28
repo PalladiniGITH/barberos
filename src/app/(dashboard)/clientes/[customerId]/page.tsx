@@ -397,8 +397,8 @@ export default async function ClienteProfilePage({ params, searchParams }: Props
                   </div>
                 </div>
               )) : (
-                <div className="tonal-note border-dashed p-5 text-sm text-muted-foreground">
-                  Ainda nao ha atendimentos no recorte escolhido para este cliente.
+                <div className="empty-state-shell-subtle p-5 text-sm text-muted-foreground">
+                  Ainda não há atendimentos no recorte escolhido para este cliente.
                 </div>
               )}
             </div>

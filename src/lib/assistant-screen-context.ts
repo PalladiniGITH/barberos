@@ -39,18 +39,18 @@ const MANAGEMENT_BASE_UI: AssistantBaseUiConfig = {
     'Como esta minha taxa de retorno?',
   ],
   placeholder: 'Pergunte sobre faturamento, agenda, clientes ou equipe...',
-  description: 'Pergunte sobre agenda, clientes, metas, margem e prioridades da operacao.',
+  description: 'Pergunte sobre agenda, clientes, metas, margem e prioridades da operação.',
 }
 
 const FINANCIAL_BASE_UI: AssistantBaseUiConfig = {
   suggestions: [
-    'Como esta minha margem este mes?',
-    'Onde minhas despesas estao pesando mais?',
-    'Qual servico sustenta melhor o lucro?',
-    'Qual tendencia financeira eu preciso acompanhar?',
+    'Como está minha margem este mês?',
+    'Onde minhas despesas estão pesando mais?',
+    'Qual serviço sustenta melhor o lucro?',
+    'Qual tendência financeira eu preciso acompanhar?',
   ],
-  placeholder: 'Pergunte sobre caixa, despesas, margem e sinais financeiros do periodo...',
-  description: 'Pergunte sobre caixa, margem, despesas e sinais financeiros do periodo.',
+  placeholder: 'Pergunte sobre caixa, despesas, margem e sinais financeiros do período...',
+  description: 'Pergunte sobre caixa, margem, despesas e sinais financeiros do período.',
 }
 
 const PROFESSIONAL_BASE_UI: AssistantBaseUiConfig = {
@@ -60,7 +60,7 @@ const PROFESSIONAL_BASE_UI: AssistantBaseUiConfig = {
     'Como esta minha agenda amanha?',
     'Quantos atendimentos faltam para minha meta?',
   ],
-  placeholder: 'Pergunte sobre sua meta, agenda, vendas ou proximos atendimentos...',
+  placeholder: 'Pergunte sobre sua meta, agenda, vendas ou próximos atendimentos...',
   description: 'Pergunte sobre sua agenda, sua meta e oportunidades praticas de venda.',
 }
 
@@ -112,13 +112,13 @@ function buildManagementScreenContext(key: AssistantScreenKey, pathname: string)
         pathname,
         visible: true,
         label: 'Dashboard executivo',
-        subtitle: 'Pergunte sobre faturamento, recorrencia, margem e prioridades da semana.',
+        subtitle: 'Pergunte sobre faturamento, recorrência, margem e prioridades da semana.',
         placeholder: 'Ex.: Como posso faturar mais esta semana?',
         suggestions: [
           'Como posso faturar mais esta semana?',
           'Quais clientes devo reativar?',
-          'Qual servico tem melhor margem?',
-          'Como esta minha taxa de retorno?',
+          'Qual serviço tem melhor margem?',
+          'Como está minha taxa de retorno?',
         ],
       }
     case 'agendamentos':
@@ -127,13 +127,13 @@ function buildManagementScreenContext(key: AssistantScreenKey, pathname: string)
         pathname,
         visible: true,
         label: 'Agenda operacional',
-        subtitle: 'Pergunte sobre horarios ociosos, encaixes e oportunidades de agenda.',
-        placeholder: 'Ex.: Onde tenho horarios ociosos hoje?',
+        subtitle: 'Pergunte sobre horários ociosos, encaixes e oportunidades de agenda.',
+        placeholder: 'Ex.: Onde tenho horários ociosos hoje?',
         suggestions: [
-          'Onde tenho horarios ociosos hoje?',
-          'Quem esta com agenda mais vazia?',
-          'Como posso lotar amanha?',
-          'Quais clientes posso chamar para preencher horarios?',
+          'Onde tenho horários ociosos hoje?',
+          'Quem está com agenda mais vazia?',
+          'Como posso lotar amanhã?',
+          'Quais clientes posso chamar para preencher horários?',
         ],
       }
     case 'clientes':
@@ -141,13 +141,13 @@ function buildManagementScreenContext(key: AssistantScreenKey, pathname: string)
         key,
         pathname,
         visible: true,
-        label: 'Clientes e recorrencia',
-        subtitle: 'Pergunte sobre retorno, risco de evasao e oportunidades de relacionamento.',
-        placeholder: 'Ex.: Quais clientes estao em risco de sumir?',
+        label: 'Clientes e recorrência',
+        subtitle: 'Pergunte sobre retorno, risco de evasão e oportunidades de relacionamento.',
+        placeholder: 'Ex.: Quais clientes estão em risco de sumir?',
         suggestions: [
-          'Quais clientes estao em risco de sumir?',
+          'Quais clientes estão em risco de sumir?',
           'Quem vale reativar primeiro?',
-          'Como esta a recorrencia dos assinantes?',
+          'Como está a recorrência dos assinantes?',
           'Qual grupo tem maior potencial de retorno?',
         ],
       }
@@ -158,11 +158,11 @@ function buildManagementScreenContext(key: AssistantScreenKey, pathname: string)
         visible: true,
         label: 'Financeiro',
         subtitle: 'Foque em caixa, receitas, despesas e ajustes para melhorar margem.',
-        placeholder: 'Ex.: Onde estou gastando mais neste mes?',
+        placeholder: 'Ex.: Onde estou gastando mais neste mês?',
         suggestions: [
           'Onde estou gastando mais?',
-          'Como esta meu caixa este mes?',
-          'Qual servico gerou mais receita?',
+          'Como está meu caixa este mês?',
+          'Qual serviço gerou mais receita?',
           'O que posso ajustar para melhorar margem?',
         ],
       }
@@ -172,13 +172,13 @@ function buildManagementScreenContext(key: AssistantScreenKey, pathname: string)
         pathname,
         visible: true,
         label: 'Equipe e metas',
-        subtitle: 'Pergunte sobre desempenho, metas, ticket medio e ritmo do time.',
-        placeholder: 'Ex.: Quem esta mais proximo da meta?',
+        subtitle: 'Pergunte sobre desempenho, metas, ticket médio e ritmo do time.',
+        placeholder: 'Ex.: Quem está mais próximo da meta?',
         suggestions: [
-          'Quem esta mais proximo da meta?',
+          'Quem está mais próximo da meta?',
           'Quem precisa vender mais?',
-          'Como melhorar o ticket medio da equipe?',
-          'Qual barbeiro teve melhor recorrencia?',
+          'Como melhorar o ticket médio da equipe?',
+          'Qual barbeiro teve melhor recorrência?',
         ],
       }
     case 'precificacao':
@@ -186,14 +186,14 @@ function buildManagementScreenContext(key: AssistantScreenKey, pathname: string)
         key,
         pathname,
         visible: true,
-        label: 'Precificacao',
-        subtitle: 'Use o contexto atual para revisar custo, margem, catalogo e oportunidades de ajuste.',
-        placeholder: 'Ex.: Qual servico tem menor margem?',
+        label: 'Precificação',
+        subtitle: 'Use o contexto atual para revisar custo, margem, catálogo e oportunidades de ajuste.',
+        placeholder: 'Ex.: Qual serviço tem menor margem?',
         suggestions: [
-          'Qual servico tem menor margem?',
+          'Qual serviço tem menor margem?',
           'Qual insumo pesa mais no custo?',
-          'Onde posso ajustar preco?',
-          'Qual servico merece virar combo?',
+          'Onde posso ajustar preço?',
+          'Qual serviço merece virar combo?',
         ],
       }
     case 'indicadores':
@@ -201,13 +201,13 @@ function buildManagementScreenContext(key: AssistantScreenKey, pathname: string)
         key,
         pathname,
         visible: true,
-        label: 'Indicadores e saude',
-        subtitle: 'Pergunte sobre tendencias, leitura do periodo e sinais de saude da base.',
-        placeholder: 'Ex.: O que mais exige atencao agora?',
+        label: 'Indicadores e saúde',
+        subtitle: 'Pergunte sobre tendências, leitura do período e sinais de saúde da base.',
+        placeholder: 'Ex.: O que mais exige atenção agora?',
         suggestions: [
-          'O que mais exige atencao agora?',
-          'Qual tendencia esta mais fraca?',
-          'Como esta a saude da base?',
+          'O que mais exige atenção agora?',
+          'Qual tendência está mais fraca?',
+          'Como está a saúde da base?',
           'Onde devo agir primeiro esta semana?',
         ],
       }
@@ -216,14 +216,14 @@ function buildManagementScreenContext(key: AssistantScreenKey, pathname: string)
         key,
         pathname,
         visible: true,
-        label: 'Configuracoes da barbearia',
-        subtitle: 'Pergunte sobre os impactos operacionais das configuracoes atuais.',
-        placeholder: 'Ex.: O que vale revisar primeiro nas configuracoes?',
+        label: 'Configurações da barbearia',
+        subtitle: 'Pergunte sobre os impactos operacionais das configurações atuais.',
+        placeholder: 'Ex.: O que vale revisar primeiro nas configurações?',
         suggestions: [
-          'O que vale revisar primeiro nas configuracoes?',
+          'O que vale revisar primeiro nas configurações?',
           'Existe algum cadastro operacional incompleto?',
           'Quais ajustes podem reduzir atrito no dia a dia?',
-          'O que merece padronizacao agora?',
+          'O que merece padronização agora?',
         ],
       }
     case 'assistente':
@@ -232,7 +232,7 @@ function buildManagementScreenContext(key: AssistantScreenKey, pathname: string)
         pathname,
         visible: true,
         label: 'BarberEX IA',
-        subtitle: 'Pergunte sobre agenda, clientes, metas e numeros da barbearia.',
+        subtitle: 'Pergunte sobre agenda, clientes, metas e números da barbearia.',
         placeholder: MANAGEMENT_BASE_UI.placeholder,
         suggestions: MANAGEMENT_BASE_UI.suggestions,
       }
@@ -242,7 +242,7 @@ function buildManagementScreenContext(key: AssistantScreenKey, pathname: string)
         pathname,
         visible: true,
         label: 'BarberEX IA',
-        subtitle: 'Pergunte sobre a tela atual e sobre os dados mais importantes do periodo.',
+        subtitle: 'Pergunte sobre a tela atual e sobre os dados mais importantes do período.',
         placeholder: MANAGEMENT_BASE_UI.placeholder,
         suggestions: MANAGEMENT_BASE_UI.suggestions,
       }
@@ -252,7 +252,7 @@ function buildManagementScreenContext(key: AssistantScreenKey, pathname: string)
         pathname,
         visible: false,
         label: 'Painel interno',
-        subtitle: 'O BarberEX IA da barbearia nao fica disponivel no painel master da plataforma.',
+        subtitle: 'O BarberEX IA da barbearia não fica disponível no painel master da plataforma.',
         placeholder: MANAGEMENT_BASE_UI.placeholder,
         suggestions: [],
       }
@@ -267,13 +267,13 @@ function buildFinancialScreenContext(key: AssistantScreenKey, pathname: string):
         pathname,
         visible: true,
         label: 'Financeiro',
-        subtitle: 'Pergunte sobre caixa, margem, despesas e sinais financeiros do periodo.',
-        placeholder: 'Ex.: Como esta minha margem este mes?',
+        subtitle: 'Pergunte sobre caixa, margem, despesas e sinais financeiros do período.',
+        placeholder: 'Ex.: Como está minha margem este mês?',
         suggestions: [
-          'Como esta meu caixa este mes?',
-          'Onde minhas despesas estao pesando mais?',
-          'Qual servico sustenta melhor o lucro?',
-          'Qual tendencia financeira eu preciso acompanhar?',
+          'Como está meu caixa este mês?',
+          'Onde minhas despesas estão pesando mais?',
+          'Qual serviço sustenta melhor o lucro?',
+          'Qual tendência financeira eu preciso acompanhar?',
         ],
       }
     case 'dashboard':
@@ -283,7 +283,7 @@ function buildFinancialScreenContext(key: AssistantScreenKey, pathname: string):
         pathname,
         visible: true,
         label: 'Financeiro',
-        subtitle: 'Pergunte sobre margem, tendencia e leitura financeira global.',
+        subtitle: 'Pergunte sobre margem, tendência e leitura financeira global.',
         placeholder: FINANCIAL_BASE_UI.placeholder,
         suggestions: FINANCIAL_BASE_UI.suggestions,
       }
@@ -293,7 +293,7 @@ function buildFinancialScreenContext(key: AssistantScreenKey, pathname: string):
         pathname,
         visible: false,
         label: 'Painel interno',
-        subtitle: 'O BarberEX IA da barbearia nao fica disponivel no painel master da plataforma.',
+        subtitle: 'O BarberEX IA da barbearia não fica disponível no painel master da plataforma.',
         placeholder: FINANCIAL_BASE_UI.placeholder,
         suggestions: [],
       }
@@ -303,7 +303,7 @@ function buildFinancialScreenContext(key: AssistantScreenKey, pathname: string):
         pathname,
         visible: true,
         label: 'Financeiro',
-        subtitle: 'Seu perfil continua restrito a leitura financeira, mesmo fora do modulo financeiro.',
+        subtitle: 'Seu perfil continua restrito à leitura financeira, mesmo fora do módulo financeiro.',
         placeholder: FINANCIAL_BASE_UI.placeholder,
         suggestions: FINANCIAL_BASE_UI.suggestions,
       }
@@ -318,13 +318,13 @@ function buildProfessionalScreenContext(key: AssistantScreenKey, pathname: strin
         pathname,
         visible: true,
         label: 'Minha agenda',
-        subtitle: 'Pergunte sobre encaixes, horarios livres e preparo para os proximos atendimentos.',
-        placeholder: 'Ex.: Como esta minha agenda amanha?',
+        subtitle: 'Pergunte sobre encaixes, horários livres e preparo para os próximos atendimentos.',
+        placeholder: 'Ex.: Como está minha agenda amanhã?',
         suggestions: [
-          'Como esta minha agenda amanha?',
-          'Onde tenho espaco para encaixe?',
-          'Quais clientes posso chamar para preencher horarios?',
-          'O que posso vender nos proximos atendimentos?',
+          'Como está minha agenda amanhã?',
+          'Onde tenho espaço para encaixe?',
+          'Quais clientes posso chamar para preencher horários?',
+          'O que posso vender nos próximos atendimentos?',
         ],
       }
     case 'equipe':
@@ -333,13 +333,13 @@ function buildProfessionalScreenContext(key: AssistantScreenKey, pathname: strin
         pathname,
         visible: true,
         label: 'Meu desempenho',
-        subtitle: 'Foque em meta, ticket, comissao e ritmo do seu resultado.',
+        subtitle: 'Foque em meta, ticket, comissão e ritmo do seu resultado.',
         placeholder: 'Ex.: Quantos atendimentos faltam para minha meta?',
         suggestions: [
           'Como bato minha meta?',
           'Quantos atendimentos faltam para minha meta?',
-          'Estou vendendo bem em comparacao com minha meta?',
-          'O que eu faco amanha para faturar mais?',
+          'Estou vendendo bem em comparação com minha meta?',
+          'O que eu faço amanhã para faturar mais?',
         ],
       }
     case 'dashboard':
@@ -347,8 +347,8 @@ function buildProfessionalScreenContext(key: AssistantScreenKey, pathname: strin
         key,
         pathname,
         visible: true,
-        label: 'Minha operacao',
-        subtitle: 'Pergunte sobre seu dia, sua meta, agenda e oportunidades praticas de venda.',
+        label: 'Minha operação',
+        subtitle: 'Pergunte sobre seu dia, sua meta, agenda e oportunidades práticas de venda.',
         placeholder: PROFESSIONAL_BASE_UI.placeholder,
         suggestions: PROFESSIONAL_BASE_UI.suggestions,
       }
@@ -358,7 +358,7 @@ function buildProfessionalScreenContext(key: AssistantScreenKey, pathname: strin
         pathname,
         visible: true,
         label: 'Minha conta',
-        subtitle: 'Pergunte sobre seu vinculo, acesso e rotina operacional.',
+        subtitle: 'Pergunte sobre seu vínculo, acesso e rotina operacional.',
         placeholder: 'Ex.: O que vale acompanhar no meu perfil agora?',
         suggestions: [
           'O que vale acompanhar no meu perfil agora?',
@@ -373,7 +373,7 @@ function buildProfessionalScreenContext(key: AssistantScreenKey, pathname: strin
         pathname,
         visible: false,
         label: 'Painel interno',
-        subtitle: 'O BarberEX IA da barbearia nao fica disponivel no painel master da plataforma.',
+        subtitle: 'O BarberEX IA da barbearia não fica disponível no painel master da plataforma.',
         placeholder: PROFESSIONAL_BASE_UI.placeholder,
         suggestions: [],
       }
@@ -383,7 +383,7 @@ function buildProfessionalScreenContext(key: AssistantScreenKey, pathname: strin
         pathname,
         visible: true,
         label: 'Meu desempenho',
-        subtitle: 'Seu escopo continua individual: agenda, meta, vendas e atendimentos proprios.',
+        subtitle: 'Seu escopo continua individual: agenda, meta, vendas e atendimentos próprios.',
         placeholder: PROFESSIONAL_BASE_UI.placeholder,
         suggestions: PROFESSIONAL_BASE_UI.suggestions,
       }

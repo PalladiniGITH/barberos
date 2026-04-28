@@ -469,7 +469,7 @@ export default async function ClientesPage({ searchParams }: Props) {
                 )) : (
                   <tr>
                     <td colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
-                      Ainda nao ha clientes suficientes nesse filtro para montar a listagem.
+                      Ainda não há clientes suficientes neste filtro para montar a listagem.
                     </td>
                   </tr>
                 )}

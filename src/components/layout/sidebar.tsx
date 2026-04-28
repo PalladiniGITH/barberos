@@ -44,7 +44,7 @@ const defaultSidebarItems: SidebarItem[] = [
     href: '/dashboard',
     icon: LayoutDashboard,
     label: 'Painel',
-    description: 'Visao geral do negocio.',
+    description: 'Visão geral do negócio.',
     section: 'essencial',
     exact: true,
   },
@@ -52,28 +52,28 @@ const defaultSidebarItems: SidebarItem[] = [
     href: '/agendamentos',
     icon: CalendarClock,
     label: 'Agenda',
-    description: 'Operacao do dia e da equipe.',
+    description: 'Operação do dia e da equipe.',
     section: 'essencial',
   },
   {
     href: '/clientes',
     icon: UserRound,
     label: 'Clientes',
-    description: 'Historico, recorrencia e valor.',
+    description: 'Histórico, recorrência e valor.',
     section: 'essencial',
   },
   {
     href: '/inteligencia',
     icon: BrainCircuit,
-    label: 'Inteligencia',
-    description: 'Leitura automatica e insights.',
+    label: 'Inteligência',
+    description: 'Leitura automática e insights.',
     section: 'essencial',
   },
   {
     href: '/indicadores',
     icon: BarChart3,
     label: 'Indicadores',
-    description: 'Margem, tendencia e saude.',
+    description: 'Margem, tendência e saúde.',
     section: 'essencial',
   },
   {
@@ -86,7 +86,7 @@ const defaultSidebarItems: SidebarItem[] = [
       {
         href: '/financeiro',
         icon: Wallet,
-        label: 'Visao geral',
+        label: 'Visão geral',
         description: 'Resumo financeiro.',
         section: 'modulos',
         exact: true,
@@ -95,28 +95,28 @@ const defaultSidebarItems: SidebarItem[] = [
         href: '/financeiro/receitas',
         icon: TrendingUp,
         label: 'Receitas',
-        description: 'Entradas do periodo.',
+        description: 'Entradas do período.',
         section: 'modulos',
       },
       {
         href: '/financeiro/despesas',
         icon: TrendingDown,
         label: 'Despesas',
-        description: 'Saidas e custos.',
+        description: 'Saídas e custos.',
         section: 'modulos',
       },
       {
         href: '/financeiro/categorias',
         icon: BarChart3,
         label: 'Categorias',
-        description: 'Organizacao financeira.',
+        description: 'Organização financeira.',
         section: 'modulos',
       },
       {
         href: '/financeiro/fluxo-caixa',
         icon: BarChart3,
         label: 'Fluxo de caixa',
-        description: 'Previsao e tendencia.',
+        description: 'Previsão e tendência.',
         section: 'modulos',
       },
     ],
@@ -131,7 +131,7 @@ const defaultSidebarItems: SidebarItem[] = [
       {
         href: '/equipe',
         icon: Users,
-        label: 'Visao geral',
+        label: 'Visão geral',
         description: 'Leitura do time.',
         section: 'modulos',
         exact: true,
@@ -161,7 +161,7 @@ const defaultSidebarItems: SidebarItem[] = [
         href: '/desafios',
         icon: Trophy,
         label: 'Campanhas',
-        description: 'Acoes de incentivo.',
+        description: 'Ações de incentivo.',
         section: 'modulos',
       },
     ],
@@ -169,14 +169,14 @@ const defaultSidebarItems: SidebarItem[] = [
   {
     href: '/precificacao',
     icon: Scissors,
-    label: 'Precificacao',
-    description: 'Catalogo, custo e margem.',
+    label: 'Precificação',
+    description: 'Catálogo, custo e margem.',
     section: 'modulos',
     children: [
       {
         href: '/precificacao',
         icon: Wallet,
-        label: 'Visao geral',
+        label: 'Visão geral',
         description: 'Resumo da margem.',
         section: 'modulos',
         exact: true,
@@ -191,15 +191,15 @@ const defaultSidebarItems: SidebarItem[] = [
       {
         href: '/precificacao/servicos',
         icon: Scissors,
-        label: 'Servicos',
-        description: 'Preco e margem.',
+        label: 'Serviços',
+        description: 'Preço e margem.',
         section: 'modulos',
       },
       {
         href: '/precificacao/insumos',
         icon: Zap,
         label: 'Insumos',
-        description: 'Custos e reposicao.',
+        description: 'Custos e reposição.',
         section: 'modulos',
       },
     ],
@@ -207,8 +207,8 @@ const defaultSidebarItems: SidebarItem[] = [
   {
     href: '/configuracoes',
     icon: Settings,
-    label: 'Configuracoes',
-    description: 'Conta, acessos e operacao.',
+    label: 'Configurações',
+    description: 'Conta, acessos e operação.',
     section: 'conta',
   },
 ]
@@ -217,8 +217,8 @@ const barberSidebarItems: SidebarItem[] = [
   {
     href: '/dashboard',
     icon: LayoutDashboard,
-    label: 'Minha operacao',
-    description: 'Resumo pessoal do seu dia e do periodo.',
+    label: 'Minha operação',
+    description: 'Resumo pessoal do seu dia e do período.',
     section: 'essencial',
     exact: true,
   },
@@ -226,28 +226,28 @@ const barberSidebarItems: SidebarItem[] = [
     href: '/agendamentos',
     icon: CalendarClock,
     label: 'Minha agenda',
-    description: 'Seus horarios, encaixes e atendimentos.',
+    description: 'Seus horários, encaixes e atendimentos.',
     section: 'essencial',
   },
   {
     href: '/equipe/metas',
     icon: Target,
     label: 'Minhas metas',
-    description: 'Objetivo individual e leitura do periodo.',
+    description: 'Objetivo individual e leitura do período.',
     section: 'essencial',
   },
   {
     href: '/equipe/desempenho',
     icon: BarChart3,
     label: 'Meu desempenho',
-    description: 'Ticket, comissao e ritmo do seu resultado.',
+    description: 'Ticket, comissão e ritmo do seu resultado.',
     section: 'essencial',
   },
   {
     href: '/configuracoes',
     icon: Settings,
     label: 'Minha conta',
-    description: 'Perfil, configuracoes pessoais e vinculo profissional.',
+    description: 'Perfil, configurações pessoais e vínculo profissional.',
     section: 'conta',
   },
 ]
@@ -255,14 +255,14 @@ const barberSidebarItems: SidebarItem[] = [
 const sectionLabels: Record<NavSection, string> = {
   plataforma: 'BarberEX',
   essencial: 'Essencial',
-  modulos: 'Modulos',
+  modulos: 'Módulos',
   conta: 'Conta',
 }
 
 const barberSectionLabels: Record<NavSection, string> = {
   plataforma: 'BarberEX',
-  essencial: 'Minha operacao',
-  modulos: 'Modulos',
+  essencial: 'Minha operação',
+  modulos: 'Módulos',
   conta: 'Conta',
 }
 
@@ -270,7 +270,7 @@ const platformSidebarItem: SidebarItem = {
   href: '/internal',
   icon: ShieldCheck,
   label: 'BarberEX Admin',
-  description: 'Tenants, IA, custos e saude operacional da plataforma.',
+  description: 'Tenants, IA, custos e saúde operacional da plataforma.',
   section: 'plataforma',
 }
 
@@ -578,7 +578,7 @@ export function Sidebar({
             href={homeHref}
             onClick={() => startNavigation(homeHref)}
             className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[0.95rem] border border-[rgba(124,58,237,0.22)] bg-[radial-gradient(circle_at_30%_20%,rgba(168,85,247,0.24),transparent_42%),linear-gradient(135deg,rgba(124,58,237,0.22),rgba(15,23,42,0.96))] text-[11px] font-semibold tracking-[0.16em] text-violet-50 shadow-[0_18px_34px_-24px_rgba(2,6,23,0.76)]"
-            title={homeHref === '/internal' ? 'Painel master da plataforma' : barberView ? 'Meu painel' : 'Painel do negocio'}
+            title={homeHref === '/internal' ? 'Painel master da plataforma' : barberView ? 'Meu painel' : 'Painel do negócio'}
           >
             {PRODUCT_MONOGRAM}
           </Link>
@@ -591,7 +591,7 @@ export function Sidebar({
           >
             <p className="truncate text-sm font-semibold tracking-tight text-slate-50">{PRODUCT_NAME}</p>
             <p className="truncate text-xs text-slate-500">
-              {barberView ? 'Painel do profissional' : 'Gestao premium da barbearia'}
+              {barberView ? 'Painel do profissional' : 'Gestão premium da barbearia'}
             </p>
           </div>
         </div>

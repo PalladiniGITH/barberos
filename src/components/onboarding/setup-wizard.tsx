@@ -68,28 +68,28 @@ const steps = [
   {
     id: 'business',
     title: 'Sua barbearia',
-    description: 'Ajuste os dados básicos para o sistema já nascer com cara de negócio real.',
+    description: 'Ajuste os dados básicos para a operação começar organizada desde o primeiro acesso.',
     icon: Briefcase,
     fields: ['name', 'phone', 'email', 'address', 'timezone'] as const,
   },
   {
     id: 'team',
     title: 'Equipe inicial',
-    description: 'Sem equipe cadastrada, não existe ranking, meta individual nem leitura real de performance.',
+    description: 'Sem equipe cadastrada, o sistema não consegue montar ranking, meta individual nem leitura de desempenho.',
     icon: Users,
     fields: ['professionals'] as const,
   },
   {
     id: 'services',
     title: 'Serviços principais',
-    description: 'Esses serviços alimentam ticket médio, margem e argumentos comerciais do produto.',
+    description: 'Esses serviços alimentam ticket médio, margem e leitura comercial do catálogo.',
     icon: Scissors,
     fields: ['services'] as const,
   },
   {
     id: 'goal',
     title: 'Meta do mês',
-    description: 'A meta transforma números soltos em direção clara para o dono e para o time.',
+    description: 'A meta transforma números soltos em direção clara para a gestão e para a equipe.',
     icon: TrendingUp,
     fields: ['revenueGoal', 'revenueMin', 'expenseLimit'] as const,
   },
@@ -143,7 +143,7 @@ export function SetupWizard({
       return
     }
 
-    toast.success(`Barbearia configurada! Agora o ${PRODUCT_NAME} pode entregar valor de verdade.`)
+    toast.success(`Barbearia configurada. Agora o ${PRODUCT_NAME} já pode montar a leitura inicial da operação.`)
     router.push('/dashboard')
     router.refresh()
   }
@@ -167,7 +167,7 @@ export function SetupWizard({
             Coloque a barbearia no ar em minutos
           </h1>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            Complete os pontos essenciais para começar a operar com agenda, equipe e visão inicial do negócio.
+            Complete os pontos essenciais para começar a operar com agenda, equipe e leitura inicial do negócio.
           </p>
         </div>
 
@@ -227,7 +227,7 @@ export function SetupWizard({
               </p>
               <p className="inline-flex items-start gap-2">
                 <ShieldCheck className="mt-0.5 h-4 w-4 text-primary" />
-                Estrutura do tenant ajustada para uso real, não só para demo.
+                Estrutura da barbearia organizada para agenda, equipe e indicadores desde o início.
               </p>
               <p className="inline-flex items-start gap-2">
                 <CalendarDays className="mt-0.5 h-4 w-4 text-primary" />
@@ -351,7 +351,7 @@ export function SetupWizard({
               <div className="rounded-2xl border border-border/70 bg-[rgba(30,41,59,0.72)] p-4">
                 <p className="text-sm font-semibold text-foreground">Quem vai aparecer no ranking e nas metas</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Cadastre a equipe principal agora. Você pode complementar depois, mas com pelo menos 1 nome o sistema já vira produto.
+                  Cadastre a equipe principal agora. Você pode complementar depois, mas com pelo menos 1 nome o sistema já libera ranking, metas e desempenho.
                 </p>
               </div>
 
@@ -410,7 +410,7 @@ export function SetupWizard({
               <div className="rounded-2xl border border-border/70 bg-[rgba(30,41,59,0.72)] p-4">
                 <p className="text-sm font-semibold text-foreground">Serviços que sustentam o seu ticket médio</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Comece com os principais. Depois o módulo de precificação ajuda a transformar isso em margem real.
+                  Comece com os principais. Depois a precificação ajuda a transformar isso em margem e leitura de resultado.
                 </p>
               </div>
 
@@ -503,7 +503,7 @@ export function SetupWizard({
               <div className="md:col-span-2 rounded-2xl border border-border/70 bg-[rgba(30,41,59,0.72)] p-4">
                 <p className="text-sm font-semibold text-foreground">Feche o setup já com direção comercial</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Em vez de só registrar movimento, o {PRODUCT_NAME} vai mostrar se {currentMonthLabel.toLowerCase()} está no caminho certo.
+                  Em vez de só registrar movimento, o {PRODUCT_NAME} vai mostrar se {currentMonthLabel.toLowerCase()} está no caminho esperado.
                 </p>
               </div>
 
@@ -551,8 +551,8 @@ export function SetupWizard({
           <div className="mt-8 flex flex-col gap-3 border-t border-border/70 pt-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-muted-foreground">
               {stepIndex < steps.length - 1
-                ? 'Avance etapa por etapa. O objetivo é colocar o tenant em operação, não abrir um formulário gigante.'
-                : 'Finalizando aqui, o sistema já nasce pronto para entregar valor na primeira visita ao dashboard.'}
+                ? 'Avance etapa por etapa. O objetivo é colocar a barbearia em operação sem transformar o setup em um formulário gigante.'
+                : 'Finalizando aqui, o sistema já entra pronto para a primeira leitura no painel executivo.'}
             </div>
 
             <div className="flex gap-3">

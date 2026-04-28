@@ -17,7 +17,7 @@ import { PeriodSelector } from '@/components/shared/period-selector'
 import { cn, formatCurrency, formatPercent } from '@/lib/utils'
 import type { CustomerTypeFilter } from '@/lib/business-insights'
 
-export const metadata: Metadata = { title: 'Inteligencia do negocio' }
+export const metadata: Metadata = { title: 'Inteligência do negócio' }
 
 interface Props {
   searchParams: { month?: string; year?: string; professionalId?: string; customerType?: string }
@@ -90,8 +90,8 @@ export default async function InteligenciaPage({ searchParams }: Props) {
   return (
     <div className="page-section mx-auto flex max-w-7xl flex-col gap-5">
       <PageHeader
-        title="Inteligencia do negocio"
-        description="Um relatorio automatico da barbearia: le caixa, meta, equipe, ticket e margem para dizer o que agir primeiro."
+        title="Inteligência do negócio"
+        description="Um relatório automático da barbearia: lê caixa, meta, equipe, ticket e margem para dizer o que agir primeiro."
         action={(
           <div className="flex flex-col items-end gap-2">
             <Suspense>
@@ -161,9 +161,9 @@ export default async function InteligenciaPage({ searchParams }: Props) {
                 </p>
               </div>
               <div className="spotlight-stat">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">Ticket medio</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">Ticket médio</p>
                 <p className="mt-2 text-2xl font-semibold text-white">{formatCurrency(context.financial.ticketAverage)}</p>
-                <p className="mt-1 text-sm text-slate-300">{context.financial.totalAppointments} atendimentos no periodo</p>
+                <p className="mt-1 text-sm text-slate-300">{context.financial.totalAppointments} atendimentos no período</p>
               </div>
             </div>
           </div>
@@ -174,9 +174,9 @@ export default async function InteligenciaPage({ searchParams }: Props) {
             <section className="premium-block">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-xl font-semibold text-foreground">Pontos de atencao do periodo</h3>
+                  <h3 className="text-xl font-semibold text-foreground">Pontos de atenção do período</h3>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    O que mais ameaca caixa, lucro, meta ou ritmo do mes agora.
+                    O que mais ameaça caixa, lucro, meta ou ritmo do mês agora.
                   </p>
                 </div>
                 <span className="rounded-full border border-[rgba(251,113,133,0.18)] bg-[rgba(251,113,133,0.1)] px-3 py-1 text-xs font-semibold text-rose-200">
@@ -191,9 +191,9 @@ export default async function InteligenciaPage({ searchParams }: Props) {
                   ))
                 ) : (
                   <div className="empty-state-shell">
-                    <p className="empty-state-title">Sem alertas criticos neste periodo</p>
+                    <p className="empty-state-title">Sem alertas críticos neste período</p>
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      O analista nao encontrou risco imediato de caixa ou meta. O melhor uso agora e acelerar ticket e margem.
+                      O analista não encontrou risco imediato de caixa ou meta. O melhor uso agora é acelerar ticket e margem.
                     </p>
                   </div>
                 )}
@@ -205,7 +205,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
                 <div>
                   <h3 className="text-xl font-semibold text-foreground">Oportunidades de melhoria</h3>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    O que pode melhorar faturamento, ticket ou margem sem depender so de mais volume.
+                    O que pode melhorar faturamento, ticket ou margem sem depender só de mais volume.
                   </p>
                 </div>
                 <span className="rounded-full border border-[rgba(56,189,248,0.18)] bg-[rgba(56,189,248,0.1)] px-3 py-1 text-xs font-semibold text-sky-200">
@@ -265,7 +265,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
               </details>
 
               <section className="premium-rail">
-                <h3 className="text-lg font-semibold text-foreground">Prioridades de acao</h3>
+                  <h3 className="text-lg font-semibold text-foreground">Prioridades de ação</h3>
                 <div className="mt-4 space-y-3">
                   {topRecommendations.map((insight, index) => (
                   <div key={insight.id} className="surface-inverse tonal-note">
@@ -282,7 +282,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
               <details className="disclosure-panel">
                 <summary className="disclosure-summary">
                   <div>
-                    <h3 className="text-lg font-semibold text-foreground">Saia da analise e execute</h3>
+                    <h3 className="text-lg font-semibold text-foreground">Saia da análise e execute</h3>
                   </div>
                   <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-xs font-semibold text-slate-300">
                     Abrir
@@ -316,7 +316,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
                       Defender margem
                     </p>
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      Veja rapido onde preco, comissao ou insumo precisam de ajuste.
+                      Veja rápido onde preço, comissão ou insumo precisam de ajuste.
                     </p>
                   </Link>
 
@@ -326,7 +326,7 @@ export default async function InteligenciaPage({ searchParams }: Props) {
                       Ler tendencia
                     </p>
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      Use quando a queda parecer repetida e voce quiser confirmar a tendencia.
+                      Use quando a queda parecer repetida e você quiser confirmar a tendência.
                     </p>
                   </Link>
                 </div>

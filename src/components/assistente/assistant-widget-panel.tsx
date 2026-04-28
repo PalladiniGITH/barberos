@@ -232,7 +232,7 @@ export function AssistantWidgetPanel() {
   )
 
   const helperSuggestions = screenContext.suggestions.length > 0 ? screenContext.suggestions : (workspace?.suggestions ?? [])
-  const helperPlaceholder = screenContext.placeholder || workspace?.placeholder || 'Pergunte sobre a operacao da barbearia.'
+  const helperPlaceholder = screenContext.placeholder || workspace?.placeholder || 'Pergunte sobre a operação da barbearia.'
   const hasActiveConversation = Boolean(
     selectedThread
     || optimisticThreadTitle
@@ -250,8 +250,8 @@ export function AssistantWidgetPanel() {
     workspace?.dataWindowLabel ?? null,
   ].filter(Boolean).join(' / ')
   const footerNote = compactConversationView
-    ? 'Baseado nos dados disponiveis do periodo e no seu escopo.'
-    : 'Respostas baseadas nos dados disponiveis do periodo. O backend continua sendo a autoridade do seu escopo.'
+    ? 'Baseado nos dados disponíveis do período e no seu escopo.'
+    : 'Respostas baseadas nos dados disponíveis do período. O backend continua sendo a autoridade do seu escopo.'
 
   useEffect(() => {
     if (process.env.NODE_ENV === 'production' || !isOpen) {
@@ -301,7 +301,7 @@ export function AssistantWidgetPanel() {
       setLoadState('ready')
     } catch (error) {
       setLoadState('error')
-      toast.error(error instanceof Error ? error.message : 'Nao foi possivel abrir o BarberEX IA agora.')
+      toast.error(error instanceof Error ? error.message : 'Não foi possível abrir o BarberEX IA agora.')
     }
   }, [loadState])
 
@@ -366,7 +366,7 @@ export function AssistantWidgetPanel() {
           const thread = await loadAssistantThread(threadId)
           setSelectedThread(thread)
         } catch (error) {
-          toast.error(error instanceof Error ? error.message : 'Nao foi possivel abrir essa conversa.')
+          toast.error(error instanceof Error ? error.message : 'Não foi possível abrir essa conversa.')
         } finally {
           setIsLoadingThread(false)
         }
@@ -422,8 +422,8 @@ export function AssistantWidgetPanel() {
           replaceThreadSummary(result.threadSummary)
           resetTransientConversation()
         } catch (error) {
-          setInlineErrorMessage('Nao consegui responder agora. Tente novamente em instantes.')
-          toast.error('Nao foi possivel falar com o BarberEX IA agora.')
+          setInlineErrorMessage('Não consegui responder agora. Tente novamente em instantes.')
+          toast.error('Não foi possível falar com o BarberEX IA agora.')
         }
       })()
     })
@@ -513,7 +513,7 @@ export function AssistantWidgetPanel() {
               </p>
             ) : (
               <>
-                <p>{workspace?.dataWindowLabel ?? 'Carregando base do periodo...'}</p>
+                <p>{workspace?.dataWindowLabel ?? 'Carregando base do período...'}</p>
                 <p>{getScopeLabel(workspace?.roleScope)} / {screenContext.label}</p>
                 {latestAssistantMessage?.metadata.dataFreshnessLabel && (
                   <p>{latestAssistantMessage.metadata.dataFreshnessLabel}</p>
@@ -540,7 +540,7 @@ export function AssistantWidgetPanel() {
           ) : loadState === 'error' && !workspace ? (
             <div className="flex min-h-0 flex-1 items-center justify-center">
               <div className="max-w-sm rounded-[1.4rem] border border-[rgba(220,38,38,0.18)] bg-[rgba(220,38,38,0.08)] px-5 py-4 text-center">
-                <p className="text-sm font-semibold text-foreground">Nao foi possivel abrir o BarberEX IA agora.</p>
+                <p className="text-sm font-semibold text-foreground">Não foi possível abrir o BarberEX IA agora.</p>
                 <p className="mt-2 text-xs leading-6 text-muted-foreground">
                   Tente novamente em instantes. O restante da tela continua funcionando normalmente.
                 </p>
@@ -656,7 +656,7 @@ export function AssistantWidgetPanel() {
                       <div className="w-full max-w-md rounded-[1.4rem] border border-dashed border-[rgba(124,92,255,0.14)] bg-[rgba(124,92,255,0.05)] p-5">
                         <p className="text-sm font-semibold text-foreground">Pergunte o que voce precisa decidir agora</p>
                         <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                          O BarberEX IA entende a tela atual, respeita o escopo do seu perfil e responde com base nos dados disponiveis do periodo.
+                          O BarberEX IA entende a tela atual, respeita o escopo do seu perfil e responde com base nos dados disponíveis do período.
                         </p>
 
                         <div className="mt-4 flex flex-wrap gap-2">

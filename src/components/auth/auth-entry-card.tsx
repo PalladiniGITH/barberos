@@ -20,10 +20,10 @@ function resolveErrorMessage(error: string | null) {
   }
 
   if (error === 'CredentialsSignin') {
-    return 'Email ou senha invalidos.'
+    return 'Email ou senha inválidos.'
   }
 
-  return 'Nao foi possivel entrar agora. Tente novamente.'
+  return 'Não foi possível entrar agora. Tente novamente.'
 }
 
 export function AuthEntryCard({
@@ -59,7 +59,7 @@ export function AuthEntryCard({
               </div>
               <div>
                 <h1 className="text-[1.35rem] font-semibold tracking-tight text-foreground">BarberEX</h1>
-                <p className="mt-1 text-sm text-slate-300">Operacao premium para barbearias que rodam o dia no detalhe.</p>
+                <p className="mt-1 text-sm text-slate-300">Operação premium para barbearias que rodam o dia no detalhe.</p>
               </div>
             </div>
 

@@ -14,15 +14,15 @@ import type { CampaignAutomationManagementData } from '@/lib/campaign-automation
 import { cn, formatPercent } from '@/lib/utils'
 
 const CAMPAIGN_LABELS: Record<CampaignAutomationType, string> = {
-  BIRTHDAY: 'Aniversarios',
+  BIRTHDAY: 'Aniversários',
   WALK_IN_INACTIVE: 'Avulsos inativos',
   SUBSCRIPTION_ABSENT: 'Assinantes ausentes',
 }
 
 const CAMPAIGN_HELPERS: Record<CampaignAutomationType, string> = {
-  BIRTHDAY: 'Relacionamento afetivo com beneficio configurado.',
-  WALK_IN_INACTIVE: 'Reativacao de clientes avulsos sem retorno recente.',
-  SUBSCRIPTION_ABSENT: 'Estimulo para assinantes voltarem a usar o plano.',
+  BIRTHDAY: 'Relacionamento afetivo com benefício configurado.',
+  WALK_IN_INACTIVE: 'Reativação de clientes avulsos sem retorno recente.',
+  SUBSCRIPTION_ABSENT: 'Estímulo para assinantes voltarem a usar o plano.',
 }
 
 const DELIVERY_STATUS_LABELS: Record<CampaignAutomationDeliveryStatus, string> = {
@@ -65,7 +65,7 @@ function StatusBadge({ status }: { status: CampaignAutomationManagementData['sta
   return (
     <span className={cn('inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold', className)}>
       <span className="h-1.5 w-1.5 rounded-full bg-current" />
-      {status === 'active' ? 'Automacao ativa' : status === 'attention' ? 'Revisar automacao' : 'Automacao inativa'}
+      {status === 'active' ? 'Automação ativa' : status === 'attention' ? 'Revisar automação' : 'Automação inativa'}
     </span>
   )
 }
@@ -120,10 +120,10 @@ export function CampaignAutomationPanel({ data }: { data: CampaignAutomationMana
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="text-[1.55rem] font-semibold tracking-tight text-foreground">
-                Campanhas automaticas e relacionamento
+                Campanhas automáticas e relacionamento
               </h2>
               <p className="mt-2 max-w-3xl text-sm leading-7 text-muted-foreground">
-                Acompanhe se as campanhas das 09:00 estao rodando, quem foi impactado e como a automacao esta ajudando a trazer clientes de volta.
+                Acompanhe se as campanhas das 09:00 estão rodando, quem foi impactado e como a automação está ajudando a trazer clientes de volta.
               </p>
             </div>
 
@@ -138,9 +138,9 @@ export function CampaignAutomationPanel({ data }: { data: CampaignAutomationMana
               icon={Activity}
             />
             <SummaryCard
-              label="Janela diaria"
+              label="Janela diária"
               value={data.executionTimeLabel}
-              helper={`Proxima janela: ${formatDateIsoLabel(data.nextWindow.localDateIso)} as ${data.nextWindow.timeLabel}.`}
+              helper={`Próxima janela: ${formatDateIsoLabel(data.nextWindow.localDateIso)} às ${data.nextWindow.timeLabel}.`}
               icon={CalendarClock}
             />
             <SummaryCard
@@ -152,7 +152,7 @@ export function CampaignAutomationPanel({ data }: { data: CampaignAutomationMana
             <SummaryCard
               label="Taxa de entrega"
               value={formatDeliveryRate(data.todayTotals.deliveryRate)}
-              helper={`${data.todayTotals.eligibleCustomers} cliente(s) elegiveis no ciclo de hoje.`}
+              helper={`${data.todayTotals.eligibleCustomers} cliente(s) elegíveis no ciclo de hoje.`}
               icon={Sparkles}
             />
           </div>
@@ -180,7 +180,7 @@ export function CampaignAutomationPanel({ data }: { data: CampaignAutomationMana
 
                 <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
                   <div>
-                    <p className="executive-label">Elegiveis</p>
+                  <p className="executive-label">Elegíveis</p>
                     <p className="mt-1 text-xl font-semibold text-foreground">{campaign.eligibleCustomers}</p>
                   </div>
                   <div>
@@ -194,9 +194,9 @@ export function CampaignAutomationPanel({ data }: { data: CampaignAutomationMana
                 </div>
 
                 <div className="mt-4 rounded-[0.9rem] border border-[rgba(255,255,255,0.07)] bg-[rgba(15,17,21,0.46)] p-3">
-                  <p className="text-sm font-semibold text-foreground">Beneficio configurado</p>
+                  <p className="text-sm font-semibold text-foreground">Benefício configurado</p>
                   <p className="mt-2 line-clamp-2 text-sm leading-6 text-foreground">
-                    {campaign.benefitDescription ?? 'Sem beneficio configurado'}
+                    {campaign.benefitDescription ?? 'Sem benefício configurado'}
                   </p>
                 </div>
               </article>
@@ -207,21 +207,21 @@ export function CampaignAutomationPanel({ data }: { data: CampaignAutomationMana
         <aside className="premium-rail p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="text-[1.35rem] font-semibold tracking-tight text-foreground">Operacao assistida</h3>
+              <h3 className="text-[1.35rem] font-semibold tracking-tight text-foreground">Operação assistida</h3>
             </div>
             <Bot className="h-5 w-5 text-primary" />
           </div>
 
           <div className="mt-4 space-y-3">
             <div className="panel-soft">
-              <p className="executive-label">Ultima execucao</p>
+              <p className="executive-label">Última execução</p>
               <p className="mt-2 text-sm font-semibold text-foreground">
-                {data.lastRun ? formatDateTimeLabel(data.lastRun.completedAt ?? data.lastRun.startedAt, data.timezone) : 'Ainda sem execucao'}
+                {data.lastRun ? formatDateTimeLabel(data.lastRun.completedAt ?? data.lastRun.startedAt, data.timezone) : 'Ainda sem execução'}
               </p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 {data.lastRun
                   ? `${data.lastRun.deliveriesSent} enviada(s), ${data.lastRun.deliveriesFailed} falha(s), ${data.lastRun.deliveriesSkipped} ignorada(s).`
-                  : 'A primeira execucao aparece aqui depois da janela diaria.'}
+                  : 'A primeira execução aparece aqui depois da janela diária.'}
               </p>
             </div>
 
@@ -241,10 +241,10 @@ export function CampaignAutomationPanel({ data }: { data: CampaignAutomationMana
             <div className="rounded-[1rem] border border-[rgba(124,58,237,0.18)] bg-[rgba(124,58,237,0.1)] p-4">
               <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                 <RotateCcw className="h-4 w-4 text-primary" />
-                Proxima janela
+                Próxima janela
               </p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                {data.nextWindow.description} A automacao usa regras deterministicas; a IA apenas personaliza a mensagem.
+                {data.nextWindow.description} A automação usa regras determinísticas; a IA apenas personaliza a mensagem.
               </p>
             </div>
           </div>
@@ -270,7 +270,7 @@ export function CampaignAutomationPanel({ data }: { data: CampaignAutomationMana
                   </p>
                 </div>
                 <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">
-                  {delivery.benefitDescription ?? 'Sem beneficio registrado'}
+                  {delivery.benefitDescription ?? 'Sem benefício registrado'}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {formatDateTimeLabel(delivery.sentAt ?? delivery.createdAt, data.timezone)}
@@ -283,7 +283,7 @@ export function CampaignAutomationPanel({ data }: { data: CampaignAutomationMana
           <div className="px-4 py-8 text-center">
             <p className="text-sm font-semibold text-foreground">Ainda sem disparos registrados</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Depois da primeira execucao diaria, os clientes impactados aparecem aqui.
+              Depois da primeira execução diária, os clientes impactados aparecem aqui.
             </p>
           </div>
         )}

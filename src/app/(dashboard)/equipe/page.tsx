@@ -95,7 +95,7 @@ export default async function EquipePage({ searchParams }: Props) {
     <div className="page-section mx-auto flex max-w-7xl flex-col gap-5">
       <PageHeader
         title="Equipe"
-        description="Uma visão comercial da equipe para apresentar resultado, ritmo e próximos passos em segundos."
+        description="Acompanhe resultado, ritmo e metas da equipe com uma leitura rápida do período."
         action={(
           <Suspense>
             <PeriodSelector month={month} year={year} pathname="/equipe" />
@@ -109,7 +109,7 @@ export default async function EquipePage({ searchParams }: Props) {
           {
             href: '/equipe',
             label: 'Visão geral',
-            helper: 'Resumo do time, metas e atalhos de navegação.',
+            helper: 'Resumo do time, metas e atalhos principais.',
           },
           {
             href: '/equipe/profissionais',
@@ -124,7 +124,7 @@ export default async function EquipePage({ searchParams }: Props) {
           {
             href: '/equipe/desempenho',
             label: 'Desempenho',
-            helper: 'Leitura de performance e resultado do time.',
+            helper: 'Leitura de desempenho e resultado do time.',
           },
         ]}
       />
@@ -139,7 +139,7 @@ export default async function EquipePage({ searchParams }: Props) {
               {formatCurrency(teamRevenue)}
             </h2>
             <p className="mt-3 text-sm leading-6 text-slate-300">
-              {monthLabel} entra como um painel comercial simples: quanto a equipe trouxe, quanto converteu e onde o dono pode agir sem planilha.
+              {monthLabel} entra como um painel comercial simples: quanto a equipe trouxe, quanto converteu e onde vale agir primeiro.
             </p>
           </div>
 
@@ -232,7 +232,7 @@ export default async function EquipePage({ searchParams }: Props) {
           <div>
             <h2 className="text-lg font-semibold text-foreground">Leitura rápida da equipe</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Essa visão funciona bem em demo porque já organiza a conversa entre pessoas, metas e resultado.
+              Use este resumo para alinhar pessoas, metas e resultado sem abrir vários módulos ao mesmo tempo.
             </p>
           </div>
           {leader && (

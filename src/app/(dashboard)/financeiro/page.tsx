@@ -251,7 +251,7 @@ export default async function FinanceiroPage({ searchParams }: Props) {
 
   const summaryCopy = totalRevenue > 0
     ? `${formatCurrency(totalRevenue)} entrou no caixa neste periodo, com lucro estimado de ${formatCurrency(profit)} e margem de ${formatPercent(profitMargin, 0)}.`
-    : 'Ainda nao ha movimentacao financeira registrada neste periodo. O painel continua pronto para assumir o primeiro ciclo.'
+    : 'Ainda não há movimentação financeira registrada neste período. Quando as primeiras entradas e saídas forem lançadas, a leitura financeira aparece aqui.'
 
   return (
     <div className="page-section mx-auto flex max-w-7xl flex-col gap-5">

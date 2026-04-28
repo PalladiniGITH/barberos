@@ -154,7 +154,7 @@ export default async function ServicosPage() {
     <div className="page-section mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
         title="Precificação"
-        description="Uma camada de margem e decisão comercial para mostrar que o produto não para no faturamento."
+        description="Revise serviços, custos e margem do catálogo com uma leitura operacional mais clara."
       />
 
       <SectionTabs
@@ -163,17 +163,17 @@ export default async function ServicosPage() {
           {
             href: '/precificacao',
             label: 'Visão geral',
-            helper: 'Resumo do catálogo, custos e atalhos de navegação.',
+            helper: 'Resumo do catálogo, custos e atalhos principais.',
           },
           {
             href: '/precificacao/servicos',
             label: 'Serviços e margem',
-            helper: 'Preço, custo e leitura de lucro por serviço.',
+            helper: 'Preço, custo e leitura de margem por serviço.',
           },
           {
             href: '/precificacao/insumos',
             label: 'Insumos',
-            helper: 'Base de custo e relação com os serviços.',
+            helper: 'Base de custo ligada aos serviços.',
           },
           {
             href: '/precificacao/resultado',
@@ -190,7 +190,7 @@ export default async function ServicosPage() {
           <p className="mt-2 text-sm text-muted-foreground">
             {services.length - activeServicesCount > 0
               ? `${services.length - activeServicesCount} inativo${services.length - activeServicesCount > 1 ? 's' : ''} preservado${services.length - activeServicesCount > 1 ? 's' : ''} no historico.`
-              : 'Catalogo principal que sustenta ticket e margem.'}
+              : 'Catálogo principal que sustenta ticket e margem.'}
           </p>
         </div>
 
@@ -229,7 +229,7 @@ export default async function ServicosPage() {
               <div className="flex flex-col gap-1">
                 <h3 className="text-base font-semibold text-foreground">Cadastrar ou importar servico</h3>
                 <p className="text-sm text-muted-foreground">
-                  Servicos migrados continuam editaveis: preco, duracao, categoria, status e insumos usados.
+                  Serviços migrados continuam editáveis: preço, duração, categoria, status e insumos usados.
                 </p>
               </div>
               <form action={saveServiceFromForm} className="mt-4 min-w-0 space-y-4">
@@ -336,7 +336,7 @@ export default async function ServicosPage() {
                     <div>
                       <h3 className="text-lg font-semibold text-foreground">{service.name}</h3>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        {service.description || 'Leitura direta de preço, custo e lucro para este serviço.'}
+                        {service.description || 'Leitura direta de preço, custo e margem para este serviço.'}
                       </p>
                       <div className="mt-3 flex flex-wrap gap-2">
                         <span className="rounded-full border border-border/70 bg-background/60 px-3 py-1 text-xs font-semibold text-muted-foreground">
@@ -500,7 +500,7 @@ export default async function ServicosPage() {
           {canManageCatalog && (
             <section className="dashboard-panel p-6">
               <h2 className="text-lg font-semibold text-foreground">Categorias de servico</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Agrupe catalogos importados, combos e servicos manuais.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Agrupe catálogos importados, combos e serviços manuais.</p>
               <form action={saveOperationalCategoryFromForm} className="mt-4 space-y-3">
                 <input type="hidden" name="type" value="SERVICE" />
                 <input type="hidden" name="active" value="true" />
@@ -548,7 +548,7 @@ export default async function ServicosPage() {
           )}
 
           <section className="dashboard-panel p-6">
-            <h2 className="text-lg font-semibold text-foreground">Destaque do catálogo</h2>
+              <h2 className="text-lg font-semibold text-foreground">Destaque do catálogo</h2>
             {bestService ? (
               <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-5">
                 <p className="text-sm font-semibold text-emerald-700">{bestService.name}</p>
@@ -616,7 +616,7 @@ export default async function ServicosPage() {
                   {attentionServices} serviço{attentionServices > 1 ? 's' : ''} com margem abaixo de 20%
                 </p>
                 <p className="mt-2 text-sm leading-6 text-rose-100/85">
-                  Essa leitura já dá um discurso muito forte na apresentação: o sistema ajuda a proteger lucro, não só a lançar valores.
+                  Essa leitura ajuda a proteger lucro antes que o catálogo comece a pressionar o resultado.
                 </p>
               </div>
             </section>

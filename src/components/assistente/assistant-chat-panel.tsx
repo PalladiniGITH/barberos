@@ -107,7 +107,7 @@ export function AssistantChatPanel({ workspace }: Props) {
         setDraft('')
         setInlineErrorMessage(null)
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Nao foi possivel falar com o BarberEX IA agora.')
+        toast.error(error instanceof Error ? error.message : 'Não foi possível falar com o BarberEX IA agora.')
       }
     })
   }
@@ -122,7 +122,7 @@ export function AssistantChatPanel({ workspace }: Props) {
         const thread = await loadAssistantThread(threadId)
         setSelectedThread(thread)
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Nao foi possivel abrir essa conversa.')
+        toast.error(error instanceof Error ? error.message : 'Não foi possível abrir essa conversa.')
       }
     })
   }
@@ -133,7 +133,7 @@ export function AssistantChatPanel({ workspace }: Props) {
         <div className="border-b border-[rgba(255,255,255,0.08)] px-5 py-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-foreground">Historico recente</h2>
+              <h2 className="text-lg font-semibold text-foreground">Histórico recente</h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 Cada conversa fica ligada ao seu perfil e ao escopo liberado para este acesso.
               </p>
@@ -152,7 +152,7 @@ export function AssistantChatPanel({ workspace }: Props) {
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
           {threadSummaries.length === 0 ? (
             <div className="rounded-[1.2rem] border border-dashed border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4 text-sm leading-6 text-muted-foreground">
-              Sua primeira pergunta ja cria uma conversa nova. Depois disso, voce pode voltar ao historico por aqui.
+              Sua primeira pergunta já cria uma conversa nova. Depois disso, você pode voltar ao histórico por aqui.
             </div>
           ) : (
             <div className="space-y-2">
@@ -234,7 +234,7 @@ export function AssistantChatPanel({ workspace }: Props) {
               {inlineErrorMessage && (
                 <div className="flex justify-start">
                   <div className="max-w-[88%] rounded-[1.1rem] border border-[rgba(220,38,38,0.24)] bg-[rgba(220,38,38,0.08)] px-4 py-3 text-sm text-slate-100">
-                    <p className="font-medium">Nao foi possivel responder agora.</p>
+                    <p className="font-medium">Não foi possível responder agora.</p>
                     <p className="mt-1 text-xs leading-6 text-rose-100/90">{inlineErrorMessage}</p>
                   </div>
                 </div>
@@ -243,9 +243,9 @@ export function AssistantChatPanel({ workspace }: Props) {
           ) : (
             <div className="flex h-full min-h-[300px] items-center justify-center">
               <div className="max-w-xl rounded-[1.5rem] border border-dashed border-[rgba(124,58,237,0.18)] bg-[rgba(124,58,237,0.06)] p-6 text-center">
-                <p className="text-sm font-semibold text-foreground">Pergunte o que voce precisa decidir agora</p>
+                <p className="text-sm font-semibold text-foreground">Pergunte o que você precisa decidir agora</p>
                 <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                  O BarberEX IA usa um contexto compacto, respeita o escopo do seu perfil e responde com base nos dados disponiveis da operacao.
+                  O BarberEX IA usa um contexto compacto, respeita o escopo do seu perfil e responde com base nos dados disponíveis da operação.
                 </p>
               </div>
             </div>

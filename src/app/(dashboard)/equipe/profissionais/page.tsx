@@ -99,7 +99,7 @@ export default async function ProfissionaisPage({ searchParams }: Props) {
     <div className="page-section mx-auto max-w-6xl">
       <PageHeader
         title="Profissionais"
-        description="Veja quem puxa resultado, ticket, escopo de atendimento e configuracao comercial do time."
+        description="Veja quem puxa resultado, ticket, escopo de atendimento e configuração comercial do time."
         action={(
           <div className="flex items-center gap-3">
             <Suspense>
@@ -115,23 +115,23 @@ export default async function ProfissionaisPage({ searchParams }: Props) {
         items={[
           {
             href: '/equipe',
-            label: 'Visao geral',
-            helper: 'Resumo do time, metas e atalhos de navegacao.',
+            label: 'Visão geral',
+            helper: 'Resumo do time, metas e atalhos de navegação.',
           },
           {
             href: '/equipe/profissionais',
             label: 'Profissionais',
-            helper: 'Ranking, ticket e gestao individual da equipe.',
+            helper: 'Ranking, ticket e gestão individual da equipe.',
           },
           {
             href: '/equipe/metas',
             label: 'Metas',
-            helper: 'Meta da barbearia e metas individuais do mes.',
+            helper: 'Meta da barbearia e metas individuais do mês.',
           },
           {
             href: '/equipe/desempenho',
             label: 'Desempenho',
-            helper: 'Leitura consolidada da operacao do time.',
+            helper: 'Leitura consolidada da operação do time.',
           },
         ]}
       />
@@ -152,14 +152,14 @@ export default async function ProfissionaisPage({ searchParams }: Props) {
         </div>
 
         <div className="kpi-card">
-          <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Lider do mes</p>
+          <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Líder do mês</p>
           <p className="text-lg font-bold text-foreground">{leader?.name ?? '—'}</p>
           <p className="text-sm text-emerald-500">{leader ? formatCurrency(leader.revenue) : ''}</p>
         </div>
 
         <div className="kpi-card">
-          <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Configuracao comercial</p>
-          <p className="text-lg font-bold text-foreground">{configuredCommissionAverage.toFixed(0)}% de comissao media</p>
+          <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Configuração comercial</p>
+          <p className="text-lg font-bold text-foreground">{configuredCommissionAverage.toFixed(0)}% de comissão média</p>
           <p className="text-sm text-muted-foreground">
             {walkInEnabledCount} operam no avulso • {subscriptionEnabledCount} atendem assinatura
           </p>
@@ -193,7 +193,7 @@ export default async function ProfissionaisPage({ searchParams }: Props) {
                     {PROFESSIONAL_ATTENDANCE_SCOPE_LABELS[professional.attendanceScope]}
                   </span>
                   <span className="rounded-full bg-secondary px-2 py-1 text-[10px] font-semibold text-muted-foreground">
-                    Comissao {Number(professional.commissionRate ?? 40).toFixed(0)}%
+                    Comissão {Number(professional.commissionRate ?? 40).toFixed(0)}%
                   </span>
                 </div>
               </div>
@@ -208,19 +208,19 @@ export default async function ProfissionaisPage({ searchParams }: Props) {
               <div className="rounded-lg border border-border/70 bg-secondary/30 px-3 py-2">
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Corte</p>
                 <p className="mt-1 font-semibold text-foreground">
-                  {professional.haircutPrice ? formatCurrency(Number(professional.haircutPrice)) : 'Padrao'}
+                  {professional.haircutPrice ? formatCurrency(Number(professional.haircutPrice)) : 'Padrão'}
                 </p>
               </div>
               <div className="rounded-lg border border-border/70 bg-secondary/30 px-3 py-2">
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Barba</p>
                 <p className="mt-1 font-semibold text-foreground">
-                  {professional.beardPrice ? formatCurrency(Number(professional.beardPrice)) : 'Padrao'}
+                  {professional.beardPrice ? formatCurrency(Number(professional.beardPrice)) : 'Padrão'}
                 </p>
               </div>
               <div className="rounded-lg border border-border/70 bg-secondary/30 px-3 py-2">
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Combo</p>
                 <p className="mt-1 font-semibold text-foreground">
-                  {professional.comboPrice ? formatCurrency(Number(professional.comboPrice)) : 'Padrao'}
+                  {professional.comboPrice ? formatCurrency(Number(professional.comboPrice)) : 'Padrão'}
                 </p>
               </div>
             </div>

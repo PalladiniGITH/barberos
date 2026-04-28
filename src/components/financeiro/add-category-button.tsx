@@ -10,9 +10,9 @@ import { toast } from 'sonner'
 import { addFinancialCategory } from '@/actions/financeiro'
 
 const schema = z.object({
-  name: z.string().min(2, 'Nome obrigatorio'),
+  name: z.string().min(2, 'Nome obrigatório'),
   type: z.enum(['REVENUE', 'EXPENSE_FIXED', 'EXPENSE_VARIABLE']),
-  color: z.string().regex(/^#([0-9a-fA-F]{6})$/, 'Cor invalida'),
+  color: z.string().regex(/^#([0-9a-fA-F]{6})$/, 'Cor inválida'),
 })
 
 type FormData = z.infer<typeof schema>
@@ -34,12 +34,12 @@ export function AddCategoryButton() {
     const result = await addFinancialCategory(data)
 
     if (result.success) {
-      toast.success('Categoria criada com sucesso')
+      toast.success('Categoria criada com sucesso.')
       reset({ type: 'EXPENSE_VARIABLE', color: '#10b981' })
       setOpen(false)
       router.refresh()
     } else {
-      toast.error(result.error ?? 'Nao foi possivel salvar')
+      toast.error(result.error ?? 'Não foi possível salvar a categoria agora.')
     }
   }
 
@@ -54,23 +54,32 @@ export function AddCategoryButton() {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <div className="relative w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-2xl">
-            <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-foreground">Nova categoria</h2>
-              <button onClick={() => setOpen(false)} className="text-muted-foreground transition-colors hover:text-foreground">
+          <div className="modal-shell relative w-full max-w-md">
+            <div className="flex items-center justify-between border-b border-[rgba(255,255,255,0.08)] px-5 py-4 sm:px-6">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Nova categoria</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Organize receitas e despesas com uma estrutura mais clara para a leitura financeira.
+                </p>
+              </div>
+              <button
+                onClick={() => setOpen(false)}
+                className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-2 text-muted-foreground transition-colors hover:text-foreground"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
+              <div className="modal-shell-body space-y-4">
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-foreground">Nome</label>
                 <input
                   {...register('name')}
                   placeholder="Ex: Insumos, Pix, Aluguel"
-                  className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-foreground outline-none transition focus:ring-2 focus:ring-primary/50"
+                  className="auth-input"
                 />
                 {errors.name && <p className="mt-1 text-xs text-destructive">{errors.name.message}</p>}
               </div>
@@ -79,11 +88,11 @@ export function AddCategoryButton() {
                 <label className="mb-1.5 block text-sm font-medium text-foreground">Tipo</label>
                 <select
                   {...register('type')}
-                  className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-foreground outline-none transition focus:ring-2 focus:ring-primary/50"
+                  className="auth-input"
                 >
                   <option value="REVENUE">Receita</option>
                   <option value="EXPENSE_FIXED">Despesa fixa</option>
-                  <option value="EXPENSE_VARIABLE">Despesa variavel</option>
+                  <option value="EXPENSE_VARIABLE">Despesa variável</option>
                 </select>
               </div>
 
@@ -104,22 +113,23 @@ export function AddCategoryButton() {
                 <input type="hidden" {...register('color')} />
                 {errors.color && <p className="mt-1 text-xs text-destructive">{errors.color.message}</p>}
               </div>
+              </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="modal-shell-footer">
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="flex-1 rounded-lg border border-border px-4 py-2 text-sm text-foreground transition-colors hover:bg-secondary"
+                  className="action-button flex-1"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                  className="action-button-primary flex flex-1 items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                  {isSubmitting ? 'Salvando' : 'Criar'}
+                  {isSubmitting ? 'Salvando...' : 'Criar categoria'}
                 </button>
               </div>
             </form>

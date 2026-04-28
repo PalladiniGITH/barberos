@@ -17,7 +17,7 @@ test('ajusta sugestoes da agenda para escopo gerencial', () => {
 
   assert.equal(context.key, 'agendamentos')
   assert.equal(context.label, 'Agenda operacional')
-  assert.match(context.suggestions[0], /horarios ociosos/i)
+  assert.match(context.suggestions[0], /hor[aá]rios ociosos/i)
 })
 
 test('mantem escopo individual para barbeiro mesmo fora do dashboard', () => {

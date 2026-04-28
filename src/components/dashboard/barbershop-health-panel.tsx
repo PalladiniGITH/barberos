@@ -50,7 +50,7 @@ export function BarbershopHealthPanel({ health }: { health: BarbershopHealthSnap
             <HealthMetricCard
               title="Assinantes ativos"
               value={`${health.activeSubscribers}`}
-              helper={`${health.subscribersWithVisits} voltaram no periodo.`}
+              helper={`${health.subscribersWithVisits} voltaram no período.`}
               icon={Users}
             />
             <HealthMetricCard
@@ -62,13 +62,13 @@ export function BarbershopHealthPanel({ health }: { health: BarbershopHealthSnap
             <HealthMetricCard
               title="Retorno avulso"
               value={formatPercent(health.walkInReturnRate, 0)}
-              helper={`${health.returningWalkInCustomers} clientes avulsos repetiram no periodo.`}
+              helper={`${health.returningWalkInCustomers} clientes avulsos repetiram no período.`}
               icon={Repeat2}
             />
             <HealthMetricCard
               title="Pulso da base"
               value={formatPercent(health.healthScore, 0)}
-              helper={`${formatPercent(health.riskSubscriberPercent, 0)} dos assinantes estao em risco.`}
+              helper={`${formatPercent(health.riskSubscriberPercent, 0)} dos assinantes estão em risco.`}
               icon={Activity}
             />
           </div>
@@ -79,7 +79,7 @@ export function BarbershopHealthPanel({ health }: { health: BarbershopHealthSnap
             <div>
               <h3 className="mt-2 text-[1.35rem] font-semibold tracking-tight text-foreground">Como estamos medindo</h3>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                A base abaixo explica como o painel le os sinais de retorno, uso e saude da assinatura.
+                A base abaixo explica como o painel lê os sinais de retorno, uso e saúde da assinatura.
               </p>
             </div>
             <ShieldCheck className="h-5 w-5 text-primary" />
@@ -95,7 +95,7 @@ export function BarbershopHealthPanel({ health }: { health: BarbershopHealthSnap
               <p className="mt-2 leading-6">{health.methodology.walkInReturnRate}</p>
             </div>
             <div className="tonal-note">
-              <p className="font-semibold text-foreground">Score de saude</p>
+              <p className="font-semibold text-foreground">Score de saúde</p>
               <p className="mt-2 leading-6">{health.methodology.healthScore}</p>
             </div>
           </div>

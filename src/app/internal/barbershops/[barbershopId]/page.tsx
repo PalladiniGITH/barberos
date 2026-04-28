@@ -35,22 +35,22 @@ export default async function PlatformBarbershopDetailPage({
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Tenant indisponivel"
-          description="Nao foi possivel carregar o detalhe desta barbearia agora. O restante da operacao master continua acessivel."
+          title="Unidade indisponível"
+          description="Não foi possível carregar os detalhes desta barbearia agora. O restante da operação da plataforma continua acessível."
           action={(
             <Link
               href="/internal"
               className="inline-flex items-center gap-2 rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-[rgba(124,58,237,0.12)]"
             >
-              Voltar para /internal
+              Voltar para a plataforma
             </Link>
           )}
         />
 
         <section className="rounded-[1.2rem] border border-amber-500/20 bg-amber-500/10 px-4 py-4 text-sm text-amber-100">
-          <p className="font-semibold">Leitura temporariamente indisponivel</p>
+          <p className="font-semibold">Leitura temporariamente indisponível</p>
           <p className="mt-2">
-            Verifique se o schema do banco desta implantacao ja recebeu as colunas mais recentes do painel master e tente novamente.
+            Revise a atualização desta implantação e tente novamente em instantes.
           </p>
         </section>
       </div>

@@ -78,7 +78,7 @@ export default async function DesempenhoPage({ searchParams }: Props) {
         <div className="page-section mx-auto flex max-w-5xl flex-col gap-6">
           <PageHeader
             title="Meu desempenho"
-            description="Nao foi possivel consolidar seus indicadores agora."
+            description="Não foi possível consolidar seus indicadores agora."
             action={(
               <Suspense>
                 <PeriodSelector month={month} year={year} pathname="/equipe/desempenho" />
@@ -89,7 +89,7 @@ export default async function DesempenhoPage({ searchParams }: Props) {
           <SectionTabs currentPath="/equipe/desempenho" items={getTeamSectionTabs(session.user.role)} />
 
           <section className="dashboard-panel p-6">
-            <h2 className="text-lg font-semibold text-foreground">Painel indisponivel</h2>
+            <h2 className="text-lg font-semibold text-foreground">Painel indisponível</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
               Sua agenda continua acessivel. Vale revisar o vinculo do barbeiro e os dados do periodo antes de tentar novamente.
             </p>

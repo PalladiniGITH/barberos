@@ -26,34 +26,34 @@ interface HeaderProps {
 
 function getPageMeta(pathname: string, role?: string | null) {
   if (pathname === '/internal') {
-    return {
-      breadcrumb: 'BarberEX Admin',
-      title: 'Operacao SaaS',
-      helper: 'Tenants, uso de IA, WhatsApp, automacoes e sinais da plataforma em uma unica leitura.',
-    }
+      return {
+        breadcrumb: 'BarberEX Admin',
+        title: 'Operação SaaS',
+        helper: 'Tenants, uso de IA, WhatsApp, automações e sinais da plataforma em uma única leitura.',
+      }
   }
 
   if (pathname.startsWith('/internal/barbershops/')) {
-    return {
-      breadcrumb: 'BarberEX Admin',
-      title: 'Tenant em detalhe',
-      helper: 'Saude operacional, uso de IA, equipe, automacoes e sinais recentes dessa barbearia.',
-    }
+      return {
+        breadcrumb: 'BarberEX Admin',
+        title: 'Tenant em detalhe',
+        helper: 'Saúde operacional, uso de IA, equipe, automações e sinais recentes dessa barbearia.',
+      }
   }
 
   if (pathname === '/dashboard') {
     if (role === 'BARBER') {
       return {
         breadcrumb: 'Meu painel',
-        title: 'Minha operacao',
-        helper: 'Agenda, meta, desempenho e leitura individual do seu periodo.',
+        title: 'Minha operação',
+        helper: 'Agenda, meta, desempenho e leitura individual do seu período.',
       }
     }
 
     return {
-      breadcrumb: 'Visao geral',
+      breadcrumb: 'Visão geral',
       title: 'Painel executivo',
-      helper: 'Visao da operacao com mais contraste, mais ritmo e menos ruido.',
+      helper: 'Visão da operação com mais contraste, mais ritmo e menos ruído.',
     }
   }
 
@@ -61,7 +61,7 @@ function getPageMeta(pathname: string, role?: string | null) {
     return {
       breadcrumb: 'Minha agenda',
       title: 'Agenda pessoal',
-      helper: 'Seus horarios, encaixes e atendimentos do dia sem ruido administrativo.',
+      helper: 'Seus horários, encaixes e atendimentos do dia sem ruído administrativo.',
     }
   }
 
@@ -69,7 +69,7 @@ function getPageMeta(pathname: string, role?: string | null) {
     return {
       breadcrumb: 'Minhas metas',
       title: 'Meta individual',
-      helper: 'Seu objetivo do periodo, progresso atual e o que falta para fechar bem o mes.',
+      helper: 'Seu objetivo do período, progresso atual e o que falta para fechar bem o mês.',
     }
   }
 
@@ -77,7 +77,7 @@ function getPageMeta(pathname: string, role?: string | null) {
     return {
       breadcrumb: 'Meu desempenho',
       title: 'Resultado pessoal',
-      helper: 'Ticket, comissao, produtos e leitura direta do seu desempenho.',
+      helper: 'Ticket, comissão, produtos e leitura direta do seu desempenho.',
     }
   }
 
@@ -85,14 +85,14 @@ function getPageMeta(pathname: string, role?: string | null) {
     return {
       breadcrumb: 'Minha conta',
       title: 'Perfil e acesso',
-      helper: 'Seus dados de acesso e o vinculo profissional usado na operacao.',
+      helper: 'Seus dados de acesso e o vínculo profissional usado na operação.',
     }
   }
 
   if (pathname.startsWith('/inteligencia')) {
     return {
-      breadcrumb: 'Inteligencia',
-      title: 'Inteligencia da operacao',
+      breadcrumb: 'Inteligência',
+      title: 'Inteligência da operação',
       helper: 'Insights, contexto e sinais para agir com mais clareza.',
     }
   }
@@ -109,15 +109,15 @@ function getPageMeta(pathname: string, role?: string | null) {
     return {
       breadcrumb: 'Clientes',
       title: 'Base de clientes',
-      helper: 'Historico, recorrencia e valor com leitura mais organizada.',
+      helper: 'Histórico, recorrência e valor com leitura mais organizada.',
     }
   }
 
   if (pathname.startsWith('/financeiro')) {
     return {
       breadcrumb: 'Financeiro',
-      title: 'Saude financeira',
-      helper: 'Receitas, despesas e caixa com menos ruido visual.',
+      title: 'Saúde financeira',
+      helper: 'Receitas, despesas e caixa com menos ruído visual.',
     }
   }
 
@@ -125,30 +125,30 @@ function getPageMeta(pathname: string, role?: string | null) {
     return {
       breadcrumb: 'Equipe',
       title: 'Leitura da equipe',
-      helper: 'Metas, desempenho e operacao do time.',
+      helper: 'Metas, desempenho e operação do time.',
     }
   }
 
   if (pathname.startsWith('/precificacao')) {
     return {
-      breadcrumb: 'Precificacao',
-      title: 'Margem e catalogo',
-      helper: 'Preco, custo e rentabilidade do que a casa vende.',
+      breadcrumb: 'Precificação',
+      title: 'Margem e catálogo',
+      helper: 'Preço, custo e rentabilidade do que a casa vende.',
     }
   }
 
   if (pathname.startsWith('/configuracoes')) {
     return {
-      breadcrumb: 'Configuracoes',
-      title: 'Conta e operacao',
+      breadcrumb: 'Configurações',
+      title: 'Conta e operação',
       helper: 'Ajustes da barbearia, acessos e estrutura.',
     }
   }
 
   return {
     breadcrumb: PRODUCT_NAME,
-    title: 'Operacao',
-    helper: 'Acompanhe a barbearia em um painel mais claro e confiavel.',
+    title: 'Operação',
+    helper: 'Acompanhe a barbearia em um painel mais claro e confiável.',
   }
 }
 
@@ -241,7 +241,7 @@ export function Header({
             </span>
             <div className="min-w-0">
               <p className="truncate text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                {pathname.startsWith('/agendamentos') ? 'Janela' : 'Periodo'}
+                {pathname.startsWith('/agendamentos') ? 'Janela' : 'Período'}
               </p>
               <p className="truncate text-sm font-medium text-foreground">{periodLabel}</p>
             </div>

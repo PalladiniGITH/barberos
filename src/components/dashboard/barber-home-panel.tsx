@@ -56,7 +56,7 @@ export function BarberHomePanel({ data }: { data: BarberDashboardData }) {
             </p>
 
             <p className="mt-4 text-sm text-slate-300">
-              {data.attendanceScopeLabel} · {data.todayLabel} · {data.upcomingToday.length} proximos atendimentos
+              {data.attendanceScopeLabel} · {data.todayLabel} · {data.upcomingToday.length} próximos atendimentos
             </p>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -68,7 +68,7 @@ export function BarberHomePanel({ data }: { data: BarberDashboardData }) {
                 <p className="mt-2 text-sm text-muted-foreground">Clientes confirmados ou pendentes na sua agenda.</p>
               </div>
               <div className="hero-stat-card">
-                <p className="executive-label">Concluidos hoje</p>
+                <p className="executive-label">Concluídos hoje</p>
                 <p className="mt-3 text-[1.9rem] font-semibold tracking-tight text-foreground">
                   {data.completedTodayCount}
                 </p>
@@ -95,19 +95,19 @@ export function BarberHomePanel({ data }: { data: BarberDashboardData }) {
                   {formatCurrency(data.monthRevenue)}
                 </p>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  {data.appointmentsCompletedInPeriod} atendimento(s) concluidos no periodo.
+                  {data.appointmentsCompletedInPeriod} atendimento(s) concluídos no período.
                 </p>
               </div>
 
               <div className="rounded-[0.95rem] border border-[rgba(91,33,182,0.16)] bg-[rgba(91,33,182,0.08)] p-4">
-                <p className="executive-label">Comissao estimada</p>
+                <p className="executive-label">Comissão estimada</p>
                 <p className="mt-3 text-[1.65rem] font-semibold tracking-tight text-foreground">
                   {formatCurrency(data.estimatedCommission)}
                 </p>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {data.actualCommission !== null
-                    ? 'Valor fechado no periodo pelo controle de comissoes.'
-                    : `Projecao usando ${formatPercent(data.commissionRatePercent, 0)} sobre a receita comissionavel.`}
+                    ? 'Valor fechado no período pelo controle de comissões.'
+                    : `Projeção usando ${formatPercent(data.commissionRatePercent, 0)} sobre a receita comissionável.`}
                 </p>
               </div>
             </div>
@@ -117,15 +117,15 @@ export function BarberHomePanel({ data }: { data: BarberDashboardData }) {
 
       <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
         <BarberMetric
-          label="Ticket medio"
+          label="Ticket médio"
           value={formatCurrency(data.averageTicket)}
-          helper="Quanto cada atendimento concluido esta deixando no seu periodo."
+          helper="Quanto cada atendimento concluído está deixando no seu período."
           icon={Scissors}
         />
         <BarberMetric
-          label="Receita comissionavel"
+          label="Receita comissionável"
           value={formatCurrency(data.commissionableRevenue)}
-          helper="Base usada para estimar comissao quando o fechamento ainda nao existe."
+          helper="Base usada para estimar comissão quando o fechamento ainda não existe."
           icon={Wallet}
         />
         <BarberMetric
@@ -137,7 +137,7 @@ export function BarberHomePanel({ data }: { data: BarberDashboardData }) {
         <BarberMetric
           label="Ritmo de meta"
           value={data.goalValue > 0 ? formatPercent(data.goalProgress, 0) : 'Sem meta'}
-          helper="Leitura simples para saber se o periodo esta acima, no ritmo ou abaixo."
+          helper="Leitura simples para saber se o período está acima, no ritmo ou abaixo."
           icon={Target}
         />
       </div>
@@ -146,7 +146,7 @@ export function BarberHomePanel({ data }: { data: BarberDashboardData }) {
         <section className="dashboard-panel p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-[1.35rem] font-semibold tracking-tight text-foreground">Seus proximos horarios</h2>
+              <h2 className="text-[1.35rem] font-semibold tracking-tight text-foreground">Seus próximos horários</h2>
             </div>
             <Link href="/agendamentos" className="surface-chip">
               Abrir agenda
@@ -174,7 +174,7 @@ export function BarberHomePanel({ data }: { data: BarberDashboardData }) {
               </div>
             )) : (
               <div className="rounded-[1rem] border border-dashed border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-4 py-5 text-sm text-muted-foreground">
-                Sua agenda de hoje esta livre no momento. Abra a agenda para encaixes e novos horarios.
+                Sua agenda de hoje está livre no momento. Abra a agenda para encaixes e novos horários.
               </div>
             )}
           </div>

@@ -98,7 +98,7 @@ export default async function ResultadoPage() {
     <div className="page-section mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
         title="Resultado da precificação"
-        description="Consolidação de margem, custo e resultado para acompanhar o retorno real do catálogo."
+        description="Consolide margem, custo e resultado para acompanhar o retorno do catálogo com mais clareza."
       />
 
       <SectionTabs
@@ -107,17 +107,17 @@ export default async function ResultadoPage() {
           {
             href: '/precificacao',
             label: 'Visão geral',
-            helper: 'Resumo do catálogo, custos e atalhos de navegação.',
+            helper: 'Resumo do catálogo, custos e atalhos principais.',
           },
           {
             href: '/precificacao/servicos',
             label: 'Serviços',
-            helper: 'Preço, custo e leitura de lucro por serviço.',
+            helper: 'Preço, custo e leitura de margem por serviço.',
           },
           {
             href: '/precificacao/insumos',
             label: 'Insumos',
-            helper: 'Base de custo e relação com os serviços.',
+            helper: 'Base de custo ligada aos serviços.',
           },
           {
             href: '/precificacao/resultado',
@@ -293,7 +293,7 @@ export default async function ResultadoPage() {
                   Resultado por hora
                 </p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  {formatCurrency(resultPerHour)} por hora de catálogo ajuda a explicar o ganho da operação com uma régua comercial simples.
+                  {formatCurrency(resultPerHour)} por hora de catálogo ajuda a medir quanto o mix atual sustenta o ganho da operação.
                 </p>
               </div>
 
@@ -316,8 +316,8 @@ export default async function ResultadoPage() {
                 </p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
                   {lowMarginServices.length > 0
-                    ? 'Há serviços que pedem ajuste de preço ou estrutura de custo. Esse é o tipo de insight que deixa a demo convincente.'
-                    : 'O catálogo já está saudável o suficiente para mostrar consistência e proteção de lucro.'}
+                    ? 'Há serviços que pedem ajuste de preço ou estrutura de custo antes de pressionar o resultado.'
+                    : 'O catálogo já está saudável o suficiente para sustentar margem com mais consistência.'}
                 </p>
               </div>
             </div>
@@ -326,7 +326,7 @@ export default async function ResultadoPage() {
           <section className="dashboard-panel p-6">
             <h2 className="text-lg font-semibold text-foreground">Próximo passo comercial</h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              A melhor forma de fechar a narrativa é voltar aos serviços e revisar onde a margem nasce.
+              Volte aos serviços e aos insumos para revisar onde a margem nasce e onde ela está ficando apertada.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <Link

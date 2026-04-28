@@ -9,23 +9,23 @@ interface TeamTab {
 const DEFAULT_TEAM_TABS: TeamTab[] = [
   {
     href: '/equipe',
-    label: 'Visao geral',
-    helper: 'Resumo do time, metas e atalhos de navegacao.',
+    label: 'Visão geral',
+    helper: 'Resumo do time, metas e atalhos de navegação.',
   },
   {
     href: '/equipe/profissionais',
     label: 'Profissionais',
-    helper: 'Ranking, ticket e gestao individual da equipe.',
+    helper: 'Ranking, ticket e gestão individual da equipe.',
   },
   {
     href: '/equipe/metas',
     label: 'Metas',
-    helper: 'Meta da barbearia e metas individuais do mes.',
+    helper: 'Meta da barbearia e metas individuais do mês.',
   },
   {
     href: '/equipe/desempenho',
     label: 'Desempenho',
-    helper: 'Leitura consolidada da operacao do time.',
+    helper: 'Leitura consolidada da operação do time.',
   },
 ]
 
@@ -33,12 +33,12 @@ const BARBER_TEAM_TABS: TeamTab[] = [
   {
     href: '/equipe/metas',
     label: 'Minhas metas',
-    helper: 'Seu objetivo individual e a leitura do periodo.',
+    helper: 'Seu objetivo individual e a leitura do período.',
   },
   {
     href: '/equipe/desempenho',
     label: 'Meu desempenho',
-    helper: 'Seu ritmo, ticket, comissao e resultados.',
+    helper: 'Seu ritmo, ticket, comissão e resultados.',
   },
 ]
 

@@ -740,7 +740,7 @@ export function ScheduleCalendar({
           if (result.success) {
             toast.success(dragState.item.itemType === 'BLOCK' ? 'Bloqueio remarcado.' : 'Agendamento remarcado.')
           } else {
-            toast.error(result.error ?? 'Nao foi possivel mover esse bloco.')
+            toast.error(result.error ?? 'Não foi possível mover esse bloco.')
           }
         }
 

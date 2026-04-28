@@ -121,8 +121,8 @@ function CategoryBlock({
         })}
 
         {categories.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-border bg-secondary/20 p-5 text-sm text-muted-foreground">
-            Nenhuma categoria neste grupo.
+          <div className="empty-state-shell-subtle p-5 text-sm text-muted-foreground">
+            Nenhuma categoria neste grupo. Quando houver movimentações, elas aparecerão aqui para acompanhar o uso real.
           </div>
         )}
       </div>
@@ -234,7 +234,7 @@ export default async function CategoriasPage({ searchParams }: Props) {
     <div className="page-section mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
         title="Categorias"
-        description="Leitura por tipo e uso real das categorias financeiras da barbearia."
+        description="Acompanhe o uso real das categorias financeiras e veja onde o caixa entra ou sai com mais peso."
         action={(
           <div className="flex items-center gap-3">
             <Suspense>
@@ -258,7 +258,7 @@ export default async function CategoriasPage({ searchParams }: Props) {
           icon={Wallet}
           title="Categorias em uso"
           value={String(usedCategories)}
-          helper="Categorias que receberam movimento no periodo atual."
+          helper="Categorias que receberam movimento no período atual."
         />
         <SummaryCard
           icon={ArrowUpCircle}
@@ -270,7 +270,7 @@ export default async function CategoriasPage({ searchParams }: Props) {
           icon={ArrowDownCircle}
           title="Despesas categorizadas"
           value={formatCurrency(currentFixedTotal + currentVariableTotal)}
-          helper="Saidas distribuidas entre despesas fixas e variaveis."
+          helper="Saídas distribuídas entre despesas fixas e variáveis."
         />
       </div>
 

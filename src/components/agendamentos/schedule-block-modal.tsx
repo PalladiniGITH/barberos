@@ -152,7 +152,7 @@ export function ScheduleBlockModal({
     setIsSubmitting(false)
 
     if (!result.success) {
-      toast.error(result.error ?? 'Nao foi possivel salvar o bloqueio.')
+      toast.error(result.error ?? 'Não foi possível salvar o bloqueio.')
       return
     }
 
@@ -171,7 +171,7 @@ export function ScheduleBlockModal({
     setIsRemoving(false)
 
     if (!result.success) {
-      toast.error(result.error ?? 'Nao foi possivel remover o bloqueio.')
+      toast.error(result.error ?? 'Não foi possível remover o bloqueio.')
       return
     }
 

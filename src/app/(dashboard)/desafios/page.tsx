@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { assertAdministrativeRole, requireSession } from '@/lib/auth'
-import { PRODUCT_NAME } from '@/lib/branding'
 import { prisma } from '@/lib/prisma'
 import {
   CHALLENGE_TYPE_LABELS,
@@ -31,21 +30,21 @@ const challengeTemplates = [
     title: 'Sprint de faturamento',
     type: 'REVENUE',
     target: 'R$ 6.000',
-    reward: 'Bônus de R$ 300 ou dia de folga',
-    helper: 'Perfeito para meses em que a barbearia precisa ganhar tração rápida.',
+    reward: 'Bônus de R$ 300 ou um dia de folga',
+    helper: 'Funciona bem em meses em que a barbearia precisa acelerar o ritmo comercial.',
   },
   {
     title: 'Ticket médio premium',
     type: 'TICKET_AVERAGE',
     target: 'R$ 75 por atendimento',
-    reward: 'Vale consumo ou comissão extra',
-    helper: 'Empurra combos, barba e serviços de maior margem sem parecer só cobrança.',
+    reward: 'Vale-consumo ou comissão extra',
+    helper: 'Ajuda a puxar combos, barba e serviços de maior margem sem perder naturalidade no atendimento.',
   },
   {
     title: 'Campeonato de recorrência',
     type: 'SERVICES_COUNT',
     target: '120 atendimentos',
-    reward: 'Troféu do mês + destaque no mural',
+    reward: 'Troféu do mês e destaque no mural',
     helper: 'Bom para operações que querem volume e disciplina comercial ao mesmo tempo.',
   },
 ]
@@ -115,7 +114,7 @@ export default async function DesafiosPage() {
     <div className="page-section mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
         title="Desafios"
-        description="Um módulo comercial para puxar performance da equipe sem transformar gestão em planilha."
+        description="Campanhas internas para acelerar resultado, reconhecer desempenho e organizar metas do time."
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -147,7 +146,7 @@ export default async function DesafiosPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Prêmios publicados</p>
           <p className="mt-3 text-3xl font-semibold text-foreground">{rewardsPublished}</p>
           <p className="mt-2 text-sm text-muted-foreground">
-            Recompensas prontas para reforçar cultura de resultado na apresentação.
+            Recompensas configuradas para reforçar cultura de resultado no dia a dia.
           </p>
         </div>
       </div>
@@ -158,12 +157,9 @@ export default async function DesafiosPage() {
             <div>
               <h2 className="text-xl font-semibold text-foreground">Desafios em andamento e histórico</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Mesmo simplificado por enquanto, este módulo já mostra como o produto ajuda a puxar faturamento e comportamento de equipe.
+                Acompanhe campanhas ativas, resultados do time e recompensas sem perder a leitura do mês.
               </p>
             </div>
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-              Estrutura pronta para demo
-            </span>
           </div>
 
           {challenges.length === 0 ? (
@@ -171,7 +167,7 @@ export default async function DesafiosPage() {
               <Trophy className="mx-auto h-10 w-10 text-muted-foreground/60" />
               <p className="mt-4 text-lg font-semibold text-foreground">Nenhum desafio criado ainda</p>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                A estrutura do módulo já está pronta para mostrar ranking, progresso e recompensa. Para a apresentação, você já consegue usar os modelos sugeridos ao lado como narrativa de produto.
+                Quando o primeiro desafio entrar, esta área passa a mostrar ranking, progresso e recompensa com clareza para a equipe.
               </p>
             </div>
           ) : (
@@ -205,7 +201,7 @@ export default async function DesafiosPage() {
                             </span>
                           </div>
                           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                            {challenge.description || 'Desafio configurado para estimular resultado da equipe com leitura rápida e recompensa clara.'}
+                            {challenge.description || 'Desafio configurado para estimular resultado da equipe com meta clara e recompensa objetiva.'}
                           </p>
                         </div>
                       </div>
@@ -227,7 +223,7 @@ export default async function DesafiosPage() {
                             Recompensa
                           </p>
                           <p className="mt-2 text-sm leading-6 text-amber-100/90">
-                            {challenge.reward || 'Defina um prêmio simples e visível para manter o desafio com cara de campanha real.'}
+                            {challenge.reward || 'Defina um prêmio simples e visível para manter o desafio claro para o time.'}
                           </p>
                         </div>
 
@@ -318,9 +314,9 @@ export default async function DesafiosPage() {
 
         <aside className="space-y-5">
           <section className="dashboard-panel p-6">
-            <h2 className="text-lg font-semibold text-foreground">Templates prontos para demo</h2>
+            <h2 className="text-lg font-semibold text-foreground">Modelos sugeridos de desafio</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Estruturas simples, com cara de produto, para mostrar o potencial do módulo sem precisar construir toda a lógica agora.
+              Estruturas simples para começar campanhas internas com foco em faturamento, ticket médio e recorrência.
             </p>
 
             <div className="mt-5 space-y-3">
@@ -345,7 +341,7 @@ export default async function DesafiosPage() {
           <section className="dashboard-panel p-6">
             <h2 className="text-lg font-semibold text-foreground">Base de competição do mês</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Uma leitura rápida para conectar desafios ao faturamento real na apresentação.
+              Uma leitura rápida para conectar desafios ao faturamento já lançado no período.
             </p>
 
             {leaderboard.length === 0 ? (
@@ -380,19 +376,19 @@ export default async function DesafiosPage() {
           </section>
 
           <section className="dashboard-panel p-6">
-            <h2 className="text-lg font-semibold text-foreground">Por que este módulo vende</h2>
+            <h2 className="text-lg font-semibold text-foreground">Como usar este módulo</h2>
             <div className="mt-4 space-y-3 text-sm text-muted-foreground">
               <p className="inline-flex items-start gap-2">
                 <Target className="mt-0.5 h-4 w-4 text-primary" />
-                Mostra que o {PRODUCT_NAME} não cuida só de lançamento, mas também de motivação comercial.
+                Use desafios para organizar metas curtas e dar direção comercial ao time.
               </p>
               <p className="inline-flex items-start gap-2">
                 <Users className="mt-0.5 h-4 w-4 text-primary" />
-                Liga resultado da equipe com metas e reconhecimento, algo raro em sistemas pequenos.
+                Ligue resultado da equipe com metas, reconhecimento e acompanhamento simples.
               </p>
               <p className="inline-flex items-start gap-2">
                 <Sparkles className="mt-0.5 h-4 w-4 text-primary" />
-                Dá argumento de valor na apresentação mesmo antes da automação completa entrar.
+                Comece com campanhas manuais e evolua a operação conforme o módulo ganhar mais uso.
               </p>
             </div>
           </section>

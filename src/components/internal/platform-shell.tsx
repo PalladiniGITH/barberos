@@ -17,8 +17,8 @@ interface PlatformShellProps {
 const platformLinks = [
   {
     href: '/internal',
-    label: 'Operacao BarberEX',
-    helper: 'Visao geral da plataforma',
+    label: 'Operação BarberEX',
+    helper: 'Visão geral da plataforma',
   },
   {
     href: '/internal',
@@ -42,12 +42,12 @@ export function PlatformShell({ children, user }: PlatformShellProps) {
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold tracking-tight text-slate-50">{PRODUCT_NAME}</p>
                 <h1 className="truncate text-[1.45rem] font-semibold tracking-tight text-foreground">
-                  Operacao BarberEX
+                  Operação BarberEX
                 </h1>
               </div>
             </div>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
-              Gestao da plataforma, tenants, custos de IA, WhatsApp e saude operacional sem misturar a rotina de uma barbearia especifica.
+              Gestão da plataforma, tenants, custos de IA, WhatsApp e saúde operacional sem misturar a rotina de uma barbearia específica.
             </p>
           </div>
 

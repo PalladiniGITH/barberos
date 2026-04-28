@@ -329,7 +329,7 @@ export function AppointmentModal({
       return
     }
 
-    toast.error(result.error ?? 'Nao foi possivel salvar o agendamento.')
+    toast.error(result.error ?? 'Não foi possível salvar o agendamento.')
   }
 
   const triggerClass = {

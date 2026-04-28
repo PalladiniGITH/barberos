@@ -105,7 +105,7 @@ export function AppointmentStatusActions({
         return
       }
 
-      toast.error(result.error ?? 'Nao foi possivel atualizar o status.')
+      toast.error(result.error ?? 'Não foi possível atualizar o status.')
     })
   }
 

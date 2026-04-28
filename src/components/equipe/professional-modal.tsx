@@ -18,12 +18,12 @@ const decimalField = z
   .optional()
   .refine(
     (value) => !value || /^\d+(?:[.,]\d{1,2})?$/.test(value.trim()),
-    'Use apenas numeros e ate 2 casas decimais'
+    'Use apenas números e até 2 casas decimais'
   )
 
 const schema = z.object({
-  name: z.string().min(2, 'Nome obrigatorio (min. 2 caracteres)'),
-  email: z.string().email('Email invalido').or(z.literal('')).optional(),
+  name: z.string().min(2, 'Nome obrigatório (min. 2 caracteres)'),
+  email: z.string().email('Email inválido').or(z.literal('')).optional(),
   phone: z.string().optional(),
   commissionRate: decimalField,
   haircutPrice: decimalField,
@@ -120,7 +120,7 @@ export function ProfessionalModal({ professional }: Props) {
               <div>
                 <h2 className="text-lg font-semibold text-foreground">{isEdit ? 'Editar profissional' : 'Novo profissional'}</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Configure atendimento, comissao e precos operacionais do barbeiro sem mexer no catalogo base.
+                  Configure atendimento, comissão e preços operacionais do barbeiro sem mexer no catálogo base.
                 </p>
               </div>
 
@@ -136,7 +136,7 @@ export function ProfessionalModal({ professional }: Props) {
                   <label className="mb-1.5 block text-sm font-medium text-foreground">Nome *</label>
                   <input
                     {...register('name')}
-                    placeholder="Ex: Joao Silva"
+                    placeholder="Ex: João Silva"
                     className="auth-input px-3 py-2.5"
                   />
                   {errors.name && <p className="mt-1 text-xs text-destructive">{errors.name.message}</p>}
@@ -183,13 +183,13 @@ export function ProfessionalModal({ professional }: Props) {
                 <div className="mb-3">
                   <h3 className="text-sm font-semibold text-foreground">Configuracao comercial</h3>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                    Esses valores entram na operacao avulsa e na leitura individual do barbeiro. Se um campo ficar vazio, o sistema usa o valor padrao do servico.
+                    Esses valores entram na operação avulsa e na leitura individual do barbeiro. Se um campo ficar vazio, o sistema usa o valor padrão do serviço.
                   </p>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium text-foreground">Comissao (%)</label>
+                    <label className="mb-1.5 block text-sm font-medium text-foreground">Comissão (%)</label>
                     <input
                       {...register('commissionRate')}
                       inputMode="decimal"

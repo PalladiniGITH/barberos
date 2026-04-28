@@ -268,7 +268,7 @@ export default async function ConfiguracoesPage() {
     },
     {
       title: 'Preco e margem',
-      helper: 'Estrutura pronta para mostrar rentabilidade sem excesso de complexidade.',
+      helper: 'Estrutura pronta para acompanhar rentabilidade sem excesso de complexidade.',
       icon: Scissors,
       tone: 'bg-amber-500/10 text-amber-200',
     },
@@ -437,7 +437,7 @@ export default async function ConfiguracoesPage() {
                   Metas individuais
                 </p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Esse e o proximo ganho simples para fortalecer equipe e desafios.
+                  Esse é o próximo ajuste simples para fortalecer o ritmo da equipe e o acompanhamento de metas.
                 </p>
               </div>
             </div>

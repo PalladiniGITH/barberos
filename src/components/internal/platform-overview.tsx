@@ -72,18 +72,18 @@ export function PlatformOverview({
     : null
   const aiCostLabel = data.cards.aiEstimatedCostUsd !== null
     ? formatUsdCurrency(data.cards.aiEstimatedCostUsd)
-    : 'Modelo sem preco'
+    : 'Modelo sem preço'
   const aiCostHelper = data.cards.aiEstimatedCostUsd !== null
     ? data.cards.aiEstimatedCostBrl !== null && usdBrlRateLabel
-      ? `~ ${formatCurrency(data.cards.aiEstimatedCostBrl)} com dolar a ${usdBrlRateLabel}.`
-      : 'Estimativa em USD com base na tabela configurada em codigo.'
-    : 'Quando um modelo nao estiver na tabela, o custo estimado permanece indisponivel.'
+      ? `~ ${formatCurrency(data.cards.aiEstimatedCostBrl)} com dólar a ${usdBrlRateLabel}.`
+      : 'Estimativa em USD com base na tabela configurada no código.'
+    : 'Quando um modelo não estiver na tabela, o custo estimado permanece indisponível.'
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Operacao BarberEX"
-        description="Gestao da plataforma, tenants, consumo de IA, WhatsApp, automacoes e saude operacional em uma visao unica."
+        title="Operação BarberEX"
+        description="Gestão da plataforma, tenants, consumo de IA, WhatsApp, automações e saúde operacional em uma visão única."
       />
 
       {data.warnings.length > 0 && (
@@ -102,10 +102,10 @@ export function PlatformOverview({
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="max-w-3xl">
               <h2 className="spotlight-title mt-0 text-[2.25rem] sm:text-[2.7rem]">
-                Leitura executiva da plataforma em uma unica camada.
+                Leitura executiva da plataforma em uma única camada.
               </h2>
               <p className="spotlight-copy mt-3 max-w-2xl">
-                Tenants ativos, risco comercial, custo de IA, mensageria e saude operacional agrupados para decidir rapido sem entrar tenant por tenant.
+                Tenants ativos, risco comercial, custo de IA, mensageria e saúde operacional agrupados para decidir rápido sem entrar tenant por tenant.
               </p>
             </div>
 
@@ -113,14 +113,14 @@ export function PlatformOverview({
               <div className="surface-tier-low p-4">
                 <p className="executive-label">Barbearias ativas</p>
                 <p className="mt-3 text-[1.9rem] font-semibold tracking-tight text-foreground">{data.cards.activeBarbershops}</p>
-                <p className="mt-2 text-sm text-muted-foreground">Tenants com operacao ligada e status comercial em dia.</p>
+                <p className="mt-2 text-sm text-muted-foreground">Tenants com operação ligada e status comercial em dia.</p>
               </div>
               <div className="surface-tier-low p-4">
-                <p className="executive-label">Operacao em risco</p>
+                <p className="executive-label">Operação em risco</p>
                 <p className="mt-3 text-[1.9rem] font-semibold tracking-tight text-foreground">
                   {data.cards.pastDueBarbershops + data.cards.blockedBarbershops}
                 </p>
-                <p className="mt-2 text-sm text-muted-foreground">Soma de tenants em atraso ou bloqueados para priorizacao comercial.</p>
+                <p className="mt-2 text-sm text-muted-foreground">Soma de tenants em atraso ou bloqueados para priorização comercial.</p>
               </div>
             </div>
           </div>
@@ -129,37 +129,37 @@ export function PlatformOverview({
             <div className="hero-stat-card">
               <p className="executive-label">Trial</p>
               <p className="mt-3 text-[1.8rem] font-semibold tracking-tight text-foreground">{data.cards.trialBarbershops}</p>
-              <p className="mt-2 text-sm text-muted-foreground">Contas em implantacao ou avaliacao inicial.</p>
+              <p className="mt-2 text-sm text-muted-foreground">Contas em implantação ou avaliação inicial.</p>
             </div>
             <div className="hero-stat-card">
-              <p className="executive-label">WhatsApp no mes</p>
+              <p className="executive-label">WhatsApp no mês</p>
               <p className="mt-3 text-[1.8rem] font-semibold tracking-tight text-foreground">{data.cards.whatsappMessagesThisMonth}</p>
-              <p className="mt-2 text-sm text-muted-foreground">Mensagens processadas pela plataforma no periodo.</p>
+              <p className="mt-2 text-sm text-muted-foreground">Mensagens processadas pela plataforma no período.</p>
             </div>
             <div className="hero-stat-card">
-              <p className="executive-label">Agendamentos no mes</p>
+              <p className="executive-label">Agendamentos no mês</p>
               <p className="mt-3 text-[1.8rem] font-semibold tracking-tight text-foreground">{data.cards.appointmentsThisMonth}</p>
               <p className="mt-2 text-sm text-muted-foreground">Volume operacional somado entre tenants ativos.</p>
             </div>
             <div className="hero-stat-card">
-              <p className="executive-label">Automacoes hoje</p>
+              <p className="executive-label">Automações hoje</p>
               <p className="mt-3 text-[1.8rem] font-semibold tracking-tight text-foreground">{data.cards.automationsToday}</p>
-              <p className="mt-2 text-sm text-muted-foreground">Execucoes registradas na janela atual da plataforma.</p>
+              <p className="mt-2 text-sm text-muted-foreground">Execuções registradas na janela atual da plataforma.</p>
             </div>
           </div>
         </div>
 
         <aside className="premium-rail p-5">
           <div>
-            <h3 className="text-[1.45rem] font-semibold tracking-tight text-foreground">Custos e saude de IA</h3>
+            <h3 className="text-[1.45rem] font-semibold tracking-tight text-foreground">Custos e saúde de IA</h3>
             <p className="mt-2 text-sm leading-7 text-muted-foreground">
-              Uma leitura curta do consumo atual para enxergar impacto financeiro, risco tecnico e necessidade de intervencao.
+              Uma leitura curta do consumo atual para enxergar impacto financeiro, risco técnico e necessidade de intervenção.
             </p>
           </div>
 
           <div className="mt-5 space-y-3">
             <div className="surface-tier-low p-4">
-              <p className="executive-label">Tokens IA no mes</p>
+              <p className="executive-label">Tokens IA no mês</p>
               <p className="mt-3 text-[1.85rem] font-semibold tracking-tight text-foreground">
                 {new Intl.NumberFormat('pt-BR').format(data.cards.aiTokensThisMonth)}
               </p>
@@ -173,7 +173,7 @@ export function PlatformOverview({
             <div className="surface-tier-low p-4">
               <p className="executive-label">Erros recentes</p>
               <p className="mt-3 text-[1.85rem] font-semibold tracking-tight text-foreground">{data.cards.recentErrors}</p>
-              <p className="mt-2 text-sm text-muted-foreground">Falhas novas de IA, mensageria ou automacao que exigem fila de atencao.</p>
+              <p className="mt-2 text-sm text-muted-foreground">Falhas novas de IA, mensageria ou automação que exigem fila de atenção.</p>
             </div>
           </div>
         </aside>
@@ -193,9 +193,9 @@ export function PlatformOverview({
           icon={TriangleAlert}
         />
         <SummaryCard
-          label="Usuarios"
+          label="Usuários"
           value={String(data.barbershops.reduce((total, item) => total + item.usersCount, 0))}
-          helper="Total de contas autenticadas distribuido entre tenants filtrados."
+          helper="Total de contas autenticadas distribuído entre tenants filtrados."
           icon={Building2}
         />
         <SummaryCard
@@ -207,11 +207,11 @@ export function PlatformOverview({
         <SummaryCard
           label="Tenants sem custo"
           value={String(data.barbershops.filter((item) => item.aiEstimatedCostUsd === null && item.aiTokensThisMonth > 0).length)}
-          helper="Contas com consumo de IA e modelo ainda sem preco configurado."
+          helper="Contas com consumo de IA e modelo ainda sem preço configurado."
           icon={Bot}
         />
         <SummaryCard
-          label="Tenants com ultima atividade"
+          label="Tenants com última atividade"
           value={String(data.barbershops.filter((item) => item.lastActivityLabel !== null).length)}
           helper="Contas com sinal operacional recente dentro da janela carregada."
           icon={MessageSquareMore}
@@ -278,13 +278,13 @@ export function PlatformOverview({
                 <th className="px-3 py-3">Barbearia</th>
                 <th className="px-3 py-3">Status</th>
                 <th className="px-3 py-3">Plano</th>
-                <th className="px-3 py-3">Usuarios</th>
+                <th className="px-3 py-3">Usuários</th>
                 <th className="px-3 py-3">Clientes</th>
                 <th className="px-3 py-3">Agenda mes</th>
                 <th className="px-3 py-3">WhatsApp</th>
                 <th className="px-3 py-3">IA</th>
-                <th className="px-3 py-3">Ultima atividade</th>
-                <th className="px-3 py-3 text-right">Acoes</th>
+                <th className="px-3 py-3">Última atividade</th>
+                <th className="px-3 py-3 text-right">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -317,7 +317,7 @@ export function PlatformOverview({
                       {barbershop.aiEstimatedCostUsd !== null
                         ? formatUsdCurrency(barbershop.aiEstimatedCostUsd)
                         : barbershop.aiUnpricedRequests > 0
-                          ? 'Modelo sem preco configurado'
+                          ? 'Modelo sem preço configurado'
                           : 'Sem custo estimado'}
                     </p>
                     {barbershop.aiEstimatedCostBrl !== null && (
@@ -327,7 +327,7 @@ export function PlatformOverview({
                     )}
                     {barbershop.aiUnpricedRequests > 0 && (
                       <p className="mt-1 text-[11px] text-amber-200">
-                        {barbershop.aiUnpricedRequests} registro{barbershop.aiUnpricedRequests > 1 ? 's' : ''} com modelo sem preco
+                        {barbershop.aiUnpricedRequests} registro{barbershop.aiUnpricedRequests > 1 ? 's' : ''} com modelo sem preço
                       </p>
                     )}
                   </td>
@@ -356,14 +356,14 @@ export function PlatformOverview({
         </div>
 
         <p className="mt-4 text-xs leading-5 text-muted-foreground">
-          Custo estimado com base na tabela configurada em codigo ({data.pricing.version}).
-          {usdBrlRateLabel ? ` Conversao em BRL usando dolar a ${usdBrlRateLabel}.` : ' Conversao em BRL indisponivel sem OPENAI_USD_BRL_RATE.'}
+          Custo estimado com base na tabela configurada no código ({data.pricing.version}).
+          {usdBrlRateLabel ? ` Conversão em BRL usando dólar a ${usdBrlRateLabel}.` : ' Conversão em BRL indisponível sem OPENAI_USD_BRL_RATE.'}
         </p>
       </section>
 
       <section className="platform-panel p-4">
         <div className="border-b border-[rgba(255,255,255,0.06)] pb-4">
-          <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">Sinais que merecem atencao</h2>
+          <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">Sinais que merecem atenção</h2>
         </div>
 
         <div className="mt-4 space-y-3">
