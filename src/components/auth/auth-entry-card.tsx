@@ -61,6 +61,7 @@ export function AuthEntryCard({
                 className="w-[220px] sm:w-[248px] lg:w-[268px]"
                 sizes="(max-width: 640px) 220px, (max-width: 1024px) 248px, 268px"
                 priority
+                fetchPriority="high"
               />
             </div>
 

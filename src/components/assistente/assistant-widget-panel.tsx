@@ -472,6 +472,8 @@ export function AssistantWidgetPanel() {
                     sizes="15px"
                     alt=""
                     aria-hidden
+                    loading="eager"
+                    fetchPriority="high"
                   />
                 </span>
                 <h2 className="text-lg font-semibold tracking-tight text-foreground">BarberEX IA</h2>

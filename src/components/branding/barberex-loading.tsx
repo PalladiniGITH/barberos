@@ -30,6 +30,8 @@ export function BarberExLoading({
             sizes="16px"
             alt=""
             aria-hidden
+            priority
+            fetchPriority="high"
           />
         </div>
 
@@ -58,6 +60,8 @@ export function BarberExLoading({
                 sizes="12px"
                 alt=""
                 aria-hidden
+                loading="eager"
+                fetchPriority="high"
               />
             </span>
             {PRODUCT_NAME}
@@ -72,6 +76,8 @@ export function BarberExLoading({
               sizes="32px"
               alt=""
               aria-hidden
+              priority
+              fetchPriority="high"
             />
           </div>
 

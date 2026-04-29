@@ -37,6 +37,8 @@ export function AssistantLauncher() {
           sizes="24px"
           alt=""
           aria-hidden
+          priority
+          fetchPriority="high"
         />
       </span>
 

@@ -594,6 +594,8 @@ export function Sidebar({
                   className="w-[152px] max-w-full"
                   sizes="152px"
                   alt="BarberEX"
+                  priority
+                  fetchPriority="high"
                 />
                 <p className="truncate text-xs text-slate-500">
                   {barberView ? 'Painel do profissional' : 'Gestão premium da barbearia'}
@@ -607,6 +609,8 @@ export function Sidebar({
                 sizes="24px"
                 alt=""
                 aria-hidden
+                priority
+                fetchPriority="high"
               />
             )}
           </Link>

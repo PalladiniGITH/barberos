@@ -36,6 +36,9 @@ interface BarberExLogoProps extends Omit<ImageProps, 'src' | 'width' | 'height' 
   variant: 'full' | 'symbol'
   tone: 'white' | 'dark'
   alt?: string
+  priority?: boolean
+  loading?: 'eager' | 'lazy'
+  fetchPriority?: 'high' | 'auto' | 'low'
 }
 
 export function BarberExLogo({
@@ -44,11 +47,18 @@ export function BarberExLogo({
   className,
   alt,
   priority,
+  loading,
+  fetchPriority,
   quality,
+  unoptimized,
   sizes,
   ...props
 }: BarberExLogoProps) {
   const asset = BRAND_ASSETS[variant][tone]
+  const resolvedPriority = priority ?? false
+  const resolvedLoading = resolvedPriority ? undefined : (loading ?? 'lazy')
+  const resolvedFetchPriority = fetchPriority ?? (resolvedPriority ? 'high' : 'auto')
+  const resolvedUnoptimized = unoptimized ?? true
 
   return (
     <Image
@@ -57,8 +67,12 @@ export function BarberExLogo({
       width={asset.width}
       height={asset.height}
       className={cn('max-w-full h-auto object-contain', className)}
-      priority={priority}
-      quality={quality ?? 100}
+      priority={resolvedPriority}
+      loading={resolvedLoading}
+      fetchPriority={resolvedFetchPriority}
+      quality={resolvedUnoptimized ? undefined : quality}
+      unoptimized={resolvedUnoptimized}
+      placeholder="empty"
       sizes={sizes}
       {...props}
     />

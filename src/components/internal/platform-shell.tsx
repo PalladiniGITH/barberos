@@ -42,6 +42,7 @@ export function PlatformShell({ children, user }: PlatformShellProps) {
                 className="w-[156px] sm:w-[172px]"
                 sizes="(max-width: 640px) 156px, 172px"
                 priority
+                fetchPriority="high"
               />
               <h1 className="truncate text-[1.45rem] font-semibold tracking-tight text-foreground">
                 Operação BarberEX

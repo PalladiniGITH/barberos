@@ -19,6 +19,8 @@ const AssistantWidgetPanel = dynamic(
           sizes="16px"
           alt=""
           aria-hidden
+          loading="eager"
+          fetchPriority="high"
         />
         <Loader2 className="h-4 w-4 animate-spin text-primary" />
         Abrindo o BarberEX IA...

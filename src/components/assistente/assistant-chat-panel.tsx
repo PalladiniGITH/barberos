@@ -194,6 +194,8 @@ export function AssistantChatPanel({ workspace }: Props) {
                     sizes="15px"
                     alt=""
                     aria-hidden
+                    priority
+                    fetchPriority="high"
                   />
                 </span>
                 <h2 className="text-xl font-semibold text-foreground">BarberEX IA</h2>
