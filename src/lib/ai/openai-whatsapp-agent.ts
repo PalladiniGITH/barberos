@@ -1619,7 +1619,7 @@ function hasExplicitPriceQuestion(message: string) {
 
 function referencesPreferredProfessional(message: string) {
   const normalized = normalizeText(message)
-  return /\b(meu barbeiro|o de sempre|de sempre|mesmo de sempre|meu de sempre|manter com o meu barbeiro|com o mesmo)\b/.test(normalized)
+  return /\b(meu barbeiro|o de sempre|de sempre|mesmo de sempre|meu de sempre|manter com o meu barbeiro|com o mesmo|mesmo barbeiro|pode ser o mesmo|o mesmo de antes|com quem estava|com quem eu estava)\b/.test(normalized)
 }
 
 function hasExplicitAnyProfessionalConsent(message: string) {

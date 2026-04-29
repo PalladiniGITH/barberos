@@ -52,6 +52,8 @@ import {
   buildNoFutureAppointmentMessage,
   buildReminderResponseClarificationMessage,
   buildRescheduleConfirmationMessage,
+  buildRescheduleCurrentProfessionalConfirmationMessage,
+  buildRescheduleCurrentProfessionalUnavailableAlternativesMessage,
   buildRescheduleProfessionalChoiceMessage,
   buildRescheduleProfessionalUnavailableMessage,
   buildReschedulePromptMessage,
@@ -1019,7 +1021,7 @@ function resolveContextualProfessionalPreference(input: {
 
 function referencesPreferredProfessional(message: string) {
   const normalized = normalizeText(message)
-  return /\b(meu barbeiro|o de sempre|de sempre|mesmo de sempre|meu de sempre|manter com o meu barbeiro|com o mesmo)\b/.test(normalized)
+  return /\b(meu barbeiro|o de sempre|de sempre|mesmo de sempre|meu de sempre|manter com o meu barbeiro|com o mesmo|mesmo barbeiro|pode ser o mesmo|o mesmo de antes|com quem estava|com quem eu estava)\b/.test(normalized)
 }
 
 function buildDateQuestion() {
@@ -2159,6 +2161,69 @@ function buildOperationalDraftWithAppointment(input: {
   return draft
 }
 
+function isCurrentAppointmentProfessionalSelection(input: {
+  appointment: WhatsAppManagedAppointment
+  professionalId: string | null
+  allowAnyProfessional: boolean
+}) {
+  return Boolean(
+    !input.allowAnyProfessional
+    && input.appointment.professionalId
+    && input.professionalId
+    && input.appointment.professionalId === input.professionalId
+  )
+}
+
+function resolveRescheduleProfessionalRequest(input: {
+  appointment: WhatsAppManagedAppointment
+  draft: WhatsAppOperationalDraft
+  allowAnyProfessionalRequested: boolean
+  requestedCurrentAppointmentProfessional: boolean
+  resolvedProfessional: NameMatch | null
+}) {
+  let requestedProfessionalId: string | null =
+    input.draft.selectedProfessionalId ?? input.appointment.professionalId
+  let requestedProfessionalName: string | null =
+    input.draft.selectedProfessionalName ?? input.appointment.professionalName
+  let allowAnyProfessional = input.draft.allowAnyProfessional
+
+  if (input.allowAnyProfessionalRequested) {
+    requestedProfessionalId = null
+    requestedProfessionalName = null
+    allowAnyProfessional = true
+  } else if (input.resolvedProfessional) {
+    requestedProfessionalId = input.resolvedProfessional.id
+    requestedProfessionalName = input.resolvedProfessional.name
+    allowAnyProfessional = false
+  } else if (input.requestedCurrentAppointmentProfessional) {
+    requestedProfessionalId = input.appointment.professionalId
+    requestedProfessionalName = input.appointment.professionalName
+    allowAnyProfessional = false
+  }
+
+  return {
+    requestedProfessionalId,
+    requestedProfessionalName,
+    allowAnyProfessional,
+    keepCurrentAppointmentProfessional: isCurrentAppointmentProfessionalSelection({
+      appointment: input.appointment,
+      professionalId: requestedProfessionalId,
+      allowAnyProfessional,
+    }),
+  }
+}
+
+function buildRescheduleConfirmationReply(input: {
+  appointment: WhatsAppManagedAppointment
+  slot: WhatsAppBookingSlot
+  timezone: string
+  keepCurrentProfessional: boolean
+}) {
+  return input.keepCurrentProfessional
+    ? buildRescheduleCurrentProfessionalConfirmationMessage(input)
+    : buildRescheduleConfirmationMessage(input)
+}
+
 function buildOperationalDraftWithAppointments(input: {
   kind: 'cancel' | 'reschedule'
   appointments: WhatsAppManagedAppointment[]
@@ -2844,6 +2909,11 @@ async function handleOperationalConversationState(input: {
         lastAssistantMessage: input.lastAssistantMessage ?? null,
       },
     })
+    const currentAppointmentProfessional = {
+      id: selectedAppointment.professionalId,
+      name: selectedAppointment.professionalName,
+    }
+    const requestedCurrentAppointmentProfessional = referencesPreferredProfessional(input.inboundText)
 
     const pendingRescheduleProfessionalChoice =
       operationDraft.pendingProfessionalOptions.length > 0
@@ -2859,14 +2929,23 @@ async function handleOperationalConversationState(input: {
       && operationDraft.requestedDateIso
       && operationDraft.requestedTimeLabel?.includes(':')
     ) {
+      const currentAppointmentProfessionalChoice = requestedCurrentAppointmentProfessional
+        ? currentAppointmentProfessional
+        : null
       const selectedPendingProfessional = interpreted.allowAnyProfessional
         ? operationDraft.offeredSlots.find((slot) => slot.timeLabel === operationDraft.requestedTimeLabel)
         : null
 
-      if (selectedPendingProfessional || pendingRescheduleProfessionalChoice) {
+      if (selectedPendingProfessional || pendingRescheduleProfessionalChoice || currentAppointmentProfessionalChoice) {
         const targetProfessionalId =
           selectedPendingProfessional?.professionalId
           ?? pendingRescheduleProfessionalChoice?.id
+          ?? currentAppointmentProfessionalChoice?.id
+
+        const targetProfessionalName =
+          selectedPendingProfessional?.professionalName
+          ?? pendingRescheduleProfessionalChoice?.name
+          ?? currentAppointmentProfessionalChoice?.name
 
         if (!targetProfessionalId) {
           const responseText = buildRescheduleProfessionalChoiceMessage({
@@ -2943,10 +3022,15 @@ async function handleOperationalConversationState(input: {
             requestedTimeLabel: professionalResolution.slot.timeLabel,
             allowAnyProfessional: false,
           }
-          const responseText = buildRescheduleConfirmationMessage({
+          const responseText = buildRescheduleConfirmationReply({
             appointment: selectedAppointment,
             slot: professionalResolution.slot,
             timezone: input.timezone,
+            keepCurrentProfessional: isCurrentAppointmentProfessionalSelection({
+              appointment: selectedAppointment,
+              professionalId: professionalResolution.slot.professionalId,
+              allowAnyProfessional: false,
+            }),
           })
 
           await persistOperationalConversationState({
@@ -2968,10 +3052,7 @@ async function handleOperationalConversationState(input: {
           }
         }
 
-        const requestedProfessionalName =
-          selectedPendingProfessional?.professionalName
-          ?? pendingRescheduleProfessionalChoice?.name
-          ?? 'Esse barbeiro'
+        const requestedProfessionalName = targetProfessionalName ?? 'Esse barbeiro'
         const nearbySlots = professionalResolution.suggestedSlots.slice(0, 4)
         const responseText = nearbySlots.length > 0
           ? `${buildRescheduleProfessionalUnavailableMessage({
@@ -3102,10 +3183,15 @@ async function handleOperationalConversationState(input: {
           requestedDateIso: pickedSlot.dateIso,
           requestedTimeLabel: pickedSlot.timeLabel,
         }
-        const responseText = buildRescheduleConfirmationMessage({
+        const responseText = buildRescheduleConfirmationReply({
           appointment: selectedAppointment,
           slot: pickedSlot,
           timezone: input.timezone,
+          keepCurrentProfessional: isCurrentAppointmentProfessionalSelection({
+            appointment: selectedAppointment,
+            professionalId: pickedSlot.professionalId,
+            allowAnyProfessional: false,
+          }),
         })
 
         await persistOperationalConversationState({
@@ -3134,15 +3220,9 @@ async function handleOperationalConversationState(input: {
       }
     }
 
-    let requestedProfessionalId: string | null = operationDraft.selectedProfessionalId ?? selectedAppointment.professionalId
-    let requestedProfessionalName: string | null = operationDraft.selectedProfessionalName ?? selectedAppointment.professionalName
-    let allowAnyProfessional = operationDraft.allowAnyProfessional
+    let resolvedMentionedProfessional: NameMatch | null = null
 
-    if (interpreted.allowAnyProfessional) {
-      requestedProfessionalId = null
-      requestedProfessionalName = null
-      allowAnyProfessional = true
-    } else if (interpreted.mentionedName) {
+    if (!interpreted.allowAnyProfessional && interpreted.mentionedName) {
       const nameResolution = await resolveMentionedName({
         rawName: interpreted.mentionedName,
         barbershopId: input.barbershop.id,
@@ -3238,11 +3318,20 @@ async function handleOperationalConversationState(input: {
       }
 
       if (nameResolution.action === 'professional' && nameResolution.resolvedProfessional) {
-        requestedProfessionalId = nameResolution.resolvedProfessional.id
-        requestedProfessionalName = nameResolution.resolvedProfessional.name
-        allowAnyProfessional = false
+        resolvedMentionedProfessional = nameResolution.resolvedProfessional
       }
     }
+
+    const professionalRequest = resolveRescheduleProfessionalRequest({
+      appointment: selectedAppointment,
+      draft: operationDraft,
+      allowAnyProfessionalRequested: interpreted.allowAnyProfessional,
+      requestedCurrentAppointmentProfessional,
+      resolvedProfessional: resolvedMentionedProfessional,
+    })
+    const requestedProfessionalId = professionalRequest.requestedProfessionalId
+    const requestedProfessionalName = professionalRequest.requestedProfessionalName
+    const allowAnyProfessional = professionalRequest.allowAnyProfessional
 
     if (!interpreted.requestedDateIso) {
       const responseText = buildRescheduleDateTimeClarificationMessage()
@@ -3344,9 +3433,77 @@ async function handleOperationalConversationState(input: {
       slotsFound: availability.slots.length,
       professionalId: allowAnyProfessional ? null : requestedProfessionalId,
     })
+    const keepingCurrentAppointmentProfessional = professionalRequest.keepCurrentAppointmentProfessional
 
     if (availability.slots.length === 0) {
       if (interpreted.exactTime) {
+        if (keepingCurrentAppointmentProfessional) {
+          try {
+            const alternativeExactTimeAvailability = await getAvailableWhatsAppSlots({
+              barbershopId: input.barbershop.id,
+              serviceId: selectedAppointment.serviceId,
+              dateIso: interpreted.requestedDateIso,
+              timezone: input.timezone,
+              professionalId: null,
+              timePreference: 'EXACT',
+              exactTime: interpreted.exactTime,
+              limit: 4,
+            })
+            const alternativeExactTimeSlots = alternativeExactTimeAvailability.slots
+              .filter((slot) =>
+                slot.timeLabel === interpreted.exactTime
+                && slot.professionalId !== selectedAppointment.professionalId
+              )
+              .slice(0, 4)
+            const alternativeProfessionals = buildNamedProfessionalOptionsFromSlots(
+              alternativeExactTimeSlots
+            ).slice(0, 4)
+
+            if (alternativeProfessionals.length > 0) {
+              const responseText = buildRescheduleCurrentProfessionalUnavailableAlternativesMessage({
+                professionalName: selectedAppointment.professionalName,
+                dateIso: interpreted.requestedDateIso,
+                timeLabel: interpreted.exactTime,
+                timezone: input.timezone,
+                professionals: alternativeProfessionals,
+              })
+              const nextDraft = {
+                ...operationDraft,
+                offeredSlots: alternativeExactTimeSlots,
+                pendingProfessionalOptions: alternativeProfessionals,
+                requestedDateIso: interpreted.requestedDateIso,
+                requestedTimeLabel: interpreted.exactTime,
+                selectedProfessionalId: selectedAppointment.professionalId,
+                selectedProfessionalName: selectedAppointment.professionalName,
+                allowAnyProfessional: false,
+                selectedSlot: null,
+              }
+
+              await persistOperationalConversationState({
+                conversationId: input.conversationId,
+                inboundText: input.inboundText,
+                responseText,
+                state: 'WAITING_RESCHEDULE_TIME',
+                draft: nextDraft,
+                source: 'whatsapp_reschedule',
+                stage: 'current_professional_unavailable_alternatives_offered',
+              })
+
+              return {
+                responseText,
+                flow: 'reschedule' as const,
+                conversationId: input.conversationId,
+                conversationState: 'WAITING_RESCHEDULE_TIME' as const,
+                usedAI: interpreted.source === 'openai',
+              }
+            }
+          } catch (error) {
+            if (!(error instanceof AvailabilityInfrastructureError)) {
+              throw error
+            }
+          }
+        }
+
         const nearbySlots = availability.suggestedSlots.slice(0, 4)
         const responseText = availability.diagnostics.finalReason === 'exact_time_unavailable'
           ? buildExactTimeFallbackResponse({
@@ -3482,10 +3639,15 @@ async function handleOperationalConversationState(input: {
         selectedProfessionalName: exactMatch.professionalName,
         allowAnyProfessional: false,
       }
-      const responseText = buildRescheduleConfirmationMessage({
+      const responseText = buildRescheduleConfirmationReply({
         appointment: selectedAppointment,
         slot: exactMatch,
         timezone: input.timezone,
+        keepCurrentProfessional: isCurrentAppointmentProfessionalSelection({
+          appointment: selectedAppointment,
+          professionalId: exactMatch.professionalId,
+          allowAnyProfessional: false,
+        }),
       })
 
       await persistOperationalConversationState({
@@ -3604,6 +3766,7 @@ async function handleOperationalConversationState(input: {
       }
     }
 
+    const requestedCurrentAppointmentProfessional = referencesPreferredProfessional(input.inboundText)
     const confirmationExactTime = extractExplicitTimeFromMessage(input.inboundText)
     const confirmationSlotSelection = resolvePresentedSlotSelection({
       offeredSlots: operationDraft.offeredSlots,
@@ -3616,6 +3779,7 @@ async function handleOperationalConversationState(input: {
     if (
       confirmationSlotSelection.pendingProfessionalOptions.length > 1
       && confirmationSlotSelection.requestedTimeLabel
+      && !requestedCurrentAppointmentProfessional
     ) {
       const responseText = buildRescheduleProfessionalChoiceMessage({
         timeLabel: confirmationSlotSelection.requestedTimeLabel,
@@ -3672,7 +3836,16 @@ async function handleOperationalConversationState(input: {
     const inferredProfessionalChoice = inferredProfessionalMatches.length === 1
       ? inferredProfessionalMatches[0]
       : null
-    const requestedProfessionalChoice = explicitProfessionalChoice ?? inferredProfessionalChoice
+    const currentAppointmentProfessionalChoice = requestedCurrentAppointmentProfessional
+      ? {
+          id: selectedAppointment.professionalId,
+          name: selectedAppointment.professionalName,
+        }
+      : null
+    const requestedProfessionalChoice =
+      explicitProfessionalChoice
+      ?? inferredProfessionalChoice
+      ?? currentAppointmentProfessionalChoice
     const shouldRefreshConfirmationContext = Boolean(confirmationSlotSelection.slot || requestedProfessionalChoice)
 
     if (shouldRefreshConfirmationContext) {
@@ -3735,10 +3908,15 @@ async function handleOperationalConversationState(input: {
           requestedTimeLabel: exactResolution.slot.timeLabel,
           allowAnyProfessional: false,
         }
-        const responseText = buildRescheduleConfirmationMessage({
+        const responseText = buildRescheduleConfirmationReply({
           appointment: selectedAppointment,
           slot: exactResolution.slot,
           timezone: input.timezone,
+          keepCurrentProfessional: isCurrentAppointmentProfessionalSelection({
+            appointment: selectedAppointment,
+            professionalId: exactResolution.slot.professionalId,
+            allowAnyProfessional: false,
+          }),
         })
 
         await persistOperationalConversationState({
@@ -6719,7 +6897,9 @@ export const __testing = {
   pickOfferedSlot,
   applyCorrectionTarget,
   isShortGreetingMessage,
+  isCurrentAppointmentProfessionalSelection,
   referencesPreferredProfessional,
+  resolveRescheduleProfessionalRequest,
   resolveContextualProfessionalPreference,
   resolveConversationRuntimeContext,
   shouldResetConversationOnGreeting,

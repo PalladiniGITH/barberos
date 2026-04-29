@@ -325,6 +325,18 @@ export function buildRescheduleConfirmationMessage(input: {
   ].join('\n')
 }
 
+export function buildRescheduleCurrentProfessionalConfirmationMessage(input: {
+  appointment: WhatsAppManagedAppointment
+  slot: WhatsAppBookingSlot
+  timezone: string
+}) {
+  return [
+    `Perfeito, mantive com ${input.slot.professionalName}.`,
+    '',
+    buildRescheduleConfirmationMessage(input),
+  ].join('\n')
+}
+
 export function buildRescheduleStrictConfirmationMessage() {
   return 'Para remarcar, me responda com uma confirmacao clara, por exemplo: pode remarcar.'
 }
@@ -352,6 +364,26 @@ export function buildRescheduleProfessionalUnavailableMessage(input: {
   const dayLabel = formatDayLabelFromIsoDate(input.dateIso, timezone).toLowerCase()
 
   return `${input.professionalName} nao esta disponivel ${dayLabel}, as ${input.timeLabel}. Posso procurar outros horarios com ele?`
+}
+
+export function buildRescheduleCurrentProfessionalUnavailableAlternativesMessage(input: {
+  professionalName: string
+  dateIso: string
+  timeLabel: string
+  timezone: string
+  professionals: NamedOptionWithId[]
+}) {
+  const timezone = resolveBusinessTimezone(input.timezone)
+  const dayLabel = formatDayLabelFromIsoDate(input.dateIso, timezone).toLowerCase()
+
+  return [
+    `${input.professionalName} nao esta disponivel ${dayLabel}, as ${input.timeLabel}.`,
+    '',
+    'Mas tenho esse horario com:',
+    ...input.professionals.map((professional, index) => `${index + 1}. ${professional.name}`),
+    '',
+    `Voce prefere algum deles ou quer procurar outro horario com ${input.professionalName}?`,
+  ].join('\n')
 }
 
 export function buildRescheduleSuccessMessage(input: {
@@ -433,6 +465,8 @@ export const __testing = {
   buildNoFutureAppointmentMessage,
   buildReminderResponseClarificationMessage,
   buildRescheduleConfirmationMessage,
+  buildRescheduleCurrentProfessionalConfirmationMessage,
+  buildRescheduleCurrentProfessionalUnavailableAlternativesMessage,
   buildRescheduleProfessionalChoiceMessage,
   buildRescheduleProfessionalUnavailableMessage,
   buildReschedulePromptMessage,

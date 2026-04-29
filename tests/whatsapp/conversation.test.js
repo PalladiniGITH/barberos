@@ -16,6 +16,44 @@ function buildSlot() {
   }
 }
 
+function buildManagedAppointment(overrides = {}) {
+  return {
+    id: 'apt-1',
+    barbershopId: 'shop-1',
+    customerId: 'customer-1',
+    serviceId: 'svc-premium',
+    serviceName: 'Corte + Barba Premium',
+    professionalId: 'pro-matheus',
+    professionalName: 'Matheus Lima',
+    status: 'PENDING',
+    startAtIso: '2026-04-29T17:00:00.000Z',
+    endAtIso: '2026-04-29T18:00:00.000Z',
+    dateIso: '2026-04-29',
+    dateLabel: 'quarta-feira, 29/04',
+    timeLabel: '14:00',
+    ...overrides,
+  }
+}
+
+function buildOperationalDraft(overrides = {}) {
+  return {
+    kind: 'reschedule',
+    appointments: [buildManagedAppointment()],
+    selectedAppointmentId: 'apt-1',
+    offeredSlots: [],
+    selectedSlot: null,
+    pendingProfessionalOptions: [],
+    requestedDateIso: null,
+    requestedTimeLabel: null,
+    selectedProfessionalId: 'pro-matheus',
+    selectedProfessionalName: 'Matheus Lima',
+    allowAnyProfessional: false,
+    triggeredByReminder: true,
+    reminderPromptedAtIso: null,
+    ...overrides,
+  }
+}
+
 test('contexto velho ou incoerente nao e considerado confiavel', () => {
   const draft = conversationTesting.buildEmptyConversationDraft()
   draft.selectedServiceId = 'svc-classic'
@@ -263,6 +301,94 @@ test('quando o cliente informa horario antes do barbeiro a pergunta continua sen
   assert.match(reply, /2\. Matheus Lima/i)
   assert.match(reply, /3\. Rafael Costa/i)
   assert.doesNotMatch(reply, /10:00 com Lucas Ribeiro/)
+})
+
+test('frases como "com o mesmo" e "com quem estava" preservam a preferencia pelo barbeiro atual', () => {
+  assert.equal(conversationTesting.referencesPreferredProfessional('com o mesmo'), true)
+  assert.equal(conversationTesting.referencesPreferredProfessional('mesmo barbeiro'), true)
+  assert.equal(conversationTesting.referencesPreferredProfessional('pode ser o mesmo'), true)
+  assert.equal(conversationTesting.referencesPreferredProfessional('com quem estava'), true)
+})
+
+test('remarcacao sem barbeiro explicito mantem o profissional do agendamento atual por padrao', () => {
+  const resolved = conversationTesting.resolveRescheduleProfessionalRequest({
+    appointment: buildManagedAppointment(),
+    draft: buildOperationalDraft({
+      selectedProfessionalId: null,
+      selectedProfessionalName: null,
+    }),
+    allowAnyProfessionalRequested: false,
+    requestedCurrentAppointmentProfessional: false,
+    resolvedProfessional: null,
+  })
+
+  assert.equal(resolved.requestedProfessionalId, 'pro-matheus')
+  assert.equal(resolved.requestedProfessionalName, 'Matheus Lima')
+  assert.equal(resolved.allowAnyProfessional, false)
+  assert.equal(resolved.keepCurrentAppointmentProfessional, true)
+})
+
+test('remarcacao aceita trocar para outro barbeiro, manter o mesmo ou liberar qualquer um', () => {
+  const explicitOtherProfessional = conversationTesting.resolveRescheduleProfessionalRequest({
+    appointment: buildManagedAppointment(),
+    draft: buildOperationalDraft(),
+    allowAnyProfessionalRequested: false,
+    requestedCurrentAppointmentProfessional: false,
+    resolvedProfessional: {
+      id: 'pro-rafael',
+      name: 'Rafael Costa',
+    },
+  })
+  const explicitCurrentProfessional = conversationTesting.resolveRescheduleProfessionalRequest({
+    appointment: buildManagedAppointment(),
+    draft: buildOperationalDraft({
+      selectedProfessionalId: null,
+      selectedProfessionalName: null,
+    }),
+    allowAnyProfessionalRequested: false,
+    requestedCurrentAppointmentProfessional: true,
+    resolvedProfessional: null,
+  })
+  const anyProfessional = conversationTesting.resolveRescheduleProfessionalRequest({
+    appointment: buildManagedAppointment(),
+    draft: buildOperationalDraft(),
+    allowAnyProfessionalRequested: true,
+    requestedCurrentAppointmentProfessional: false,
+    resolvedProfessional: null,
+  })
+
+  assert.equal(explicitOtherProfessional.requestedProfessionalId, 'pro-rafael')
+  assert.equal(explicitOtherProfessional.requestedProfessionalName, 'Rafael Costa')
+  assert.equal(explicitOtherProfessional.keepCurrentAppointmentProfessional, false)
+
+  assert.equal(explicitCurrentProfessional.requestedProfessionalId, 'pro-matheus')
+  assert.equal(explicitCurrentProfessional.keepCurrentAppointmentProfessional, true)
+
+  assert.equal(anyProfessional.requestedProfessionalId, null)
+  assert.equal(anyProfessional.requestedProfessionalName, null)
+  assert.equal(anyProfessional.allowAnyProfessional, true)
+})
+
+test('sem professionalId no appointment atual a remarcacao nao inventa barbeiro padrao', () => {
+  const appointmentWithoutProfessional = buildManagedAppointment({
+    professionalId: null,
+    professionalName: null,
+  })
+  const resolved = conversationTesting.resolveRescheduleProfessionalRequest({
+    appointment: appointmentWithoutProfessional,
+    draft: buildOperationalDraft({
+      appointments: [appointmentWithoutProfessional],
+      selectedProfessionalId: null,
+      selectedProfessionalName: null,
+    }),
+    allowAnyProfessionalRequested: false,
+    requestedCurrentAppointmentProfessional: false,
+    resolvedProfessional: null,
+  })
+
+  assert.equal(resolved.requestedProfessionalId, null)
+  assert.equal(resolved.requestedProfessionalName, null)
+  assert.equal(resolved.keepCurrentAppointmentProfessional, false)
 })
 
 test('resposta com nome do barbeiro seleciona a opcao ja apresentada sem depender de nova busca textual de horario', () => {

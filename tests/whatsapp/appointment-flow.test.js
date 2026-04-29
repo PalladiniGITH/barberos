@@ -76,6 +76,34 @@ test('remarcacao com horario repetido por barbeiro pede escolha explicita do pro
   assert.match(message, /Qual voce prefere/i)
 })
 
+test('remarcacao com o barbeiro atual disponivel resume direto mantendo o mesmo profissional', () => {
+  const message = flowTesting.buildRescheduleCurrentProfessionalConfirmationMessage({
+    appointment: buildAppointment({
+      professionalId: 'pro-matheus',
+      professionalName: 'Matheus Lima',
+      serviceName: 'Corte + Barba Premium',
+      dateIso: '2026-04-29',
+      dateLabel: 'quarta-feira, 29/04',
+      timeLabel: '14:00',
+    }),
+    slot: {
+      key: 'pro-matheus:2026-04-29T19:00:00.000Z',
+      professionalId: 'pro-matheus',
+      professionalName: 'Matheus Lima',
+      dateIso: '2026-04-29',
+      timeLabel: '16:00',
+      startAtIso: '2026-04-29T19:00:00.000Z',
+      endAtIso: '2026-04-29T20:00:00.000Z',
+    },
+    timezone: 'America/Sao_Paulo',
+  })
+
+  assert.match(message, /mantive com Matheus Lima/i)
+  assert.match(message, /Horario: 16:00/i)
+  assert.match(message, /Barbeiro: Matheus Lima/i)
+  assert.doesNotMatch(message, /Lucas Ribeiro|Rafael Costa/i)
+})
+
 test('troca de barbeiro indisponivel na remarcacao responde com mensagem operacional clara', () => {
   const message = flowTesting.buildRescheduleProfessionalUnavailableMessage({
     professionalName: 'Rafael Costa',
@@ -87,6 +115,25 @@ test('troca de barbeiro indisponivel na remarcacao responde com mensagem operaci
   assert.match(message, /Rafael Costa nao esta disponivel/i)
   assert.match(message, /19:30/)
   assert.match(message, /Posso procurar outros horarios com ele/i)
+})
+
+test('remarcacao explica quando o barbeiro atual nao esta disponivel e lista outros no mesmo horario', () => {
+  const message = flowTesting.buildRescheduleCurrentProfessionalUnavailableAlternativesMessage({
+    professionalName: 'Matheus Lima',
+    dateIso: '2026-04-29',
+    timeLabel: '16:00',
+    timezone: 'America/Sao_Paulo',
+    professionals: [
+      { id: 'pro-lucas', name: 'Lucas Ribeiro' },
+      { id: 'pro-rafael', name: 'Rafael Costa' },
+    ],
+  })
+
+  assert.match(message, /Matheus Lima nao esta disponivel/i)
+  assert.match(message, /16:00/)
+  assert.match(message, /1\. Lucas Ribeiro/i)
+  assert.match(message, /2\. Rafael Costa/i)
+  assert.match(message, /outro horario com Matheus Lima/i)
 })
 
 test('draft operacional preserva pendingProfessionalOptions quando o fluxo de remarcacao aguarda barbeiro', () => {

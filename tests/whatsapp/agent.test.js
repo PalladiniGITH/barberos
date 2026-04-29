@@ -1321,6 +1321,13 @@ test('horario exato antes do barbeiro vira escolha de barbeiro, nao lista mista 
   assert.doesNotMatch(override.replyText, /10:00 com Lucas Ribeiro/)
 })
 
+test('agente reconhece pedidos para manter o mesmo barbeiro na remarcacao', () => {
+  assert.equal(agentTesting.referencesPreferredProfessional('com o mesmo'), true)
+  assert.equal(agentTesting.referencesPreferredProfessional('mesmo barbeiro'), true)
+  assert.equal(agentTesting.referencesPreferredProfessional('pode ser o mesmo'), true)
+  assert.equal(agentTesting.referencesPreferredProfessional('com quem estava'), true)
+})
+
 test('pickPresentedOfferedSlot nao escolhe barbeiro arbitrariamente quando so o horario foi informado', () => {
   const slot = agentTesting.pickPresentedOfferedSlot({
     offeredSlots: [
