@@ -21,6 +21,12 @@ model Barbershop {
   email                 String?
   timezone              String    @default("America/Sao_Paulo")
   active                Boolean   @default(true)
+  whatsappEnabled       Boolean   @default(false)
+  evolutionInstanceName String?   @unique
+  whatsappLastInboundAt DateTime?
+  whatsappLastOutboundAt DateTime?
+  whatsappLastErrorAt   DateTime?
+  whatsappLastErrorMessage String?
   subscriptionPlan      String?
   subscriptionStatus    BarbershopSubscriptionStatus @default(TRIAL)
   trialEndsAt           DateTime?

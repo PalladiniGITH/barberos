@@ -7,7 +7,10 @@ import { processEvolutionWebhookPayload } from '@/lib/integrations/evolution-web
 
 export const runtime = 'nodejs'
 
-export async function POST(request: Request) {
+export async function POST(
+  request: Request,
+  context: { params: { barbershopSlug: string } }
+) {
   if (!isEvolutionWebhookRequestAuthorized(request)) {
     return NextResponse.json(
       { ok: false, error: 'Webhook Evolution nao autorizado.' },
@@ -27,38 +30,14 @@ export async function POST(request: Request) {
   }
 
   const normalized = normalizeEvolutionWebhookPayload(payload)
-  const phone = normalized.remotePhone
-  const message = normalized.text
-
-  console.info('[evolution-webhook] normalized payload', {
-    eventOriginal: normalized.originalEvent,
-    eventNormalized: normalized.event,
-    shouldProcessInboundMessage: normalized.shouldProcessInboundMessage,
-    ignoreReason: normalized.ignoreReason,
-    fromMe: normalized.fromMe,
-    messageType: normalized.messageType,
+  const result = await processEvolutionWebhookPayload(payload, {
+    routeBarbershopSlug: context.params.barbershopSlug,
   })
-
-  if (!normalized.shouldProcessInboundMessage) {
-    console.warn('[evolution-webhook] inbound message ignored before handler', {
-      eventOriginal: normalized.originalEvent,
-      eventNormalized: normalized.event,
-      shouldProcessInboundMessage: normalized.shouldProcessInboundMessage,
-      ignoreReason: normalized.ignoreReason,
-      fromMe: normalized.fromMe,
-      messageType: normalized.messageType,
-    })
-  }
-
-  const result = await processEvolutionWebhookPayload(payload)
 
   if (result.code === 409 || result.code === 202) {
     console.warn('[evolution-webhook] tenant not processed', {
+      routeSlug: context.params.barbershopSlug,
       instanceNameReceived: 'diagnostics' in result ? result.diagnostics?.instanceNameReceived ?? normalized.instanceName : normalized.instanceName,
-      routeSlug: 'diagnostics' in result ? result.diagnostics?.routeSlug ?? null : null,
-      barbershopId: 'diagnostics' in result ? result.diagnostics?.barbershopId ?? null : null,
-      barbershopSlug: 'diagnostics' in result ? result.diagnostics?.barbershopSlug ?? null : null,
-      barbershopName: 'diagnostics' in result ? result.diagnostics?.barbershopName ?? null : null,
       matchedBy: 'diagnostics' in result ? result.diagnostics?.matchedBy ?? null : null,
       finalReason: 'diagnostics' in result ? result.diagnostics?.reason ?? result.reason : result.reason,
     })
@@ -76,8 +55,8 @@ export async function POST(request: Request) {
           ok: result.ok,
           reason: result.reason,
           eventId: result.eventId,
-          phone,
-          message,
+          phone: normalized.remotePhone,
+          message: normalized.text,
           customerId: 'customerId' in result ? result.customerId : undefined,
           customerCreated: 'customerCreated' in result ? result.customerCreated : undefined,
           conversationId: 'conversationId' in result ? result.conversationId : undefined,

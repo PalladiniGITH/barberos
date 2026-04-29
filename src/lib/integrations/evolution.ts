@@ -7,7 +7,7 @@ const DEFAULT_EVOLUTION_WEBHOOK_EVENTS = ['MESSAGES_UPSERT', 'CONNECTION_UPDATE'
 type EvolutionConfig = {
   apiUrl: string
   apiKey: string
-  instance: string
+  instance: string | null
   webhookSecret: string
   publicAppUrl: string
 }
@@ -338,7 +338,7 @@ function getPublicAppUrl() {
 function getEvolutionConfig(): EvolutionConfig {
   const apiUrl = process.env.EVOLUTION_API_URL
   const apiKey = process.env.EVOLUTION_API_KEY
-  const instance = process.env.EVOLUTION_INSTANCE
+  const instance = process.env.EVOLUTION_INSTANCE?.trim() || null
   const webhookSecret = process.env.EVOLUTION_WEBHOOK_SECRET
 
   if (!apiUrl) {
@@ -347,10 +347,6 @@ function getEvolutionConfig(): EvolutionConfig {
 
   if (!apiKey) {
     throw new Error('EVOLUTION_API_KEY nao configurada.')
-  }
-
-  if (!instance) {
-    throw new Error('EVOLUTION_INSTANCE nao configurada.')
   }
 
   if (!webhookSecret) {
@@ -509,7 +505,13 @@ function buildDedupeKey(input: {
 }
 
 export function getEvolutionInstanceName() {
-  return getEvolutionConfig().instance
+  const instance = getEvolutionConfig().instance
+
+  if (!instance) {
+    throw new Error('EVOLUTION_INSTANCE nao configurada.')
+  }
+
+  return instance
 }
 
 export function getEvolutionWebhookUrl() {

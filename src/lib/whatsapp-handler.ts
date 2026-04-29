@@ -2,13 +2,22 @@ import 'server-only'
 
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { getEvolutionInstanceName, sendTextMessage } from '@/lib/integrations/evolution'
+import { sendTextMessage } from '@/lib/integrations/evolution'
 import { processWhatsAppConversation } from '@/lib/whatsapp-conversation'
+import {
+  markWhatsAppInboundReceived,
+  markWhatsAppIntegrationError,
+  markWhatsAppOutboundDelivered,
+  resolveWhatsAppOutboundIntegration,
+  resolveWhatsAppTenantFromEvolutionPayload,
+  type WhatsAppTenantResolutionResult,
+} from '@/lib/whatsapp-tenant'
 
 export interface IncomingWhatsAppMessage {
   provider: 'EVOLUTION'
   event: string
   instanceName: string | null
+  routeBarbershopSlug?: string | null
   phone: string | null
   message: string | null
   contactName?: string | null
@@ -20,30 +29,16 @@ export interface IncomingWhatsAppMessage {
   ignoreReason?: string | null
 }
 
-interface TenantCandidate {
-  id: string
-  name: string
-  slug: string
-  timezone: string
-}
-
-interface TenantResolutionResult {
-  barbershop: TenantCandidate | null
-  instanceNameReceived: string | null
-  configuredInstance: string
-  explicitBarbershopSlug: string | null
-  matchedBy: 'explicit_slug' | 'slug_exact' | 'slug_normalized' | 'name_normalized' | 'slug_in_instance' | 'single_tenant_fallback' | null
-  reason: string
-}
-
 interface TenantResolutionLogContext {
+  barbershopId: string | null
+  barbershopSlug: string | null
+  barbershopName: string | null
+  instanceName: string | null
   instanceNameReceived: string | null
-  configuredInstance: string
-  explicitBarbershopSlug: string | null
-  foundBarbershopSlug: string | null
-  foundBarbershopName: string | null
-  matchedBy: TenantResolutionResult['matchedBy']
-  finalReason: string
+  routeSlug: string | null
+  matchedBy: WhatsAppTenantResolutionResult['matchedBy']
+  reason: string
+  status: WhatsAppTenantResolutionResult['status']
 }
 
 interface AggregatedInboundMessage {
@@ -367,169 +362,17 @@ function chooseCustomerName(input: {
   return buildFallbackCustomerName(input.phone)
 }
 
-function normalizeTenantKey(value?: string | null) {
-  if (!value) {
-    return null
-  }
-
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}
-
-function buildTenantLogContext(result: TenantResolutionResult): TenantResolutionLogContext {
+function buildTenantLogContext(result: WhatsAppTenantResolutionResult): TenantResolutionLogContext {
   return {
+    barbershopId: result.barbershopId,
+    barbershopSlug: result.barbershopSlug,
+    barbershopName: result.barbershopName,
+    instanceName: result.instanceName,
     instanceNameReceived: result.instanceNameReceived,
-    configuredInstance: result.configuredInstance,
-    explicitBarbershopSlug: result.explicitBarbershopSlug,
-    foundBarbershopSlug: result.barbershop?.slug ?? null,
-    foundBarbershopName: result.barbershop?.name ?? null,
+    routeSlug: result.routeSlug,
     matchedBy: result.matchedBy,
-    finalReason: result.reason,
-  }
-}
-
-async function resolveTenantBarbershop(instanceName: string | null): Promise<TenantResolutionResult> {
-  const configuredInstance = getEvolutionInstanceName()
-  const explicitBarbershopSlug = process.env.EVOLUTION_BARBERSHOP_SLUG?.trim() || null
-  const resolvedInstance = instanceName ?? configuredInstance
-  const normalizedConfiguredInstance = normalizeTenantKey(configuredInstance)
-  const normalizedResolvedInstance = normalizeTenantKey(resolvedInstance)
-
-  if (
-    normalizedResolvedInstance
-    && normalizedConfiguredInstance
-    && normalizedResolvedInstance !== normalizedConfiguredInstance
-  ) {
-    return {
-      barbershop: null,
-      instanceNameReceived: instanceName,
-      configuredInstance,
-      explicitBarbershopSlug,
-      matchedBy: null,
-      reason: 'instance_mismatch',
-    }
-  }
-
-  if (explicitBarbershopSlug) {
-    const explicitMatch = await prisma.barbershop.findFirst({
-      where: {
-        slug: explicitBarbershopSlug,
-        active: true,
-      },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        timezone: true,
-      },
-    })
-
-    return {
-      barbershop: explicitMatch,
-      instanceNameReceived: instanceName,
-      configuredInstance,
-      explicitBarbershopSlug,
-      matchedBy: explicitMatch ? 'explicit_slug' : null,
-      reason: explicitMatch ? 'resolved' : 'explicit_slug_not_found',
-    }
-  }
-
-  const barbershops = await prisma.barbershop.findMany({
-    where: { active: true },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      timezone: true,
-    },
-  })
-
-  const exactSlugMatch = barbershops.find((barbershop) => barbershop.slug === resolvedInstance)
-  if (exactSlugMatch) {
-    return {
-      barbershop: exactSlugMatch,
-      instanceNameReceived: instanceName,
-      configuredInstance,
-      explicitBarbershopSlug,
-      matchedBy: 'slug_exact',
-      reason: 'resolved',
-    }
-  }
-
-  const normalizedSlugMatch = barbershops.find((barbershop) =>
-    normalizeTenantKey(barbershop.slug) === normalizedResolvedInstance
-  )
-  if (normalizedSlugMatch) {
-    return {
-      barbershop: normalizedSlugMatch,
-      instanceNameReceived: instanceName,
-      configuredInstance,
-      explicitBarbershopSlug,
-      matchedBy: 'slug_normalized',
-      reason: 'resolved',
-    }
-  }
-
-  const normalizedNameMatch = barbershops.find((barbershop) =>
-    normalizeTenantKey(barbershop.name) === normalizedResolvedInstance
-  )
-  if (normalizedNameMatch) {
-    return {
-      barbershop: normalizedNameMatch,
-      instanceNameReceived: instanceName,
-      configuredInstance,
-      explicitBarbershopSlug,
-      matchedBy: 'name_normalized',
-      reason: 'resolved',
-    }
-  }
-
-  const slugContainedMatches = normalizedResolvedInstance
-    ? barbershops.filter((barbershop) => {
-        const normalizedSlug = normalizeTenantKey(barbershop.slug)
-        return Boolean(
-          normalizedSlug
-          && (
-            normalizedResolvedInstance.includes(normalizedSlug)
-            || normalizedSlug.includes(normalizedResolvedInstance)
-          )
-        )
-      })
-    : []
-
-  if (slugContainedMatches.length === 1) {
-    return {
-      barbershop: slugContainedMatches[0],
-      instanceNameReceived: instanceName,
-      configuredInstance,
-      explicitBarbershopSlug,
-      matchedBy: 'slug_in_instance',
-      reason: 'resolved',
-    }
-  }
-
-  if (barbershops.length === 1) {
-    return {
-      barbershop: barbershops[0],
-      instanceNameReceived: instanceName,
-      configuredInstance,
-      explicitBarbershopSlug,
-      matchedBy: 'single_tenant_fallback',
-      reason: 'resolved',
-    }
-  }
-
-  return {
-    barbershop: null,
-    instanceNameReceived: instanceName,
-    configuredInstance,
-    explicitBarbershopSlug,
-    matchedBy: null,
-    reason: slugContainedMatches.length > 1 ? 'ambiguous_instance_match' : 'barbershop_not_found',
+    reason: result.reason,
+    status: result.status,
   }
 }
 
@@ -883,6 +726,7 @@ async function findExistingMessagingEvent(dedupeKey: string) {
 
 async function createMessagingEvent(input: {
   barbershopId: string
+  instanceName: string
   normalized: IncomingWhatsAppMessage
 }) {
   return prisma.messagingEvent.create({
@@ -892,7 +736,7 @@ async function createMessagingEvent(input: {
       direction: input.normalized.shouldProcessInboundMessage ? 'INBOUND' : 'SYSTEM',
       status: input.normalized.shouldProcessInboundMessage ? 'PENDING' : 'IGNORED',
       eventType: input.normalized.event,
-      instanceName: input.normalized.instanceName ?? getEvolutionInstanceName(),
+      instanceName: input.instanceName,
       dedupeKey: input.normalized.dedupeKey,
       providerMessageId: input.normalized.messageId ?? null,
       remoteJid: input.normalized.remoteJid ?? null,
@@ -919,6 +763,7 @@ async function createOutboundMessagingEvent(input: {
   phone: string
   responseText: string
   inboundEventId: string
+  instanceName: string
 }) {
   try {
     await prisma.messagingEvent.create({
@@ -929,7 +774,7 @@ async function createOutboundMessagingEvent(input: {
         direction: 'OUTBOUND',
         status: 'PROCESSED',
         eventType: 'WHATSAPP_REPLY',
-        instanceName: getEvolutionInstanceName(),
+        instanceName: input.instanceName,
         dedupeKey: `outbound:${input.inboundEventId}`,
         remotePhone: input.phone,
         bodyText: input.responseText,
@@ -969,10 +814,13 @@ async function claimMessagingEventForProcessing(eventId: string) {
 }
 
 export async function handleIncomingWhatsAppMessage(input: IncomingWhatsAppMessage) {
-  const tenantResolution = await resolveTenantBarbershop(input.instanceName)
+  const tenantResolution = await resolveWhatsAppTenantFromEvolutionPayload({
+    instanceName: input.instanceName,
+    routeBarbershopSlug: input.routeBarbershopSlug ?? null,
+  })
   const tenantResolutionLog = buildTenantLogContext(tenantResolution)
 
-  if (tenantResolution.barbershop) {
+  if (tenantResolution.status === 'resolved' && tenantResolution.barbershop) {
     console.info('[whatsapp-handler] tenant resolved', tenantResolutionLog)
   } else {
     console.warn('[whatsapp-handler] tenant resolution failed', tenantResolutionLog)
@@ -980,10 +828,10 @@ export async function handleIncomingWhatsAppMessage(input: IncomingWhatsAppMessa
 
   const barbershop = tenantResolution.barbershop
 
-  if (!barbershop) {
+  if (tenantResolution.status !== 'resolved' || !barbershop || !tenantResolution.instanceName) {
     return {
-      ok: false,
-      code: 409,
+      ok: tenantResolution.status === 'ignored',
+      code: tenantResolution.status === 'error' ? 409 : 202,
       reason: `tenant_not_configured:${tenantResolution.reason}`,
       diagnostics: tenantResolutionLog,
       replySent: false,
@@ -996,6 +844,7 @@ export async function handleIncomingWhatsAppMessage(input: IncomingWhatsAppMessa
     try {
       existingEvent = await createMessagingEvent({
         barbershopId: barbershop.id,
+        instanceName: tenantResolution.instanceName,
         normalized: input,
       })
     } catch (error) {
@@ -1013,6 +862,8 @@ export async function handleIncomingWhatsAppMessage(input: IncomingWhatsAppMessa
   if (!existingEvent) {
     throw new Error('Nao foi possivel registrar o evento do WhatsApp.')
   }
+
+  await markWhatsAppInboundReceived(barbershop.id)
 
   if (!input.shouldProcessInboundMessage || !input.phone) {
     return {
@@ -1105,10 +956,18 @@ export async function handleIncomingWhatsAppMessage(input: IncomingWhatsAppMessa
       eventId: existingEvent.id,
     })
     const responseText = conversation.responseText
+    const outboundIntegration = await resolveWhatsAppOutboundIntegration({
+      barbershopId: barbershop.id,
+    })
+
+    if (outboundIntegration.status !== 'resolved' || !outboundIntegration.instanceName) {
+      throw new Error('Integracao WhatsApp nao configurada para esta barbearia.')
+    }
 
     await sendTextMessage({
       number: input.phone,
       text: responseText,
+      instance: outboundIntegration.instanceName,
     })
 
     await createOutboundMessagingEvent({
@@ -1117,7 +976,10 @@ export async function handleIncomingWhatsAppMessage(input: IncomingWhatsAppMessa
       phone: input.phone,
       responseText,
       inboundEventId: existingEvent.id,
+      instanceName: outboundIntegration.instanceName,
     })
+
+    await markWhatsAppOutboundDelivered(barbershop.id)
 
     await prisma.messagingEvent.update({
       where: { id: existingEvent.id },
@@ -1147,6 +1009,11 @@ export async function handleIncomingWhatsAppMessage(input: IncomingWhatsAppMessa
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao processar mensagem do WhatsApp.'
+
+    await markWhatsAppIntegrationError({
+      barbershopId: barbershop.id,
+      message,
+    })
 
     await prisma.messagingEvent.update({
       where: { id: existingEvent.id },
@@ -1181,4 +1048,6 @@ export const __testing = {
   shouldFinalizeDebouncedTurn,
   resolveAggregationWindowMs,
   shouldProcessImmediately,
+  findOrCreateCustomerFromInbound,
+  getOrCreateWhatsappConversation,
 }

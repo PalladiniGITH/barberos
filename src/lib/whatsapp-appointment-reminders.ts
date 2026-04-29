@@ -2,7 +2,7 @@ import 'server-only'
 
 import { timingSafeEqual } from 'node:crypto'
 import { Prisma } from '@prisma/client'
-import { getEvolutionInstanceName, normalizeEvolutionPhoneNumber, sendTextMessage } from '@/lib/integrations/evolution'
+import { normalizeEvolutionPhoneNumber, sendTextMessage } from '@/lib/integrations/evolution'
 import { prisma } from '@/lib/prisma'
 import {
   formatDayLabelFromIsoDate,
@@ -10,6 +10,11 @@ import {
   formatTimeInTimezone,
   resolveBusinessTimezone,
 } from '@/lib/timezone'
+import {
+  markWhatsAppIntegrationError,
+  markWhatsAppOutboundDelivered,
+  resolveWhatsAppOutboundIntegration,
+} from '@/lib/whatsapp-tenant'
 
 export const WHATSAPP_APPOINTMENT_CONFIRMATION_ROUTE_PATH = '/api/internal/whatsapp-appointment-confirmations/run'
 export const WHATSAPP_APPOINTMENT_CONFIRMATION_SECRET_HEADER = 'x-automation-secret'
@@ -352,6 +357,7 @@ async function createReminderMessagingEvent(input: {
   appointment: ReminderAppointmentContext
   dedupeKey: string
   reminderMessage: string
+  instanceName: string
 }) {
   return prisma.messagingEvent.create({
     data: {
@@ -361,7 +367,7 @@ async function createReminderMessagingEvent(input: {
       direction: 'OUTBOUND',
       status: 'PENDING',
       eventType: 'APPOINTMENT_CONFIRMATION_REMINDER',
-      instanceName: getEvolutionInstanceName(),
+      instanceName: input.instanceName,
       dedupeKey: input.dedupeKey,
       remotePhone: input.appointment.customerPhone,
       bodyText: input.reminderMessage,
@@ -439,6 +445,35 @@ export async function runDueWhatsAppAppointmentConfirmations(input?: {
       continue
     }
 
+    const outboundIntegration = await resolveWhatsAppOutboundIntegration({
+      barbershopId: appointment.barbershopId,
+    })
+
+    if (outboundIntegration.status !== 'resolved' || !outboundIntegration.instanceName) {
+      summary.failed += 1
+
+      await prisma.appointment.update({
+        where: { id: appointment.id },
+        data: {
+          confirmationReminderStatus: 'FAILED',
+          confirmationReminderError: 'outbound_integration_missing',
+        },
+      })
+
+      await markWhatsAppIntegrationError({
+        barbershopId: appointment.barbershopId,
+        message: 'Integracao WhatsApp nao configurada para envio de lembrete.',
+      })
+
+      console.warn('[whatsapp-reminder] failed', {
+        appointmentId: appointment.id,
+        barbershopId: appointment.barbershopId,
+        reason: 'outbound_integration_missing',
+      })
+
+      continue
+    }
+
     const reminderMessage = buildAppointmentConfirmationReminderMessage({
       appointment,
     })
@@ -454,6 +489,7 @@ export async function runDueWhatsAppAppointmentConfirmations(input?: {
         appointment,
         dedupeKey,
         reminderMessage,
+        instanceName: outboundIntegration.instanceName,
       })
       eventId = event.id
     } catch (error) {
@@ -473,6 +509,7 @@ export async function runDueWhatsAppAppointmentConfirmations(input?: {
       const providerPayload = await sendTextMessage({
         number: normalizedPhone,
         text: reminderMessage,
+        instance: outboundIntegration.instanceName,
       })
 
       await prisma.messagingEvent.update({
@@ -502,6 +539,8 @@ export async function runDueWhatsAppAppointmentConfirmations(input?: {
         now,
       })
 
+      await markWhatsAppOutboundDelivered(appointment.barbershopId)
+
       summary.sent += 1
       console.info('[whatsapp-reminder] sent', {
         appointmentId: appointment.id,
@@ -510,6 +549,11 @@ export async function runDueWhatsAppAppointmentConfirmations(input?: {
     } catch (error) {
       summary.failed += 1
       const message = error instanceof Error ? error.message : String(error)
+
+      await markWhatsAppIntegrationError({
+        barbershopId: appointment.barbershopId,
+        message,
+      })
 
       await prisma.messagingEvent.update({
         where: { id: eventId! },

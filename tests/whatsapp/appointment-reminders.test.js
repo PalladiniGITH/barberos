@@ -19,6 +19,8 @@ function withReminderMocks(mocks, fn) {
   const originals = {
     appointmentFindMany: prisma.appointment.findMany,
     appointmentUpdate: prisma.appointment.update,
+    barbershopFindUnique: prisma.barbershop.findUnique,
+    barbershopUpdate: prisma.barbershop.update,
     messagingEventCreate: prisma.messagingEvent.create,
     messagingEventUpdate: prisma.messagingEvent.update,
     whatsappConversationFindUnique: prisma.whatsappConversation.findUnique,
@@ -27,6 +29,8 @@ function withReminderMocks(mocks, fn) {
 
   prisma.appointment.findMany = mocks.appointmentFindMany ?? originals.appointmentFindMany
   prisma.appointment.update = mocks.appointmentUpdate ?? originals.appointmentUpdate
+  prisma.barbershop.findUnique = mocks.barbershopFindUnique ?? originals.barbershopFindUnique
+  prisma.barbershop.update = mocks.barbershopUpdate ?? originals.barbershopUpdate
   prisma.messagingEvent.create = mocks.messagingEventCreate ?? originals.messagingEventCreate
   prisma.messagingEvent.update = mocks.messagingEventUpdate ?? originals.messagingEventUpdate
   prisma.whatsappConversation.findUnique = mocks.whatsappConversationFindUnique ?? originals.whatsappConversationFindUnique
@@ -37,6 +41,8 @@ function withReminderMocks(mocks, fn) {
     .finally(() => {
       prisma.appointment.findMany = originals.appointmentFindMany
       prisma.appointment.update = originals.appointmentUpdate
+      prisma.barbershop.findUnique = originals.barbershopFindUnique
+      prisma.barbershop.update = originals.barbershopUpdate
       prisma.messagingEvent.create = originals.messagingEventCreate
       prisma.messagingEvent.update = originals.messagingEventUpdate
       prisma.whatsappConversation.findUnique = originals.whatsappConversationFindUnique
@@ -59,6 +65,7 @@ test('runDueWhatsAppAppointmentConfirmations envia uma vez e nao duplica no segu
 
   const originalFetch = global.fetch
   const fetchCalls = []
+  const fetchUrls = []
   const now = new Date('2026-04-28T15:00:00.000Z')
   const appointments = [
     {
@@ -102,7 +109,8 @@ test('runDueWhatsAppAppointmentConfirmations envia uma vez e nao duplica no segu
     },
   ]
 
-  global.fetch = async (_url, init = {}) => {
+  global.fetch = async (url, init = {}) => {
+    fetchUrls.push(String(url))
     fetchCalls.push(init.body ? JSON.parse(String(init.body)) : null)
     return {
       ok: true,
@@ -127,6 +135,22 @@ test('runDueWhatsAppAppointmentConfirmations envia uma vez e nao duplica no segu
           Object.assign(appointment, data)
           return appointment
         },
+        barbershopFindUnique: async ({ where }) => {
+          if (where.id === 'shop-1') {
+            return {
+              id: 'shop-1',
+              name: 'Konoha',
+              slug: 'konoha',
+              timezone: 'America/Sao_Paulo',
+              active: true,
+              whatsappEnabled: true,
+              evolutionInstanceName: 'konoha',
+            }
+          }
+
+          return null
+        },
+        barbershopUpdate: async () => ({ success: true }),
         messagingEventCreate: async () => ({ id: 'event-1' }),
         messagingEventUpdate: async () => ({ success: true }),
         whatsappConversationFindUnique: async () => ({ id: 'conv-1', state: 'IDLE', updatedAt: new Date('2026-04-28T12:00:00.000Z') }),
@@ -148,9 +172,81 @@ test('runDueWhatsAppAppointmentConfirmations envia uma vez e nao duplica no segu
         assert.equal(firstRun.sent, 1)
         assert.equal(firstRun.failed, 0)
         assert.equal(fetchCalls.length, 1)
+        assert.match(fetchUrls[0], /\/message\/sendText\/konoha$/)
         assert.ok(appointments[0].confirmationReminderSentAt instanceof Date)
         assert.equal(secondRun.sent, 0)
         assert.equal(fetchCalls.length, 1)
+      }
+    )
+  } finally {
+    global.fetch = originalFetch
+  }
+})
+
+test('runDueWhatsAppAppointmentConfirmations nao derruba o job quando a integracao outbound nao existe', async () => {
+  withReminderEnv()
+
+  const originalFetch = global.fetch
+  const fetchCalls = []
+  const now = new Date('2026-04-28T15:00:00.000Z')
+  const appointments = [
+    {
+      id: 'apt-1',
+      barbershopId: 'shop-without-whatsapp',
+      customerId: 'customer-1',
+      status: 'CONFIRMED',
+      startAt: new Date('2026-04-28T17:00:00.000Z'),
+      endAt: new Date('2026-04-28T17:45:00.000Z'),
+      confirmationReminderSentAt: null,
+      customer: { name: 'Bruno', phone: '(11) 99999-1234' },
+      barbershop: { name: 'Sem WhatsApp', timezone: 'America/Sao_Paulo', active: true },
+      professional: { id: 'pro-1', name: 'Lucas' },
+      service: { id: 'svc-1', name: 'Corte Classic' },
+    },
+  ]
+
+  global.fetch = async (_url, init = {}) => {
+    fetchCalls.push(init.body ? JSON.parse(String(init.body)) : null)
+    return {
+      ok: true,
+      status: 201,
+      statusText: 'Created',
+      text: async () => JSON.stringify({ key: { id: 'msg-1' } }),
+    }
+  }
+
+  try {
+    await withReminderMocks(
+      {
+        appointmentFindMany: async () => appointments,
+        appointmentUpdate: async ({ where, data }) => {
+          const appointment = appointments.find((item) => item.id === where.id)
+          Object.assign(appointment, data)
+          return appointment
+        },
+        barbershopFindUnique: async () => ({
+          id: 'shop-without-whatsapp',
+          name: 'Sem WhatsApp',
+          slug: 'sem-whatsapp',
+          timezone: 'America/Sao_Paulo',
+          active: true,
+          whatsappEnabled: false,
+          evolutionInstanceName: null,
+        }),
+        barbershopUpdate: async () => ({ success: true }),
+      },
+      async () => {
+        const summary = await runDueWhatsAppAppointmentConfirmations({
+          now,
+          leadMinutes: 120,
+          toleranceMinutes: 10,
+        })
+
+        assert.equal(summary.sent, 0)
+        assert.equal(summary.failed, 1)
+        assert.equal(fetchCalls.length, 0)
+        assert.equal(appointments[0].confirmationReminderStatus, 'FAILED')
+        assert.equal(appointments[0].confirmationReminderError, 'outbound_integration_missing')
       }
     )
   } finally {

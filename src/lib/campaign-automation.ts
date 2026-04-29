@@ -18,7 +18,6 @@ import {
 import { z } from 'zod'
 import {
   EvolutionApiError,
-  getEvolutionInstanceName,
   normalizeEvolutionPhoneNumber,
   sendTextMessage,
 } from '@/lib/integrations/evolution'
@@ -31,6 +30,11 @@ import {
   resolveBusinessTimezone,
   shiftIsoDate,
 } from '@/lib/timezone'
+import {
+  markWhatsAppIntegrationError,
+  markWhatsAppOutboundDelivered,
+  resolveWhatsAppOutboundIntegration,
+} from '@/lib/whatsapp-tenant'
 
 const DEFAULT_OPENAI_MODEL = 'gpt-5.4-mini'
 const DEFAULT_TIMEOUT_MS = 8000
@@ -382,14 +386,6 @@ function getLocalMonthDayKey(dateIso: string) {
 
 function hashValue(value: string) {
   return createHash('sha256').update(value).digest('hex').slice(0, 12)
-}
-
-function getSafeEvolutionInstanceName() {
-  try {
-    return getEvolutionInstanceName()
-  } catch {
-    return process.env.EVOLUTION_INSTANCE?.trim() || 'evolution'
-  }
 }
 
 export function describeExistingDailyRunReason(status: CampaignAutomationRun['status']) {
@@ -1202,6 +1198,7 @@ async function createAutomationMessagingEvent(input: {
   deliveryId: string
   runId: string
   providerPayload: unknown
+  instanceName: string
   status: 'PROCESSED' | 'FAILED'
   errorMessage?: string | null
 }) {
@@ -1219,7 +1216,7 @@ async function createAutomationMessagingEvent(input: {
       direction: 'OUTBOUND',
       status: input.status,
       eventType: `CAMPAIGN_${input.campaignType}`,
-      instanceName: getSafeEvolutionInstanceName(),
+      instanceName: input.instanceName,
       dedupeKey,
       remotePhone: input.phone,
       bodyText: input.message,
@@ -1312,6 +1309,32 @@ async function processCampaignType(input: {
   localYear: number
   referenceDate: Date
 }) {
+  const outboundIntegration = await resolveWhatsAppOutboundIntegration({
+    barbershopId: input.barbershop.id,
+  })
+
+  if (outboundIntegration.status !== 'resolved' || !outboundIntegration.instanceName) {
+    await markWhatsAppIntegrationError({
+      barbershopId: input.barbershop.id,
+      message: 'Integracao WhatsApp nao configurada para campanhas automaticas.',
+    })
+
+    logCampaignError('outbound_integration_missing', {
+      campaignType: input.config.campaignType,
+      barbershopSlug: input.barbershop.slug,
+      reason: outboundIntegration.reason,
+    })
+
+    return {
+      campaignType: input.config.campaignType,
+      eligibleCustomers: 0,
+      deliveriesCreated: 0,
+      deliveriesSent: 0,
+      deliveriesFailed: 0,
+      deliveriesSkipped: 0,
+    }
+  }
+
   const baseCustomers = await getBaseCustomersForCampaign({
     barbershopId: input.barbershop.id,
     campaignType: input.config.campaignType,
@@ -1399,6 +1422,7 @@ async function processCampaignType(input: {
       const providerPayload = await sendTextMessage({
         number: prepared.normalizedPhone,
         text: prepared.finalMessage,
+        instance: outboundIntegration.instanceName,
       })
 
       const messagingEventId = await createAutomationMessagingEvent({
@@ -1413,8 +1437,11 @@ async function processCampaignType(input: {
         deliveryId,
         runId: input.runId,
         providerPayload,
+        instanceName: outboundIntegration.instanceName,
         status: 'PROCESSED',
       })
+
+      await markWhatsAppOutboundDelivered(input.barbershop.id)
 
       await prisma.campaignAutomationDelivery.update({
         where: { id: deliveryId },
@@ -1447,6 +1474,10 @@ async function processCampaignType(input: {
     } catch (error) {
       const diagnostics = buildDeliveryFailureDiagnostics(error)
       const message = diagnostics.message
+      await markWhatsAppIntegrationError({
+        barbershopId: input.barbershop.id,
+        message,
+      })
       const messagingEventId = await createAutomationMessagingEvent({
         barbershopId: input.barbershop.id,
         customerId: customer.id,
@@ -1459,6 +1490,7 @@ async function processCampaignType(input: {
         deliveryId,
         runId: input.runId,
         providerPayload: diagnostics,
+        instanceName: outboundIntegration.instanceName,
         status: 'FAILED',
         errorMessage: message,
       })

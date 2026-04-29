@@ -3,7 +3,12 @@ import 'server-only'
 import { normalizeEvolutionWebhookPayload } from '@/lib/integrations/evolution'
 import { handleIncomingWhatsAppMessage } from '@/lib/whatsapp-handler'
 
-export async function processEvolutionWebhookPayload(payload: unknown) {
+export async function processEvolutionWebhookPayload(
+  payload: unknown,
+  options?: {
+    routeBarbershopSlug?: string | null
+  }
+) {
   const normalized = normalizeEvolutionWebhookPayload(payload)
 
   console.info('[evolution-webhook] normalized payload', {
@@ -19,6 +24,7 @@ export async function processEvolutionWebhookPayload(payload: unknown) {
     provider: 'EVOLUTION',
     event: normalized.event,
     instanceName: normalized.instanceName,
+    routeBarbershopSlug: options?.routeBarbershopSlug ?? null,
     phone: normalized.remotePhone,
     message: normalized.text,
     contactName: normalized.contactName,
