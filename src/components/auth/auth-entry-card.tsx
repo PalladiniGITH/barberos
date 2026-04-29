@@ -62,7 +62,6 @@ export function AuthEntryCard({
                 sizes="(max-width: 640px) 220px, (max-width: 1024px) 248px, 268px"
                 priority
               />
-              <p className="mt-3 text-sm text-slate-300">Operação premium para barbearias que rodam o dia no detalhe.</p>
             </div>
 
             <div className="mt-6 max-w-xl">

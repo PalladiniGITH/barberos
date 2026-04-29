@@ -5,8 +5,8 @@ const BRAND_ASSETS = {
   full: {
     white: {
       src: '/brand/barberex-logo-white.png',
-      width: 484,
-      height: 130,
+      width: 1426,
+      height: 319,
       alt: 'BarberEX',
     },
     dark: {
@@ -19,8 +19,8 @@ const BRAND_ASSETS = {
   symbol: {
     white: {
       src: '/brand/barberex-symbol-white.png',
-      width: 332,
-      height: 302,
+      width: 951,
+      height: 858,
       alt: 'Simbolo BarberEX',
     },
     dark: {
@@ -44,6 +44,7 @@ export function BarberExLogo({
   className,
   alt,
   priority,
+  quality,
   sizes,
   ...props
 }: BarberExLogoProps) {
@@ -55,8 +56,9 @@ export function BarberExLogo({
       alt={alt ?? asset.alt}
       width={asset.width}
       height={asset.height}
-      className={cn('h-auto w-auto object-contain', className)}
+      className={cn('max-w-full h-auto object-contain', className)}
       priority={priority}
+      quality={quality ?? 100}
       sizes={sizes}
       {...props}
     />
