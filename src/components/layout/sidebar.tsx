@@ -22,9 +22,9 @@ import {
   Wallet,
   Zap,
 } from 'lucide-react'
-import { PRODUCT_MONOGRAM, PRODUCT_NAME } from '@/lib/branding'
 import { hasPlatformAccess, isBarberRole } from '@/lib/auth-routes'
 import { cn } from '@/lib/utils'
+import { BarberExLogo } from '@/components/brand/barberex-logo'
 import { useNavigationFeedback } from '@/components/layout/navigation-feedback'
 
 type NavSection = 'plataforma' | 'essencial' | 'modulos' | 'conta'
@@ -573,27 +573,43 @@ export function Sidebar({
       style={{ willChange: 'width' }}
     >
       <div className={cn('flex h-full min-h-0 min-w-0 flex-1 flex-col py-4', expanded ? 'px-3' : 'px-2')}>
-        <div className={cn('flex min-h-[56px] items-center gap-3 rounded-[1rem]', expanded ? 'overflow-hidden px-2.5' : 'justify-center overflow-visible px-0')}>
+        <div className={cn('flex min-h-[56px] rounded-[1rem]', expanded ? 'items-start overflow-hidden px-2.5 py-1.5' : 'items-center justify-center overflow-visible px-0')}>
           <Link
             href={homeHref}
             onClick={() => startNavigation(homeHref)}
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[0.95rem] border border-[rgba(124,58,237,0.22)] bg-[radial-gradient(circle_at_30%_20%,rgba(168,85,247,0.24),transparent_42%),linear-gradient(135deg,rgba(124,58,237,0.22),rgba(15,23,42,0.96))] text-[11px] font-semibold tracking-[0.16em] text-violet-50 shadow-[0_18px_34px_-24px_rgba(2,6,23,0.76)]"
+            aria-label={homeHref === '/internal' ? 'Painel master da plataforma' : barberView ? 'Meu painel' : 'Painel do negócio'}
             title={homeHref === '/internal' ? 'Painel master da plataforma' : barberView ? 'Meu painel' : 'Painel do negócio'}
-          >
-            {PRODUCT_MONOGRAM}
-          </Link>
-
-          <div
             className={cn(
-              'min-w-0 transition-[opacity,transform,max-width] duration-150 ease-out',
-              expanded ? 'max-w-full translate-x-0 opacity-100' : 'max-w-0 -translate-x-2 opacity-0'
+              'group flex min-w-0 flex-shrink-0 transition-opacity duration-150 hover:opacity-95',
+              expanded
+                ? 'w-full flex-col items-start gap-2'
+                : 'h-11 w-11 items-center justify-center rounded-[0.95rem] border border-[rgba(124,58,237,0.22)] bg-[radial-gradient(circle_at_30%_20%,rgba(168,85,247,0.24),transparent_42%),linear-gradient(135deg,rgba(124,58,237,0.22),rgba(15,23,42,0.96))] shadow-[0_18px_34px_-24px_rgba(2,6,23,0.76)]'
             )}
           >
-            <p className="truncate text-sm font-semibold tracking-tight text-slate-50">{PRODUCT_NAME}</p>
-            <p className="truncate text-xs text-slate-500">
-              {barberView ? 'Painel do profissional' : 'Gestão premium da barbearia'}
-            </p>
-          </div>
+            {expanded ? (
+              <>
+                <BarberExLogo
+                  variant="full"
+                  tone="white"
+                  className="w-[152px] max-w-full"
+                  sizes="152px"
+                  alt="BarberEX"
+                />
+                <p className="truncate text-xs text-slate-500">
+                  {barberView ? 'Painel do profissional' : 'Gestão premium da barbearia'}
+                </p>
+              </>
+            ) : (
+              <BarberExLogo
+                variant="symbol"
+                tone="white"
+                className="w-[1.45rem]"
+                sizes="24px"
+                alt=""
+                aria-hidden
+              />
+            )}
+          </Link>
         </div>
 
         <div className="mt-5 min-h-0 flex-1">

@@ -18,6 +18,11 @@ export const metadata: Metadata = {
   applicationName: PRODUCT_NAME,
   title: { default: PRODUCT_NAME, template: `%s | ${PRODUCT_NAME}` },
   description: PRODUCT_TAGLINE,
+  icons: {
+    icon: [{ url: '/favicon.png', type: 'image/png' }],
+    shortcut: '/favicon.png',
+    apple: '/apple-touch-icon.png',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

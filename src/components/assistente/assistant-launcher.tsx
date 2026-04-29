@@ -1,8 +1,8 @@
 'use client'
 
 import { MessageSquareText, Sparkles } from 'lucide-react'
-import { PRODUCT_MONOGRAM } from '@/lib/branding'
 import { cn } from '@/lib/utils'
+import { BarberExLogo } from '@/components/brand/barberex-logo'
 import { useAssistantWidget } from '@/components/assistente/assistant-widget-provider'
 
 export function AssistantLauncher() {
@@ -30,7 +30,14 @@ export function AssistantLauncher() {
         <span className="absolute right-1.5 top-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[rgba(139,92,246,0.18)] text-violet-100">
           <Sparkles className="h-3 w-3" />
         </span>
-        {PRODUCT_MONOGRAM}
+        <BarberExLogo
+          variant="symbol"
+          tone="white"
+          className="w-[1.5rem]"
+          sizes="24px"
+          alt=""
+          aria-hidden
+        />
       </span>
 
       <span className="hidden min-w-0 flex-col sm:flex">

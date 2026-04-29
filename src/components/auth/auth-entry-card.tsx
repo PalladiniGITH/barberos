@@ -6,6 +6,7 @@ import { signIn } from 'next-auth/react'
 import { ArrowRight, Loader2 } from 'lucide-react'
 import { AUTHENTICATED_HOME_PATH } from '@/lib/auth-routes'
 import { PRODUCT_POSITIONING } from '@/lib/branding'
+import { BarberExLogo } from '@/components/brand/barberex-logo'
 
 interface AuthEntryCardProps {
   callbackUrl: string
@@ -53,14 +54,15 @@ export function AuthEntryCard({
       <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-[1120px] items-center gap-4 lg:grid-cols-[minmax(0,0.96fr)_400px] xl:grid-cols-[minmax(0,1fr)_420px]">
         <section className="dashboard-spotlight relative overflow-hidden p-6 sm:p-7 lg:p-8">
           <div className="max-w-2xl">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-[1.05rem] border border-[rgba(124,92,255,0.16)] bg-[linear-gradient(180deg,rgba(124,92,255,0.18),rgba(62,44,112,0.14))] text-sm font-semibold tracking-[0.26em] text-violet-50 shadow-[0_22px_44px_-28px_rgba(76,29,149,0.52)]">
-                BX
-              </div>
-              <div>
-                <h1 className="text-[1.35rem] font-semibold tracking-tight text-foreground">BarberEX</h1>
-                <p className="mt-1 text-sm text-slate-300">Operação premium para barbearias que rodam o dia no detalhe.</p>
-              </div>
+            <div className="max-w-[17.5rem] sm:max-w-[19.5rem]">
+              <BarberExLogo
+                variant="full"
+                tone="white"
+                className="w-[220px] sm:w-[248px] lg:w-[268px]"
+                sizes="(max-width: 640px) 220px, (max-width: 1024px) 248px, 268px"
+                priority
+              />
+              <p className="mt-3 text-sm text-slate-300">Operação premium para barbearias que rodam o dia no detalhe.</p>
             </div>
 
             <div className="mt-6 max-w-xl">
