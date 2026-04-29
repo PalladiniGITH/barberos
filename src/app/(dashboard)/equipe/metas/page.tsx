@@ -17,6 +17,7 @@ import { PageHeader } from '@/components/layout/page-header'
 import { SectionTabs } from '@/components/layout/section-tabs'
 import { PeriodSelector } from '@/components/shared/period-selector'
 import { GoalForm } from '@/components/equipe/goal-form'
+import { ProfessionalAvatar } from '@/components/ui/professional-avatar'
 import { AlertTriangle, CheckCircle2, Target, TrendingUp } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Metas' }
@@ -413,9 +414,11 @@ export default async function MetasPage({ searchParams }: Props) {
             return (
               <div key={pg.id} className="rounded-xl border border-border bg-card p-4">
                 <div className="mb-3 flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
-                    {pg.professional.name.split(' ').map((namePart) => namePart[0]).join('').slice(0, 2).toUpperCase()}
-                  </div>
+                  <ProfessionalAvatar
+                    name={pg.professional.name}
+                    imageUrl={pg.professional.avatar}
+                    size="sm"
+                  />
                   <span className="flex-1 font-medium text-foreground">{pg.professional.name}</span>
                   <div className="flex items-center gap-1">
                     {statusIcon[status]}

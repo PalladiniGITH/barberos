@@ -1,9 +1,11 @@
 import { cn, formatCurrency, formatPercent } from '@/lib/utils'
 import { Crown, Medal, TrendingUp } from 'lucide-react'
+import { ProfessionalAvatar } from '@/components/ui/professional-avatar'
 
 interface RankingEntry {
   id: string
   name: string
+  avatar: string | null
   revenue: number
   goal: number
   position: number
@@ -57,11 +59,16 @@ export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
                     <span className="flex h-11 w-11 items-center justify-center rounded-[1rem] border border-[rgba(124,92,255,0.18)] bg-[rgba(124,92,255,0.14)] text-primary">
                       {positionIcon(leader.position)}
                     </span>
+                    <ProfessionalAvatar
+                      name={leader.name}
+                      imageUrl={leader.avatar}
+                      size="md"
+                    />
                     <div className="min-w-0">
-                    <p className="text-sm font-semibold tracking-[0.16em] text-violet-100">Profissional em destaque</p>
-                    <h4 className="truncate text-[1.4rem] font-semibold tracking-tight text-foreground">{leader.name}</h4>
+                      <p className="text-sm font-semibold tracking-[0.16em] text-violet-100">Profissional em destaque</p>
+                      <h4 className="truncate text-[1.4rem] font-semibold tracking-tight text-foreground">{leader.name}</h4>
+                    </div>
                   </div>
-                </div>
 
                   <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground">
                     {hasGoal
@@ -132,13 +139,20 @@ export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
 
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <p className="truncate text-base font-semibold text-foreground">{entry.name}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {hasGoal
-                          ? `Meta individual: ${formatCurrency(entry.goal)}`
-                          : `${formatPercent(shareOfTeam, 0)} do faturamento da equipe`}
-                      </p>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <ProfessionalAvatar
+                        name={entry.name}
+                        imageUrl={entry.avatar}
+                        size="sm"
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-semibold text-foreground">{entry.name}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {hasGoal
+                            ? `Meta individual: ${formatCurrency(entry.goal)}`
+                            : `${formatPercent(shareOfTeam, 0)} do faturamento da equipe`}
+                        </p>
+                      </div>
                     </div>
 
                     <div className="tonal-note px-3.5 py-2.5 text-right">

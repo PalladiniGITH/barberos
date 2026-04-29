@@ -10,6 +10,7 @@ import { SectionTabs } from '@/components/layout/section-tabs'
 import { PeriodSelector } from '@/components/shared/period-selector'
 import { ProfessionalModal, type ProfessionalFormValue } from '@/components/equipe/professional-modal'
 import { ToggleActiveButton } from '@/components/equipe/toggle-active-button'
+import { ProfessionalAvatar } from '@/components/ui/professional-avatar'
 import {
   PROFESSIONAL_ATTENDANCE_SCOPE_LABELS,
   resolveProfessionalAttendanceScope,
@@ -83,6 +84,7 @@ export default async function ProfissionaisPage({ searchParams }: Props) {
         name: professional.name,
         email: professional.email,
         phone: professional.phone,
+        avatar: professional.avatar,
         commissionRate: professional.commissionRate,
         haircutPrice: professional.haircutPrice,
         beardPrice: professional.beardPrice,
@@ -176,9 +178,11 @@ export default async function ProfissionaisPage({ searchParams }: Props) {
             </div>
 
             <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20 text-sm font-bold text-primary">
-                {professional.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()}
-              </div>
+              <ProfessionalAvatar
+                name={professional.name}
+                imageUrl={professional.avatar}
+                size="md"
+              />
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">

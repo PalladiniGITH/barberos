@@ -5,7 +5,6 @@ import { Loader2, MessageSquarePlus, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { askAssistant, loadAssistantThread } from '@/actions/assistant-chat'
 import { AssistantMessageContent } from '@/components/assistente/assistant-message-content'
-import { BarberExLogo } from '@/components/brand/barberex-logo'
 import type {
   AiAssistantWorkspaceView,
   AiChatMessageView,
@@ -185,19 +184,7 @@ export function AssistantChatPanel({ workspace }: Props) {
         <div className="border-b border-[rgba(255,255,255,0.08)] px-5 py-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-[0.9rem] border border-[rgba(124,92,255,0.18)] bg-[radial-gradient(circle_at_top,rgba(168,85,247,0.18),transparent_48%),linear-gradient(135deg,rgba(124,92,255,0.14),rgba(19,19,23,0.98))]">
-                  <BarberExLogo
-                    variant="symbol"
-                    tone="white"
-                    className="w-[0.95rem]"
-                    sizes="15px"
-                    alt=""
-                    aria-hidden
-                    priority
-                    fetchPriority="high"
-                  />
-                </span>
+              <div className="flex items-center">
                 <h2 className="text-xl font-semibold text-foreground">BarberEX IA</h2>
               </div>
 

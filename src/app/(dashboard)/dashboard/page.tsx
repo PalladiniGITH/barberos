@@ -64,6 +64,7 @@ function buildDashboardData(report: BusinessIntelligenceReport) {
     .map((professional, index) => ({
       id: professional.id,
       name: professional.name,
+      avatar: professional.avatar,
       revenue: professional.revenue,
       goal: professional.goalValue,
       position: index + 1,

@@ -582,7 +582,7 @@ export function Sidebar({
             className={cn(
               'group flex min-w-0 flex-shrink-0 transition-opacity duration-150 hover:opacity-95',
               expanded
-                ? 'w-full flex-col items-start gap-2'
+                ? 'w-full flex-col items-start'
                 : 'h-11 w-11 items-center justify-center rounded-[0.95rem] border border-[rgba(124,58,237,0.22)] bg-[radial-gradient(circle_at_30%_20%,rgba(168,85,247,0.24),transparent_42%),linear-gradient(135deg,rgba(124,58,237,0.22),rgba(15,23,42,0.96))] shadow-[0_18px_34px_-24px_rgba(2,6,23,0.76)]'
             )}
           >
@@ -597,9 +597,11 @@ export function Sidebar({
                   priority
                   fetchPriority="high"
                 />
-                <p className="truncate text-xs text-slate-500">
+                
+                <p className="hidden truncate text-xs text-slate-500">
                   {barberView ? 'Painel do profissional' : 'Gestão premium da barbearia'}
                 </p>
+                
               </>
             ) : (
               <BarberExLogo

@@ -19,7 +19,6 @@ import type {
   AiChatThreadDetailView,
   AiChatThreadSummaryView,
 } from '@/lib/ai/assistant-chat-types'
-import { BarberExLogo } from '@/components/brand/barberex-logo'
 import { buildAssistantDisplayedMessages, type AssistantDisplayedMessage } from '@/lib/assistant-widget-state'
 import { cn } from '@/lib/utils'
 import { useAssistantWidget } from '@/components/assistente/assistant-widget-provider'
@@ -463,19 +462,7 @@ export function AssistantWidgetPanel() {
         )}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-[0.9rem] border border-[rgba(124,92,255,0.18)] bg-[radial-gradient(circle_at_top,rgba(168,85,247,0.18),transparent_48%),linear-gradient(135deg,rgba(124,92,255,0.14),rgba(19,19,23,0.98))]">
-                  <BarberExLogo
-                    variant="symbol"
-                    tone="white"
-                    className="w-[0.95rem]"
-                    sizes="15px"
-                    alt=""
-                    aria-hidden
-                    loading="eager"
-                    fetchPriority="high"
-                  />
-                </span>
+              <div className="flex items-center">
                 <h2 className="text-lg font-semibold tracking-tight text-foreground">BarberEX IA</h2>
               </div>
               <p className={cn(

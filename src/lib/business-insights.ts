@@ -113,6 +113,7 @@ export interface BusinessInsightGoalSnapshot {
 export interface BusinessInsightProfessionalSnapshot {
   id: string
   name: string
+  avatar: string | null
   active: boolean
   revenue: number
   previousRevenue: number

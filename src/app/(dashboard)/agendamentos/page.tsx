@@ -38,6 +38,8 @@ interface ScheduleCalendarColumn {
   title: string
   helper: string
   professionalId: string | null
+  professionalName: string | null
+  professionalAvatar: string | null
   dateIso: string
   appointments: PositionedAppointment[]
 }
@@ -105,6 +107,9 @@ function buildPositionedAppointments(appointments: ScheduleAppointmentItem[]): P
 function buildDayViewColumns(data: Awaited<ReturnType<typeof getSchedulePageData>>): ScheduleCalendarColumn[] {
   const selectedDay = data.days[0]?.key
   const appointments = data.appointments.filter((appointment) => appointment.localDateIso === selectedDay)
+  const selectedProfessional = data.selectedProfessionalId
+    ? data.visibleProfessionals[0] ?? null
+    : null
 
   return [
     {
@@ -114,6 +119,8 @@ function buildDayViewColumns(data: Awaited<ReturnType<typeof getSchedulePageData
         ? `${appointments.length} blocos visiveis nesta agenda`
         : `${appointments.length} blocos entre equipe, encaixes e bloqueios`,
       professionalId: data.selectedProfessionalId,
+      professionalName: selectedProfessional?.name ?? null,
+      professionalAvatar: selectedProfessional?.avatar ?? null,
       dateIso: selectedDay,
       appointments: buildPositionedAppointments(appointments),
     },
@@ -136,6 +143,8 @@ function buildBarberViewColumns(data: Awaited<ReturnType<typeof getSchedulePageD
       title: professional.name,
       helper: `${appointmentCount} atendimento${appointmentCount === 1 ? '' : 's'}${blockCount > 0 ? ` - ${blockCount} bloqueio${blockCount === 1 ? '' : 's'}` : ''}`,
       professionalId: professional.id,
+      professionalName: professional.name,
+      professionalAvatar: professional.avatar,
       dateIso: selectedDay,
       appointments: buildPositionedAppointments(appointments),
     }

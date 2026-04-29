@@ -24,6 +24,7 @@ import {
   updateAppointment,
 } from '@/actions/agendamentos'
 import { getAppointmentSaveSuccessMessage } from '@/lib/agendamentos/appointment-edit'
+import { ProfessionalAvatar } from '@/components/ui/professional-avatar'
 import type {
   ScheduleToolbarProfessional,
   ScheduleToolbarService,
@@ -643,8 +644,17 @@ export function AppointmentModal({
                         <UserRound className="h-4 w-4 text-primary" />
                         Atendimento
                       </div>
-                      <p className="mt-3 text-sm text-muted-foreground">{selectedProfessional?.name ?? 'Selecione o barbeiro'}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Status: {APPOINTMENT_STATUS_LABELS[selectedStatus]}</p>
+                      <div className="mt-3 flex items-center gap-3">
+                        <ProfessionalAvatar
+                          name={selectedProfessional?.name ?? 'Barbeiro'}
+                          imageUrl={selectedProfessional?.avatar}
+                          size="sm"
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm text-muted-foreground">{selectedProfessional?.name ?? 'Selecione o barbeiro'}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">Status: {APPOINTMENT_STATUS_LABELS[selectedStatus]}</p>
+                        </div>
+                      </div>
                       {selectedProfessionalScope && (
                         <p className="mt-2 text-xs text-muted-foreground">{selectedProfessionalScope}</p>
                       )}

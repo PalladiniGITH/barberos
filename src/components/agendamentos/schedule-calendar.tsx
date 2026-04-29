@@ -13,6 +13,7 @@ import {
 } from '@/actions/agendamentos'
 import { AppointmentModal } from '@/components/agendamentos/appointment-modal'
 import { ScheduleBlockModal, type ScheduleBlockValue } from '@/components/agendamentos/schedule-block-modal'
+import { ProfessionalAvatar } from '@/components/ui/professional-avatar'
 import type {
   ScheduleAppointmentItem,
   ScheduleToolbarProfessional,
@@ -45,6 +46,8 @@ interface ScheduleCalendarColumn {
   title: string
   helper: string
   professionalId: string | null
+  professionalName: string | null
+  professionalAvatar: string | null
   dateIso: string
   appointments: PositionedAppointment[]
 }
@@ -722,8 +725,21 @@ export function ScheduleCalendar({
                 key={`${column.key}-header`}
                 className="rounded-[0.95rem] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(31,34,44,0.99),rgba(18,20,28,0.99))] px-4 py-3 shadow-[0_16px_24px_-18px_rgba(2,6,23,0.5)]"
               >
-                <p className="text-sm font-semibold tracking-tight text-foreground">{column.title}</p>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">{column.helper}</p>
+                <div className="flex items-start gap-3">
+                  {column.professionalName ? (
+                    <ProfessionalAvatar
+                      name={column.professionalName}
+                      imageUrl={column.professionalAvatar}
+                      size="sm"
+                      className="mt-0.5"
+                    />
+                  ) : null}
+
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold tracking-tight text-foreground">{column.title}</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">{column.helper}</p>
+                  </div>
+                </div>
               </div>
             ))}
           </div>

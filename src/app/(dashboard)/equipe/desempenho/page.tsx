@@ -20,6 +20,7 @@ import { getTeamSectionTabs } from '@/lib/team-navigation'
 import { PageHeader } from '@/components/layout/page-header'
 import { SectionTabs } from '@/components/layout/section-tabs'
 import { PeriodSelector } from '@/components/shared/period-selector'
+import { ProfessionalAvatar } from '@/components/ui/professional-avatar'
 import { ArrowUpRight, BadgeCheck, Crown, Target, TrendingUp, Users } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Desempenho' }
@@ -502,8 +503,15 @@ export default async function DesempenhoPage({ searchParams }: Props) {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-foreground">{professional.name}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
+                        <div className="mb-2 flex items-center gap-3">
+                          <ProfessionalAvatar
+                            name={professional.name}
+                            imageUrl={professional.avatar}
+                            size="sm"
+                          />
+                          <p className="truncate text-sm font-semibold text-foreground">{professional.name}</p>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
                           {professional.count} atendimentos
                           {professional.goalValue > 0 ? ` · meta de ${formatCurrency(professional.goalValue)}` : ' · sem meta individual'}
                         </p>
@@ -598,11 +606,22 @@ export default async function DesempenhoPage({ searchParams }: Props) {
                   <Users className="h-4 w-4 text-primary" />
                   Top performer
                 </p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  {leader
-                    ? `${leader.name} lidera com ${formatCurrency(leader.revenue)} e ${formatCurrency(leader.ticket)} de ticket medio.`
-                    : 'Cadastre receitas para enxergar o profissional mais forte do periodo.'}
-                </p>
+                {leader ? (
+                  <div className="mt-3 flex items-center gap-3">
+                    <ProfessionalAvatar
+                      name={leader.name}
+                      imageUrl={leader.avatar}
+                      size="sm"
+                    />
+                    <p className="text-sm leading-6 text-muted-foreground">
+                      {`${leader.name} lidera com ${formatCurrency(leader.revenue)} e ${formatCurrency(leader.ticket)} de ticket medio.`}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    Cadastre receitas para enxergar o profissional mais forte do periodo.
+                  </p>
+                )}
               </div>
             </div>
           </section>

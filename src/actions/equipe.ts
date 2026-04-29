@@ -5,6 +5,10 @@ import { revalidatePath } from 'next/cache'
 import { requireSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { attendanceScopeToFlags } from '@/lib/professionals/operational-config'
+import {
+  isProfessionalAvatarUrl,
+  normalizeProfessionalAvatarUrl,
+} from '@/lib/professionals/avatar'
 
 type ActionResult = { success: true } | { success: false; error: string }
 
@@ -29,6 +33,10 @@ const ProfessionalSchema = z.object({
   name: z.string().min(2, 'Nome deve ter ao menos 2 caracteres').max(100),
   email: z.string().email('Email inválido').optional().or(z.literal('')),
   phone: z.string().max(20).optional().or(z.literal('')),
+  avatar: z.string().trim().max(500, 'URL da foto muito longa').optional().or(z.literal('')).refine(
+    (value) => !value || isProfessionalAvatarUrl(value),
+    'URL da foto invalida'
+  ),
   commissionRate: z.preprocess(
     parseOptionalDecimal,
     z.number().min(0, 'Comissao invalida').max(100, 'Comissao invalida').nullable().optional()
@@ -64,6 +72,7 @@ export async function createProfessional(rawData: unknown): Promise<ActionResult
     name,
     email,
     phone,
+    avatar,
     commissionRate,
     haircutPrice,
     beardPrice,
@@ -85,6 +94,7 @@ export async function createProfessional(rawData: unknown): Promise<ActionResult
       name,
       email: email || null,
       phone: phone || null,
+      avatar: normalizeProfessionalAvatarUrl(avatar),
       commissionRate,
       haircutPrice,
       beardPrice,
@@ -95,6 +105,9 @@ export async function createProfessional(rawData: unknown): Promise<ActionResult
   })
 
   revalidatePath('/equipe/profissionais')
+  revalidatePath('/equipe')
+  revalidatePath('/equipe/desempenho')
+  revalidatePath('/equipe/metas')
   revalidatePath('/agendamentos')
   revalidatePath('/dashboard')
   return { success: true }
@@ -119,6 +132,7 @@ export async function updateProfessional(id: string, rawData: unknown): Promise<
     name,
     email,
     phone,
+    avatar,
     commissionRate,
     haircutPrice,
     beardPrice,
@@ -133,6 +147,7 @@ export async function updateProfessional(id: string, rawData: unknown): Promise<
       name,
       email: email || null,
       phone: phone || null,
+      avatar: normalizeProfessionalAvatarUrl(avatar),
       commissionRate,
       haircutPrice,
       beardPrice,
@@ -142,6 +157,9 @@ export async function updateProfessional(id: string, rawData: unknown): Promise<
   })
 
   revalidatePath('/equipe/profissionais')
+  revalidatePath('/equipe')
+  revalidatePath('/equipe/desempenho')
+  revalidatePath('/equipe/metas')
   revalidatePath('/agendamentos')
   revalidatePath('/dashboard')
   return { success: true }
@@ -159,6 +177,9 @@ export async function toggleProfessionalActive(id: string): Promise<ActionResult
   if (!prof || prof.barbershopId !== session.user.barbershopId) return { success: false, error: 'Não autorizado' }
   await prisma.professional.update({ where: { id }, data: { active: !prof.active } })
   revalidatePath('/equipe/profissionais')
+  revalidatePath('/equipe')
+  revalidatePath('/equipe/desempenho')
+  revalidatePath('/equipe/metas')
   revalidatePath('/agendamentos')
   revalidatePath('/dashboard')
   return { success: true }

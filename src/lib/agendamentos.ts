@@ -47,6 +47,7 @@ export interface ScheduleSearchParams {
 export interface ScheduleToolbarProfessional {
   id: string
   name: string
+  avatar: string | null
   commissionRate: number | null
   haircutPrice: number | null
   beardPrice: number | null
@@ -292,6 +293,7 @@ const getCachedSchedulePageData = cache(
           select: {
             id: true,
             name: true,
+            avatar: true,
             commissionRate: true,
             haircutPrice: true,
             beardPrice: true,
@@ -391,6 +393,7 @@ const getCachedSchedulePageData = cache(
     const scheduleProfessionals: ScheduleToolbarProfessional[] = professionals.map((professional) => ({
       id: professional.id,
       name: professional.name,
+      avatar: professional.avatar,
       commissionRate: professional.commissionRate ? Number(professional.commissionRate) : null,
       haircutPrice: professional.haircutPrice ? Number(professional.haircutPrice) : null,
       beardPrice: professional.beardPrice ? Number(professional.beardPrice) : null,

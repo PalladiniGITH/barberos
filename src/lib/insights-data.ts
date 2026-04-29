@@ -205,6 +205,7 @@ const loadBusinessInsightsData = cache(async (
       select: {
         id: true,
         name: true,
+        avatar: true,
         active: true,
       },
     }),
@@ -405,6 +406,7 @@ const loadBusinessInsightsData = cache(async (
     return {
       id: professional.id,
       name: professional.name,
+      avatar: professional.avatar,
       active: professional.active,
       revenue,
       previousRevenue: previous?.revenue ?? 0,
