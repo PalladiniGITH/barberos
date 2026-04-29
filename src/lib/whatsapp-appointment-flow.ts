@@ -3,6 +3,7 @@ import 'server-only'
 import type { Prisma } from '@prisma/client'
 import type { WhatsAppManagedAppointment } from '@/lib/agendamentos/whatsapp-appointment-operations'
 import type { WhatsAppBookingSlot } from '@/lib/agendamentos/whatsapp-booking'
+import type { NamedOptionWithId } from '@/lib/whatsapp-option-resolution'
 import { formatDayLabelFromIsoDate, resolveBusinessTimezone } from '@/lib/timezone'
 
 export type WhatsAppOperationalFlowKind = 'cancel' | 'reschedule' | 'reminder'
@@ -13,6 +14,7 @@ export interface WhatsAppOperationalDraft {
   selectedAppointmentId: string | null
   offeredSlots: WhatsAppBookingSlot[]
   selectedSlot: WhatsAppBookingSlot | null
+  pendingProfessionalOptions: NamedOptionWithId[]
   requestedDateIso: string | null
   requestedTimeLabel: string | null
   selectedProfessionalId: string | null
@@ -76,6 +78,16 @@ function isBookingSlot(value: unknown): value is WhatsAppBookingSlot {
   )
 }
 
+function isNamedOptionWithId(value: unknown): value is NamedOptionWithId {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false
+  }
+
+  const option = value as Record<string, unknown>
+
+  return typeof option.id === 'string' && typeof option.name === 'string'
+}
+
 export function buildEmptyOperationalDraft(
   kind: WhatsAppOperationalFlowKind,
   appointments: WhatsAppManagedAppointment[] = [],
@@ -86,6 +98,7 @@ export function buildEmptyOperationalDraft(
     selectedAppointmentId: appointments.length === 1 ? appointments[0].id : null,
     offeredSlots: [],
     selectedSlot: null,
+    pendingProfessionalOptions: [],
     requestedDateIso: null,
     requestedTimeLabel: null,
     selectedProfessionalId: appointments.length === 1 ? appointments[0].professionalId : null,
@@ -115,6 +128,9 @@ export function parseOperationalDraft(raw: Prisma.JsonValue | null) {
     ? candidate.offeredSlots.filter(isBookingSlot)
     : []
   const selectedSlot = isBookingSlot(candidate.selectedSlot) ? candidate.selectedSlot : null
+  const pendingProfessionalOptions = Array.isArray(candidate.pendingProfessionalOptions)
+    ? candidate.pendingProfessionalOptions.filter(isNamedOptionWithId)
+    : []
 
   return {
     kind,
@@ -124,6 +140,7 @@ export function parseOperationalDraft(raw: Prisma.JsonValue | null) {
       : null,
     offeredSlots,
     selectedSlot,
+    pendingProfessionalOptions,
     requestedDateIso: typeof candidate.requestedDateIso === 'string'
       ? candidate.requestedDateIso
       : null,
@@ -312,6 +329,31 @@ export function buildRescheduleStrictConfirmationMessage() {
   return 'Para remarcar, me responda com uma confirmacao clara, por exemplo: pode remarcar.'
 }
 
+export function buildRescheduleProfessionalChoiceMessage(input: {
+  timeLabel: string
+  professionals: NamedOptionWithId[]
+}) {
+  return [
+    `Tenho ${input.timeLabel} disponivel com mais de um barbeiro:`,
+    '',
+    ...input.professionals.map((professional, index) => `${index + 1}. ${professional.name}`),
+    '',
+    'Qual voce prefere?',
+  ].join('\n')
+}
+
+export function buildRescheduleProfessionalUnavailableMessage(input: {
+  professionalName: string
+  dateIso: string
+  timeLabel: string
+  timezone: string
+}) {
+  const timezone = resolveBusinessTimezone(input.timezone)
+  const dayLabel = formatDayLabelFromIsoDate(input.dateIso, timezone).toLowerCase()
+
+  return `${input.professionalName} nao esta disponivel ${dayLabel}, as ${input.timeLabel}. Posso procurar outros horarios com ele?`
+}
+
 export function buildRescheduleSuccessMessage(input: {
   appointment: WhatsAppManagedAppointment
   slot: WhatsAppBookingSlot
@@ -364,6 +406,8 @@ export const __testing = {
   buildNoFutureAppointmentMessage,
   buildReminderResponseClarificationMessage,
   buildRescheduleConfirmationMessage,
+  buildRescheduleProfessionalChoiceMessage,
+  buildRescheduleProfessionalUnavailableMessage,
   buildReschedulePromptMessage,
   buildRescheduleSelectionMessage,
   buildRescheduleStrictConfirmationMessage,

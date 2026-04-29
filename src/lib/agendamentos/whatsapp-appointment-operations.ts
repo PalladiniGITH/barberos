@@ -9,6 +9,7 @@ import {
   formatTimeLabel,
   getOperationalBufferMinutes,
   hasBufferedConflict,
+  isAppointmentWithinWorkingWindow,
 } from '@/lib/agendamentos/availability'
 import {
   formatDayLabelFromIsoDate,
@@ -354,9 +355,13 @@ export async function rescheduleAppointmentFromWhatsApp(input: {
 
     const dayOpen = buildLocalDate(input.dateIso, SCHEDULE_START_HOUR, 0, timezone)
     const dayClose = buildLocalDate(input.dateIso, SCHEDULE_END_HOUR, 0, timezone)
-    const bufferedEndAt = new Date(endAt.getTime() + operationalBufferMinutes * 60_000)
 
-    if (startAt < dayOpen || bufferedEndAt > dayClose) {
+    if (!isAppointmentWithinWorkingWindow({
+      startAt,
+      endAt,
+      dayOpen,
+      dayClose,
+    })) {
       return {
         ok: false,
         reason: 'slot_unavailable',

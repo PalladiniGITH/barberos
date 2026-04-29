@@ -235,6 +235,15 @@ export function hasBufferedConflict(input: {
   return overlaps(input.candidateStart, candidateBufferedEnd, input.blockedStart, blockedBufferedEnd)
 }
 
+export function isAppointmentWithinWorkingWindow(input: {
+  startAt: Date
+  endAt: Date
+  dayOpen: Date
+  dayClose: Date
+}) {
+  return input.startAt >= input.dayOpen && input.endAt <= input.dayClose
+}
+
 export function matchesTimePreference(input: {
   startAt: Date
   preference?: string | null
@@ -320,6 +329,7 @@ export async function listBlockingAppointmentsForDay(input: {
 export const __testing = {
   getMinimumLeadTimeMinutes,
   getEarliestCustomerSlotStart,
+  isAppointmentWithinWorkingWindow,
   isTransientAvailabilityDbError,
   matchesTimePreference,
   runAvailabilityDbQueryWithRetry,

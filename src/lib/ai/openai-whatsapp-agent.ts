@@ -35,6 +35,7 @@ import {
   findNamedOptionCandidates,
   findServiceCandidates,
   pickNamedOptionBySelection,
+  resolvePresentedSlotSelection,
 } from '@/lib/whatsapp-option-resolution'
 import {
   buildProfessionalSelectionExplanation,
@@ -2020,54 +2021,22 @@ function findProfessionalCandidates(professionals: WhatsAppAgentInput['professio
   })
 }
 
-function matchesOfferedSlotProfessionalSelection(input: {
-  slot: WhatsAppBookingSlot
-  message: string
-  professionalName?: string | null
-}) {
-  const normalizedMessage = normalizeIntentPhrase(input.message)
-  const normalizedProfessionalName = input.professionalName ? normalizeIntentPhrase(input.professionalName) : ''
-
-  if (normalizedProfessionalName && normalizeIntentPhrase(input.slot.professionalName).includes(normalizedProfessionalName)) {
-    return true
-  }
-
-  return nameTokens(input.slot.professionalName).some((token) =>
-    normalizedMessage === token
-    || normalizedMessage.startsWith(`${token} `)
-    || normalizedMessage.includes(` ${token}`)
-  )
-}
-
 function pickPresentedOfferedSlot(input: {
   offeredSlots: WhatsAppBookingSlot[]
   selectedOptionNumber: number | null
   requestedTime?: string | null
   professionalName?: string | null
+  preferredTimeLabel?: string | null
   message: string
 }) {
-  if (input.selectedOptionNumber && input.selectedOptionNumber >= 1 && input.selectedOptionNumber <= input.offeredSlots.length) {
-    return input.offeredSlots[input.selectedOptionNumber - 1] ?? null
-  }
-
-  if (input.requestedTime) {
-    const requestedTimeMatch = input.offeredSlots.find((slot) => slot.timeLabel === input.requestedTime)
-    if (requestedTimeMatch) {
-      return requestedTimeMatch
-    }
-  }
-
-  const normalizedMessage = normalizeIntentPhrase(input.message)
-  const labelMatch = input.offeredSlots.find((slot) => normalizeIntentPhrase(slot.timeLabel) === normalizedMessage)
-  if (labelMatch) {
-    return labelMatch
-  }
-
-  return input.offeredSlots.find((slot) => matchesOfferedSlotProfessionalSelection({
-    slot,
-    message: input.message,
+  return resolvePresentedSlotSelection({
+    offeredSlots: input.offeredSlots,
+    selectedOptionNumber: input.selectedOptionNumber,
+    requestedTimeLabel: input.requestedTime,
+    preferredTimeLabel: input.preferredTimeLabel,
     professionalName: input.professionalName,
-  })) ?? null
+    message: input.message,
+  }).slot
 }
 
 function applyCorrectionTargetToMemory(memory: WorkingMemory, correctionTarget: string) {
@@ -3381,6 +3350,7 @@ async function executeAgentTool(input: {
       selectedOptionNumber,
       requestedTime: typeof args.requestedTime === 'string' ? args.requestedTime : null,
       professionalName: typeof args.professionalName === 'string' ? args.professionalName : null,
+      preferredTimeLabel: memory.requestedTimeLabel,
       message: agentInput.inboundText,
     })
     if (selectedPresentedSlot) {
@@ -3636,6 +3606,8 @@ async function executeAgentTool(input: {
       offeredSlots: memory.offeredSlots,
       selectedOptionNumber,
       requestedTime,
+      professionalName: typeof args.professionalName === 'string' ? args.professionalName : null,
+      preferredTimeLabel: memory.selectedSlot?.timeLabel ?? memory.requestedTimeLabel,
       message: agentInput.inboundText,
     })
     if (selectedPresentedSlot) {

@@ -13,6 +13,16 @@ export interface ProfessionalSlotLike {
   professionalName: string
 }
 
+export interface PresentedSlotLike extends ProfessionalSlotLike {
+  timeLabel: string
+}
+
+export interface PresentedSlotSelectionResolution<T extends PresentedSlotLike> {
+  slot: T | null
+  requestedTimeLabel: string | null
+  pendingProfessionalOptions: NamedOptionWithId[]
+}
+
 export function normalizeNamedOptionText(value: string) {
   return value
     .normalize('NFD')
@@ -263,4 +273,110 @@ export function buildNamedProfessionalOptionsFromSlots<T extends ProfessionalSlo
   }
 
   return options
+}
+
+function matchesPresentedSlotProfessionalSelection<T extends ProfessionalSlotLike>(input: {
+  slot: T
+  message: string
+  professionalName?: string | null
+}) {
+  const normalizedMessage = normalizeNamedOptionText(input.message)
+  const normalizedProfessionalName = input.professionalName
+    ? normalizeNamedOptionText(input.professionalName)
+    : ''
+
+  if (
+    normalizedProfessionalName
+    && normalizeNamedOptionText(input.slot.professionalName).includes(normalizedProfessionalName)
+  ) {
+    return true
+  }
+
+  return optionNameTokens(input.slot.professionalName).some((token) =>
+    normalizedMessage === token
+    || normalizedMessage.startsWith(`${token} `)
+    || normalizedMessage.includes(` ${token}`)
+  )
+}
+
+export function resolvePresentedSlotSelection<T extends PresentedSlotLike>(input: {
+  offeredSlots: T[]
+  selectedOptionNumber: number | null
+  requestedTimeLabel?: string | null
+  professionalName?: string | null
+  preferredTimeLabel?: string | null
+  message: string
+}): PresentedSlotSelectionResolution<T> {
+  if (
+    input.selectedOptionNumber
+    && input.selectedOptionNumber >= 1
+    && input.selectedOptionNumber <= input.offeredSlots.length
+  ) {
+    return {
+      slot: input.offeredSlots[input.selectedOptionNumber - 1] ?? null,
+      requestedTimeLabel: null,
+      pendingProfessionalOptions: [],
+    }
+  }
+
+  const normalizedMessage = normalizeNamedOptionText(input.message)
+  const requestedTimeLabel =
+    input.requestedTimeLabel
+    ?? input.offeredSlots.find((slot) => normalizeNamedOptionText(slot.timeLabel) === normalizedMessage)?.timeLabel
+    ?? null
+
+  if (requestedTimeLabel) {
+    const sameTimeSlots = input.offeredSlots.filter((slot) => slot.timeLabel === requestedTimeLabel)
+    const professionalOptions = buildNamedProfessionalOptionsFromSlots(sameTimeSlots).slice(0, 4)
+
+    if (professionalOptions.length === 1) {
+      return {
+        slot: sameTimeSlots[0] ?? null,
+        requestedTimeLabel,
+        pendingProfessionalOptions: [],
+      }
+    }
+
+    if (professionalOptions.length > 1) {
+      return {
+        slot: null,
+        requestedTimeLabel,
+        pendingProfessionalOptions: professionalOptions,
+      }
+    }
+  }
+
+  const preferredTimeSlots = input.preferredTimeLabel
+    ? input.offeredSlots.filter((slot) => slot.timeLabel === input.preferredTimeLabel)
+    : []
+
+  const preferredTimeProfessionalMatch = preferredTimeSlots.find((slot) =>
+    matchesPresentedSlotProfessionalSelection({
+      slot,
+      message: input.message,
+      professionalName: input.professionalName,
+    })
+  )
+
+  if (preferredTimeProfessionalMatch) {
+    return {
+      slot: preferredTimeProfessionalMatch,
+      requestedTimeLabel: preferredTimeProfessionalMatch.timeLabel,
+      pendingProfessionalOptions: [],
+    }
+  }
+
+  const professionalMatch = input.offeredSlots.find((slot) =>
+    matchesPresentedSlotProfessionalSelection({
+      slot,
+      message: input.message,
+      professionalName: input.professionalName,
+    })
+  )
+
+  return {
+    slot: professionalMatch ?? null,
+    requestedTimeLabel: professionalMatch?.timeLabel ?? requestedTimeLabel ?? null,
+    pendingProfessionalOptions: [],
+  }
 }

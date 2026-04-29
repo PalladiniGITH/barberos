@@ -16,6 +16,7 @@ import {
   getMinimumLeadTimeMinutes,
   getOperationalBufferMinutes,
   hasBufferedConflict,
+  isAppointmentWithinWorkingWindow,
   isTransientAvailabilityDbError,
   listBlockingAppointmentsForDay,
   matchesTimePreference,
@@ -245,7 +246,6 @@ function buildRequestedSlotDiagnostic(input: {
     input.timezone,
   )
   const requestedEndAt = new Date(requestedStartAt.getTime() + input.serviceDuration * 60_000)
-  const bufferedEndAt = new Date(requestedEndAt.getTime() + input.operationalBufferMinutes * 60_000)
 
   const exactMatch = input.openSlots.find((slot) => (
     slot.timeLabel === input.exactTime
@@ -265,7 +265,12 @@ function buildRequestedSlotDiagnostic(input: {
     }
   }
 
-  if (requestedStartAt < input.dayOpen || bufferedEndAt > input.dayClose) {
+  if (!isAppointmentWithinWorkingWindow({
+    startAt: requestedStartAt,
+    endAt: requestedEndAt,
+    dayOpen: input.dayOpen,
+    dayClose: input.dayClose,
+  })) {
     return {
       requestedSlot: {
         exactTime: input.exactTime,
@@ -599,13 +604,17 @@ export async function getAvailableWhatsAppSlots(input: {
       candidate = new Date(candidate.getTime() + SCHEDULE_SLOT_STEP_MINUTES * 60_000)
     ) {
       const slotEnd = new Date(candidate.getTime() + service.duration * 60_000)
-      const bufferedEnd = new Date(slotEnd.getTime() + operationalBufferMinutes * 60_000)
 
       if (isToday && candidate < firstEligibleStartAt) {
         continue
       }
 
-      if (bufferedEnd > dayClose) {
+      if (!isAppointmentWithinWorkingWindow({
+        startAt: candidate,
+        endAt: slotEnd,
+        dayOpen,
+        dayClose,
+      })) {
         continue
       }
 
@@ -916,7 +925,6 @@ export async function createAppointmentFromWhatsApp(input: {
   })
   const endAt = new Date(startAt.getTime() + service.duration * 60_000)
   const operationalBufferMinutes = getOperationalBufferMinutes()
-  const bufferedEndAt = new Date(endAt.getTime() + operationalBufferMinutes * 60_000)
   const dateIso = input.dateIso ?? formatLocalDate(startAt, resolvedTimezone)
   const openAt = buildLocalDate(dateIso, SCHEDULE_START_HOUR, 0, resolvedTimezone)
   const closeAt = buildLocalDate(dateIso, SCHEDULE_END_HOUR, 0, resolvedTimezone)
@@ -947,7 +955,12 @@ export async function createAppointmentFromWhatsApp(input: {
     datetimeConvertedBack: formatDateTimeInTimezone(startAt, resolvedTimezone),
   })
 
-  if (startAt < openAt || bufferedEndAt > closeAt) {
+  if (!isAppointmentWithinWorkingWindow({
+    startAt,
+    endAt,
+    dayOpen: openAt,
+    dayClose: closeAt,
+  })) {
     throw new Error('O horario selecionado esta fora da janela de atendimento.')
   }
 

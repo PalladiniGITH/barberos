@@ -1321,6 +1321,89 @@ test('horario exato antes do barbeiro vira escolha de barbeiro, nao lista mista 
   assert.doesNotMatch(override.replyText, /10:00 com Lucas Ribeiro/)
 })
 
+test('pickPresentedOfferedSlot nao escolhe barbeiro arbitrariamente quando so o horario foi informado', () => {
+  const slot = agentTesting.pickPresentedOfferedSlot({
+    offeredSlots: [
+      {
+        key: 'pro-lucas:2026-05-01T22:30:00.000Z',
+        professionalId: 'pro-lucas',
+        professionalName: 'Lucas Ribeiro',
+        dateIso: '2026-05-01',
+        timeLabel: '19:30',
+        startAtIso: '2026-05-01T22:30:00.000Z',
+        endAtIso: '2026-05-01T23:30:00.000Z',
+      },
+      {
+        key: 'pro-rafael:2026-05-01T22:30:00.000Z',
+        professionalId: 'pro-rafael',
+        professionalName: 'Rafael Costa',
+        dateIso: '2026-05-01',
+        timeLabel: '19:30',
+        startAtIso: '2026-05-01T22:30:00.000Z',
+        endAtIso: '2026-05-01T23:30:00.000Z',
+      },
+    ],
+    selectedOptionNumber: null,
+    requestedTime: '19:30',
+    professionalName: null,
+    preferredTimeLabel: null,
+    message: '19:30',
+  })
+
+  assert.equal(slot, null)
+})
+
+test('pickPresentedOfferedSlot usa o mesmo horario atual ao interpretar "com Rafael"', () => {
+  const slot = agentTesting.pickPresentedOfferedSlot({
+    offeredSlots: [
+      {
+        key: 'pro-lucas:2026-05-01T22:45:00.000Z',
+        professionalId: 'pro-lucas',
+        professionalName: 'Lucas Ribeiro',
+        dateIso: '2026-05-01',
+        timeLabel: '19:45',
+        startAtIso: '2026-05-01T22:45:00.000Z',
+        endAtIso: '2026-05-01T23:45:00.000Z',
+      },
+      {
+        key: 'pro-rafael:2026-05-01T22:45:00.000Z',
+        professionalId: 'pro-rafael',
+        professionalName: 'Rafael Costa',
+        dateIso: '2026-05-01',
+        timeLabel: '19:45',
+        startAtIso: '2026-05-01T22:45:00.000Z',
+        endAtIso: '2026-05-01T23:45:00.000Z',
+      },
+      {
+        key: 'pro-lucas:2026-05-01T22:30:00.000Z',
+        professionalId: 'pro-lucas',
+        professionalName: 'Lucas Ribeiro',
+        dateIso: '2026-05-01',
+        timeLabel: '19:30',
+        startAtIso: '2026-05-01T22:30:00.000Z',
+        endAtIso: '2026-05-01T23:30:00.000Z',
+      },
+      {
+        key: 'pro-rafael:2026-05-01T22:30:00.000Z',
+        professionalId: 'pro-rafael',
+        professionalName: 'Rafael Costa',
+        dateIso: '2026-05-01',
+        timeLabel: '19:30',
+        startAtIso: '2026-05-01T22:30:00.000Z',
+        endAtIso: '2026-05-01T23:30:00.000Z',
+      },
+    ],
+    selectedOptionNumber: null,
+    requestedTime: null,
+    professionalName: 'Rafael',
+    preferredTimeLabel: '19:30',
+    message: 'com o Rafael',
+  })
+
+  assert.equal(slot?.professionalName, 'Rafael Costa')
+  assert.equal(slot?.timeLabel, '19:30')
+})
+
 test('copy do fluxo whatsapp nao usa markdown cru com dois asteriscos', () => {
   const memory = agentTesting.buildInitialMemory(createAgentInput())
   memory.selectedServiceId = 'svc-classic'

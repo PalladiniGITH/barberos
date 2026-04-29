@@ -54,9 +54,65 @@ test('remarcacao detecta intencao, pede novo horario e exige confirmacao forte',
   assert.equal(flowTesting.isRescheduleIntentMessage('preciso remarcar meu horario'), true)
   assert.equal(flowTesting.isExplicitRescheduleConfirmationMessage('pode remarcar'), true)
   assert.equal(flowTesting.isExplicitRescheduleConfirmationMessage('blz'), false)
+  assert.equal(flowTesting.isExplicitRescheduleConfirmationMessage('com o Rafael'), false)
+  assert.equal(flowTesting.isExplicitRescheduleConfirmationMessage('pode'), false)
 
   const prompt = flowTesting.buildReschedulePromptMessage(buildAppointment())
   assert.match(prompt, /Para qual dia e horario voce quer remarcar/i)
+})
+
+test('remarcacao com horario repetido por barbeiro pede escolha explicita do profissional', () => {
+  const message = flowTesting.buildRescheduleProfessionalChoiceMessage({
+    timeLabel: '19:30',
+    professionals: [
+      { id: 'pro-lucas', name: 'Lucas Ribeiro' },
+      { id: 'pro-rafael', name: 'Rafael Costa' },
+    ],
+  })
+
+  assert.match(message, /19:30/)
+  assert.match(message, /1\. Lucas Ribeiro/i)
+  assert.match(message, /2\. Rafael Costa/i)
+  assert.match(message, /Qual voce prefere/i)
+})
+
+test('troca de barbeiro indisponivel na remarcacao responde com mensagem operacional clara', () => {
+  const message = flowTesting.buildRescheduleProfessionalUnavailableMessage({
+    professionalName: 'Rafael Costa',
+    dateIso: '2026-04-29',
+    timeLabel: '19:30',
+    timezone: 'America/Sao_Paulo',
+  })
+
+  assert.match(message, /Rafael Costa nao esta disponivel/i)
+  assert.match(message, /19:30/)
+  assert.match(message, /Posso procurar outros horarios com ele/i)
+})
+
+test('draft operacional preserva pendingProfessionalOptions quando o fluxo de remarcacao aguarda barbeiro', () => {
+  const parsed = flowTesting.parseOperationalDraft({
+    kind: 'reschedule',
+    appointments: [buildAppointment()],
+    selectedAppointmentId: 'apt-1',
+    offeredSlots: [],
+    selectedSlot: null,
+    pendingProfessionalOptions: [
+      { id: 'pro-lucas', name: 'Lucas Ribeiro' },
+      { id: 'pro-rafael', name: 'Rafael Costa' },
+    ],
+    requestedDateIso: '2026-04-29',
+    requestedTimeLabel: '19:30',
+    selectedProfessionalId: null,
+    selectedProfessionalName: null,
+    allowAnyProfessional: false,
+    triggeredByReminder: false,
+    reminderPromptedAtIso: null,
+  })
+
+  assert.deepEqual(
+    parsed?.pendingProfessionalOptions.map((option) => option.name),
+    ['Lucas Ribeiro', 'Rafael Costa']
+  )
 })
 
 test('resposta ao lembrete diferencia confirmar, remarcar, cancelar e ambiguo', () => {

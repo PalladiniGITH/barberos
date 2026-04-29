@@ -282,6 +282,87 @@ test('resposta com nome do barbeiro seleciona a opcao ja apresentada sem depende
   assert.equal(slot?.professionalName, 'Lucas Ribeiro')
 })
 
+test('resposta so com horario nao escolhe barbeiro arbitrariamente no fluxo legado', () => {
+  const slot = conversationTesting.pickOfferedSlot({
+    offeredSlots: [
+      {
+        key: 'pro-lucas:2026-04-27T22:30:00.000Z',
+        professionalId: 'pro-lucas',
+        professionalName: 'Lucas Ribeiro',
+        dateIso: '2026-04-27',
+        timeLabel: '19:30',
+        startAtIso: '2026-04-27T22:30:00.000Z',
+        endAtIso: '2026-04-27T23:30:00.000Z',
+      },
+      {
+        key: 'pro-rafael:2026-04-27T22:30:00.000Z',
+        professionalId: 'pro-rafael',
+        professionalName: 'Rafael Costa',
+        dateIso: '2026-04-27',
+        timeLabel: '19:30',
+        startAtIso: '2026-04-27T22:30:00.000Z',
+        endAtIso: '2026-04-27T23:30:00.000Z',
+      },
+    ],
+    selectedOptionNumber: null,
+    exactTime: '19:30',
+    message: '19:30',
+  })
+
+  assert.equal(slot, null)
+})
+
+test('troca "com Rafael" no fluxo legado prioriza o mesmo horario que ja estava em confirmacao', () => {
+  const slot = conversationTesting.pickOfferedSlot({
+    offeredSlots: [
+      {
+        key: 'pro-lucas:2026-04-27T22:45:00.000Z',
+        professionalId: 'pro-lucas',
+        professionalName: 'Lucas Ribeiro',
+        dateIso: '2026-04-27',
+        timeLabel: '19:45',
+        startAtIso: '2026-04-27T22:45:00.000Z',
+        endAtIso: '2026-04-27T23:45:00.000Z',
+      },
+      {
+        key: 'pro-rafael:2026-04-27T22:45:00.000Z',
+        professionalId: 'pro-rafael',
+        professionalName: 'Rafael Costa',
+        dateIso: '2026-04-27',
+        timeLabel: '19:45',
+        startAtIso: '2026-04-27T22:45:00.000Z',
+        endAtIso: '2026-04-27T23:45:00.000Z',
+      },
+      {
+        key: 'pro-lucas:2026-04-27T22:30:00.000Z',
+        professionalId: 'pro-lucas',
+        professionalName: 'Lucas Ribeiro',
+        dateIso: '2026-04-27',
+        timeLabel: '19:30',
+        startAtIso: '2026-04-27T22:30:00.000Z',
+        endAtIso: '2026-04-27T23:30:00.000Z',
+      },
+      {
+        key: 'pro-rafael:2026-04-27T22:30:00.000Z',
+        professionalId: 'pro-rafael',
+        professionalName: 'Rafael Costa',
+        dateIso: '2026-04-27',
+        timeLabel: '19:30',
+        startAtIso: '2026-04-27T22:30:00.000Z',
+        endAtIso: '2026-04-27T23:30:00.000Z',
+      },
+    ],
+    selectedOptionNumber: null,
+    exactTime: null,
+    preferredTimeLabel: '19:30',
+    professionalName: 'Rafael',
+    message: 'com o Rafael',
+  })
+
+  assert.equal(slot?.professionalName, 'Rafael Costa')
+  assert.equal(slot?.timeLabel, '19:30')
+})
+
 test('correcao de data no fluxo legado preserva o horario ja escolhido para revalidacao', () => {
   const draft = conversationTesting.buildEmptyConversationDraft()
   draft.selectedServiceId = 'svc-pigmentacao'
