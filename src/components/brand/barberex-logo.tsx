@@ -5,7 +5,7 @@ const BRAND_ASSETS = {
   full: {
     white: {
       src: '/brand/barberex-logo-white.png',
-      width: 1426,
+      width: 1421,
       height: 319,
       alt: 'BarberEX',
     },
