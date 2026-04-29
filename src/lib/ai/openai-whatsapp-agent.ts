@@ -1756,7 +1756,7 @@ function sanitizeReplyTextAgainstProfessionalVocative(input: {
 }
 
 function containsFinalConfirmationLanguage(replyText: string) {
-  return /\b(ficou marcado|agendamento confirmado|seu horario esta confirmado|horario confirmado|seu horário está confirmado|horário confirmado)\b/i.test(
+  return /\b(ficou marcado|ficou reservado|agendamento confirmado|seu horario esta confirmado|horario confirmado|horario reservado|seu horario esta reservado|seu horário está confirmado|horário confirmado|horário reservado|seu horário está reservado)\b/i.test(
     normalizeText(replyText)
   )
 }
@@ -1768,7 +1768,7 @@ function containsConfirmationPromptLanguage(replyText: string) {
 }
 
 function containsPrematureAvailabilityPromiseLanguage(replyText: string) {
-  return /\b(ja tenho|consegui|reservei|ja deixei|seu horario esta separado|seu horário está separado|pronto para|ficou marcado|confirmado)\b/i.test(
+  return /\b(ja tenho|consegui|reservei|ja deixei|seu horario esta separado|seu horário está separado|pronto para|ficou marcado|ficou reservado|horario reservado|seu horario esta reservado|confirmado)\b/i.test(
     normalizeText(replyText)
   )
 }

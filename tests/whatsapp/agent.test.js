@@ -2343,6 +2343,39 @@ test('bloqueia linguagem de sucesso antes da persistencia real do agendamento', 
   assert.match(reply, /Quer confirmar esse agendamento/i)
 })
 
+test('bloqueia linguagem de horario reservado antes da persistencia real do agendamento', () => {
+  const memory = agentTesting.buildInitialMemory(createAgentInput())
+  memory.selectedServiceId = 'svc-classic'
+  memory.selectedServiceName = 'Corte Classic'
+  memory.selectedProfessionalId = 'pro-rafael'
+  memory.selectedProfessionalName = 'Rafael Costa'
+  memory.requestedDateIso = '2026-04-13'
+  memory.selectedSlot = {
+    key: 'pro-rafael:2026-04-13T18:00:00.000Z',
+    professionalId: 'pro-rafael',
+    professionalName: 'Rafael Costa',
+    dateIso: '2026-04-13',
+    timeLabel: '15:00',
+    startAtIso: '2026-04-13T18:00:00.000Z',
+    endAtIso: '2026-04-13T18:35:00.000Z',
+  }
+
+  const reply = agentTesting.sanitizePrematureConfirmationReply({
+    replyText: 'Seu horario ficou reservado para hoje as 15:00 com Rafael Costa.',
+    nextAction: 'ASK_CONFIRMATION',
+    shouldCreateAppointment: false,
+    memory,
+    customerName: 'Gustavo',
+    barbershopName: 'Linha Nobre',
+    preferredProfessionalName: null,
+    serviceNames: SERVICES.map((service) => service.name),
+    nowContext: createAgentInput().nowContext,
+  })
+
+  assert.doesNotMatch(reply, /ficou reservado/i)
+  assert.match(reply, /Quer confirmar esse agendamento/i)
+})
+
 test('atalho deterministico fecha a confirmacao quando o cliente responde afirmativamente', () => {
   const memory = agentTesting.buildInitialMemory(createAgentInput())
   memory.state = 'WAITING_CONFIRMATION'

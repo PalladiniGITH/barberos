@@ -105,6 +105,9 @@ test('cria agendamento persistindo o equivalente UTC correto do horario escolhid
       })
 
       assert.equal(createdPayload.startAt.toISOString(), '2026-04-13T16:15:00.000Z')
+      assert.equal(createdPayload.status, 'PENDING')
+      assert.equal(createdPayload.source, 'WHATSAPP')
+      assert.equal(createdPayload.confirmedAt, null)
       assert.equal(formatDateTimeInTimezone(createdPayload.startAt, 'America/Sao_Paulo'), '2026-04-13 13:15')
       assert.equal(appointment.startAt.toISOString(), '2026-04-13T16:15:00.000Z')
       assert.equal(formatDateTimeInTimezone(appointment.startAt, 'America/Sao_Paulo'), '2026-04-13 13:15')
@@ -144,6 +147,7 @@ test('cobre o caso completo de hoje + servico + tarde + escolha 13:15 sem offset
       })
 
       assert.equal(createdPayload.startAt.toISOString(), '2026-04-13T16:15:00.000Z')
+      assert.equal(createdPayload.status, 'PENDING')
       assert.equal(formatDateTimeInTimezone(createdPayload.startAt, 'America/Sao_Paulo'), '2026-04-13 13:15')
       assert.equal(formatDateTimeInTimezone(appointment.startAt, 'America/Sao_Paulo'), '2026-04-13 13:15')
     }

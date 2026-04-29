@@ -997,7 +997,7 @@ export async function createAppointmentFromWhatsApp(input: {
       customerId: input.customerId,
       professionalId: input.professionalId,
       serviceId: input.serviceId,
-      status: 'CONFIRMED',
+      status: 'PENDING',
       source: 'WHATSAPP',
       billingModel: customer.type === 'SUBSCRIPTION' ? 'SUBSCRIPTION_INCLUDED' : 'AVULSO',
       startAt,
@@ -1006,7 +1006,7 @@ export async function createAppointmentFromWhatsApp(input: {
       priceSnapshot: resolvedPrice.price,
       notes: input.notes?.trim() || null,
       sourceReference: input.sourceReference,
-      confirmedAt: new Date(),
+      confirmedAt: null,
     },
     select: {
       id: true,
@@ -1024,6 +1024,18 @@ export async function createAppointmentFromWhatsApp(input: {
     datetimeReturnedToAgendaUtc: appointment.startAt.toISOString(),
     datetimeReturnedToAgendaLocal: formatDateTimeInTimezone(appointment.startAt, resolvedTimezone),
     datetimeReturnedToQueueLocal: `${formatIsoDateInTimezone(appointment.startAt, resolvedTimezone)} ${formatTimeLabel(appointment.startAt, resolvedTimezone)}`,
+  })
+  console.info('[whatsapp-confirmation] appointment_created_waiting_confirmation', {
+    appointmentId: appointment.id,
+    barbershopId: input.barbershopId,
+    barbershopSlug: null,
+    customerId: input.customerId,
+    startAt: appointment.startAt.toISOString(),
+    statusBefore: null,
+    statusAfter: 'PENDING',
+    confirmationStatus: null,
+    source: 'WHATSAPP',
+    instanceName: null,
   })
 
   safeRevalidateSchedulePath('/agendamentos')

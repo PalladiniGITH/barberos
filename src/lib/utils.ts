@@ -99,7 +99,7 @@ export const ROLE_LABELS: Record<string, string> = {
 }
 
 export const APPOINTMENT_STATUS_LABELS: Record<string, string> = {
-  PENDING: 'Pendente',
+  PENDING: 'Aguardando confirmacao',
   CONFIRMED: 'Confirmado',
   CANCELLED: 'Cancelado',
   COMPLETED: 'Concluido',

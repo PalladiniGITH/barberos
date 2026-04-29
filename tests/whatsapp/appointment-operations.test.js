@@ -98,7 +98,7 @@ test('rescheduleAppointmentFromWhatsApp atualiza o mesmo agendamento e reseta ci
             barbershopId: 'shop-1',
             customerId: 'customer-1',
             serviceId: 'svc-1',
-            status: 'CONFIRMED',
+            status: data.status,
             startAt: data.startAt,
             endAt: data.endAt,
             professional: { id: 'pro-2', name: 'Matheus' },
@@ -133,7 +133,10 @@ test('rescheduleAppointmentFromWhatsApp atualiza o mesmo agendamento e reseta ci
       assert.equal(result.ok, true)
       assert.equal(result.reason, 'success')
       assert.equal(result.appointment.professionalName, 'Matheus')
+      assert.equal(result.appointment.status, 'PENDING')
       assert.equal(updatePayload.professionalId, 'pro-2')
+      assert.equal(updatePayload.status, 'PENDING')
+      assert.equal(updatePayload.confirmedAt, null)
       assert.equal(updatePayload.confirmationReminderSentAt, null)
       assert.equal(updatePayload.confirmationResponseStatus, null)
     }
@@ -174,7 +177,7 @@ test('rescheduleAppointmentFromWhatsApp aceita atendimento que termina exatament
             barbershopId: 'shop-1',
             customerId: 'customer-1',
             serviceId: 'svc-premium',
-            status: 'CONFIRMED',
+            status: data.status,
             startAt: data.startAt,
             endAt: data.endAt,
             professional: { id: 'pro-rafael', name: 'Rafael Costa' },
@@ -209,6 +212,7 @@ test('rescheduleAppointmentFromWhatsApp aceita atendimento que termina exatament
       assert.equal(result.ok, true)
       assert.equal(result.reason, 'success')
       assert.equal(updatePayload.endAt.toISOString(), '2026-04-30T00:00:00.000Z')
+      assert.equal(updatePayload.status, 'PENDING')
     }
   )
 })

@@ -161,6 +161,10 @@ function capitalizeLabel(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
+function hasPendingBooking(bookings: ExistingCustomerBookingItem[]) {
+  return bookings.some((booking) => booking.status === 'PENDING')
+}
+
 function buildDaySentenceLead(dateIso: string, timezone: string, referenceDateIso?: string | null) {
   const relativeDay = describeQueryDay(dateIso, timezone, referenceDateIso)
 
@@ -189,23 +193,28 @@ export function buildExistingCustomerBookingResponse(input: {
   const continuationMessage = input.hasSchedulingContext
     ? ' Quer manter esse e marcar outro tambem, ou prefere ajustar esse?'
     : ''
+  const usesPendingLanguage = hasPendingBooking(input.bookings)
+  const emptyLabel = usesPendingLanguage ? 'agendado' : 'confirmado'
 
   if (input.bookings.length === 0) {
     if (queryScope === 'WEEK') {
-      return `Voce nao tem nenhum horario confirmado essa semana.${input.hasSchedulingContext ? ' Se quiser, continuo o novo agendamento por aqui.' : ''}`
+      return `Voce nao tem nenhum horario ${emptyLabel} essa semana.${input.hasSchedulingContext ? ' Se quiser, continuo o novo agendamento por aqui.' : ''}`
     }
 
     if (input.requestedDateIso) {
-      return `${buildDaySentenceLead(input.requestedDateIso, timezone, referenceDateIso)} voce nao tem nenhum horario confirmado.${input.hasSchedulingContext ? ' Se quiser, continuo o novo agendamento por aqui.' : ''}`
+      return `${buildDaySentenceLead(input.requestedDateIso, timezone, referenceDateIso)} voce nao tem nenhum horario ${emptyLabel}.${input.hasSchedulingContext ? ' Se quiser, continuo o novo agendamento por aqui.' : ''}`
     }
 
-    return `No momento voce nao tem nenhum horario confirmado.${input.hasSchedulingContext ? ' Se quiser, continuo o novo agendamento por aqui.' : ''}`
+    return `No momento voce nao tem nenhum horario ${emptyLabel}.${input.hasSchedulingContext ? ' Se quiser, continuo o novo agendamento por aqui.' : ''}`
   }
 
   if (input.bookings.length === 1) {
     const booking = input.bookings[0]
     if (queryScope === 'WEEK') {
-      return `Voce tem um horario na ${describeWeekday(booking.dateIso, timezone)} as ${booking.timeLabel} com ${booking.professionalName} para ${booking.serviceName}.${continuationMessage}`.trim()
+      const suffix = booking.status === 'PENDING'
+        ? ' Esse horario ainda esta aguardando confirmacao.'
+        : ''
+      return `Voce tem um horario na ${describeWeekday(booking.dateIso, timezone)} as ${booking.timeLabel} com ${booking.professionalName} para ${booking.serviceName}.${suffix}${continuationMessage}`.trim()
     }
 
     const dayDescription = input.requestedDateIso
@@ -213,17 +222,30 @@ export function buildExistingCustomerBookingResponse(input: {
       : `para ${describeQueryDay(booking.dateIso, timezone, referenceDateIso)}`
 
     const leadIn = input.requestedDateIso
-      ? `${dayDescription.charAt(0).toUpperCase() + dayDescription.slice(1)} voce esta marcado as ${booking.timeLabel}`
-      : `Seu proximo horario e ${dayDescription} as ${booking.timeLabel}`
+      ? booking.status === 'PENDING'
+        ? `${dayDescription.charAt(0).toUpperCase() + dayDescription.slice(1)} voce tem um horario reservado as ${booking.timeLabel}`
+        : `${dayDescription.charAt(0).toUpperCase() + dayDescription.slice(1)} voce esta marcado as ${booking.timeLabel}`
+      : booking.status === 'PENDING'
+        ? `Seu proximo horario reservado e ${dayDescription} as ${booking.timeLabel}`
+        : `Seu proximo horario e ${dayDescription} as ${booking.timeLabel}`
+    const suffix = booking.status === 'PENDING'
+      ? ' Esse horario ainda esta aguardando confirmacao.'
+      : ''
 
-    return `${leadIn}\npara ${booking.serviceName} com ${booking.professionalName}.${continuationMessage}`.trim()
+    return `${leadIn}\npara ${booking.serviceName} com ${booking.professionalName}.${suffix}${continuationMessage}`.trim()
   }
 
   const header = queryScope === 'WEEK'
-    ? 'Essa semana voce tem estes horarios confirmados:'
+    ? usesPendingLanguage
+      ? 'Essa semana voce tem estes horarios agendados:'
+      : 'Essa semana voce tem estes horarios confirmados:'
     : input.requestedDateIso
-    ? `${buildDaySentenceLead(input.requestedDateIso, timezone, referenceDateIso)} voce tem estes horarios confirmados:`
-    : 'Seus proximos horarios sao:'
+    ? usesPendingLanguage
+      ? `${buildDaySentenceLead(input.requestedDateIso, timezone, referenceDateIso)} voce tem estes horarios agendados:`
+      : `${buildDaySentenceLead(input.requestedDateIso, timezone, referenceDateIso)} voce tem estes horarios confirmados:`
+    : usesPendingLanguage
+      ? 'Seus proximos horarios agendados sao:'
+      : 'Seus proximos horarios sao:'
   const lines = input.bookings
     .map((booking) => {
       const heading = queryScope === 'WEEK'
@@ -231,7 +253,10 @@ export function buildExistingCustomerBookingResponse(input: {
         : input.requestedDateIso
           ? `${booking.timeLabel}`
           : `${capitalizeLabel(describeQueryDay(booking.dateIso, timezone, referenceDateIso))} - ${booking.timeLabel}`
-      return `- ${heading}\n  ${booking.serviceName} com ${booking.professionalName}`
+      const statusSuffix = booking.status === 'PENDING'
+        ? ' (aguardando confirmacao)'
+        : ''
+      return `- ${heading}\n  ${booking.serviceName} com ${booking.professionalName}${statusSuffix}`
     })
     .join('\n\n')
 

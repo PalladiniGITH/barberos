@@ -95,7 +95,20 @@ test('retomada logo apos agendamento confirmado usa contexto recente em vez de s
   assert.equal(hasRecentContext, true)
   assert.match(reply, /16:45/)
   assert.match(reply, /Rafael Costa/)
-  assert.match(reply, /ja ficou marcado|Precisa de mais alguma coisa/i)
+  assert.match(reply, /ficou reservado|Precisa de mais alguma coisa/i)
+})
+
+test('mensagem final do agendamento via WhatsApp fala em horario reservado e nao confirmado', () => {
+  const reply = conversationTesting.buildSuccessMessage(
+    buildSlot(),
+    'Corte Classic',
+    'America/Sao_Paulo'
+  )
+
+  assert.match(reply, /horario ficou reservado/i)
+  assert.match(reply, /Vou te chamar mais perto do horario para confirmar sua presenca/i)
+  assert.doesNotMatch(reply, /horario esta confirmado/i)
+  assert.doesNotMatch(reply, /Agendamento confirmado/i)
 })
 
 test('detecta topic switch quando o cliente pergunta sobre horario ja confirmado', () => {

@@ -362,13 +362,14 @@ export function buildRescheduleSuccessMessage(input: {
   const timezone = resolveBusinessTimezone(input.timezone)
 
   return [
-    'Pronto, seu horario foi remarcado.',
+    'Pronto, seu horario foi remarcado e ficou reservado:',
     '',
-    'Novo horario:',
     `Data: ${formatDayLabelFromIsoDate(input.slot.dateIso, timezone)}`,
     `Horario: ${input.slot.timeLabel}`,
     `Servico: ${input.appointment.serviceName}`,
     `Barbeiro: ${input.slot.professionalName}`,
+    '',
+    'Vou te chamar mais perto do horario para confirmar sua presenca.',
   ].join('\n')
 }
 
@@ -379,15 +380,41 @@ export function buildReminderResponseClarificationMessage() {
 export function parseReminderResponseAction(message: string) {
   const normalized = normalizeIntentPhrase(message)
 
-  if (['1', 'confirmo', 'sim', 'presenca confirmada', 'confirmar presenca'].includes(normalized)) {
+  if ([
+    '1',
+    'confirmo',
+    'confirmado',
+    'sim',
+    'sim confirmado',
+    'vou sim',
+    'pode confirmar',
+    'estarei ai',
+    'presenca confirmada',
+    'confirmar presenca',
+  ].includes(normalized)) {
     return 'confirm'
   }
 
-  if (['2', 'remarcar', 'quero remarcar', 'reagendar', 'quero reagendar'].includes(normalized)) {
+  if ([
+    '2',
+    'remarcar',
+    'quero remarcar',
+    'reagendar',
+    'quero reagendar',
+    'outro horario',
+    'trocar horario',
+  ].includes(normalized)) {
     return 'reschedule'
   }
 
-  if (['3', 'cancelar', 'quero cancelar', 'cancelamento'].includes(normalized)) {
+  if ([
+    '3',
+    'cancelar',
+    'quero cancelar',
+    'cancelamento',
+    'nao vou',
+    'nao consigo ir',
+  ].includes(normalized)) {
     return 'cancel'
   }
 

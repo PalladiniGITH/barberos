@@ -119,6 +119,32 @@ test('consulta de um unico horario usa formato bonito em duas linhas', () => {
   assert.match(response, /para Hidratacao Capilar com Rafael Costa/i)
 })
 
+test('consulta de horario pendente usa linguagem de reservado e aguardando confirmacao', () => {
+  const response = buildExistingCustomerBookingResponse({
+    bookings: [
+      bookingStatusTesting.serializeExistingCustomerBooking({
+        appointment: buildAppointment('2026-04-15T19:00:00.000Z', {
+          id: 'apt-pending',
+          status: 'PENDING',
+          serviceName: 'Barba Terapia',
+          professionalName: 'Lucas Ribeiro',
+        }),
+        timezone: 'America/Sao_Paulo',
+      }),
+    ],
+    requestedDateIso: '2026-04-15',
+    queryScope: 'DAY',
+    timezone: 'America/Sao_Paulo',
+    hasSchedulingContext: false,
+    referenceDateIso: '2026-04-14',
+  })
+
+  assert.match(response, /Amanha voce tem um horario reservado as 16:00/i)
+  assert.match(response, /Barba Terapia com Lucas Ribeiro/i)
+  assert.match(response, /aguardando confirmacao/i)
+  assert.doesNotMatch(response, /voce esta marcado/i)
+})
+
 test('consulta sem horario em um sabado usa resposta objetiva com dia da semana', () => {
   const response = buildExistingCustomerBookingResponse({
     bookings: [],

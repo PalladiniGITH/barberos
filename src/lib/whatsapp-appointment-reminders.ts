@@ -28,11 +28,17 @@ export interface AppointmentReminderSummary {
   sent: number
   skipped: number
   failed: number
+  expiredAppointmentsFound: number
+  expired: number
+  expiredOutboundSent: number
+  expiredOutboundSkipped: number
+  expiredOutboundFailed: number
 }
 
 export interface ReminderAppointmentContext {
   id: string
   barbershopId: string
+  barbershopSlug: string | null
   customerId: string
   customerPhone: string | null
   customerName: string
@@ -42,6 +48,7 @@ export interface ReminderAppointmentContext {
   serviceName: string
   professionalId: string
   professionalName: string
+  source: 'WHATSAPP' | 'MANUAL'
   status: 'PENDING' | 'CONFIRMED'
   startAt: Date
   endAt: Date
@@ -93,11 +100,12 @@ function serializeReminderAppointment(input: {
     id: string
     barbershopId: string
     customerId: string
+    source: 'WHATSAPP' | 'MANUAL'
     status: 'PENDING' | 'CONFIRMED'
     startAt: Date
     endAt: Date
     customer: { name: string, phone: string | null }
-    barbershop: { name: string, timezone: string | null }
+    barbershop: { name: string, slug?: string | null, timezone: string | null }
     professional: { id: string, name: string }
     service: { id: string, name: string }
   }
@@ -108,6 +116,7 @@ function serializeReminderAppointment(input: {
   return {
     id: input.appointment.id,
     barbershopId: input.appointment.barbershopId,
+    barbershopSlug: input.appointment.barbershop.slug ?? null,
     customerId: input.appointment.customerId,
     customerPhone: input.appointment.customer.phone,
     customerName: input.appointment.customer.name,
@@ -117,6 +126,7 @@ function serializeReminderAppointment(input: {
     serviceName: input.appointment.service.name,
     professionalId: input.appointment.professional.id,
     professionalName: input.appointment.professional.name,
+    source: input.appointment.source,
     status: input.appointment.status,
     startAt: input.appointment.startAt,
     endAt: input.appointment.endAt,
@@ -135,8 +145,11 @@ export function getWhatsAppAppointmentConfirmationLeadMinutes() {
 
 export function getWhatsAppAppointmentConfirmationToleranceMinutes() {
   return normalizeLeadMinutes(
-    process.env.WHATSAPP_APPOINTMENT_CONFIRMATION_TOLERANCE_MINUTES,
-    DEFAULT_WHATSAPP_APPOINTMENT_CONFIRMATION_TOLERANCE_MINUTES,
+    process.env.WHATSAPP_CONFIRMATION_EXPIRE_AFTER_START_MINUTES,
+    normalizeLeadMinutes(
+      process.env.WHATSAPP_APPOINTMENT_CONFIRMATION_TOLERANCE_MINUTES,
+      DEFAULT_WHATSAPP_APPOINTMENT_CONFIRMATION_TOLERANCE_MINUTES,
+    ),
   )
 }
 
@@ -167,6 +180,44 @@ export function buildAppointmentReminderDedupeKey(input: {
   return `appointment-reminder:${input.appointmentId}:${input.leadMinutes}`
 }
 
+export function buildAppointmentConfirmationExpiredMessage(input: {
+  appointment: ReminderAppointmentContext
+}) {
+  return [
+    `Oi, ${input.appointment.customerName.split(' ')[0]}!`,
+    '',
+    'Nao recebemos sua confirmacao a tempo, entao esse horario nao ficou confirmado.',
+    'Se quiser, posso te ajudar a marcar um novo horario.',
+  ].join('\n')
+}
+
+function buildExpiredAppointmentDedupeKey(input: {
+  appointmentId: string
+}) {
+  return `appointment-confirmation-expired:${input.appointmentId}`
+}
+
+function buildConfirmationLogPayload(input: {
+  appointment: Pick<ReminderAppointmentContext, 'id' | 'barbershopId' | 'barbershopSlug' | 'customerId' | 'startAt' | 'source'>
+  statusBefore: string | null
+  statusAfter: string | null
+  confirmationStatus: string | null
+  instanceName: string | null
+}) {
+  return {
+    appointmentId: input.appointment.id,
+    barbershopId: input.appointment.barbershopId,
+    barbershopSlug: input.appointment.barbershopSlug,
+    customerId: input.appointment.customerId,
+    startAt: input.appointment.startAt.toISOString(),
+    statusBefore: input.statusBefore,
+    statusAfter: input.statusAfter,
+    confirmationStatus: input.confirmationStatus,
+    source: input.appointment.source,
+    instanceName: input.instanceName,
+  }
+}
+
 export function isWhatsAppAppointmentConfirmationRequestAuthorized(request: Request) {
   const sharedSecret = getAutomationRunnerSecret()
   const providedSecret =
@@ -190,7 +241,8 @@ async function loadDueAppointmentsForReminder(input: {
 
   const appointments = await prisma.appointment.findMany({
     where: {
-      status: { in: ['PENDING', 'CONFIRMED'] },
+      source: 'WHATSAPP',
+      status: 'PENDING',
       startAt: {
         gte: windowStart,
         lte: windowEnd,
@@ -209,6 +261,7 @@ async function loadDueAppointmentsForReminder(input: {
       id: true,
       barbershopId: true,
       customerId: true,
+      source: true,
       status: true,
       startAt: true,
       endAt: true,
@@ -221,6 +274,7 @@ async function loadDueAppointmentsForReminder(input: {
       barbershop: {
         select: {
           name: true,
+          slug: true,
           timezone: true,
         },
       },
@@ -245,6 +299,88 @@ async function loadDueAppointmentsForReminder(input: {
         id: appointment.id,
         barbershopId: appointment.barbershopId,
         customerId: appointment.customerId,
+        source: appointment.source as 'WHATSAPP' | 'MANUAL',
+        status: appointment.status as 'PENDING' | 'CONFIRMED',
+        startAt: appointment.startAt,
+        endAt: appointment.endAt,
+        customer: appointment.customer,
+        barbershop: appointment.barbershop,
+        professional: appointment.professional,
+        service: appointment.service,
+      },
+    })
+  )
+}
+
+async function loadExpiredPendingAppointments(input: {
+  now: Date
+  toleranceMinutes: number
+}) {
+  const expirationThreshold = new Date(
+    input.now.getTime() - Math.max(input.toleranceMinutes, 0) * 60_000
+  )
+
+  const appointments = await prisma.appointment.findMany({
+    where: {
+      source: 'WHATSAPP',
+      status: 'PENDING',
+      startAt: {
+        lte: expirationThreshold,
+      },
+      confirmationReminderSentAt: { not: null },
+      confirmationRequestedAt: { not: null },
+      confirmationResponseAt: null,
+      customer: {
+        active: true,
+      },
+      barbershop: {
+        active: true,
+      },
+    },
+    orderBy: { startAt: 'asc' },
+    select: {
+      id: true,
+      barbershopId: true,
+      customerId: true,
+      source: true,
+      status: true,
+      startAt: true,
+      endAt: true,
+      customer: {
+        select: {
+          name: true,
+          phone: true,
+        },
+      },
+      barbershop: {
+        select: {
+          name: true,
+          slug: true,
+          timezone: true,
+        },
+      },
+      professional: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      service: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  })
+
+  return appointments.map((appointment) =>
+    serializeReminderAppointment({
+      appointment: {
+        id: appointment.id,
+        barbershopId: appointment.barbershopId,
+        customerId: appointment.customerId,
+        source: appointment.source as 'WHATSAPP' | 'MANUAL',
         status: appointment.status as 'PENDING' | 'CONFIRMED',
         startAt: appointment.startAt,
         endAt: appointment.endAt,
@@ -384,11 +520,63 @@ async function createReminderMessagingEvent(input: {
   })
 }
 
+async function createExpirationMessagingEvent(input: {
+  appointment: ReminderAppointmentContext
+  dedupeKey: string
+  message: string
+  instanceName: string
+}) {
+  return prisma.messagingEvent.create({
+    data: {
+      barbershopId: input.appointment.barbershopId,
+      customerId: input.appointment.customerId,
+      provider: 'EVOLUTION',
+      direction: 'OUTBOUND',
+      status: 'PENDING',
+      eventType: 'APPOINTMENT_CONFIRMATION_EXPIRED',
+      instanceName: input.instanceName,
+      dedupeKey: input.dedupeKey,
+      remotePhone: input.appointment.customerPhone,
+      bodyText: input.message,
+      responseText: input.message,
+      payload: buildJsonValue({
+        source: 'whatsapp-appointment-confirmation-expired',
+        appointmentId: input.appointment.id,
+      }),
+    },
+    select: {
+      id: true,
+    },
+  })
+}
+
 function isDuplicateError(error: unknown) {
   return (
     error instanceof Prisma.PrismaClientKnownRequestError
     && error.code === 'P2002'
   )
+}
+
+export async function expirePendingAppointmentConfirmation(input: {
+  appointmentId: string
+  barbershopId: string
+}) {
+  return prisma.appointment.updateMany({
+    where: {
+      id: input.appointmentId,
+      barbershopId: input.barbershopId,
+      source: 'WHATSAPP',
+      status: 'PENDING',
+      confirmationReminderSentAt: { not: null },
+      confirmationRequestedAt: { not: null },
+      confirmationResponseAt: null,
+    },
+    data: {
+      status: 'NO_SHOW',
+      confirmedAt: null,
+      cancelledAt: null,
+    },
+  })
 }
 
 export async function runDueWhatsAppAppointmentConfirmations(input?: {
@@ -422,6 +610,11 @@ export async function runDueWhatsAppAppointmentConfirmations(input?: {
     sent: 0,
     skipped: 0,
     failed: 0,
+    expiredAppointmentsFound: 0,
+    expired: 0,
+    expiredOutboundSent: 0,
+    expiredOutboundSkipped: 0,
+    expiredOutboundFailed: 0,
   }
 
   for (const appointment of dueAppointments) {
@@ -440,6 +633,16 @@ export async function runDueWhatsAppAppointmentConfirmations(input?: {
 
       console.info('[whatsapp-reminder] skipped', {
         appointmentId: appointment.id,
+        reason: 'invalid_phone',
+      })
+      console.warn('[whatsapp-confirmation] outbound_failed', {
+        ...buildConfirmationLogPayload({
+          appointment,
+          statusBefore: appointment.status,
+          statusAfter: appointment.status,
+          confirmationStatus: null,
+          instanceName: null,
+        }),
         reason: 'invalid_phone',
       })
       continue
@@ -468,6 +671,16 @@ export async function runDueWhatsAppAppointmentConfirmations(input?: {
       console.warn('[whatsapp-reminder] failed', {
         appointmentId: appointment.id,
         barbershopId: appointment.barbershopId,
+        reason: 'outbound_integration_missing',
+      })
+      console.warn('[whatsapp-confirmation] outbound_failed', {
+        ...buildConfirmationLogPayload({
+          appointment,
+          statusBefore: appointment.status,
+          statusAfter: appointment.status,
+          confirmationStatus: null,
+          instanceName: null,
+        }),
         reason: 'outbound_integration_missing',
       })
 
@@ -546,6 +759,20 @@ export async function runDueWhatsAppAppointmentConfirmations(input?: {
         appointmentId: appointment.id,
         barbershopId: appointment.barbershopId,
       })
+      console.info('[whatsapp-confirmation] reminder_sent', buildConfirmationLogPayload({
+        appointment,
+        statusBefore: appointment.status,
+        statusAfter: appointment.status,
+        confirmationStatus: null,
+        instanceName: outboundIntegration.instanceName,
+      }))
+      console.info('[whatsapp-confirmation] outbound_sent', buildConfirmationLogPayload({
+        appointment,
+        statusBefore: appointment.status,
+        statusAfter: appointment.status,
+        confirmationStatus: null,
+        instanceName: outboundIntegration.instanceName,
+      }))
     } catch (error) {
       summary.failed += 1
       const message = error instanceof Error ? error.message : String(error)
@@ -575,6 +802,168 @@ export async function runDueWhatsAppAppointmentConfirmations(input?: {
         appointmentId: appointment.id,
         message,
       })
+      console.error('[whatsapp-confirmation] outbound_failed', {
+        ...buildConfirmationLogPayload({
+          appointment,
+          statusBefore: appointment.status,
+          statusAfter: appointment.status,
+          confirmationStatus: null,
+          instanceName: outboundIntegration.instanceName,
+        }),
+        reason: message,
+      })
+    }
+  }
+
+  const expiredAppointments = await loadExpiredPendingAppointments({
+    now,
+    toleranceMinutes,
+  })
+
+  summary.expiredAppointmentsFound = expiredAppointments.length
+
+  for (const appointment of expiredAppointments) {
+    const expiration = await expirePendingAppointmentConfirmation({
+      appointmentId: appointment.id,
+      barbershopId: appointment.barbershopId,
+    })
+
+    if (expiration.count === 0) {
+      summary.expiredOutboundSkipped += 1
+      continue
+    }
+
+    summary.expired += 1
+    console.info('[whatsapp-confirmation] expired_without_response', buildConfirmationLogPayload({
+      appointment,
+      statusBefore: appointment.status,
+      statusAfter: 'NO_SHOW',
+      confirmationStatus: null,
+      instanceName: null,
+    }))
+
+    const normalizedPhone = normalizeEvolutionPhoneNumber(appointment.customerPhone)
+    if (!normalizedPhone) {
+      summary.expiredOutboundSkipped += 1
+      console.warn('[whatsapp-confirmation] outbound_failed', {
+        ...buildConfirmationLogPayload({
+          appointment,
+          statusBefore: appointment.status,
+          statusAfter: 'NO_SHOW',
+          confirmationStatus: null,
+          instanceName: null,
+        }),
+        reason: 'invalid_phone',
+      })
+      continue
+    }
+
+    const outboundIntegration = await resolveWhatsAppOutboundIntegration({
+      barbershopId: appointment.barbershopId,
+    })
+
+    if (outboundIntegration.status !== 'resolved' || !outboundIntegration.instanceName) {
+      summary.expiredOutboundFailed += 1
+
+      await markWhatsAppIntegrationError({
+        barbershopId: appointment.barbershopId,
+        message: 'Integracao WhatsApp nao configurada para aviso de confirmacao expirada.',
+      })
+
+      console.warn('[whatsapp-confirmation] outbound_failed', {
+        ...buildConfirmationLogPayload({
+          appointment,
+          statusBefore: appointment.status,
+          statusAfter: 'NO_SHOW',
+          confirmationStatus: null,
+          instanceName: null,
+        }),
+        reason: 'outbound_integration_missing',
+      })
+      continue
+    }
+
+    const expiredMessage = buildAppointmentConfirmationExpiredMessage({
+      appointment,
+    })
+    const dedupeKey = buildExpiredAppointmentDedupeKey({
+      appointmentId: appointment.id,
+    })
+
+    let eventId: string | null = null
+
+    try {
+      const event = await createExpirationMessagingEvent({
+        appointment,
+        dedupeKey,
+        message: expiredMessage,
+        instanceName: outboundIntegration.instanceName,
+      })
+      eventId = event.id
+    } catch (error) {
+      if (isDuplicateError(error)) {
+        summary.expiredOutboundSkipped += 1
+        continue
+      }
+
+      throw error
+    }
+
+    try {
+      const providerPayload = await sendTextMessage({
+        number: normalizedPhone,
+        text: expiredMessage,
+        instance: outboundIntegration.instanceName,
+      })
+
+      await prisma.messagingEvent.update({
+        where: { id: eventId! },
+        data: {
+          status: 'PROCESSED',
+          providerMessageId: typeof providerPayload === 'object' && providerPayload && 'key' in providerPayload
+            ? String((providerPayload as { key?: { id?: string } }).key?.id ?? '')
+            : null,
+          processedAt: new Date(),
+        },
+      })
+
+      await markWhatsAppOutboundDelivered(appointment.barbershopId)
+
+      summary.expiredOutboundSent += 1
+      console.info('[whatsapp-confirmation] outbound_sent', buildConfirmationLogPayload({
+        appointment,
+        statusBefore: appointment.status,
+        statusAfter: 'NO_SHOW',
+        confirmationStatus: null,
+        instanceName: outboundIntegration.instanceName,
+      }))
+    } catch (error) {
+      summary.expiredOutboundFailed += 1
+      const message = error instanceof Error ? error.message : String(error)
+
+      await markWhatsAppIntegrationError({
+        barbershopId: appointment.barbershopId,
+        message,
+      })
+
+      await prisma.messagingEvent.update({
+        where: { id: eventId! },
+        data: {
+          status: 'FAILED',
+          lastError: message,
+        },
+      })
+
+      console.error('[whatsapp-confirmation] outbound_failed', {
+        ...buildConfirmationLogPayload({
+          appointment,
+          statusBefore: appointment.status,
+          statusAfter: 'NO_SHOW',
+          confirmationStatus: null,
+          instanceName: outboundIntegration.instanceName,
+        }),
+        reason: message,
+      })
     }
   }
 
@@ -587,13 +976,18 @@ export async function findPendingReminderAppointmentForCustomer(input: {
   now?: Date
 }) {
   const now = input.now ?? new Date()
+  const expirationThreshold = new Date(
+    now.getTime() - getWhatsAppAppointmentConfirmationToleranceMinutes() * 60_000
+  )
 
   const appointment = await prisma.appointment.findFirst({
     where: {
       barbershopId: input.barbershopId,
       customerId: input.customerId,
+      source: 'WHATSAPP',
       status: { in: ['PENDING', 'CONFIRMED'] },
-      startAt: { gt: now },
+      startAt: { gte: expirationThreshold },
+      confirmationReminderSentAt: { not: null },
       confirmationRequestedAt: { not: null },
       confirmationResponseAt: null,
     },
@@ -605,6 +999,7 @@ export async function findPendingReminderAppointmentForCustomer(input: {
       id: true,
       barbershopId: true,
       customerId: true,
+      source: true,
       status: true,
       startAt: true,
       endAt: true,
@@ -617,6 +1012,7 @@ export async function findPendingReminderAppointmentForCustomer(input: {
       barbershop: {
         select: {
           name: true,
+          slug: true,
           timezone: true,
         },
       },
@@ -640,13 +1036,14 @@ export async function findPendingReminderAppointmentForCustomer(input: {
   }
 
   return serializeReminderAppointment({
-    appointment: {
-      id: appointment.id,
-      barbershopId: appointment.barbershopId,
-      customerId: appointment.customerId,
-      status: appointment.status as 'PENDING' | 'CONFIRMED',
-      startAt: appointment.startAt,
-      endAt: appointment.endAt,
+      appointment: {
+        id: appointment.id,
+        barbershopId: appointment.barbershopId,
+        customerId: appointment.customerId,
+        source: appointment.source as 'WHATSAPP' | 'MANUAL',
+        status: appointment.status as 'PENDING' | 'CONFIRMED',
+        startAt: appointment.startAt,
+        endAt: appointment.endAt,
       customer: appointment.customer,
       barbershop: appointment.barbershop,
       professional: appointment.professional,
@@ -663,6 +1060,7 @@ export async function confirmAppointmentPresenceFromReminder(input: {
     where: {
       id: input.appointmentId,
       barbershopId: input.barbershopId,
+      source: 'WHATSAPP',
       status: { in: ['PENDING', 'CONFIRMED'] },
     },
     data: {
@@ -683,6 +1081,7 @@ export async function markAppointmentReminderResponse(input: {
     where: {
       id: input.appointmentId,
       barbershopId: input.barbershopId,
+      source: 'WHATSAPP',
       status: { in: ['PENDING', 'CONFIRMED'] },
     },
     data: {
@@ -694,5 +1093,7 @@ export async function markAppointmentReminderResponse(input: {
 
 export const __testing = {
   buildAppointmentConfirmationReminderMessage,
+  buildAppointmentConfirmationExpiredMessage,
   buildAppointmentReminderDedupeKey,
+  buildExpiredAppointmentDedupeKey,
 }

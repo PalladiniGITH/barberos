@@ -510,14 +510,14 @@ function buildRecentConfirmedBookingSummary(
   serviceName: string | null,
   timezone: string
 ) {
-  return `Agendamento confirmado: ${formatDayLabel(slot.dateIso, timezone).toLowerCase()} as ${slot.timeLabel} com ${slot.professionalName} para ${serviceName ?? 'o servico solicitado'}.`
+  return `Horario reservado: ${formatDayLabel(slot.dateIso, timezone).toLowerCase()} as ${slot.timeLabel} com ${slot.professionalName} para ${serviceName ?? 'o servico solicitado'}. Aguardando confirmacao de presenca.`
 }
 
 function buildRecentConfirmedGreeting(
   booking: RecentConfirmedBookingMemory,
   timezone: string
 ) {
-  return `Oi! Seu horario ja ficou marcado para ${formatDayLabel(booking.dateIso, timezone).toLowerCase()} as ${booking.timeLabel} com ${booking.professionalName} para ${booking.serviceName}. Precisa de mais alguma coisa?`
+  return `Oi! Seu horario ficou reservado para ${formatDayLabel(booking.dateIso, timezone).toLowerCase()} as ${booking.timeLabel} com ${booking.professionalName} para ${booking.serviceName}. Vou te chamar mais perto do horario para confirmar sua presenca. Precisa de mais alguma coisa?`
 }
 
 function shiftDateIso(dateIso: string, days: number) {
@@ -1181,7 +1181,16 @@ function buildConfirmationReminderMessage() {
 }
 
 function buildSuccessMessage(slot: ConversationSlot, serviceName: string, timezone: string) {
-  return `Perfeito, ficou marcado.\n\nSeu horario esta confirmado para ${formatDayLabel(slot.dateIso, timezone).toLowerCase()} as ${slot.timeLabel} com ${slot.professionalName} para ${serviceName}.\n\nSe quiser remarcar ou cancelar depois, e so me chamar aqui.`
+  return [
+    'Pronto, seu horario ficou reservado:',
+    '',
+    `Data: ${formatDayLabel(slot.dateIso, timezone)}`,
+    `Horario: ${slot.timeLabel}`,
+    `Servico: ${serviceName}`,
+    `Barbeiro: ${slot.professionalName}`,
+    '',
+    'Vou te chamar mais perto do horario para confirmar sua presenca.',
+  ].join('\n')
 }
 
 function buildRescheduleMessage() {
@@ -2246,6 +2255,19 @@ async function handleOperationalConversationState(input: {
         }
       }
 
+      console.info('[whatsapp-confirmation] customer_confirmed', {
+        appointmentId: activeReminderAppointment.id,
+        barbershopId: input.barbershop.id,
+        barbershopSlug: input.barbershop.slug,
+        customerId: input.customer.id,
+        startAt: activeReminderAppointment.startAtIso,
+        statusBefore: activeReminderAppointment.status,
+        statusAfter: 'CONFIRMED',
+        confirmationStatus: 'CONFIRMED',
+        source: 'WHATSAPP',
+        instanceName: null,
+      })
+
       const responseText = buildReminderConfirmedMessage()
 
       await persistOperationalConversationState({
@@ -2273,6 +2295,19 @@ async function handleOperationalConversationState(input: {
         appointmentId: activeReminderAppointment.id,
         barbershopId: input.barbershop.id,
         responseStatus: 'RESCHEDULE_REQUESTED',
+      })
+
+      console.info('[whatsapp-confirmation] customer_requested_reschedule', {
+        appointmentId: activeReminderAppointment.id,
+        barbershopId: input.barbershop.id,
+        barbershopSlug: input.barbershop.slug,
+        customerId: input.customer.id,
+        startAt: activeReminderAppointment.startAtIso,
+        statusBefore: activeReminderAppointment.status,
+        statusAfter: activeReminderAppointment.status,
+        confirmationStatus: 'RESCHEDULE_REQUESTED',
+        source: 'WHATSAPP',
+        instanceName: null,
       })
 
       const draft = buildOperationalDraftWithAppointment({
@@ -2308,28 +2343,66 @@ async function handleOperationalConversationState(input: {
         responseStatus: 'CANCELLATION_REQUESTED',
       })
 
-      const draft = buildOperationalDraftWithAppointment({
-        kind: 'cancel',
-        appointment: activeReminderAppointment,
-        triggeredByReminder: true,
+      const cancelledAppointment = await cancelAppointmentFromWhatsApp({
+        appointmentId: activeReminderAppointment.id,
+        barbershopId: input.barbershop.id,
+        timezone: input.timezone,
       })
-      const responseText = buildCancellationConfirmationMessage(activeReminderAppointment)
+
+      if (!cancelledAppointment) {
+        const responseText = buildReminderNotFoundMessage()
+
+        await persistOperationalConversationState({
+          conversationId: input.conversationId,
+          inboundText: input.inboundText,
+          responseText,
+          state: 'IDLE',
+          draft: null,
+          source: 'whatsapp_reminder',
+          stage: 'cancel_missing',
+        })
+
+        return {
+          responseText,
+          flow: 'booking_status' as const,
+          conversationId: input.conversationId,
+          conversationState: 'IDLE' as const,
+          usedAI: false,
+        }
+      }
+
+      console.info('[whatsapp-confirmation] customer_cancelled', {
+        appointmentId: cancelledAppointment.id,
+        barbershopId: input.barbershop.id,
+        barbershopSlug: input.barbershop.slug,
+        customerId: input.customer.id,
+        startAt: cancelledAppointment.startAtIso,
+        statusBefore: activeReminderAppointment.status,
+        statusAfter: 'CANCELLED',
+        confirmationStatus: 'CANCELLATION_REQUESTED',
+        source: 'WHATSAPP',
+        instanceName: null,
+      })
+
+      const responseText = 'Tudo certo, seu horario foi cancelado. Quando quiser, posso te ajudar a marcar outro.'
 
       await persistOperationalConversationState({
         conversationId: input.conversationId,
         inboundText: input.inboundText,
         responseText,
-        state: 'WAITING_CANCEL_CONFIRMATION',
-        draft,
+        state: 'IDLE',
+        draft: null,
         source: 'whatsapp_reminder',
         stage: 'cancel_requested',
+        completedAt: new Date(),
       })
 
       return {
         responseText,
-        flow: 'booking_status' as const,
+        flow: 'appointment_cancelled' as const,
         conversationId: input.conversationId,
-        conversationState: 'WAITING_CANCEL_CONFIRMATION' as const,
+        conversationState: 'IDLE' as const,
+        appointmentId: cancelledAppointment.id,
         usedAI: false,
       }
     }
@@ -6625,6 +6698,7 @@ export const __testing = {
   buildExistingBookingStatusMessage,
   buildOfferedSlotSelectionPrompt,
   buildRecentConfirmedGreeting,
+  buildSuccessMessage,
   buildServiceQuestion,
   buildServiceSelectionQuestion,
   buildProfessionalQuestion,
