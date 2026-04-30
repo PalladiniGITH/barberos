@@ -7,7 +7,6 @@ import { prisma } from '@/lib/prisma'
 import { BRAZIL_TIMEZONES } from '@/lib/onboarding'
 import {
   attendanceScopeToFlags,
-  resolveProfessionalAttendanceScope,
 } from '@/lib/professionals/operational-config'
 import {
   isProfessionalAvatarUrl,
@@ -72,14 +71,6 @@ function toDateAtUtcNoon(value: string | null | undefined) {
   }
 
   return new Date(`${value}T12:00:00.000Z`)
-}
-
-function toDateInputValue(value: Date | null | undefined) {
-  if (!value) {
-    return null
-  }
-
-  return value.toISOString().slice(0, 10)
 }
 
 function buildMutationError(error: unknown, fallbackMessage: string) {
@@ -1200,9 +1191,4 @@ export async function removePlatformScheduleBlock(
     })
     return buildMutationError(error, 'Nao foi possivel remover o bloqueio operacional.')
   }
-}
-
-export const __testing = {
-  resolveProfessionalAttendanceScope,
-  toDateInputValue,
 }
