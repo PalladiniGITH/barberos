@@ -2,6 +2,9 @@
   "name": "barbermain",
   "version": "0.1.0",
   "private": true,
+  "overrides": {
+    "cookie": "0.7.2"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -53,8 +56,8 @@
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "lucide-react": "^0.395.0",
-    "next": "14.2.4",
-    "next-auth": "^4.24.7",
+    "next": "14.2.35",
+    "next-auth": "4.24.14",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.52.0",
@@ -71,7 +74,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.19",
-    "postcss": "^8.4.38",
+    "postcss": "^8.5.12",
     "prisma": "^5.14.0",
     "tailwindcss": "^3.4.4",
     "ts-node": "^10.9.2",
