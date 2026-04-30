@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { normalizeEvolutionWebhookPayload } from '@/lib/integrations/evolution'
+import { safeLog } from '@/lib/security/safe-logger'
 import { handleIncomingWhatsAppMessage } from '@/lib/whatsapp-handler'
 
 export async function processEvolutionWebhookPayload(
@@ -11,7 +12,7 @@ export async function processEvolutionWebhookPayload(
 ) {
   const normalized = normalizeEvolutionWebhookPayload(payload)
 
-  console.info('[evolution-webhook] normalized payload', {
+  safeLog('info', '[evolution-webhook] normalized payload', {
     eventOriginal: normalized.originalEvent,
     eventNormalized: normalized.event,
     shouldProcessInboundMessage: normalized.shouldProcessInboundMessage,

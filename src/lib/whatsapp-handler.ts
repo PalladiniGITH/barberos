@@ -12,6 +12,7 @@ import {
   resolveWhatsAppTenantFromEvolutionPayload,
   type WhatsAppTenantResolutionResult,
 } from '@/lib/whatsapp-tenant'
+import { safeLog } from '@/lib/security/safe-logger'
 
 export interface IncomingWhatsAppMessage {
   provider: 'EVOLUTION'
@@ -535,7 +536,7 @@ async function aggregateInboundMessages(input: {
   ) {
     activeWindowMs = Math.max(activeWindowMs, FORMING_BOOKING_TURN_SENSITIVE_WINDOW_MS)
 
-    console.info('[handler] ongoing turn preserved context', {
+    safeLog('info', '[handler] ongoing turn preserved context', {
       conversationId: conversation.id,
       state: aggregationState,
       updatedAt: conversation.updatedAt.toISOString(),
@@ -544,7 +545,7 @@ async function aggregateInboundMessages(input: {
     })
   }
 
-  console.info('[whatsapp-agent] aggregation window used', {
+  safeLog('info', '[whatsapp-agent] aggregation window used', {
     conversationId: conversation.id,
     state: aggregationState,
     windowMs: activeWindowMs,
@@ -554,7 +555,7 @@ async function aggregateInboundMessages(input: {
   })
 
   if (fragmentedBookingTurn.active) {
-    console.info('[whatsapp-agent] fragmented turn state', {
+    safeLog('info', '[whatsapp-agent] fragmented turn state', {
       conversationId: conversation.id,
       state: aggregationState,
       rawMessages: [...previousBuffer, normalizedMessage],
@@ -564,28 +565,29 @@ async function aggregateInboundMessages(input: {
   }
 
   if (previousBuffer.length > 0 && aggregationState === 'IDLE') {
-    console.info(
+    safeLog(
+      'info',
       fragmentedBookingTurn.active
         ? '[whatsapp-agent] blocked immediate processing due to in-progress turn'
         : '[whatsapp-agent] blocked immediate processing due to pending buffer',
       {
-      conversationId: conversation.id,
-      state: aggregationState,
-      message: normalizedMessage,
-      bufferedMessages: previousBuffer,
+        conversationId: conversation.id,
+        state: aggregationState,
+        message: normalizedMessage,
+        bufferedMessages: previousBuffer,
       }
     )
   }
 
   if (fragmentedBookingTurn.active) {
-    console.info('[whatsapp-agent] turn still forming', {
+    safeLog('info', '[whatsapp-agent] turn still forming', {
       conversationId: conversation.id,
       state: aggregationState,
       rawMessages: [...previousBuffer, normalizedMessage],
       fragments: fragmentedBookingTurn.summary,
     })
 
-    console.info('[whatsapp-agent] delayed due to fragmented scheduling intent', {
+    safeLog('info', '[whatsapp-agent] delayed due to fragmented scheduling intent', {
       conversationId: conversation.id,
       state: aggregationState,
       windowMs: activeWindowMs,
@@ -605,14 +607,14 @@ async function aggregateInboundMessages(input: {
   })
 
   if (previousBuffer.length > 0) {
-    console.info('[whatsapp-agent] buffer carried across sequential messages', {
+    safeLog('info', '[whatsapp-agent] buffer carried across sequential messages', {
       conversationId: conversation.id,
       state: aggregationState,
       bufferedMessages: previousBuffer,
       incomingMessage: normalizedMessage,
     })
 
-    console.info('[whatsapp-agent] merged into existing pending buffer', {
+    safeLog('info', '[whatsapp-agent] merged into existing pending buffer', {
       conversationId: conversation.id,
       state: aggregationState,
       rawMessages: nextBuffer,
@@ -620,7 +622,7 @@ async function aggregateInboundMessages(input: {
     })
 
     if (fragmentedBookingTurn.active) {
-      console.info('[whatsapp-agent] merged fragmented booking turn', {
+      safeLog('info', '[whatsapp-agent] merged fragmented booking turn', {
         conversationId: conversation.id,
         state: aggregationState,
         rawMessages: nextBuffer,
@@ -629,7 +631,7 @@ async function aggregateInboundMessages(input: {
     }
   }
 
-  console.info('[whatsapp-agent] buffered message', {
+  safeLog('info', '[whatsapp-agent] buffered message', {
     conversationId: conversation.id,
     state: aggregationState,
     windowMs: activeWindowMs,
@@ -638,7 +640,7 @@ async function aggregateInboundMessages(input: {
     nextBufferedCount: nextBuffer.length,
   })
 
-  console.info('[whatsapp-agent] waiting for aggregation window', {
+  safeLog('info', '[whatsapp-agent] waiting for aggregation window', {
     conversationId: conversation.id,
     state: aggregationState,
     windowMs: activeWindowMs,
@@ -660,7 +662,7 @@ async function aggregateInboundMessages(input: {
     waitStartedAt: now,
     lastMessageTimestamp: latestConversation.lastMessageTimestamp,
   })) {
-    console.info('[whatsapp-agent] debounce timer restarted', {
+    safeLog('info', '[whatsapp-agent] debounce timer restarted', {
       conversationId: conversation.id,
       state: aggregationState,
       previousWaitStartedAt: now.toISOString(),
@@ -688,14 +690,14 @@ async function aggregateInboundMessages(input: {
     },
   })
 
-  console.info('[whatsapp-agent] message aggregation', {
+  safeLog('info', '[whatsapp-agent] message aggregation', {
     state: aggregationState,
     windowMs: activeWindowMs,
     rawMessages,
     concatenatedMessage,
   })
 
-  console.info('[whatsapp-agent] final merged turn emitted', {
+  safeLog('info', '[whatsapp-agent] final merged turn emitted', {
     conversationId: conversation.id,
     state: aggregationState,
     windowMs: activeWindowMs,
@@ -821,9 +823,9 @@ export async function handleIncomingWhatsAppMessage(input: IncomingWhatsAppMessa
   const tenantResolutionLog = buildTenantLogContext(tenantResolution)
 
   if (tenantResolution.status === 'resolved' && tenantResolution.barbershop) {
-    console.info('[whatsapp-handler] tenant resolved', tenantResolutionLog)
+    safeLog('info', '[whatsapp-handler] tenant resolved', tenantResolutionLog)
   } else {
-    console.warn('[whatsapp-handler] tenant resolution failed', tenantResolutionLog)
+    safeLog('warn', '[whatsapp-handler] tenant resolution failed', tenantResolutionLog)
   }
 
   const barbershop = tenantResolution.barbershop

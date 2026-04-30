@@ -23,6 +23,8 @@ import {
   resolveProfessionalServicePrice,
 } from '@/lib/professionals/operational-config'
 import { findSessionProfessional } from '@/lib/professionals/session-professional'
+import { assertCanManageAppointment } from '@/lib/security/guards'
+import { safeLog } from '@/lib/security/safe-logger'
 
 type ActionResult = { success: true } | { success: false; error: string }
 type Session = Awaited<ReturnType<typeof requireSession>>
@@ -128,6 +130,8 @@ async function getBarbershopTimezone(barbershopId: string) {
 }
 
 async function resolveSchedulingActorScope(session: Session): Promise<SchedulingActorScope> {
+  assertCanManageAppointment(session.user.role)
+
   if (!isBarberRole(session.user.role)) {
     return {
       isBarber: false,
@@ -618,7 +622,11 @@ export async function createAppointment(rawData: unknown): Promise<ActionResult>
     revalidateSchedulePaths()
     return { success: true }
   } catch (error) {
-    console.error('createAppointment error', error)
+    safeLog('error', '[appointments] create failed', {
+      barbershopId,
+      role: session.user.role,
+      error,
+    })
     return { success: false, error: 'Nao foi possivel salvar o agendamento.' }
   }
 }
@@ -758,7 +766,12 @@ export async function updateAppointment(id: string, rawData: unknown): Promise<A
     revalidateSchedulePaths()
     return { success: true }
   } catch (error) {
-    console.error('updateAppointment error', error)
+    safeLog('error', '[appointments] update failed', {
+      appointmentId: id,
+      barbershopId,
+      role: session.user.role,
+      error,
+    })
     return { success: false, error: 'Nao foi possivel atualizar o agendamento.' }
   }
 }
@@ -809,7 +822,12 @@ export async function updateAppointmentStatus(id: string, rawStatus: unknown): P
     revalidateSchedulePaths()
     return { success: true }
   } catch (error) {
-    console.error('updateAppointmentStatus error', error)
+    safeLog('error', '[appointments] status update failed', {
+      appointmentId: id,
+      barbershopId,
+      role: session.user.role,
+      error,
+    })
     return { success: false, error: 'Nao foi possivel atualizar o status.' }
   }
 }
@@ -888,7 +906,12 @@ export async function moveAppointmentSlot(id: string, rawData: unknown): Promise
     revalidateSchedulePaths()
     return { success: true }
   } catch (error) {
-    console.error('moveAppointmentSlot error', error)
+    safeLog('error', '[appointments] move failed', {
+      appointmentId: id,
+      barbershopId,
+      role: session.user.role,
+      error,
+    })
     return { success: false, error: 'Nao foi possivel mover o agendamento.' }
   }
 }
@@ -957,7 +980,11 @@ export async function createScheduleBlock(rawData: unknown): Promise<ActionResul
     revalidateSchedulePaths()
     return { success: true }
   } catch (error) {
-    console.error('createScheduleBlock error', error)
+    safeLog('error', '[appointments] block create failed', {
+      barbershopId,
+      role: session.user.role,
+      error,
+    })
     return { success: false, error: 'Nao foi possivel bloquear esse intervalo.' }
   }
 }
@@ -1032,7 +1059,12 @@ export async function moveScheduleBlock(id: string, rawData: unknown): Promise<A
     revalidateSchedulePaths()
     return { success: true }
   } catch (error) {
-    console.error('moveScheduleBlock error', error)
+    safeLog('error', '[appointments] block move failed', {
+      blockId: id,
+      barbershopId,
+      role: session.user.role,
+      error,
+    })
     return { success: false, error: 'Nao foi possivel mover o bloqueio.' }
   }
 }
@@ -1062,7 +1094,12 @@ export async function removeScheduleBlock(id: string): Promise<ActionResult> {
     revalidateSchedulePaths()
     return { success: true }
   } catch (error) {
-    console.error('removeScheduleBlock error', error)
+    safeLog('error', '[appointments] block remove failed', {
+      blockId: id,
+      barbershopId,
+      role: session.user.role,
+      error,
+    })
     return { success: false, error: 'Nao foi possivel remover o bloqueio.' }
   }
 }

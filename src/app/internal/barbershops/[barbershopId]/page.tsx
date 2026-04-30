@@ -1,8 +1,9 @@
 import Link from 'next/link'
-import { requirePlatformSession } from '@/lib/auth'
 import { getPlatformBarbershopDetailData } from '@/lib/platform-admin'
 import { PageHeader } from '@/components/layout/page-header'
 import { PlatformBarbershopDetail } from '@/components/internal/platform-barbershop-detail'
+import { requirePlatformAdmin } from '@/lib/security/guards'
+import { safeLog } from '@/lib/security/safe-logger'
 
 interface PlatformBarbershopDetailPageProps {
   params: {
@@ -13,23 +14,23 @@ interface PlatformBarbershopDetailPageProps {
 export default async function PlatformBarbershopDetailPage({
   params,
 }: PlatformBarbershopDetailPageProps) {
-  const session = await requirePlatformSession()
+  const session = await requirePlatformAdmin()
 
   try {
     const data = await getPlatformBarbershopDetailData(
       {
-        userId: session.user.id,
-        platformRole: session.user.platformRole,
+        userId: session.userId,
+        platformRole: session.platformRole,
       },
       params.barbershopId
     )
 
     return <PlatformBarbershopDetail data={data} />
   } catch (error) {
-    console.error('[platform-admin] detail failed', {
-      userId: session.user.id,
+    safeLog('error', '[platform-admin] detail failed', {
+      userId: session.userId,
       barbershopId: params.barbershopId,
-      error: error instanceof Error ? error.message : String(error),
+      error,
     })
 
     return (

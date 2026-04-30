@@ -10,6 +10,7 @@ import {
 } from '@/lib/ai/openai-pricing'
 import { assertPlatformRoleAllowed } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { safeLog } from '@/lib/security/safe-logger'
 import { formatDateTimeInTimezone, resolveBusinessTimezone } from '@/lib/timezone'
 
 const RECENT_ERROR_LIMIT = 8
@@ -349,9 +350,7 @@ async function getAiUsageLogColumnAvailability(): Promise<AiUsageLogColumnAvaila
       status: columns.has('status'),
     }
   } catch (error) {
-    console.warn('[platform-admin] usage_schema_probe_failed', {
-      error: error instanceof Error ? error.message : String(error),
-    })
+    safeLog('warn', '[platform-admin] usage_schema_probe_failed', { error })
 
     return {
       estimatedCostUsd: false,
@@ -412,9 +411,9 @@ async function recordPlatformAuditLog(input: {
       },
     })
   } catch (error) {
-    console.warn('[platform-admin] audit_log_failed', {
+    safeLog('warn', '[platform-admin] audit_log_failed', {
       action: input.action,
-      error: error instanceof Error ? error.message : String(error),
+      error,
     })
   }
 }
@@ -557,9 +556,9 @@ async function loadOverviewAiUsageData(input: {
       failedAiUsage,
     }
   } catch (error) {
-    console.error('[platform-admin] usage loaded failed', {
+    safeLog('error', '[platform-admin] usage loaded failed', {
       stage: 'overview',
-      error: error instanceof Error ? error.message : String(error),
+      error,
     })
     input.warnings.push('Nao foi possivel carregar todas as metricas de IA desta visao. O restante do painel continua disponivel.')
     return {
@@ -741,10 +740,10 @@ async function loadDetailAiUsageData(input: {
       failedAiUsage,
     }
   } catch (error) {
-    console.error('[platform-admin] usage loaded failed', {
+    safeLog('error', '[platform-admin] usage loaded failed', {
       stage: 'detail',
       barbershopId: input.barbershopId,
-      error: error instanceof Error ? error.message : String(error),
+      error,
     })
     input.warnings.push('Parte da telemetria de IA desta barbearia nao ficou disponivel nesta leitura. O restante do detalhe continua carregado.')
     return {
@@ -763,7 +762,7 @@ export async function getPlatformOverviewData(
   filters: PlatformOverviewFilters
 ): Promise<PlatformOverviewData> {
   assertPlatformRoleAllowed(session.platformRole)
-  console.info('[platform-admin] overview started', {
+  safeLog('info', '[platform-admin] overview started', {
     userId: session.userId,
     filters: {
       search: normalizeText(filters.search) || null,
@@ -916,7 +915,7 @@ export async function getPlatformOverviewData(
       }),
     ])
 
-    console.info('[platform-admin] tenants loaded', {
+    safeLog('info', '[platform-admin] tenants loaded', {
       count: barbershops.length,
     })
 
@@ -931,7 +930,7 @@ export async function getPlatformOverviewData(
       warnings,
     })
 
-    console.info('[platform-admin] usage loaded', {
+    safeLog('info', '[platform-admin] usage loaded', {
       tenantsWithUsage: usageGroups.length,
       warnings: warnings.length,
     })
@@ -1013,7 +1012,7 @@ export async function getPlatformOverviewData(
       .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
       .slice(0, RECENT_ERROR_LIMIT)
 
-    console.info('[platform-admin] costs computed', {
+    safeLog('info', '[platform-admin] costs computed', {
       tokens: rows.reduce((sum, item) => sum + item.aiTokensThisMonth, 0),
       estimatedCostUsd: rows.reduce((sum, item) => sum + item.aiEstimatedCostUsd, 0),
     })
@@ -1060,9 +1059,9 @@ export async function getPlatformOverviewData(
       recentErrors,
     }
   } catch (error) {
-    console.error('[platform-admin] overview failed', {
+    safeLog('error', '[platform-admin] overview failed', {
       userId: session.userId,
-      error: error instanceof Error ? error.message : String(error),
+      error,
     })
 
     return createEmptyPlatformOverviewData(filters, [

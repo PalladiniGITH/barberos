@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
   AuthenticationRequiredError,
-  requireSession,
 } from '@/lib/auth'
 import {
   deleteProfessionalAvatarFile,
@@ -11,6 +10,12 @@ import {
   ProfessionalAvatarUploadError,
 } from '@/lib/professionals/avatar-storage'
 import { revalidateProfessionalSurfaces } from '@/lib/professionals/revalidation'
+import {
+  assertCanManageProfessional,
+  ensureResourceBelongsToBarbershop,
+  requireAuthenticatedUser,
+} from '@/lib/security/guards'
+import { safeLog } from '@/lib/security/safe-logger'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -24,11 +29,8 @@ export async function POST(
   context: { params: { professionalId: string } }
 ) {
   try {
-    const session = await requireSession()
-
-    if (session.user.role === 'BARBER') {
-      return jsonError('Sem permissao para alterar fotos da equipe.', 403)
-    }
+    const session = await requireAuthenticatedUser()
+    assertCanManageProfessional(session.role, 'Sem permissao para alterar fotos da equipe.')
 
     const professionalId = context.params.professionalId
     const professional = await prisma.professional.findUnique({
@@ -40,9 +42,14 @@ export async function POST(
       },
     })
 
-    if (!professional || professional.barbershopId !== session.user.barbershopId) {
+    if (!professional) {
       return jsonError('Profissional nao encontrado para este tenant.', 404)
     }
+    ensureResourceBelongsToBarbershop(
+      professional.barbershopId,
+      session.barbershopId,
+      'Profissional nao encontrado para este tenant.'
+    )
 
     const formData = await request.formData()
     const uploadedFile = formData.get('file')
@@ -53,7 +60,7 @@ export async function POST(
 
     const storedAvatar = await storeProfessionalAvatarFile({
       file: uploadedFile,
-      barbershopId: session.user.barbershopId,
+      barbershopId: session.barbershopId,
       professionalId,
     })
 
@@ -78,15 +85,29 @@ export async function POST(
       { status: 200 }
     )
   } catch (error) {
-    if (error instanceof AuthenticationRequiredError) {
+    if (
+      error instanceof AuthenticationRequiredError
+      || (error instanceof Error && error.name === 'AuthenticationRequiredError')
+    ) {
       return jsonError('Sessao expirada. Entre novamente para enviar a foto.', 401)
     }
 
-    if (error instanceof ProfessionalAvatarUploadError) {
-      return jsonError(error.message, error.statusCode)
+    if (error instanceof Error && error.name === 'AuthorizationError') {
+      return jsonError(error.message, 403)
     }
 
-    console.error('[professional-avatar-upload] unexpected error', error)
+    if (
+      error instanceof ProfessionalAvatarUploadError
+      || (error instanceof Error && error.name === 'ProfessionalAvatarUploadError')
+    ) {
+      const uploadError = error as ProfessionalAvatarUploadError
+      return jsonError(uploadError.message, uploadError.statusCode ?? 400)
+    }
+
+    safeLog('error', '[professional-avatar-upload] unexpected error', {
+      professionalId: context.params.professionalId,
+      error,
+    })
     return jsonError('Nao foi possivel enviar a foto agora.', 500)
   }
 }

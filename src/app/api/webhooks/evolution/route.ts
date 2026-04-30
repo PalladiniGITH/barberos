@@ -4,6 +4,7 @@ import {
   normalizeEvolutionWebhookPayload,
 } from '@/lib/integrations/evolution'
 import { processEvolutionWebhookPayload } from '@/lib/integrations/evolution-webhook'
+import { safeLog } from '@/lib/security/safe-logger'
 
 export const runtime = 'nodejs'
 
@@ -27,10 +28,7 @@ export async function POST(request: Request) {
   }
 
   const normalized = normalizeEvolutionWebhookPayload(payload)
-  const phone = normalized.remotePhone
-  const message = normalized.text
-
-  console.info('[evolution-webhook] normalized payload', {
+  safeLog('info', '[evolution-webhook] normalized payload', {
     eventOriginal: normalized.originalEvent,
     eventNormalized: normalized.event,
     shouldProcessInboundMessage: normalized.shouldProcessInboundMessage,
@@ -40,7 +38,7 @@ export async function POST(request: Request) {
   })
 
   if (!normalized.shouldProcessInboundMessage) {
-    console.warn('[evolution-webhook] inbound message ignored before handler', {
+    safeLog('warn', '[evolution-webhook] inbound message ignored before handler', {
       eventOriginal: normalized.originalEvent,
       eventNormalized: normalized.event,
       shouldProcessInboundMessage: normalized.shouldProcessInboundMessage,
@@ -53,7 +51,7 @@ export async function POST(request: Request) {
   const result = await processEvolutionWebhookPayload(payload)
 
   if (result.code === 409 || result.code === 202) {
-    console.warn('[evolution-webhook] tenant not processed', {
+    safeLog('warn', '[evolution-webhook] tenant not processed', {
       instanceNameReceived: 'diagnostics' in result ? result.diagnostics?.instanceNameReceived ?? normalized.instanceName : normalized.instanceName,
       routeSlug: 'diagnostics' in result ? result.diagnostics?.routeSlug ?? null : null,
       barbershopId: 'diagnostics' in result ? result.diagnostics?.barbershopId ?? null : null,
@@ -76,8 +74,6 @@ export async function POST(request: Request) {
           ok: result.ok,
           reason: result.reason,
           eventId: result.eventId,
-          phone,
-          message,
           customerId: 'customerId' in result ? result.customerId : undefined,
           customerCreated: 'customerCreated' in result ? result.customerCreated : undefined,
           conversationId: 'conversationId' in result ? result.conversationId : undefined,

@@ -3,6 +3,7 @@ import {
   ProfessionalAvatarUploadError,
   readProfessionalAvatarFile,
 } from '@/lib/professionals/avatar-storage'
+import { safeLog } from '@/lib/security/safe-logger'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -31,11 +32,19 @@ export async function GET(
       },
     })
   } catch (error) {
-    if (error instanceof ProfessionalAvatarUploadError) {
-      return new NextResponse(error.message, { status: error.statusCode })
+    if (
+      error instanceof ProfessionalAvatarUploadError
+      || (error instanceof Error && error.name === 'ProfessionalAvatarUploadError')
+    ) {
+      const uploadError = error as ProfessionalAvatarUploadError
+      return new NextResponse(uploadError.message, { status: uploadError.statusCode ?? 400 })
     }
 
-    console.error('[professional-avatar-file] unexpected error', error)
+    safeLog('error', '[professional-avatar-file] unexpected error', {
+      barbershopId: context.params.barbershopId,
+      fileName: context.params.fileName,
+      error,
+    })
     return new NextResponse('Internal Server Error', { status: 500 })
   }
 }

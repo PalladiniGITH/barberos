@@ -3,8 +3,13 @@
 import { CategoryType } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { requireSession, assertOwnership, assertAdministrativeRole, AuthorizationError } from '@/lib/auth'
+import { assertOwnership, AuthorizationError } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
+import {
+  assertCanManageFinance,
+  ensureResourceBelongsToBarbershop,
+  requireAuthenticatedUser,
+} from '@/lib/security/guards'
 
 const RevenueSchema = z.object({
   amount: z.string().transform((value) => parseFloat(value)).pipe(
@@ -40,7 +45,7 @@ type ActionResult = { success: true } | { success: false; error: string }
 
 function blockBarberFinancialAction(role: string) {
   try {
-    assertAdministrativeRole(role, 'Sem permissao para alterar dados financeiros da barbearia.')
+    assertCanManageFinance(role, 'Sem permissao para alterar dados financeiros da barbearia.')
     return null
   } catch (error) {
     if (error instanceof AuthorizationError) {
@@ -52,9 +57,9 @@ function blockBarberFinancialAction(role: string) {
 }
 
 export async function addFinancialCategory(rawData: unknown): Promise<ActionResult> {
-  const session = await requireSession()
-  const { barbershopId } = session.user
-  const blocked = blockBarberFinancialAction(session.user.role)
+  const session = await requireAuthenticatedUser()
+  const { barbershopId } = session
+  const blocked = blockBarberFinancialAction(session.role)
 
   if (blocked) {
     return blocked
@@ -97,9 +102,9 @@ export async function addFinancialCategory(rawData: unknown): Promise<ActionResu
 }
 
 export async function addRevenue(rawData: unknown): Promise<ActionResult> {
-  const session = await requireSession()
-  const { barbershopId } = session.user
-  const blocked = blockBarberFinancialAction(session.user.role)
+  const session = await requireAuthenticatedUser()
+  const { barbershopId } = session
+  const blocked = blockBarberFinancialAction(session.role)
 
   if (blocked) {
     return blocked
@@ -137,16 +142,21 @@ export async function addRevenue(rawData: unknown): Promise<ActionResult> {
 }
 
 export async function updateRevenue(id: string, rawData: unknown): Promise<ActionResult> {
-  const session = await requireSession()
-  const { barbershopId } = session.user
-  const blocked = blockBarberFinancialAction(session.user.role)
+  const session = await requireAuthenticatedUser()
+  const { barbershopId } = session
+  const blocked = blockBarberFinancialAction(session.role)
 
   if (blocked) {
     return blocked
   }
 
   const existing = await prisma.revenue.findUnique({ where: { id }, select: { barbershopId: true } })
-  if (!existing || existing.barbershopId !== barbershopId) {
+  if (!existing) {
+    return { success: false, error: 'Nao autorizado' }
+  }
+  try {
+    ensureResourceBelongsToBarbershop(existing.barbershopId, barbershopId, 'Nao autorizado')
+  } catch {
     return { success: false, error: 'Nao autorizado' }
   }
 
@@ -181,15 +191,20 @@ export async function updateRevenue(id: string, rawData: unknown): Promise<Actio
 }
 
 export async function deleteRevenue(id: string): Promise<ActionResult> {
-  const session = await requireSession()
-  const blocked = blockBarberFinancialAction(session.user.role)
+  const session = await requireAuthenticatedUser()
+  const blocked = blockBarberFinancialAction(session.role)
 
   if (blocked) {
     return blocked
   }
 
   const rev = await prisma.revenue.findUnique({ where: { id }, select: { barbershopId: true } })
-  if (!rev || rev.barbershopId !== session.user.barbershopId) {
+  if (!rev) {
+    return { success: false, error: 'Nao autorizado' }
+  }
+  try {
+    ensureResourceBelongsToBarbershop(rev.barbershopId, session.barbershopId, 'Nao autorizado')
+  } catch {
     return { success: false, error: 'Nao autorizado' }
   }
   await prisma.revenue.delete({ where: { id } })
@@ -199,9 +214,9 @@ export async function deleteRevenue(id: string): Promise<ActionResult> {
 }
 
 export async function addExpense(rawData: unknown): Promise<ActionResult> {
-  const session = await requireSession()
-  const { barbershopId } = session.user
-  const blocked = blockBarberFinancialAction(session.user.role)
+  const session = await requireAuthenticatedUser()
+  const { barbershopId } = session
+  const blocked = blockBarberFinancialAction(session.role)
 
   if (blocked) {
     return blocked
@@ -234,16 +249,21 @@ export async function addExpense(rawData: unknown): Promise<ActionResult> {
 }
 
 export async function updateExpense(id: string, rawData: unknown): Promise<ActionResult> {
-  const session = await requireSession()
-  const { barbershopId } = session.user
-  const blocked = blockBarberFinancialAction(session.user.role)
+  const session = await requireAuthenticatedUser()
+  const { barbershopId } = session
+  const blocked = blockBarberFinancialAction(session.role)
 
   if (blocked) {
     return blocked
   }
 
   const existing = await prisma.expense.findUnique({ where: { id }, select: { barbershopId: true } })
-  if (!existing || existing.barbershopId !== barbershopId) {
+  if (!existing) {
+    return { success: false, error: 'Nao autorizado' }
+  }
+  try {
+    ensureResourceBelongsToBarbershop(existing.barbershopId, barbershopId, 'Nao autorizado')
+  } catch {
     return { success: false, error: 'Nao autorizado' }
   }
 
@@ -274,15 +294,20 @@ export async function updateExpense(id: string, rawData: unknown): Promise<Actio
 }
 
 export async function deleteExpense(id: string): Promise<ActionResult> {
-  const session = await requireSession()
-  const blocked = blockBarberFinancialAction(session.user.role)
+  const session = await requireAuthenticatedUser()
+  const blocked = blockBarberFinancialAction(session.role)
 
   if (blocked) {
     return blocked
   }
 
   const exp = await prisma.expense.findUnique({ where: { id }, select: { barbershopId: true } })
-  if (!exp || exp.barbershopId !== session.user.barbershopId) {
+  if (!exp) {
+    return { success: false, error: 'Nao autorizado' }
+  }
+  try {
+    ensureResourceBelongsToBarbershop(exp.barbershopId, session.barbershopId, 'Nao autorizado')
+  } catch {
     return { success: false, error: 'Nao autorizado' }
   }
   await prisma.expense.delete({ where: { id } })
@@ -292,15 +317,20 @@ export async function deleteExpense(id: string): Promise<ActionResult> {
 }
 
 export async function markExpensePaid(id: string): Promise<ActionResult> {
-  const session = await requireSession()
-  const blocked = blockBarberFinancialAction(session.user.role)
+  const session = await requireAuthenticatedUser()
+  const blocked = blockBarberFinancialAction(session.role)
 
   if (blocked) {
     return blocked
   }
 
   const exp = await prisma.expense.findUnique({ where: { id }, select: { barbershopId: true } })
-  if (!exp || exp.barbershopId !== session.user.barbershopId) {
+  if (!exp) {
+    return { success: false, error: 'Nao autorizado' }
+  }
+  try {
+    ensureResourceBelongsToBarbershop(exp.barbershopId, session.barbershopId, 'Nao autorizado')
+  } catch {
     return { success: false, error: 'Nao autorizado' }
   }
   await prisma.expense.update({ where: { id }, data: { paid: true, paidAt: new Date() } })

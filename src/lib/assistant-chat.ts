@@ -24,6 +24,7 @@ import type {
 import { generateInternalAssistantAnswer } from '@/lib/ai/internal-assistant'
 import { recordAiUsage } from '@/lib/ai/usage-log'
 import { prisma } from '@/lib/prisma'
+import { safeLog } from '@/lib/security/safe-logger'
 import { formatDateTimeInTimezone, resolveBusinessTimezone } from '@/lib/timezone'
 
 const MAX_THREAD_MESSAGES = 40
@@ -39,25 +40,13 @@ interface AssistantSessionIdentity {
 }
 
 function logAssistantWidgetEvent(stage: string, input: Record<string, unknown>) {
-  console.info(`[assistant-widget] ${stage}`, input)
+  safeLog('info', `[assistant-widget] ${stage}`, input)
 }
 
 function logAssistantWidgetError(stage: string, input: Record<string, unknown>, error: unknown) {
-  const details = error instanceof Error
-    ? {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-      }
-    : {
-        name: 'UnknownError',
-        message: String(error),
-        stack: null,
-      }
-
-  console.error(`[assistant-widget] ${stage}`, {
+  safeLog('error', `[assistant-widget] ${stage}`, {
     ...input,
-    error: details,
+    error,
   })
 }
 

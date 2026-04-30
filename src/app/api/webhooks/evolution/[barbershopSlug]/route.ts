@@ -4,6 +4,7 @@ import {
   normalizeEvolutionWebhookPayload,
 } from '@/lib/integrations/evolution'
 import { processEvolutionWebhookPayload } from '@/lib/integrations/evolution-webhook'
+import { safeLog } from '@/lib/security/safe-logger'
 
 export const runtime = 'nodejs'
 
@@ -35,7 +36,7 @@ export async function POST(
   })
 
   if (result.code === 409 || result.code === 202) {
-    console.warn('[evolution-webhook] tenant not processed', {
+    safeLog('warn', '[evolution-webhook] tenant not processed', {
       routeSlug: context.params.barbershopSlug,
       instanceNameReceived: 'diagnostics' in result ? result.diagnostics?.instanceNameReceived ?? normalized.instanceName : normalized.instanceName,
       matchedBy: 'diagnostics' in result ? result.diagnostics?.matchedBy ?? null : null,
@@ -55,8 +56,6 @@ export async function POST(
           ok: result.ok,
           reason: result.reason,
           eventId: result.eventId,
-          phone: normalized.remotePhone,
-          message: normalized.text,
           customerId: 'customerId' in result ? result.customerId : undefined,
           customerCreated: 'customerCreated' in result ? result.customerCreated : undefined,
           conversationId: 'conversationId' in result ? result.conversationId : undefined,
