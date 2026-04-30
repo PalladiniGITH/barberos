@@ -6,6 +6,7 @@ import {
 } from '@/lib/auth'
 import {
   deleteProfessionalAvatarFile,
+  isUploadedFileLike,
   storeProfessionalAvatarFile,
   ProfessionalAvatarUploadError,
 } from '@/lib/professionals/avatar-storage'
@@ -46,7 +47,7 @@ export async function POST(
     const formData = await request.formData()
     const uploadedFile = formData.get('file')
 
-    if (!(uploadedFile instanceof File)) {
+    if (!isUploadedFileLike(uploadedFile)) {
       return jsonError('Selecione uma imagem valida para continuar.', 400)
     }
 
@@ -89,4 +90,3 @@ export async function POST(
     return jsonError('Nao foi possivel enviar a foto agora.', 500)
   }
 }
-

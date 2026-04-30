@@ -33,12 +33,39 @@ export class ProfessionalAvatarUploadError extends Error {
   }
 }
 
+export interface UploadedFileLike {
+  arrayBuffer: () => Promise<ArrayBuffer>
+  size: number
+  type: string
+  name?: string | null
+}
+
 export interface ProfessionalAvatarStorageConfig {
   driver: 'local'
   publicBaseUrl: string
   localDir: string
   maxFileSizeMb: number
   maxFileSizeBytes: number
+}
+
+export function isUploadedFileLike(value: unknown): value is UploadedFileLike {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  const candidateValue = value as Partial<UploadedFileLike>
+
+  return (
+    typeof candidateValue.arrayBuffer === 'function' &&
+    typeof candidateValue.size === 'number' &&
+    Number.isFinite(candidateValue.size) &&
+    candidateValue.size >= 0 &&
+    typeof candidateValue.type === 'string' &&
+    (!('name' in candidateValue) ||
+      candidateValue.name === undefined ||
+      candidateValue.name === null ||
+      typeof candidateValue.name === 'string')
+  )
 }
 
 function parsePositiveInteger(value: string | undefined, fallbackValue: number) {
@@ -300,13 +327,20 @@ export async function deleteProfessionalAvatarFile(
 }
 
 export async function storeProfessionalAvatarFile(input: {
-  file: File
+  file: UploadedFileLike
   barbershopId: string
   professionalId: string
   env?: NodeJS.ProcessEnv
 }) {
   const env = input.env ?? process.env
   const config = resolveProfessionalAvatarStorageConfig(env)
+
+  if (!isUploadedFileLike(input.file)) {
+    throw new ProfessionalAvatarUploadError(
+      'Selecione uma imagem valida para continuar.',
+      400
+    )
+  }
 
   if (!PROFESSIONAL_AVATAR_ALLOWED_MIME_TYPES.includes(
     input.file.type as ProfessionalAvatarAllowedMimeType
