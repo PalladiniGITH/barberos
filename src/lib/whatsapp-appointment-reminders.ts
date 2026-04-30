@@ -55,6 +55,8 @@ export interface ReminderAppointmentContext {
   dateIso: string
   dateLabel: string
   timeLabel: string
+  confirmationReminderSentAt: Date | null
+  confirmationRequestedAt: Date | null
 }
 
 function getAutomationRunnerSecret() {
@@ -95,6 +97,12 @@ function normalizeLeadMinutes(rawValue: string | undefined, fallback: number) {
   return parsed
 }
 
+function getReminderConfirmationExpirationThreshold(now: Date) {
+  return new Date(
+    now.getTime() - getWhatsAppAppointmentConfirmationToleranceMinutes() * 60_000
+  )
+}
+
 function serializeReminderAppointment(input: {
   appointment: {
     id: string
@@ -108,6 +116,8 @@ function serializeReminderAppointment(input: {
     barbershop: { name: string, slug?: string | null, timezone: string | null }
     professional: { id: string, name: string }
     service: { id: string, name: string }
+    confirmationReminderSentAt: Date | null
+    confirmationRequestedAt: Date | null
   }
 }) {
   const timezone = resolveBusinessTimezone(input.appointment.barbershop.timezone)
@@ -133,8 +143,47 @@ function serializeReminderAppointment(input: {
     dateIso,
     dateLabel: formatDayLabelFromIsoDate(dateIso, timezone),
     timeLabel: formatTimeInTimezone(input.appointment.startAt, timezone),
+    confirmationReminderSentAt: input.appointment.confirmationReminderSentAt,
+    confirmationRequestedAt: input.appointment.confirmationRequestedAt,
   } satisfies ReminderAppointmentContext
 }
+
+const REMINDER_APPOINTMENT_SELECT = {
+  id: true,
+  barbershopId: true,
+  customerId: true,
+  source: true,
+  status: true,
+  startAt: true,
+  endAt: true,
+  confirmationReminderSentAt: true,
+  confirmationRequestedAt: true,
+  customer: {
+    select: {
+      name: true,
+      phone: true,
+    },
+  },
+  barbershop: {
+    select: {
+      name: true,
+      slug: true,
+      timezone: true,
+    },
+  },
+  professional: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+  service: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+} satisfies Prisma.AppointmentSelect
 
 export function getWhatsAppAppointmentConfirmationLeadMinutes() {
   return normalizeLeadMinutes(
@@ -265,6 +314,8 @@ async function loadDueAppointmentsForReminder(input: {
       status: true,
       startAt: true,
       endAt: true,
+      confirmationReminderSentAt: true,
+      confirmationRequestedAt: true,
       customer: {
         select: {
           name: true,
@@ -307,6 +358,8 @@ async function loadDueAppointmentsForReminder(input: {
         barbershop: appointment.barbershop,
         professional: appointment.professional,
         service: appointment.service,
+        confirmationReminderSentAt: appointment.confirmationReminderSentAt,
+        confirmationRequestedAt: appointment.confirmationRequestedAt,
       },
     })
   )
@@ -346,6 +399,8 @@ async function loadExpiredPendingAppointments(input: {
       status: true,
       startAt: true,
       endAt: true,
+      confirmationReminderSentAt: true,
+      confirmationRequestedAt: true,
       customer: {
         select: {
           name: true,
@@ -388,6 +443,8 @@ async function loadExpiredPendingAppointments(input: {
         barbershop: appointment.barbershop,
         professional: appointment.professional,
         service: appointment.service,
+        confirmationReminderSentAt: appointment.confirmationReminderSentAt,
+        confirmationRequestedAt: appointment.confirmationRequestedAt,
       },
     })
   )
@@ -970,72 +1027,37 @@ export async function runDueWhatsAppAppointmentConfirmations(input?: {
   return summary
 }
 
-export async function findPendingReminderAppointmentForCustomer(input: {
+async function loadReminderAppointmentsForCustomer(input: {
   barbershopId: string
   customerId: string
-  now?: Date
+  now: Date
+  window: 'pending' | 'expired'
 }) {
-  const now = input.now ?? new Date()
-  const expirationThreshold = new Date(
-    now.getTime() - getWhatsAppAppointmentConfirmationToleranceMinutes() * 60_000
-  )
+  const expirationThreshold = getReminderConfirmationExpirationThreshold(input.now)
 
-  const appointment = await prisma.appointment.findFirst({
+  const appointments = await prisma.appointment.findMany({
     where: {
       barbershopId: input.barbershopId,
       customerId: input.customerId,
       source: 'WHATSAPP',
       status: { in: ['PENDING', 'CONFIRMED'] },
-      startAt: { gte: expirationThreshold },
+      startAt: input.window === 'pending'
+        ? { gte: expirationThreshold }
+        : { lt: expirationThreshold },
       confirmationReminderSentAt: { not: null },
       confirmationRequestedAt: { not: null },
       confirmationResponseAt: null,
     },
     orderBy: [
-      { confirmationRequestedAt: 'desc' },
       { startAt: 'asc' },
+      { confirmationRequestedAt: 'desc' },
     ],
-    select: {
-      id: true,
-      barbershopId: true,
-      customerId: true,
-      source: true,
-      status: true,
-      startAt: true,
-      endAt: true,
-      customer: {
-        select: {
-          name: true,
-          phone: true,
-        },
-      },
-      barbershop: {
-        select: {
-          name: true,
-          slug: true,
-          timezone: true,
-        },
-      },
-      professional: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-      service: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-    },
+    take: 6,
+    select: REMINDER_APPOINTMENT_SELECT,
   })
 
-  if (!appointment) {
-    return null
-  }
-
-  return serializeReminderAppointment({
+  return appointments.map((appointment) =>
+    serializeReminderAppointment({
       appointment: {
         id: appointment.id,
         barbershopId: appointment.barbershopId,
@@ -1044,29 +1066,74 @@ export async function findPendingReminderAppointmentForCustomer(input: {
         status: appointment.status as 'PENDING' | 'CONFIRMED',
         startAt: appointment.startAt,
         endAt: appointment.endAt,
-      customer: appointment.customer,
-      barbershop: appointment.barbershop,
-      professional: appointment.professional,
-      service: appointment.service,
-    },
+        customer: appointment.customer,
+        barbershop: appointment.barbershop,
+        professional: appointment.professional,
+        service: appointment.service,
+        confirmationReminderSentAt: appointment.confirmationReminderSentAt,
+        confirmationRequestedAt: appointment.confirmationRequestedAt,
+      },
+    })
+  )
+}
+
+export async function findPendingReminderAppointmentsForCustomer(input: {
+  barbershopId: string
+  customerId: string
+  now?: Date
+}) {
+  return loadReminderAppointmentsForCustomer({
+    barbershopId: input.barbershopId,
+    customerId: input.customerId,
+    now: input.now ?? new Date(),
+    window: 'pending',
+  })
+}
+
+export async function findPendingReminderAppointmentForCustomer(input: {
+  barbershopId: string
+  customerId: string
+  now?: Date
+}) {
+  const appointments = await findPendingReminderAppointmentsForCustomer(input)
+  return appointments[0] ?? null
+}
+
+export async function findExpiredReminderAppointmentsForCustomer(input: {
+  barbershopId: string
+  customerId: string
+  now?: Date
+}) {
+  return loadReminderAppointmentsForCustomer({
+    barbershopId: input.barbershopId,
+    customerId: input.customerId,
+    now: input.now ?? new Date(),
+    window: 'expired',
   })
 }
 
 export async function confirmAppointmentPresenceFromReminder(input: {
   appointmentId: string
   barbershopId: string
+  now?: Date
 }) {
+  const now = input.now ?? new Date()
+
   return prisma.appointment.updateMany({
     where: {
       id: input.appointmentId,
       barbershopId: input.barbershopId,
       source: 'WHATSAPP',
       status: { in: ['PENDING', 'CONFIRMED'] },
+      startAt: { gte: getReminderConfirmationExpirationThreshold(now) },
+      confirmationReminderSentAt: { not: null },
+      confirmationRequestedAt: { not: null },
+      confirmationResponseAt: null,
     },
     data: {
       status: 'CONFIRMED',
-      confirmedAt: new Date(),
-      confirmationResponseAt: new Date(),
+      confirmedAt: now,
+      confirmationResponseAt: now,
       confirmationResponseStatus: 'CONFIRMED',
     },
   })
@@ -1076,16 +1143,23 @@ export async function markAppointmentReminderResponse(input: {
   appointmentId: string
   barbershopId: string
   responseStatus: 'RESCHEDULE_REQUESTED' | 'CANCELLATION_REQUESTED'
+  now?: Date
 }) {
+  const now = input.now ?? new Date()
+
   return prisma.appointment.updateMany({
     where: {
       id: input.appointmentId,
       barbershopId: input.barbershopId,
       source: 'WHATSAPP',
       status: { in: ['PENDING', 'CONFIRMED'] },
+      startAt: { gte: getReminderConfirmationExpirationThreshold(now) },
+      confirmationReminderSentAt: { not: null },
+      confirmationRequestedAt: { not: null },
+      confirmationResponseAt: null,
     },
     data: {
-      confirmationResponseAt: new Date(),
+      confirmationResponseAt: now,
       confirmationResponseStatus: input.responseStatus,
     },
   })

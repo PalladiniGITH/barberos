@@ -954,6 +954,7 @@ export async function handleIncomingWhatsAppMessage(input: IncomingWhatsAppMessa
       inboundText: aggregatedMessage.concatenatedMessage,
       rawMessages: aggregatedMessage.rawMessages,
       eventId: existingEvent.id,
+      instanceName: tenantResolution.instanceName,
     })
     const responseText = conversation.responseText
     const outboundIntegration = await resolveWhatsAppOutboundIntegration({

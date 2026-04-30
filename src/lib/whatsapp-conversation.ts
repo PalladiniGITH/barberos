@@ -41,6 +41,7 @@ import {
   getTodayIsoInTimezone,
   nextWeekdayIsoDate,
   resolveBusinessTimezone,
+  shiftIsoDate,
   thisOrNextWeekdayIsoDate,
 } from '@/lib/timezone'
 import { resolveCustomerPreferredProfessional } from '@/lib/customers/preferred-professional'
@@ -49,6 +50,7 @@ import {
   buildCancellationSelectionMessage,
   buildCancellationStrictConfirmationMessage,
   buildEmptyOperationalDraft,
+  isReminderGreetingMessage,
   buildNoFutureAppointmentMessage,
   buildReminderResponseClarificationMessage,
   buildRescheduleConfirmationMessage,
@@ -72,8 +74,10 @@ import {
   type WhatsAppOperationalDraft,
 } from '@/lib/whatsapp-appointment-flow'
 import {
+  buildAppointmentConfirmationExpiredMessage,
   confirmAppointmentPresenceFromReminder,
-  findPendingReminderAppointmentForCustomer,
+  findExpiredReminderAppointmentsForCustomer,
+  findPendingReminderAppointmentsForCustomer,
   markAppointmentReminderResponse,
   type ReminderAppointmentContext,
 } from '@/lib/whatsapp-appointment-reminders'
@@ -121,6 +125,7 @@ interface ConversationServiceInput {
   inboundText: string
   rawMessages?: string[]
   eventId: string
+  instanceName?: string | null
 }
 
 interface ConversationServiceResult {
@@ -1410,7 +1415,7 @@ function mapReminderAppointmentToManagedAppointment(
     professionalName: appointment.professionalName,
     status: appointment.status,
     startAtIso: appointment.startAt.toISOString(),
-    endAtIso: appointment.startAt.toISOString(),
+    endAtIso: appointment.endAt.toISOString(),
     dateIso: appointment.dateIso,
     dateLabel: appointment.dateLabel,
     timeLabel: appointment.timeLabel,
@@ -2140,6 +2145,850 @@ function buildReminderNotFoundMessage() {
   return 'Nao encontrei um horario pendente de confirmacao agora. Se quiser, eu posso verificar seus proximos agendamentos por aqui.'
 }
 
+function buildReminderConfirmedDetailMessage(appointment: WhatsAppManagedAppointment) {
+  return `Perfeito, presenca confirmada para ${appointment.dateLabel.toLowerCase()} as ${appointment.timeLabel} com ${appointment.professionalName}. Te esperamos no horario combinado.`
+}
+
+function maskPhoneForLog(phone?: string | null) {
+  const digits = phone?.replace(/\D/g, '') ?? ''
+
+  if (!digits) {
+    return null
+  }
+
+  if (digits.length <= 4) {
+    return digits
+  }
+
+  return `${digits.slice(0, 2)}***${digits.slice(-4)}`
+}
+
+function buildPendingReminderFollowUpMessage(appointment: WhatsAppManagedAppointment) {
+  return [
+    `Oi! Antes de seguir, preciso da confirmacao do seu horario de ${appointment.dateLabel.toLowerCase()} as ${appointment.timeLabel}.`,
+    '',
+    '1 - Confirmo',
+    '2 - Quero remarcar',
+    '3 - Quero cancelar',
+  ].join('\n')
+}
+
+function formatPendingReminderOption(appointment: WhatsAppManagedAppointment, index: number) {
+  return [
+    `${index + 1}. ${appointment.dateLabel} - ${appointment.timeLabel}`,
+    `${appointment.serviceName} com ${appointment.professionalName} (aguardando confirmacao)`,
+  ].join('\n')
+}
+
+function buildPendingReminderOptionsMessage(input: {
+  appointments: WhatsAppManagedAppointment[]
+  requestedAction?: 'confirm' | 'reschedule' | 'cancel' | null
+  leadIn?: string | null
+}) {
+  const tail =
+    input.requestedAction === 'reschedule'
+      ? 'Me diga qual voce quer remarcar.'
+      : input.requestedAction === 'cancel'
+        ? 'Me diga qual voce quer cancelar.'
+        : 'Me diga qual voce quer confirmar, remarcar ou cancelar.'
+
+  const body = [
+    'Seus proximos horarios agendados sao:',
+    '',
+    ...input.appointments.flatMap((appointment, index) => {
+      const lines = [formatPendingReminderOption(appointment, index)]
+      if (index < input.appointments.length - 1) {
+        lines.push('')
+      }
+      return lines
+    }),
+    '',
+    tail,
+  ].join('\n')
+
+  return input.leadIn ? `${input.leadIn}\n\n${body}` : body
+}
+
+function buildPendingReminderAmbiguousMessage(appointments: WhatsAppManagedAppointment[]) {
+  return buildPendingReminderOptionsMessage({
+    appointments,
+    leadIn: 'Encontrei mais de um horario que pode ser esse.',
+  })
+}
+
+type ReminderAppointmentAction = 'confirm' | 'reschedule' | 'cancel'
+
+interface ReminderSelectionResolution {
+  status: 'none' | 'unique' | 'ambiguous'
+  appointment: WhatsAppManagedAppointment | null
+  matchedBy:
+    | 'number'
+    | 'ordinal'
+    | 'today'
+    | 'tomorrow'
+    | 'time'
+    | 'professional'
+    | 'service'
+    | null
+}
+
+function resolveReminderSelectionMatches(input: {
+  matches: WhatsAppManagedAppointment[]
+  matchedBy: ReminderSelectionResolution['matchedBy']
+}) {
+  if (input.matches.length === 1) {
+    return {
+      status: 'unique',
+      appointment: input.matches[0],
+      matchedBy: input.matchedBy,
+    } satisfies ReminderSelectionResolution
+  }
+
+  if (input.matches.length > 1) {
+    return {
+      status: 'ambiguous',
+      appointment: null,
+      matchedBy: input.matchedBy,
+    } satisfies ReminderSelectionResolution
+  }
+
+  return {
+    status: 'none',
+    appointment: null,
+    matchedBy: null,
+  } satisfies ReminderSelectionResolution
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function findAppointmentMatchesByText(
+  appointments: WhatsAppManagedAppointment[],
+  normalizedMessage: string,
+  valueResolver: (appointment: WhatsAppManagedAppointment) => string,
+) {
+  return appointments.filter((appointment) => {
+    const normalizedValue = normalizeIntentPhrase(valueResolver(appointment))
+    if (!normalizedValue) {
+      return false
+    }
+
+    if (normalizedMessage.includes(normalizedValue)) {
+      return true
+    }
+
+    return normalizedValue
+      .split(' ')
+      .filter((token) => token.length >= 4)
+      .some((token) => new RegExp(`\\b${escapeRegExp(token)}\\b`).test(normalizedMessage))
+  })
+}
+
+function resolveReminderAppointmentSelection(input: {
+  message: string
+  appointments: WhatsAppManagedAppointment[]
+  currentDateIso: string
+  allowNumericSelection: boolean
+}) {
+  const normalizedIntent = normalizeIntentPhrase(input.message)
+  const normalizedText = normalizeText(input.message)
+
+  if (!normalizedIntent) {
+    return {
+      status: 'none',
+      appointment: null,
+      matchedBy: null,
+    } satisfies ReminderSelectionResolution
+  }
+
+  if (input.allowNumericSelection) {
+    const numericSelection = parseOperationalSelectionNumber(
+      input.message,
+      input.appointments.length,
+    )
+
+    if (numericSelection) {
+      const selectedAppointment = input.appointments[numericSelection - 1] ?? null
+      if (selectedAppointment) {
+        return {
+          status: 'unique',
+          appointment: selectedAppointment,
+          matchedBy: 'number',
+        } satisfies ReminderSelectionResolution
+      }
+    }
+  }
+
+  if (/\b(o\s+)?primeiro\b/.test(normalizedIntent) && input.appointments[0]) {
+    return {
+      status: 'unique',
+      appointment: input.appointments[0],
+      matchedBy: 'ordinal',
+    } satisfies ReminderSelectionResolution
+  }
+
+  if (/\b(o\s+)?segundo\b/.test(normalizedIntent) && input.appointments[1]) {
+    return {
+      status: 'unique',
+      appointment: input.appointments[1],
+      matchedBy: 'ordinal',
+    } satisfies ReminderSelectionResolution
+  }
+
+  if (/\b(o\s+)?terceiro\b/.test(normalizedIntent) && input.appointments[2]) {
+    return {
+      status: 'unique',
+      appointment: input.appointments[2],
+      matchedBy: 'ordinal',
+    } satisfies ReminderSelectionResolution
+  }
+
+  if (/\b(hoje|de hoje|o de hoje|esse de hoje)\b/.test(normalizedIntent)) {
+    return resolveReminderSelectionMatches({
+      matches: input.appointments.filter((appointment) => appointment.dateIso === input.currentDateIso),
+      matchedBy: 'today',
+    })
+  }
+
+  if (/\b(amanha|de amanha|o de amanha|esse de amanha)\b/.test(normalizedIntent)) {
+    return resolveReminderSelectionMatches({
+      matches: input.appointments.filter(
+        (appointment) => appointment.dateIso === shiftIsoDate(input.currentDateIso, 1)
+      ),
+      matchedBy: 'tomorrow',
+    })
+  }
+
+  const timeMatch = normalizedText.match(/\b(\d{1,2}:\d{2})\b/)
+  if (timeMatch) {
+    return resolveReminderSelectionMatches({
+      matches: input.appointments.filter((appointment) => appointment.timeLabel === timeMatch[1]),
+      matchedBy: 'time',
+    })
+  }
+
+  const professionalMatches = findAppointmentMatchesByText(
+    input.appointments,
+    normalizedIntent,
+    (appointment) => appointment.professionalName,
+  )
+  if (professionalMatches.length > 0) {
+    return resolveReminderSelectionMatches({
+      matches: professionalMatches,
+      matchedBy: 'professional',
+    })
+  }
+
+  const serviceMatches = findAppointmentMatchesByText(
+    input.appointments,
+    normalizedIntent,
+    (appointment) => appointment.serviceName,
+  )
+  if (serviceMatches.length > 0) {
+    return resolveReminderSelectionMatches({
+      matches: serviceMatches,
+      matchedBy: 'service',
+    })
+  }
+
+  return {
+    status: 'none',
+    appointment: null,
+    matchedBy: null,
+  } satisfies ReminderSelectionResolution
+}
+
+function resolveReminderActionForSelectedAppointment(message: string): ReminderAppointmentAction {
+  const parsedAction = parseReminderResponseAction(message)
+
+  if (parsedAction === 'reschedule') {
+    return 'reschedule'
+  }
+
+  if (parsedAction === 'cancel') {
+    return 'cancel'
+  }
+
+  return 'confirm'
+}
+
+function buildReminderLogPayload(input: {
+  appointment: ReminderAppointmentContext | null
+  fallbackAppointment?: WhatsAppManagedAppointment | null
+  barbershopSlug: string | null
+  customerId: string
+  customerPhone?: string | null
+  statusBefore: string | null
+  statusAfter: string | null
+  confirmationStatus: string | null
+  inboundText: string
+  instanceName?: string | null
+}) {
+  return {
+    appointmentId: input.appointment?.id ?? input.fallbackAppointment?.id ?? null,
+    barbershopId: input.appointment?.barbershopId ?? input.fallbackAppointment?.barbershopId ?? null,
+    barbershopSlug: input.barbershopSlug,
+    customerId: input.customerId,
+    phoneMasked: maskPhoneForLog(input.customerPhone),
+    startAt: input.appointment?.startAt.toISOString() ?? input.fallbackAppointment?.startAtIso ?? null,
+    confirmationReminderSentAt: input.appointment?.confirmationReminderSentAt?.toISOString() ?? null,
+    statusBefore: input.statusBefore,
+    statusAfter: input.statusAfter,
+    confirmationStatus: input.confirmationStatus,
+    inboundTextNormalized: normalizeIntentPhrase(input.inboundText),
+    instanceName: input.instanceName ?? null,
+  }
+}
+
+async function handlePendingReminderConversationState(input: {
+  conversationId: string
+  inboundText: string
+  barbershop: {
+    id: string
+    name: string
+    slug: string
+    timezone: string
+  }
+  customer: {
+    id: string
+    name: string
+    created: boolean
+    phone?: string | null
+  }
+  operationalDraft: WhatsAppOperationalDraft | null
+  nowContext: {
+    dateIso: string
+    dateTimeLabel: string
+    hour: number
+    minute: number
+  }
+  pendingReminderAppointments?: ReminderAppointmentContext[] | null
+  instanceName?: string | null
+}) {
+  const pendingReminderContexts = input.pendingReminderAppointments
+    ?? await findPendingReminderAppointmentsForCustomer({
+      barbershopId: input.barbershop.id,
+      customerId: input.customer.id,
+    })
+
+  if (pendingReminderContexts.length === 0) {
+    const expiredReminderContexts = await findExpiredReminderAppointmentsForCustomer({
+      barbershopId: input.barbershop.id,
+      customerId: input.customer.id,
+    })
+    const expiredReminder = expiredReminderContexts[0] ?? null
+
+    if (!expiredReminder) {
+      return null
+    }
+
+    console.info('[whatsapp-confirmation] pending_reminder_expired', {
+      ...buildReminderLogPayload({
+        appointment: expiredReminder,
+        barbershopSlug: input.barbershop.slug,
+        customerId: input.customer.id,
+        customerPhone: input.customer.phone ?? null,
+        statusBefore: expiredReminder.status,
+        statusAfter: expiredReminder.status,
+        confirmationStatus: expiredReminder.status === 'CONFIRMED' ? 'CONFIRMED' : null,
+        inboundText: input.inboundText,
+        instanceName: input.instanceName,
+      }),
+    })
+
+    const responseText = buildAppointmentConfirmationExpiredMessage({
+      appointment: expiredReminder,
+    })
+
+    await persistOperationalConversationState({
+      conversationId: input.conversationId,
+      inboundText: input.inboundText,
+      responseText,
+      state: 'IDLE',
+      draft: null,
+      source: 'whatsapp_reminder',
+      stage: 'expired_window',
+    })
+
+    return {
+      responseText,
+      flow: 'booking_status' as const,
+      conversationId: input.conversationId,
+      conversationState: 'IDLE' as const,
+      usedAI: false,
+    }
+  }
+
+  const reminderAppointments = pendingReminderContexts.map((appointment) =>
+    mapReminderAppointmentToManagedAppointment(appointment)
+  )
+  const reminderDraft = buildEmptyOperationalDraft('reminder', reminderAppointments)
+  reminderDraft.triggeredByReminder = true
+  reminderDraft.reminderPromptedAtIso =
+    input.operationalDraft?.reminderPromptedAtIso ?? new Date().toISOString()
+
+  if (
+    input.operationalDraft?.selectedAppointmentId
+    && reminderAppointments.some((appointment) => appointment.id === input.operationalDraft?.selectedAppointmentId)
+  ) {
+    reminderDraft.selectedAppointmentId = input.operationalDraft.selectedAppointmentId
+  }
+
+  const persistedSelectionState =
+    input.operationalDraft?.kind === 'reminder'
+    && (input.operationalDraft.appointments.length ?? 0) > 1
+
+  let selectedAppointment =
+    reminderDraft.selectedAppointmentId
+      ? reminderAppointments.find((appointment) => appointment.id === reminderDraft.selectedAppointmentId) ?? null
+      : null
+
+  if (reminderAppointments.length > 1) {
+    if (persistedSelectionState) {
+      console.info('[whatsapp-confirmation] appointment_selection_state_detected', {
+        conversationId: input.conversationId,
+        customerId: input.customer.id,
+        barbershopId: input.barbershop.id,
+        barbershopSlug: input.barbershop.slug,
+        pendingAppointments: reminderAppointments.length,
+        inboundTextNormalized: normalizeIntentPhrase(input.inboundText),
+        instanceName: input.instanceName ?? null,
+      })
+    }
+
+    const selectionResolution = resolveReminderAppointmentSelection({
+      message: input.inboundText,
+      appointments: reminderAppointments,
+      currentDateIso: input.nowContext.dateIso,
+      allowNumericSelection: persistedSelectionState,
+    })
+
+    if (selectionResolution.status === 'ambiguous') {
+      console.info('[whatsapp-confirmation] appointment_selection_ambiguous', {
+        conversationId: input.conversationId,
+        customerId: input.customer.id,
+        barbershopId: input.barbershop.id,
+        barbershopSlug: input.barbershop.slug,
+        matchedBy: selectionResolution.matchedBy,
+        inboundTextNormalized: normalizeIntentPhrase(input.inboundText),
+        instanceName: input.instanceName ?? null,
+      })
+
+      const responseText = buildPendingReminderAmbiguousMessage(reminderAppointments)
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'WAITING_REMINDER_RESPONSE',
+        draft: reminderDraft,
+        source: 'whatsapp_reminder',
+        stage: 'selection_ambiguous',
+      })
+
+      return {
+        responseText,
+        flow: 'booking_status' as const,
+        conversationId: input.conversationId,
+        conversationState: 'WAITING_REMINDER_RESPONSE' as const,
+        usedAI: false,
+      }
+    }
+
+    if (selectionResolution.status === 'unique' && selectionResolution.appointment) {
+      selectedAppointment = selectionResolution.appointment
+      reminderDraft.selectedAppointmentId = selectionResolution.appointment.id
+
+      console.info('[whatsapp-confirmation] appointment_selection_resolved', {
+        conversationId: input.conversationId,
+        customerId: input.customer.id,
+        barbershopId: input.barbershop.id,
+        barbershopSlug: input.barbershop.slug,
+        appointmentId: selectionResolution.appointment.id,
+        matchedBy: selectionResolution.matchedBy,
+        inboundTextNormalized: normalizeIntentPhrase(input.inboundText),
+        instanceName: input.instanceName ?? null,
+      })
+    } else {
+      if (!persistedSelectionState) {
+        console.info('[whatsapp-confirmation] appointment_selection_state_missing_db_fallback', {
+          conversationId: input.conversationId,
+          customerId: input.customer.id,
+          barbershopId: input.barbershop.id,
+          barbershopSlug: input.barbershop.slug,
+          inboundTextNormalized: normalizeIntentPhrase(input.inboundText),
+          pendingAppointments: reminderAppointments.length,
+          instanceName: input.instanceName ?? null,
+        })
+      }
+
+      console.info('[whatsapp-confirmation] appointment_options_listed', {
+        conversationId: input.conversationId,
+        customerId: input.customer.id,
+        barbershopId: input.barbershop.id,
+        barbershopSlug: input.barbershop.slug,
+        pendingAppointments: reminderAppointments.map((appointment) => ({
+          appointmentId: appointment.id,
+          startAt: appointment.startAtIso,
+          serviceName: appointment.serviceName,
+          professionalName: appointment.professionalName,
+        })),
+        inboundTextNormalized: normalizeIntentPhrase(input.inboundText),
+        instanceName: input.instanceName ?? null,
+      })
+
+      const requestedAction = (() => {
+        const parsed = parseReminderResponseAction(input.inboundText)
+        return parsed === 'confirm' || parsed === 'reschedule' || parsed === 'cancel'
+          ? parsed
+          : null
+      })()
+
+      const responseText = buildPendingReminderOptionsMessage({
+        appointments: reminderAppointments,
+        requestedAction,
+      })
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'WAITING_REMINDER_RESPONSE',
+        draft: reminderDraft,
+        source: 'whatsapp_reminder',
+        stage: 'selection_requested',
+      })
+
+      return {
+        responseText,
+        flow: 'booking_status' as const,
+        conversationId: input.conversationId,
+        conversationState: 'WAITING_REMINDER_RESPONSE' as const,
+        usedAI: false,
+      }
+    }
+  } else {
+    selectedAppointment = reminderAppointments[0] ?? null
+  }
+
+  const selectedReminderContext = selectedAppointment
+    ? pendingReminderContexts.find((appointment) => appointment.id === selectedAppointment?.id) ?? null
+    : null
+
+  if (!selectedAppointment) {
+    return null
+  }
+
+  const reminderAction = reminderAppointments.length > 1
+    ? resolveReminderActionForSelectedAppointment(input.inboundText)
+    : parseReminderResponseAction(input.inboundText)
+
+  if (reminderAppointments.length === 1 && reminderAction === 'none') {
+    if (isReminderGreetingMessage(input.inboundText)) {
+      console.info('[whatsapp-confirmation] greeting_during_pending_reminder', {
+        ...buildReminderLogPayload({
+          appointment: selectedReminderContext,
+          fallbackAppointment: selectedAppointment,
+          barbershopSlug: input.barbershop.slug,
+          customerId: input.customer.id,
+          customerPhone: input.customer.phone ?? null,
+          statusBefore: selectedAppointment.status,
+          statusAfter: selectedAppointment.status,
+          confirmationStatus: null,
+          inboundText: input.inboundText,
+          instanceName: input.instanceName,
+        }),
+      })
+    }
+
+    const responseText = buildPendingReminderFollowUpMessage(selectedAppointment)
+
+    await persistOperationalConversationState({
+      conversationId: input.conversationId,
+      inboundText: input.inboundText,
+      responseText,
+      state: 'WAITING_REMINDER_RESPONSE',
+      draft: reminderDraft,
+      source: 'whatsapp_reminder',
+      stage: 'prompt_repeated',
+    })
+
+    return {
+      responseText,
+      flow: 'booking_status' as const,
+      conversationId: input.conversationId,
+      conversationState: 'WAITING_REMINDER_RESPONSE' as const,
+      usedAI: false,
+    }
+  }
+
+  if (reminderAction === 'ambiguous') {
+    const responseText = buildReminderResponseClarificationMessage()
+
+    await persistOperationalConversationState({
+      conversationId: input.conversationId,
+      inboundText: input.inboundText,
+      responseText,
+      state: 'WAITING_REMINDER_RESPONSE',
+      draft: reminderDraft,
+      source: 'whatsapp_reminder',
+      stage: 'clarification_requested',
+    })
+
+    return {
+      responseText,
+      flow: 'booking_status' as const,
+      conversationId: input.conversationId,
+      conversationState: 'WAITING_REMINDER_RESPONSE' as const,
+      usedAI: false,
+    }
+  }
+
+  if (reminderAction === 'confirm') {
+    const confirmation = await confirmAppointmentPresenceFromReminder({
+      appointmentId: selectedAppointment.id,
+      barbershopId: input.barbershop.id,
+      now: new Date(),
+    })
+
+    if (confirmation.count === 0) {
+      const responseText = selectedReminderContext
+        ? buildAppointmentConfirmationExpiredMessage({ appointment: selectedReminderContext })
+        : buildReminderNotFoundMessage()
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: selectedReminderContext ? 'IDLE' : 'IDLE',
+        draft: null,
+        source: 'whatsapp_reminder',
+        stage: selectedReminderContext ? 'confirm_expired' : 'confirm_missing',
+      })
+
+      return {
+        responseText,
+        flow: 'booking_status' as const,
+        conversationId: input.conversationId,
+        conversationState: 'IDLE' as const,
+        usedAI: false,
+      }
+    }
+
+    console.info('[whatsapp-confirmation] reminder_response_confirmed', {
+      ...buildReminderLogPayload({
+        appointment: selectedReminderContext,
+        fallbackAppointment: selectedAppointment,
+        barbershopSlug: input.barbershop.slug,
+        customerId: input.customer.id,
+        customerPhone: input.customer.phone ?? null,
+        statusBefore: selectedAppointment.status,
+        statusAfter: 'CONFIRMED',
+        confirmationStatus: 'CONFIRMED',
+        inboundText: input.inboundText,
+        instanceName: input.instanceName,
+      }),
+    })
+
+    const responseText = reminderAppointments.length > 1
+      ? buildReminderConfirmedDetailMessage(selectedAppointment)
+      : buildReminderConfirmedMessage()
+
+    await persistOperationalConversationState({
+      conversationId: input.conversationId,
+      inboundText: input.inboundText,
+      responseText,
+      state: 'IDLE',
+      draft: null,
+      source: 'whatsapp_reminder',
+      stage: 'confirmed',
+      completedAt: new Date(),
+    })
+
+    return {
+      responseText,
+      flow: 'acknowledgement' as const,
+      conversationId: input.conversationId,
+      conversationState: 'IDLE' as const,
+      usedAI: false,
+    }
+  }
+
+  if (reminderAction === 'reschedule') {
+    const rescheduleMarked = await markAppointmentReminderResponse({
+      appointmentId: selectedAppointment.id,
+      barbershopId: input.barbershop.id,
+      responseStatus: 'RESCHEDULE_REQUESTED',
+      now: new Date(),
+    })
+
+    if (rescheduleMarked.count === 0) {
+      const responseText = selectedReminderContext
+        ? buildAppointmentConfirmationExpiredMessage({ appointment: selectedReminderContext })
+        : buildReminderNotFoundMessage()
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'IDLE',
+        draft: null,
+        source: 'whatsapp_reminder',
+        stage: selectedReminderContext ? 'reschedule_expired' : 'reschedule_missing',
+      })
+
+      return {
+        responseText,
+        flow: 'booking_status' as const,
+        conversationId: input.conversationId,
+        conversationState: 'IDLE' as const,
+        usedAI: false,
+      }
+    }
+
+    console.info('[whatsapp-confirmation] reminder_response_reschedule', {
+      ...buildReminderLogPayload({
+        appointment: selectedReminderContext,
+        fallbackAppointment: selectedAppointment,
+        barbershopSlug: input.barbershop.slug,
+        customerId: input.customer.id,
+        customerPhone: input.customer.phone ?? null,
+        statusBefore: selectedAppointment.status,
+        statusAfter: selectedAppointment.status,
+        confirmationStatus: 'RESCHEDULE_REQUESTED',
+        inboundText: input.inboundText,
+        instanceName: input.instanceName,
+      }),
+    })
+
+    const nextDraft = buildOperationalDraftWithAppointment({
+      kind: 'reschedule',
+      appointment: selectedAppointment,
+      triggeredByReminder: true,
+    })
+    const responseText = buildReschedulePromptMessage(selectedAppointment)
+
+    await persistOperationalConversationState({
+      conversationId: input.conversationId,
+      inboundText: input.inboundText,
+      responseText,
+      state: 'WAITING_RESCHEDULE_TIME',
+      draft: nextDraft,
+      source: 'whatsapp_reminder',
+      stage: 'reschedule_requested',
+    })
+
+    return {
+      responseText,
+      flow: 'reschedule' as const,
+      conversationId: input.conversationId,
+      conversationState: 'WAITING_RESCHEDULE_TIME' as const,
+      usedAI: false,
+    }
+  }
+
+  if (reminderAction === 'cancel') {
+    const cancellationMarked = await markAppointmentReminderResponse({
+      appointmentId: selectedAppointment.id,
+      barbershopId: input.barbershop.id,
+      responseStatus: 'CANCELLATION_REQUESTED',
+      now: new Date(),
+    })
+
+    if (cancellationMarked.count === 0) {
+      const responseText = selectedReminderContext
+        ? buildAppointmentConfirmationExpiredMessage({ appointment: selectedReminderContext })
+        : buildReminderNotFoundMessage()
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'IDLE',
+        draft: null,
+        source: 'whatsapp_reminder',
+        stage: selectedReminderContext ? 'cancel_expired' : 'cancel_missing',
+      })
+
+      return {
+        responseText,
+        flow: 'booking_status' as const,
+        conversationId: input.conversationId,
+        conversationState: 'IDLE' as const,
+        usedAI: false,
+      }
+    }
+
+    const cancelledAppointment = await cancelAppointmentFromWhatsApp({
+      appointmentId: selectedAppointment.id,
+      barbershopId: input.barbershop.id,
+      timezone: input.barbershop.timezone,
+    })
+
+    if (!cancelledAppointment) {
+      const responseText = buildReminderNotFoundMessage()
+
+      await persistOperationalConversationState({
+        conversationId: input.conversationId,
+        inboundText: input.inboundText,
+        responseText,
+        state: 'IDLE',
+        draft: null,
+        source: 'whatsapp_reminder',
+        stage: 'cancel_missing_after_mark',
+      })
+
+      return {
+        responseText,
+        flow: 'booking_status' as const,
+        conversationId: input.conversationId,
+        conversationState: 'IDLE' as const,
+        usedAI: false,
+      }
+    }
+
+    console.info('[whatsapp-confirmation] reminder_response_cancel', {
+      ...buildReminderLogPayload({
+        appointment: selectedReminderContext,
+        fallbackAppointment: selectedAppointment,
+        barbershopSlug: input.barbershop.slug,
+        customerId: input.customer.id,
+        customerPhone: input.customer.phone ?? null,
+        statusBefore: selectedAppointment.status,
+        statusAfter: 'CANCELLED',
+        confirmationStatus: 'CANCELLATION_REQUESTED',
+        inboundText: input.inboundText,
+        instanceName: input.instanceName,
+      }),
+    })
+
+    const responseText = 'Tudo certo, seu horario foi cancelado. Quando quiser, posso te ajudar a marcar outro.'
+
+    await persistOperationalConversationState({
+      conversationId: input.conversationId,
+      inboundText: input.inboundText,
+      responseText,
+      state: 'IDLE',
+      draft: null,
+      source: 'whatsapp_reminder',
+      stage: 'cancel_requested',
+      completedAt: new Date(),
+    })
+
+    return {
+      responseText,
+      flow: 'appointment_cancelled' as const,
+      conversationId: input.conversationId,
+      conversationState: 'IDLE' as const,
+      appointmentId: cancelledAppointment.id,
+      usedAI: false,
+    }
+  }
+
+  return null
+}
+
 function buildRescheduleDateTimeClarificationMessage() {
   return 'Me diga o novo dia e horario desejados, por exemplo: amanha as 15:00.'
 }
@@ -2263,6 +3112,8 @@ async function handleOperationalConversationState(input: {
   professionals: Array<{ id: string, name: string }>
   lastCustomerMessage?: string | null
   lastAssistantMessage?: string | null
+  pendingReminderAppointments?: ReminderAppointmentContext[] | null
+  instanceName?: string | null
 }) {
   const operationDraft = input.operationalDraft
     ?? buildEmptyOperationalDraft(
@@ -2274,227 +3125,16 @@ async function handleOperationalConversationState(input: {
     )
 
   if (input.state === 'WAITING_REMINDER_RESPONSE') {
-    const pendingReminder = await findPendingReminderAppointmentForCustomer({
-      barbershopId: input.barbershop.id,
-      customerId: input.customer.id,
+    return handlePendingReminderConversationState({
+      conversationId: input.conversationId,
+      inboundText: input.inboundText,
+      barbershop: input.barbershop,
+      customer: input.customer,
+      operationalDraft: operationDraft,
+      nowContext: input.nowContext,
+      pendingReminderAppointments: input.pendingReminderAppointments,
+      instanceName: input.instanceName,
     })
-
-    const activeReminderAppointment =
-      selectOperationalAppointment(operationDraft)
-      ?? (pendingReminder ? mapReminderAppointmentToManagedAppointment(pendingReminder) : null)
-
-    if (!activeReminderAppointment) {
-      return null
-    }
-
-    const reminderAction = parseReminderResponseAction(input.inboundText)
-    const reminderDraft = buildEmptyOperationalDraft('reminder', [activeReminderAppointment])
-    reminderDraft.selectedAppointmentId = activeReminderAppointment.id
-    reminderDraft.triggeredByReminder = true
-
-    if (reminderAction === 'confirm') {
-      const confirmation = await confirmAppointmentPresenceFromReminder({
-        appointmentId: activeReminderAppointment.id,
-        barbershopId: input.barbershop.id,
-      })
-
-      if (confirmation.count === 0) {
-        const responseText = buildReminderNotFoundMessage()
-
-        await persistOperationalConversationState({
-          conversationId: input.conversationId,
-          inboundText: input.inboundText,
-          responseText,
-          state: 'IDLE',
-          draft: null,
-          source: 'whatsapp_reminder',
-          stage: 'confirm_missing',
-        })
-
-        return {
-          responseText,
-          flow: 'booking_status' as const,
-          conversationId: input.conversationId,
-          conversationState: 'IDLE' as const,
-          usedAI: false,
-        }
-      }
-
-      console.info('[whatsapp-confirmation] customer_confirmed', {
-        appointmentId: activeReminderAppointment.id,
-        barbershopId: input.barbershop.id,
-        barbershopSlug: input.barbershop.slug,
-        customerId: input.customer.id,
-        startAt: activeReminderAppointment.startAtIso,
-        statusBefore: activeReminderAppointment.status,
-        statusAfter: 'CONFIRMED',
-        confirmationStatus: 'CONFIRMED',
-        source: 'WHATSAPP',
-        instanceName: null,
-      })
-
-      const responseText = buildReminderConfirmedMessage()
-
-      await persistOperationalConversationState({
-        conversationId: input.conversationId,
-        inboundText: input.inboundText,
-        responseText,
-        state: 'IDLE',
-        draft: null,
-        source: 'whatsapp_reminder',
-        stage: 'confirmed',
-        completedAt: new Date(),
-      })
-
-      return {
-        responseText,
-        flow: 'acknowledgement' as const,
-        conversationId: input.conversationId,
-        conversationState: 'IDLE' as const,
-        usedAI: false,
-      }
-    }
-
-    if (reminderAction === 'reschedule') {
-      await markAppointmentReminderResponse({
-        appointmentId: activeReminderAppointment.id,
-        barbershopId: input.barbershop.id,
-        responseStatus: 'RESCHEDULE_REQUESTED',
-      })
-
-      console.info('[whatsapp-confirmation] customer_requested_reschedule', {
-        appointmentId: activeReminderAppointment.id,
-        barbershopId: input.barbershop.id,
-        barbershopSlug: input.barbershop.slug,
-        customerId: input.customer.id,
-        startAt: activeReminderAppointment.startAtIso,
-        statusBefore: activeReminderAppointment.status,
-        statusAfter: activeReminderAppointment.status,
-        confirmationStatus: 'RESCHEDULE_REQUESTED',
-        source: 'WHATSAPP',
-        instanceName: null,
-      })
-
-      const draft = buildOperationalDraftWithAppointment({
-        kind: 'reschedule',
-        appointment: activeReminderAppointment,
-        triggeredByReminder: true,
-      })
-      const responseText = buildReschedulePromptMessage(activeReminderAppointment)
-
-      await persistOperationalConversationState({
-        conversationId: input.conversationId,
-        inboundText: input.inboundText,
-        responseText,
-        state: 'WAITING_RESCHEDULE_TIME',
-        draft,
-        source: 'whatsapp_reminder',
-        stage: 'reschedule_requested',
-      })
-
-      return {
-        responseText,
-        flow: 'reschedule' as const,
-        conversationId: input.conversationId,
-        conversationState: 'WAITING_RESCHEDULE_TIME' as const,
-        usedAI: false,
-      }
-    }
-
-    if (reminderAction === 'cancel') {
-      await markAppointmentReminderResponse({
-        appointmentId: activeReminderAppointment.id,
-        barbershopId: input.barbershop.id,
-        responseStatus: 'CANCELLATION_REQUESTED',
-      })
-
-      const cancelledAppointment = await cancelAppointmentFromWhatsApp({
-        appointmentId: activeReminderAppointment.id,
-        barbershopId: input.barbershop.id,
-        timezone: input.timezone,
-      })
-
-      if (!cancelledAppointment) {
-        const responseText = buildReminderNotFoundMessage()
-
-        await persistOperationalConversationState({
-          conversationId: input.conversationId,
-          inboundText: input.inboundText,
-          responseText,
-          state: 'IDLE',
-          draft: null,
-          source: 'whatsapp_reminder',
-          stage: 'cancel_missing',
-        })
-
-        return {
-          responseText,
-          flow: 'booking_status' as const,
-          conversationId: input.conversationId,
-          conversationState: 'IDLE' as const,
-          usedAI: false,
-        }
-      }
-
-      console.info('[whatsapp-confirmation] customer_cancelled', {
-        appointmentId: cancelledAppointment.id,
-        barbershopId: input.barbershop.id,
-        barbershopSlug: input.barbershop.slug,
-        customerId: input.customer.id,
-        startAt: cancelledAppointment.startAtIso,
-        statusBefore: activeReminderAppointment.status,
-        statusAfter: 'CANCELLED',
-        confirmationStatus: 'CANCELLATION_REQUESTED',
-        source: 'WHATSAPP',
-        instanceName: null,
-      })
-
-      const responseText = 'Tudo certo, seu horario foi cancelado. Quando quiser, posso te ajudar a marcar outro.'
-
-      await persistOperationalConversationState({
-        conversationId: input.conversationId,
-        inboundText: input.inboundText,
-        responseText,
-        state: 'IDLE',
-        draft: null,
-        source: 'whatsapp_reminder',
-        stage: 'cancel_requested',
-        completedAt: new Date(),
-      })
-
-      return {
-        responseText,
-        flow: 'appointment_cancelled' as const,
-        conversationId: input.conversationId,
-        conversationState: 'IDLE' as const,
-        appointmentId: cancelledAppointment.id,
-        usedAI: false,
-      }
-    }
-
-    if (reminderAction === 'ambiguous') {
-      const responseText = buildReminderResponseClarificationMessage()
-
-      await persistOperationalConversationState({
-        conversationId: input.conversationId,
-        inboundText: input.inboundText,
-        responseText,
-        state: 'WAITING_REMINDER_RESPONSE',
-        draft: reminderDraft,
-        source: 'whatsapp_reminder',
-        stage: 'clarification_requested',
-      })
-
-      return {
-        responseText,
-        flow: 'booking_status' as const,
-        conversationId: input.conversationId,
-        conversationState: 'WAITING_REMINDER_RESPONSE' as const,
-        usedAI: false,
-      }
-    }
-
-    return null
   }
 
   if (input.state === 'WAITING_CANCEL_SELECTION') {
@@ -4388,6 +5028,7 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
       })),
       lastCustomerMessage: conversation.lastInboundText ?? null,
       lastAssistantMessage: conversation.lastAssistantText ?? null,
+      instanceName: input.instanceName ?? null,
     })
 
     if (operationalResult) {
@@ -4463,47 +5104,87 @@ export async function processWhatsAppConversation(input: ConversationServiceInpu
     })
   }
 
+  const pendingReminderAppointments = await findPendingReminderAppointmentsForCustomer({
+    barbershopId: input.barbershop.id,
+    customerId: input.customer.id,
+  })
   const reminderResponseAction = parseReminderResponseAction(inboundText)
-  if (reminderResponseAction !== 'none') {
-    const pendingReminderAppointment = await findPendingReminderAppointmentForCustomer({
-      barbershopId: input.barbershop.id,
-      customerId: input.customer.id,
+  const shouldCheckReminderState =
+    pendingReminderAppointments.length > 0
+    || currentState === 'WAITING_REMINDER_RESPONSE'
+    || operationalDraft?.kind === 'reminder'
+    || reminderResponseAction !== 'none'
+    || isExistingBookingStatusQuestion({
+      message: inboundText,
+      lastCustomerMessage: canContinueFromContext ? conversation.lastInboundText : null,
+      lastAssistantMessage: canContinueFromContext ? conversation.lastAssistantText : null,
     })
 
-    if (pendingReminderAppointment) {
-      const reminderDraft = buildEmptyOperationalDraft('reminder', [
-        mapReminderAppointmentToManagedAppointment(pendingReminderAppointment),
-      ])
-      reminderDraft.selectedAppointmentId = pendingReminderAppointment.id
-      reminderDraft.triggeredByReminder = true
+  if (pendingReminderAppointments.length > 0) {
+    console.info('[whatsapp-confirmation] pending_reminder_detected', {
+      appointmentId: pendingReminderAppointments[0]?.id ?? null,
+      barbershopId: input.barbershop.id,
+      barbershopSlug: input.barbershop.slug,
+      customerId: input.customer.id,
+      phoneMasked: maskPhoneForLog(input.customer.phone ?? null),
+      startAt: pendingReminderAppointments[0]?.startAt.toISOString() ?? null,
+      confirmationReminderSentAt: pendingReminderAppointments[0]?.confirmationReminderSentAt?.toISOString() ?? null,
+      statusBefore: pendingReminderAppointments[0]?.status ?? null,
+      statusAfter: pendingReminderAppointments[0]?.status ?? null,
+      inboundTextNormalized: normalizeIntentPhrase(inboundText),
+      instanceName: input.instanceName ?? null,
+      pendingAppointments: pendingReminderAppointments.length,
+    })
 
-      const reminderResult = await handleOperationalConversationState({
-        state: 'WAITING_REMINDER_RESPONSE',
-        conversationId: conversation.id,
-        inboundText,
-        barbershop: input.barbershop,
-        customer: input.customer,
-        eventId: input.eventId,
-        operationalDraft: reminderDraft,
-        timezone,
-        nowContext,
-        services: services.map((service) => ({
-          id: service.id,
-          name: service.name,
-        })),
-        professionals: professionals.map((professional) => ({
-          id: professional.id,
-          name: professional.name,
-        })),
-        lastCustomerMessage: conversation.lastInboundText ?? null,
-        lastAssistantMessage: conversation.lastAssistantText ?? null,
-      })
+    console.info('[whatsapp-confirmation] existing_appointment_flow_wins_over_new_booking', {
+      conversationId: conversation.id,
+      customerId: input.customer.id,
+      barbershopId: input.barbershop.id,
+      barbershopSlug: input.barbershop.slug,
+      inboundTextNormalized: normalizeIntentPhrase(inboundText),
+      pendingAppointments: pendingReminderAppointments.length,
+      instanceName: input.instanceName ?? null,
+    })
+  }
 
-      if (reminderResult) {
-        return reminderResult
-      }
+  if (shouldCheckReminderState) {
+    const reminderResult = await handleOperationalConversationState({
+      state: 'WAITING_REMINDER_RESPONSE',
+      conversationId: conversation.id,
+      inboundText,
+      barbershop: input.barbershop,
+      customer: input.customer,
+      eventId: input.eventId,
+      operationalDraft: operationalDraft?.kind === 'reminder' ? operationalDraft : null,
+      timezone,
+      nowContext,
+      services: services.map((service) => ({
+        id: service.id,
+        name: service.name,
+      })),
+      professionals: professionals.map((professional) => ({
+        id: professional.id,
+        name: professional.name,
+      })),
+      lastCustomerMessage: conversation.lastInboundText ?? null,
+      lastAssistantMessage: conversation.lastAssistantText ?? null,
+      pendingReminderAppointments,
+      instanceName: input.instanceName ?? null,
+    })
+
+    if (reminderResult) {
+      return reminderResult
     }
   }
+
+  console.info('[whatsapp-confirmation] no_pending_reminder_continue_normal_flow', {
+    conversationId: conversation.id,
+    customerId: input.customer.id,
+    barbershopId: input.barbershop.id,
+    barbershopSlug: input.barbershop.slug,
+    inboundTextNormalized: normalizeIntentPhrase(inboundText),
+    instanceName: input.instanceName ?? null,
+  })
 
   if (isCancellationIntentMessage(inboundText)) {
     console.info('[whatsapp-cancel] intent detected', {
@@ -6876,6 +7557,8 @@ export const __testing = {
   buildExistingBookingStatusMessage,
   buildOfferedSlotSelectionPrompt,
   buildRecentConfirmedGreeting,
+  buildPendingReminderFollowUpMessage,
+  buildPendingReminderOptionsMessage,
   buildSuccessMessage,
   buildServiceQuestion,
   buildServiceSelectionQuestion,
@@ -6902,6 +7585,7 @@ export const __testing = {
   resolveRescheduleProfessionalRequest,
   resolveContextualProfessionalPreference,
   resolveConversationRuntimeContext,
+  resolveReminderAppointmentSelection,
   shouldResetConversationOnGreeting,
   isProfessionalSelectionWhyQuestion,
 }

@@ -409,48 +409,85 @@ export function buildReminderResponseClarificationMessage() {
   return 'Para confirmar, responda 1. Para remarcar, responda 2. Para cancelar, responda 3.'
 }
 
+export function isReminderGreetingMessage(message: string) {
+  const normalized = normalizeIntentPhrase(message)
+
+  return [
+    'oi',
+    'ola',
+    'bom dia',
+    'boa tarde',
+    'boa noite',
+    'tudo bem',
+    'e ai',
+    'eai',
+    'opa',
+    'oie',
+  ].includes(normalized)
+}
+
 export function parseReminderResponseAction(message: string) {
   const normalized = normalizeIntentPhrase(message)
 
-  if ([
-    '1',
-    'confirmo',
-    'confirmado',
-    'sim',
-    'sim confirmado',
-    'vou sim',
-    'pode confirmar',
-    'estarei ai',
-    'presenca confirmada',
-    'confirmar presenca',
-  ].includes(normalized)) {
+  if (
+    normalized === '1'
+    || /(?:^|\s)1(?:\s|$)/.test(normalized)
+    || [
+      'confirmo',
+      'confirmado',
+      'sim',
+      'sim confirmado',
+      'vou sim',
+      'pode confirmar',
+      'estarei ai',
+      'presenca confirmada',
+      'confirmar presenca',
+      'confirmar horario',
+      'confirmar meu horario',
+      'quero confirmar meu horario',
+      'quero confirmar o horario',
+      'confirmar minha presenca',
+      'quero confirmar minha presenca',
+    ].includes(normalized)
+    || /\b(confirmo|confirmar|confirmado|confirmacao|confirmar meu horario|quero confirmar meu horario|confirmar minha presenca)\b/.test(normalized)
+  ) {
     return 'confirm'
   }
 
-  if ([
-    '2',
-    'remarcar',
-    'quero remarcar',
-    'reagendar',
-    'quero reagendar',
-    'outro horario',
-    'trocar horario',
-  ].includes(normalized)) {
+  if (
+    normalized === '2'
+    || /(?:^|\s)2(?:\s|$)/.test(normalized)
+    || [
+      'remarcar',
+      'quero remarcar',
+      'reagendar',
+      'quero reagendar',
+      'outro horario',
+      'trocar horario',
+      'trocar meu horario',
+      'mudar meu horario',
+    ].includes(normalized)
+    || /\b(remarcar|reagendar|outro horario|trocar horario|trocar meu horario|mudar meu horario)\b/.test(normalized)
+  ) {
     return 'reschedule'
   }
 
-  if ([
-    '3',
-    'cancelar',
-    'quero cancelar',
-    'cancelamento',
-    'nao vou',
-    'nao consigo ir',
-  ].includes(normalized)) {
+  if (
+    normalized === '3'
+    || /(?:^|\s)3(?:\s|$)/.test(normalized)
+    || [
+      'cancelar',
+      'quero cancelar',
+      'cancelamento',
+      'nao vou',
+      'nao consigo ir',
+    ].includes(normalized)
+    || /\b(cancelar|cancelamento|nao vou|nao consigo ir)\b/.test(normalized)
+  ) {
     return 'cancel'
   }
 
-  if (['ok', 'blz', 'pode', 'isso', 'acho que sim'].includes(normalized)) {
+  if (['ok', 'blz', 'pode', 'isso', 'acho que sim', 'beleza'].includes(normalized)) {
     return 'ambiguous'
   }
 
@@ -476,6 +513,7 @@ export const __testing = {
   isExplicitCancellationConfirmationMessage,
   isExplicitRescheduleConfirmationMessage,
   isNegativeOperationalResponse,
+  isReminderGreetingMessage,
   isRescheduleIntentMessage,
   parseOperationalDraft,
   parseOperationalSelectionNumber,

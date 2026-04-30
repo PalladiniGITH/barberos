@@ -267,6 +267,112 @@ test('follow-up curto como "e domingo?" nao cai em novo agendamento', () => {
   assert.equal(detected, true)
 })
 
+test('seleciona appointment pendente pelo dia, horario e barbeiro no fluxo de confirmacao', () => {
+  const appointments = [
+    buildManagedAppointment({
+      id: 'apt-hoje',
+      serviceName: 'Barba Terapia',
+      professionalName: 'Rafael Costa',
+      dateIso: '2026-04-29',
+      dateLabel: 'Hoje',
+      timeLabel: '11:30',
+    }),
+    buildManagedAppointment({
+      id: 'apt-amanha',
+      serviceName: 'Pigmentacao Natural',
+      professionalName: 'Matheus Lima',
+      dateIso: '2026-04-30',
+      dateLabel: 'Amanha',
+      timeLabel: '12:00',
+    }),
+  ]
+
+  const byToday = conversationTesting.resolveReminderAppointmentSelection({
+    message: 'confirma o de hoje',
+    appointments,
+    currentDateIso: '2026-04-29',
+    allowNumericSelection: false,
+  })
+  const byTime = conversationTesting.resolveReminderAppointmentSelection({
+    message: 'confirma o das 12:00',
+    appointments,
+    currentDateIso: '2026-04-29',
+    allowNumericSelection: false,
+  })
+  const byProfessional = conversationTesting.resolveReminderAppointmentSelection({
+    message: 'confirma com Rafael',
+    appointments,
+    currentDateIso: '2026-04-29',
+    allowNumericSelection: false,
+  })
+
+  assert.equal(byToday.status, 'unique')
+  assert.equal(byToday.appointment?.id, 'apt-hoje')
+  assert.equal(byTime.status, 'unique')
+  assert.equal(byTime.appointment?.id, 'apt-amanha')
+  assert.equal(byProfessional.status, 'unique')
+  assert.equal(byProfessional.appointment?.id, 'apt-hoje')
+})
+
+test('seleciona appointment pelo numero somente quando o estado aberto ja listou opcoes', () => {
+  const appointments = [
+    buildManagedAppointment({ id: 'apt-1' }),
+    buildManagedAppointment({
+      id: 'apt-2',
+      professionalName: 'Rafael Costa',
+      timeLabel: '15:00',
+    }),
+  ]
+
+  const withoutState = conversationTesting.resolveReminderAppointmentSelection({
+    message: '1',
+    appointments,
+    currentDateIso: '2026-04-29',
+    allowNumericSelection: false,
+  })
+  const withState = conversationTesting.resolveReminderAppointmentSelection({
+    message: '1',
+    appointments,
+    currentDateIso: '2026-04-29',
+    allowNumericSelection: true,
+  })
+
+  assert.equal(withoutState.status, 'none')
+  assert.equal(withState.status, 'unique')
+  assert.equal(withState.appointment?.id, 'apt-1')
+})
+
+test('seleciona como ambiguo quando mais de um appointment combina com o mesmo criterio', () => {
+  const appointments = [
+    buildManagedAppointment({
+      id: 'apt-1',
+      serviceName: 'Barba Terapia',
+      professionalName: 'Rafael Costa',
+      dateIso: '2026-04-29',
+      dateLabel: 'Hoje',
+      timeLabel: '11:30',
+    }),
+    buildManagedAppointment({
+      id: 'apt-2',
+      serviceName: 'Barba Terapia',
+      professionalName: 'Rafael Lima',
+      dateIso: '2026-04-29',
+      dateLabel: 'Hoje',
+      timeLabel: '13:00',
+    }),
+  ]
+
+  const resolution = conversationTesting.resolveReminderAppointmentSelection({
+    message: 'confirma o da barba',
+    appointments,
+    currentDateIso: '2026-04-29',
+    allowNumericSelection: false,
+  })
+
+  assert.equal(resolution.status, 'ambiguous')
+  assert.equal(resolution.appointment, null)
+})
+
 test('sem barbeiro definido a conversa pergunta preferencia antes de sugerir horarios', () => {
   const reply = conversationTesting.buildProfessionalQuestion(
     ['Lucas Ribeiro', 'Matheus Lima', 'Rafael Costa'],

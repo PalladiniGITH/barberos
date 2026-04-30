@@ -167,6 +167,8 @@ test('resposta ao lembrete diferencia confirmar, remarcar, cancelar e ambiguo', 
   assert.equal(flowTesting.parseReminderResponseAction('confirmo'), 'confirm')
   assert.equal(flowTesting.parseReminderResponseAction('pode confirmar'), 'confirm')
   assert.equal(flowTesting.parseReminderResponseAction('vou sim'), 'confirm')
+  assert.equal(flowTesting.parseReminderResponseAction('oi 1'), 'confirm')
+  assert.equal(flowTesting.parseReminderResponseAction('quero confirmar meu horario'), 'confirm')
   assert.equal(flowTesting.parseReminderResponseAction('2'), 'reschedule')
   assert.equal(flowTesting.parseReminderResponseAction('quero remarcar'), 'reschedule')
   assert.equal(flowTesting.parseReminderResponseAction('outro horario'), 'reschedule')
@@ -175,6 +177,8 @@ test('resposta ao lembrete diferencia confirmar, remarcar, cancelar e ambiguo', 
   assert.equal(flowTesting.parseReminderResponseAction('nao vou'), 'cancel')
   assert.equal(flowTesting.parseReminderResponseAction('ok'), 'ambiguous')
   assert.equal(flowTesting.parseReminderResponseAction('boa tarde'), 'none')
+  assert.equal(flowTesting.isReminderGreetingMessage('Oi'), true)
+  assert.equal(flowTesting.isReminderGreetingMessage('tudo bem'), true)
 })
 
 test('seleciona a opcao numerada do fluxo operacional', () => {
