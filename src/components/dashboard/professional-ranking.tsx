@@ -29,7 +29,7 @@ export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
   const [leader, ...rest] = data
 
   return (
-    <section className="dashboard-panel p-6">
+    <section className="dashboard-panel p-5 sm:p-6">
       <div className="flex flex-col gap-4 border-b border-[rgba(255,255,255,0.03)] pb-5 xl:flex-row xl:items-start xl:justify-between">
         <div>
           <h3 className="mt-2 text-[1.55rem] font-semibold tracking-tight text-foreground">Ranking dos profissionais</h3>
@@ -52,11 +52,11 @@ export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
           const shareOfTeam = totalRevenue > 0 ? (leader.revenue / totalRevenue) * 100 : 0
 
           return (
-            <article className="surface-tier-low p-5 sm:p-6">
-              <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+            <article className="surface-tier-low p-4 sm:p-6">
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(260px,0.85fr)]">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-11 w-11 items-center justify-center rounded-[1rem] border border-[rgba(124,92,255,0.18)] bg-[rgba(124,92,255,0.14)] text-primary">
+                  <div className="flex items-start gap-3 sm:gap-4">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] border border-[rgba(124,92,255,0.18)] bg-[rgba(124,92,255,0.14)] text-primary">
                       {positionIcon(leader.position)}
                     </span>
                     <ProfessionalAvatar
@@ -64,9 +64,11 @@ export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
                       imageUrl={leader.avatar}
                       size="md"
                     />
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold tracking-[0.16em] text-violet-100">Profissional em destaque</p>
-                      <h4 className="truncate text-[1.4rem] font-semibold tracking-tight text-foreground">{leader.name}</h4>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-violet-100/90">Destaque do periodo</p>
+                      <h4 className="mt-1 text-[clamp(1.25rem,1.02rem+0.9vw,1.7rem)] font-semibold leading-tight tracking-tight text-foreground break-words">
+                        {leader.name}
+                      </h4>
                     </div>
                   </div>
 
@@ -77,20 +79,22 @@ export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
                   </p>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[320px] xl:grid-cols-1">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-3">
                   <div className="panel-soft">
                     <p className="executive-label">Receita</p>
-                    <p className="mt-3 text-xl font-semibold text-foreground">{formatCurrency(leader.revenue)}</p>
+                    <p className="mt-3 text-[clamp(1.05rem,0.98rem+0.55vw,1.2rem)] font-semibold leading-tight text-foreground break-words">
+                      {formatCurrency(leader.revenue)}
+                    </p>
                   </div>
                   <div className="panel-soft">
                     <p className="executive-label">{hasGoal ? 'Meta individual' : 'Participacao'}</p>
-                    <p className="mt-3 text-xl font-semibold text-foreground">
+                    <p className="mt-3 text-[clamp(1.05rem,0.98rem+0.55vw,1.2rem)] font-semibold leading-tight text-foreground break-words">
                       {hasGoal ? formatCurrency(leader.goal) : formatPercent(shareOfTeam, 0)}
                     </p>
                   </div>
                   <div className="panel-soft">
                     <p className="executive-label">Ritmo atual</p>
-                    <p className="mt-3 text-xl font-semibold text-foreground">
+                    <p className="mt-3 text-[clamp(1.05rem,0.98rem+0.55vw,1.2rem)] font-semibold leading-tight text-foreground break-words">
                       {hasGoal
                         ? goalProgress >= 100
                           ? 'Meta batida'
@@ -138,16 +142,16 @@ export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="flex min-w-0 items-center gap-3">
                       <ProfessionalAvatar
                         name={entry.name}
                         imageUrl={entry.avatar}
                         size="sm"
                       />
-                      <div className="min-w-0">
-                        <p className="truncate text-base font-semibold text-foreground">{entry.name}</p>
-                        <p className="mt-1 text-sm text-muted-foreground">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-base font-semibold leading-tight text-foreground break-words">{entry.name}</p>
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
                           {hasGoal
                             ? `Meta individual: ${formatCurrency(entry.goal)}`
                             : `${formatPercent(shareOfTeam, 0)} do faturamento da equipe`}
@@ -155,9 +159,9 @@ export function ProfessionalRanking({ data }: ProfessionalRankingProps) {
                       </div>
                     </div>
 
-                    <div className="tonal-note px-3.5 py-2.5 text-right">
+                    <div className="tonal-note w-full px-3.5 py-2.5 text-left lg:w-auto lg:min-w-[170px] lg:text-right">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Receita</p>
-                      <p className="mt-1 text-base font-semibold tabular-nums text-foreground">
+                      <p className="mt-1 text-base font-semibold tabular-nums leading-tight text-foreground break-words">
                         {formatCurrency(entry.revenue)}
                       </p>
                     </div>

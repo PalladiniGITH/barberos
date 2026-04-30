@@ -154,7 +154,7 @@ function TrendBadge({
       )}
     >
       <config.Icon className="h-3.5 w-3.5" />
-      <span className="min-w-0 truncate">{config.label}</span>
+      <span className="min-w-0 break-words">{config.label}</span>
     </span>
   )
 }
@@ -178,19 +178,19 @@ function ExecutiveCard({
 }) {
   return (
     <article className={cn(
-      'executive-metric overflow-hidden',
+      'executive-metric h-full',
       emphasis && 'rounded-[1.2rem] p-5 sm:p-6',
       className
     )}>
       <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4">
         <div className="min-w-0 flex-1">
           <p className="executive-label">{title}</p>
-          <p className={cn('executive-value', emphasis && 'mt-3 text-[2.35rem] sm:text-[2.55rem]')}>
+          <p className={cn('executive-value break-words', emphasis && 'mt-3 text-[clamp(2rem,1.45rem+1.75vw,2.55rem)]')}>
             {value}
           </p>
         </div>
         {trend !== undefined && (
-          <div className="flex max-w-full flex-wrap items-start justify-start sm:justify-end">
+          <div className="flex w-full max-w-full flex-wrap items-start justify-start sm:w-auto sm:justify-end">
             <TrendBadge change={trend} positiveIsGood={positiveIsGood} />
           </div>
         )}
@@ -248,7 +248,7 @@ function ComparisonRow({ metric }: { metric: ComparisonMetric }) {
           <p className="text-sm font-semibold text-foreground">{metric.label}</p>
           <p className="mt-1 text-xs text-muted-foreground">Antes: {formatCurrency(metric.previous)}</p>
         </div>
-        <div className="min-w-[148px] text-left sm:text-right">
+        <div className="min-w-0 text-left sm:min-w-[148px] sm:text-right">
           <p className="text-sm font-semibold text-foreground">{formatCurrency(metric.current)}</p>
           <div className="mt-2">
             <TrendBadge change={metric.change} positiveIsGood={metric.positiveIsGood} />
@@ -498,7 +498,7 @@ export default async function DashboardPage({ searchParams }: Props) {
       />
 
       <section className="dashboard-spotlight overflow-hidden p-6 sm:p-7">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_360px]">
+        <div className="grid gap-5 min-[1320px]:grid-cols-[minmax(0,1.45fr)_360px]">
           <div>
             <h2 className="spotlight-title mt-0">{formatCurrency(data.totalRevenue)}</h2>
             <p className="spotlight-copy max-w-2xl">
@@ -512,7 +512,7 @@ export default async function DashboardPage({ searchParams }: Props) {
               </p>
             </div>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <div className="hero-stat-card">
                 <p className="executive-label">Margem atual</p>
                 <p className="mt-3 text-2xl font-semibold tracking-tight text-foreground">
@@ -537,7 +537,7 @@ export default async function DashboardPage({ searchParams }: Props) {
             </div>
           </div>
 
-          <aside className="premium-rail p-5">
+          <aside className="premium-rail p-4 sm:p-5">
             <div className="space-y-4">
               <div className="panel-soft">
                 <p className="executive-label">Meta principal</p>
@@ -598,15 +598,15 @@ export default async function DashboardPage({ searchParams }: Props) {
 
       {primaryAlert && <AlertBanner alert={primaryAlert} />}
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_330px]">
-        <div className="grid gap-5 xl:grid-cols-12">
+      <section className="grid gap-5 min-[1320px]:grid-cols-[minmax(0,1.45fr)_330px]">
+        <div className="grid gap-5 md:grid-cols-2 min-[1400px]:grid-cols-12">
           <ExecutiveCard
             title="Lucro estimado"
             value={formatCurrency(data.profit)}
             helper={data.profit >= 0 ? `${formatPercent(data.profitMargin, 0)} de margem sobre a receita lancada.` : 'O lucro estimado ficou negativo neste periodo.'}
             trend={data.profitChange}
             emphasis
-            className="xl:col-span-6"
+            className="min-[1400px]:col-span-6"
           />
           <ExecutiveCard
             title="Falta para meta"
@@ -617,7 +617,7 @@ export default async function DashboardPage({ searchParams }: Props) {
                 : `${formatCurrency(data.requiredDailyRevenue)} por dia para fechar o objetivo.`
               : 'Defina uma meta para o painel orientar o ritmo do mes.'}
             emphasis
-            className="xl:col-span-6"
+            className="min-[1400px]:col-span-6"
           />
           <ExecutiveCard
             title="Despesas"
@@ -625,21 +625,21 @@ export default async function DashboardPage({ searchParams }: Props) {
             helper={data.expenseLimit > 0 ? `${formatPercent(data.expenseLimitUsage, 0)} do teto mensal.` : 'Sem teto formal de despesa definido.'}
             trend={data.expenseChange}
             positiveIsGood={false}
-            className="xl:col-span-3"
+            className="min-[1400px]:col-span-3"
           />
           <ExecutiveCard
             title="Ticket medio"
             value={formatCurrency(data.ticketAverage)}
             helper={`${data.totalAppointments} atendimentos registrados no periodo.`}
             trend={data.ticketChange}
-            className="xl:col-span-3"
+            className="min-[1400px]:col-span-3"
           />
           <ExecutiveCard
             title="Receita confirmada"
             value={formatCurrency(data.totalRevenue)}
             helper="Faturamento registrado no periodo com base real."
             trend={data.revenueChange}
-            className="xl:col-span-3"
+            className="min-[1400px]:col-span-3"
           />
           <ExecutiveCard
             title="Meta do mes"
@@ -647,7 +647,7 @@ export default async function DashboardPage({ searchParams }: Props) {
             helper={data.goalValue > 0
               ? `${formatCurrency(data.totalRevenue)} de ${formatCurrency(data.goalValue)}.`
               : 'Sem objetivo formal configurado para este periodo.'}
-            className="xl:col-span-3"
+            className="min-[1400px]:col-span-3"
           />
         </div>
 
@@ -695,14 +695,14 @@ export default async function DashboardPage({ searchParams }: Props) {
         </aside>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(300px,380px)]">
+      <section className="grid gap-5 min-[1320px]:grid-cols-[minmax(0,1fr)_minmax(300px,380px)]">
         <BarbershopHealthPanel health={barbershopHealth} />
         <DashboardInsightsPreview report={intelligenceReport} />
       </section>
 
       <CampaignAutomationPanel data={campaignAutomation} />
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_360px]">
+      <div className="grid gap-5 min-[1320px]:grid-cols-[minmax(0,1.45fr)_360px]">
         <RevenueChart data={data.chartData} />
 
         <aside className="space-y-5">
@@ -772,7 +772,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         </aside>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,1fr)]">
+      <div className="grid gap-5 min-[1320px]:grid-cols-[minmax(0,1.1fr)_minmax(320px,1fr)]">
         {data.ranking.length > 0 ? (
           <ProfessionalRanking data={data.ranking.slice(0, 5)} />
         ) : (

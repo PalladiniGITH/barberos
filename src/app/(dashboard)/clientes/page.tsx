@@ -120,14 +120,14 @@ function SummaryCard({
   }[tone]
 
   return (
-    <div className={cn('surface-inverse rounded-[1.1rem] border p-4 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.82)]', toneClass)}>
+    <div className={cn('surface-inverse h-full min-w-0 rounded-[1.1rem] border p-4 shadow-[0_22px_44px_-34px_rgba(2,6,23,0.82)]', toneClass)}>
       <div className="flex items-center gap-3">
         <span className="flex h-10 w-10 items-center justify-center rounded-[0.95rem] border border-[rgba(91,33,182,0.12)] bg-[rgba(91,33,182,0.08)] text-primary">
           <Icon className="h-4 w-4" />
         </span>
-        <div>
+        <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{title}</p>
-          <p className="mt-1.5 text-[1.85rem] font-semibold leading-none text-foreground">{value}</p>
+          <p className="mt-1.5 break-words text-[clamp(1.55rem,1.18rem+1vw,1.85rem)] font-semibold leading-tight tracking-tight text-foreground">{value}</p>
         </div>
       </div>
       <p className="mt-2.5 text-[13px] leading-5 text-muted-foreground">{helper}</p>
@@ -194,7 +194,7 @@ export default async function ClientesPage({ searchParams }: Props) {
       />
 
       <section className="dashboard-panel dashboard-spotlight px-5 py-5">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_340px]">
+        <div className="grid gap-5 min-[1320px]:grid-cols-[minmax(0,1.2fr)_340px]">
           <div>
             <p className="text-sm text-slate-300">
               {directory.summary.customers} clientes no recorte · {directory.summary.atRiskCustomers} em observacao
@@ -268,7 +268,7 @@ export default async function ClientesPage({ searchParams }: Props) {
         </div>
       </section>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 min-[1320px]:grid-cols-4">
         <SummaryCard
           title="Clientes visiveis"
           value={`${directory.summary.customers}`}
@@ -382,7 +382,7 @@ export default async function ClientesPage({ searchParams }: Props) {
         </div>
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid gap-5 min-[1320px]:grid-cols-[minmax(0,1fr)_320px]">
         <section className="dashboard-panel p-5 sm:p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -394,25 +394,21 @@ export default async function ClientesPage({ searchParams }: Props) {
             <p className="text-sm text-muted-foreground">{directory.rows.length} clientes no recorte</p>
           </div>
 
-          <div className="table-shell mt-5 overflow-x-auto">
-            <table className="data-table min-w-full text-sm">
+          <div className="table-shell mt-5">
+            <table className="data-table w-full text-sm [table-layout:fixed]">
               <thead>
                 <tr className="border-b border-[rgba(255,255,255,0.05)] text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  <th className="pb-3 pr-4">Cliente</th>
-                  <th className="pb-3 pr-4">Tipo</th>
-                  <th className="pb-3 pr-4">Barbeiro</th>
-                  <th className="pb-3 pr-4">Atendimentos</th>
-                  <th className="pb-3 pr-4">Gerado</th>
-                  <th className="pb-3 pr-4">Ticket medio</th>
-                  <th className="pb-3 pr-4">Ultima visita</th>
-                  <th className="pb-3">Sinalizacao</th>
+                  <th className="w-[32%] pb-3 pr-4">Cliente</th>
+                  <th className="w-[23%] pb-3 pr-4">Relacionamento</th>
+                  <th className="w-[25%] pb-3 pr-4">Financeiro</th>
+                  <th className="w-[20%] pb-3">Sinalizacao</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[rgba(255,255,255,0.05)]">
                 {directory.rows.length > 0 ? directory.rows.map((row) => (
                   <tr key={row.id} className="align-top transition-colors hover:bg-[rgba(124,92,255,0.04)]">
                     <td className="py-4 pr-4">
-                      <div className="min-w-[220px]">
+                      <div className="min-w-0 space-y-2">
                         <Link
                           href={buildCustomerProfileHref({
                             customerId: row.id,
@@ -420,41 +416,51 @@ export default async function ClientesPage({ searchParams }: Props) {
                             year,
                             professionalId,
                           })}
-                          className="inline-flex items-center gap-2 font-semibold text-foreground transition-colors hover:text-primary"
+                          className="inline-flex max-w-full items-start gap-2 font-semibold text-foreground transition-colors hover:text-primary"
                         >
-                          {row.name}
-                          <ArrowUpRight className="h-4 w-4" />
+                          <span className="break-words leading-5">{row.name}</span>
+                          <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0" />
                         </Link>
-                        <p className="mt-1 text-xs text-muted-foreground">
+                        <p className="text-xs leading-5 text-muted-foreground break-words">
                           {row.phone ?? row.email ?? 'Sem contato cadastrado'}
                         </p>
+                        <div className="flex flex-wrap gap-2">
+                          <ToneBadge label={CUSTOMER_TYPE_LABELS[row.type]} tone={row.type === 'SUBSCRIPTION' ? 'positive' : 'neutral'} />
+                          {row.subscriptionStatus && (
+                            <ToneBadge
+                              label={SUBSCRIPTION_STATUS_LABELS[row.subscriptionStatus]}
+                              tone={row.subscriptionStatus === 'ACTIVE' ? 'positive' : 'warning'}
+                            />
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="py-4 pr-4">
-                      <div className="flex flex-col gap-2">
-                        <ToneBadge label={CUSTOMER_TYPE_LABELS[row.type]} tone={row.type === 'SUBSCRIPTION' ? 'positive' : 'neutral'} />
-                        {row.subscriptionStatus && (
-                          <ToneBadge
-                            label={SUBSCRIPTION_STATUS_LABELS[row.subscriptionStatus]}
-                            tone={row.subscriptionStatus === 'ACTIVE' ? 'positive' : 'warning'}
-                          />
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-4 pr-4 text-foreground">{row.mostFrequentProfessionalName ?? 'Sem padrao'}</td>
-                    <td className="py-4 pr-4 text-foreground">{row.visits}</td>
-                    <td className="py-4 pr-4">
-                      <div>
-                        <p className="font-semibold text-foreground">{formatCurrency(row.totalRevenue)}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {row.estimatedRevenue > 0 ? `${formatCurrency(row.estimatedRevenue)} estimado` : `${formatCurrency(row.realRevenue)} real`}
+                      <div className="space-y-2">
+                        <p className="font-medium leading-5 text-foreground break-words">{row.mostFrequentProfessionalName ?? 'Sem padrao'}</p>
+                        <p className="text-xs leading-5 text-muted-foreground">
+                          {row.visits} atendimento{row.visits === 1 ? '' : 's'}
+                        </p>
+                        <p className="text-xs leading-5 text-muted-foreground">
+                          {row.lastVisitAt ? `Ultima visita em ${formatDate(row.lastVisitAt)}` : 'Sem visita registrada'}
                         </p>
                       </div>
                     </td>
-                    <td className="py-4 pr-4 text-foreground">{formatCurrency(row.ticketAverage)}</td>
-                    <td className="py-4 pr-4 text-foreground">{row.lastVisitAt ? formatDate(row.lastVisitAt) : 'Sem visita'}</td>
+                    <td className="py-4 pr-4">
+                      <div className="space-y-2">
+                        <div>
+                          <p className="font-semibold text-foreground break-words">{formatCurrency(row.totalRevenue)}</p>
+                          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                            {row.estimatedRevenue > 0 ? `${formatCurrency(row.estimatedRevenue)} estimado` : `${formatCurrency(row.realRevenue)} real`}
+                          </p>
+                        </div>
+                        <p className="text-xs leading-5 text-muted-foreground">
+                          Ticket medio <span className="font-medium text-foreground">{formatCurrency(row.ticketAverage)}</span>
+                        </p>
+                      </div>
+                    </td>
                     <td className="py-4">
-                      <div className="flex min-w-[190px] flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <ToneBadge
                           label={row.riskLabel}
                           tone={row.riskLevel === 'warning' || row.riskLevel === 'loss' ? 'warning' : row.riskLevel === 'underused' ? 'positive' : 'neutral'}
@@ -468,7 +474,7 @@ export default async function ClientesPage({ searchParams }: Props) {
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
+                    <td colSpan={4} className="py-8 text-center text-sm text-muted-foreground">
                       Ainda não há clientes suficientes neste filtro para montar a listagem.
                     </td>
                   </tr>

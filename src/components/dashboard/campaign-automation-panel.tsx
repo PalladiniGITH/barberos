@@ -82,11 +82,11 @@ function SummaryCard({
   icon: typeof Activity
 }) {
   return (
-    <div className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
+    <div className="flex h-full min-w-0 flex-col rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4">
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="executive-label">{label}</p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">{value}</p>
+          <p className="mt-2 break-words text-[clamp(1.35rem,1.08rem+0.85vw,1.85rem)] font-semibold leading-tight tracking-tight text-foreground">{value}</p>
         </div>
         <span className="flex h-10 w-10 items-center justify-center rounded-[0.95rem] border border-[rgba(124,58,237,0.18)] bg-[rgba(124,58,237,0.12)] text-primary">
           <Icon className="h-4 w-4" />
@@ -115,7 +115,7 @@ function DeliveryStatusChip({ status }: { status: CampaignAutomationDeliveryStat
 export function CampaignAutomationPanel({ data }: { data: CampaignAutomationManagementData }) {
   return (
     <section className="dashboard-panel overflow-hidden p-5 sm:p-6">
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_360px]">
+      <div className="grid gap-5 min-[1320px]:grid-cols-[minmax(0,1.35fr)_360px]">
         <div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -130,7 +130,7 @@ export function CampaignAutomationPanel({ data }: { data: CampaignAutomationMana
             <StatusBadge status={data.status} />
           </div>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-5 grid gap-3 md:grid-cols-2 min-[1400px]:grid-cols-4">
             <SummaryCard
               label="Status"
               value={data.statusLabel}
@@ -157,19 +157,19 @@ export function CampaignAutomationPanel({ data }: { data: CampaignAutomationMana
             />
           </div>
 
-          <div className="mt-5 grid gap-3 lg:grid-cols-3">
+          <div className="mt-5 grid gap-3 md:grid-cols-2 min-[1450px]:grid-cols-3">
             {data.campaignSummaries.map((campaign) => (
               <article
                 key={campaign.campaignType}
-                className="rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.03))] p-4"
+                className="flex h-full flex-col rounded-[1rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.03))] p-4"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-foreground">{CAMPAIGN_LABELS[campaign.campaignType]}</p>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">{CAMPAIGN_HELPERS[campaign.campaignType]}</p>
                   </div>
                   <span className={cn(
-                    'rounded-full border px-2.5 py-1 text-[11px] font-semibold',
+                    'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold',
                     campaign.active
                       ? 'border-[rgba(124,58,237,0.28)] bg-[rgba(124,58,237,0.13)] text-violet-100'
                       : 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-muted-foreground'
@@ -178,9 +178,9 @@ export function CampaignAutomationPanel({ data }: { data: CampaignAutomationMana
                   </span>
                 </div>
 
-                <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
+                <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
                   <div>
-                  <p className="executive-label">Elegíveis</p>
+                    <p className="executive-label">Elegíveis</p>
                     <p className="mt-1 text-xl font-semibold text-foreground">{campaign.eligibleCustomers}</p>
                   </div>
                   <div>
@@ -193,9 +193,9 @@ export function CampaignAutomationPanel({ data }: { data: CampaignAutomationMana
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-[0.9rem] border border-[rgba(255,255,255,0.07)] bg-[rgba(15,17,21,0.46)] p-3">
+                <div className="mt-auto flex min-h-[116px] flex-col rounded-[0.9rem] border border-[rgba(255,255,255,0.07)] bg-[rgba(15,17,21,0.46)] p-3">
                   <p className="text-sm font-semibold text-foreground">Benefício configurado</p>
-                  <p className="mt-2 line-clamp-2 text-sm leading-6 text-foreground">
+                  <p className="mt-2 line-clamp-3 text-sm leading-6 text-foreground">
                     {campaign.benefitDescription ?? 'Sem benefício configurado'}
                   </p>
                 </div>

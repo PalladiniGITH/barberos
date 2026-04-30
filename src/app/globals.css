@@ -208,7 +208,7 @@
   .disclosure-panel,
   .panel-card,
   .metric-card {
-    @apply rounded-[1.12rem] border text-card-foreground;
+    @apply min-w-0 rounded-[1.12rem] border text-card-foreground;
     border-color: rgba(255, 255, 255, 0.032);
     box-shadow:
       0 22px 42px -40px rgba(2, 6, 23, 0.74),
@@ -277,11 +277,11 @@
   }
 
   .dashboard-hero-grid {
-    @apply grid gap-3 xl:grid-cols-[minmax(0,1.3fr)_360px];
+    @apply grid gap-3 md:grid-cols-2 min-[1320px]:grid-cols-[minmax(0,1.3fr)_360px];
   }
 
   .hero-stat-card {
-    @apply rounded-[1rem] border p-5 backdrop-blur-sm;
+    @apply h-full min-w-0 rounded-[1rem] border p-4 backdrop-blur-sm sm:p-5;
     border-color: rgba(255, 255, 255, 0.03);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0.012));
     box-shadow: 0 14px 26px -26px rgba(2, 6, 23, 0.4);
@@ -294,7 +294,9 @@
   }
 
   .spotlight-title {
-    @apply mt-2 text-[2.45rem] font-semibold leading-[0.95] tracking-[-0.05em] text-foreground sm:text-[3.05rem];
+    @apply mt-2 font-semibold leading-[0.95] tracking-[-0.05em] text-foreground;
+    font-size: clamp(2.1rem, 1.45rem + 2.25vw, 3.05rem);
+    white-space: normal;
   }
 
   .spotlight-copy {
@@ -322,11 +324,11 @@
   }
 
   .metric-card {
-    @apply p-5;
+    @apply p-4 sm:p-5;
   }
 
   .executive-metric {
-    @apply rounded-[1rem] border p-5;
+    @apply min-w-0 rounded-[1rem] border p-4 sm:p-5;
     border-color: rgba(255, 255, 255, 0.03);
     background:
       linear-gradient(180deg, rgba(35, 35, 39, 0.74), rgba(24, 24, 27, 0.94));
@@ -338,7 +340,10 @@
   }
 
   .executive-value {
-    @apply mt-2.5 text-[2.1rem] font-semibold leading-none tracking-tight text-foreground;
+    @apply mt-2.5 font-semibold tracking-tight text-foreground;
+    font-size: clamp(1.72rem, 1.08rem + 1.5vw, 2.2rem);
+    line-height: 1.02;
+    white-space: normal;
   }
 
   .premium-dark-button,
@@ -405,7 +410,7 @@
   }
 
   .panel-soft {
-    @apply rounded-[0.95rem] border p-4;
+    @apply h-full min-w-0 rounded-[0.95rem] border p-3.5 sm:p-4;
     border-color: rgba(255, 255, 255, 0.028);
     background: linear-gradient(180deg, rgba(36, 36, 40, 0.18), rgba(26, 26, 29, 0.54));
   }

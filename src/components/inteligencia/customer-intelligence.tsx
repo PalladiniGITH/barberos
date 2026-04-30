@@ -106,14 +106,14 @@ function SummaryMetric({
   }[tone]
 
   return (
-    <div className={cn('surface-inverse rounded-[1.1rem] border p-4 shadow-[0_18px_34px_-34px_rgba(2,6,23,0.62)]', toneClass)}>
+    <div className={cn('surface-inverse h-full min-w-0 rounded-[1.1rem] border p-4 shadow-[0_18px_34px_-34px_rgba(2,6,23,0.62)]', toneClass)}>
       <div className="flex items-center gap-3">
         <span className="flex h-10 w-10 items-center justify-center rounded-[0.95rem] border border-[rgba(91,33,182,0.12)] bg-[rgba(91,33,182,0.08)] text-primary">
           <Icon className="h-4 w-4" />
         </span>
-        <div>
+        <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{title}</p>
-          <p className="mt-1 text-xl font-semibold text-foreground">{value}</p>
+          <p className="mt-1 break-words text-[clamp(1.15rem,0.98rem+0.7vw,1.4rem)] font-semibold leading-tight text-foreground">{value}</p>
         </div>
       </div>
       <p className="mt-3 text-sm leading-6 text-muted-foreground">{helper}</p>
@@ -192,7 +192,7 @@ function RankingList({
       <div className="mt-4 space-y-3">
         {items.length > 0 ? items.map((customer) => (
           <div key={customer.id} className="surface-inverse tonal-note p-4 shadow-none">
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <Link
                   href={buildCustomerProfileHref({
@@ -201,7 +201,7 @@ function RankingList({
                     year,
                     professionalId,
                   })}
-                  className="truncate text-sm font-semibold text-foreground transition-colors hover:text-primary"
+                  className="inline-block max-w-full break-words text-sm font-semibold leading-5 text-foreground transition-colors hover:text-primary"
                 >
                   {customer.name}
                 </Link>
@@ -218,8 +218,8 @@ function RankingList({
                 />
               </div>
 
-              <div className="text-right">
-                <p className="text-sm font-semibold text-foreground">{renderMetric(customer)}</p>
+              <div className="w-full text-left sm:w-auto sm:text-right">
+                <p className="break-words text-sm font-semibold text-foreground">{renderMetric(customer)}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{customer.visits} visita{customer.visits === 1 ? '' : 's'}</p>
               </div>
             </div>
@@ -375,7 +375,7 @@ export function CustomerIntelligenceSection({
           </div>
         </div>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-6 grid gap-4 md:grid-cols-2 min-[1320px]:grid-cols-4">
           <SummaryMetric
             title="Base filtrada"
             value={`${customers.summary.visibleCustomers} clientes`}
@@ -405,7 +405,7 @@ export function CustomerIntelligenceSection({
         </div>
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_360px]">
+      <div className="grid gap-5 min-[1320px]:grid-cols-[minmax(0,1.25fr)_360px]">
         <section className="space-y-5">
           <section className="dashboard-panel p-5 sm:p-6">
             <div className="flex items-start justify-between gap-3">
@@ -462,7 +462,7 @@ export function CustomerIntelligenceSection({
             </div>
           </section>
 
-          <div className="grid gap-5 xl:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-2 min-[1450px]:grid-cols-3">
             <RankingList
               title="Mais lucrativos"
               subtitle="Quem mais ajuda no lucro"
@@ -612,7 +612,7 @@ export function CustomerIntelligenceSection({
         </aside>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid gap-5 min-[1320px]:grid-cols-[minmax(0,1fr)_360px]">
         <section className="dashboard-panel p-5 sm:p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -627,25 +627,20 @@ export function CustomerIntelligenceSection({
           </div>
 
           <div className="table-shell mt-5 overflow-hidden">
-            <div className="overflow-x-auto">
-            <table className="data-table min-w-full text-sm">
+            <table className="data-table w-full text-sm [table-layout:fixed]">
               <thead>
                 <tr className="border-b border-[rgba(255,255,255,0.08)] text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  <th className="pb-3 pr-4">Cliente</th>
-                  <th className="pb-3 pr-4">Modelo</th>
-                  <th className="pb-3 pr-4">Visitas</th>
-                  <th className="pb-3 pr-4">Gerado</th>
-                  <th className="pb-3 pr-4">Custo</th>
-                  <th className="pb-3 pr-4">Margem</th>
-                  <th className="pb-3 pr-4">Receita/visita</th>
-                  <th className="pb-3">Leitura</th>
+                  <th className="w-[30%] pb-3 pr-4">Cliente</th>
+                  <th className="w-[22%] pb-3 pr-4">Modelo e uso</th>
+                  <th className="w-[30%] pb-3 pr-4">Financeiro</th>
+                  <th className="w-[18%] pb-3">Leitura</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[rgba(255,255,255,0.05)]">
                 {customers.table.length > 0 ? customers.table.slice(0, 12).map((customer) => (
                   <tr key={customer.id} className="align-top">
                     <td className="py-4 pr-4">
-                      <div className="min-w-[220px]">
+                      <div className="min-w-0">
                         <Link
                           href={buildCustomerProfileHref({
                             customerId: customer.id,
@@ -653,17 +648,17 @@ export function CustomerIntelligenceSection({
                             year,
                             professionalId: customers.filters.professionalId,
                           })}
-                          className="font-semibold text-foreground transition-colors hover:text-primary"
+                          className="inline-block max-w-full break-words font-semibold leading-5 text-foreground transition-colors hover:text-primary"
                         >
                           {customer.name}
                         </Link>
-                        <p className="mt-1 text-xs text-muted-foreground">
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground break-words">
                           {customer.professionalNames.length > 0 ? customer.professionalNames.join(', ') : 'Sem barbeiro predominante'}
                         </p>
                       </div>
                     </td>
                     <td className="py-4 pr-4">
-                      <div className="flex flex-col gap-2">
+                      <div className="space-y-2">
                         <span className="inline-flex w-fit items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-2.5 py-1 text-[11px] text-muted-foreground">
                           {CUSTOMER_TYPE_LABELS[customer.type]}
                         </span>
@@ -674,23 +669,29 @@ export function CustomerIntelligenceSection({
                               : APPOINTMENT_BILLING_MODEL_LABELS.SUBSCRIPTION_INCLUDED}
                           </span>
                         )}
+                        <p className="text-xs leading-5 text-muted-foreground">
+                          {customer.visits} visita{customer.visits === 1 ? '' : 's'} no recorte
+                        </p>
                       </div>
                     </td>
-                    <td className="py-4 pr-4 text-foreground">{customer.visits}</td>
                     <td className="py-4 pr-4">
-                      <p className="font-semibold text-foreground">{formatCurrency(customer.totalRevenue)}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{formatCurrency(customer.realRevenue)} real / {formatCurrency(customer.estimatedRevenue)} est.</p>
-                    </td>
-                    <td className="py-4 pr-4 text-foreground">{formatCurrency(customer.estimatedCost)}</td>
-                    <td className="py-4 pr-4">
-                      <div>
-                        <p className="font-semibold text-foreground">{formatCurrency(customer.margin)}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{formatPercent(customer.marginPercent, 0)}</p>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="font-semibold text-foreground">{formatCurrency(customer.totalRevenue)}</p>
+                          <p className="mt-1 text-xs leading-5 text-muted-foreground">{formatCurrency(customer.realRevenue)} real / {formatCurrency(customer.estimatedRevenue)} est.</p>
+                        </div>
+                        <p className="text-xs leading-5 text-muted-foreground">
+                          Custo <span className="font-medium text-foreground">{formatCurrency(customer.estimatedCost)}</span>
+                          <span className="mx-1.5 text-slate-500">·</span>
+                          Margem <span className="font-medium text-foreground">{formatCurrency(customer.margin)}</span> ({formatPercent(customer.marginPercent, 0)})
+                        </p>
+                        <p className="text-xs leading-5 text-muted-foreground">
+                          Receita/visita <span className="font-medium text-foreground">{formatCurrency(customer.revenuePerVisit)}</span>
+                        </p>
                       </div>
                     </td>
-                    <td className="py-4 pr-4 text-foreground">{formatCurrency(customer.revenuePerVisit)}</td>
                     <td className="py-4">
-                      <div className="flex min-w-[190px] flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <CustomerRiskBadge customer={customer} />
                         <RevenueConfidenceBadge customer={customer} />
                       </div>
@@ -698,14 +699,13 @@ export function CustomerIntelligenceSection({
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
+                    <td colSpan={4} className="py-8 text-center text-sm text-muted-foreground">
                       Ainda não há clientes suficientes para exibir a tabela neste recorte. Ajuste o filtro ou aguarde novos atendimentos.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
-            </div>
           </div>
         </section>
 
