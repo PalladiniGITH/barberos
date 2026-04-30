@@ -1,6 +1,12 @@
 import 'server-only'
 
-import type { AiChatUsageSource, BarbershopSubscriptionStatus, Prisma } from '@prisma/client'
+import type {
+  AiChatUsageSource,
+  BarbershopSubscriptionStatus,
+  CustomerType,
+  Prisma,
+  SubscriptionStatus,
+} from '@prisma/client'
 import {
   OPENAI_PRICING_SOURCE_UPDATED_AT,
   OPENAI_PRICING_VERSION,
@@ -9,7 +15,11 @@ import {
   getOpenAiUsdBrlRate,
 } from '@/lib/ai/openai-pricing'
 import { assertPlatformRoleAllowed } from '@/lib/auth'
+import { SCHEDULE_END_HOUR, SCHEDULE_START_HOUR } from '@/lib/agendamentos/availability'
+import { OPERATIONAL_BLOCK_SOURCE_PREFIX } from '@/lib/agendamentos/operational-blocks'
+import { BRAZIL_TIMEZONES } from '@/lib/onboarding'
 import { prisma } from '@/lib/prisma'
+import { resolveProfessionalAttendanceScope } from '@/lib/professionals/operational-config'
 import { safeLog } from '@/lib/security/safe-logger'
 import { formatDateTimeInTimezone, resolveBusinessTimezone } from '@/lib/timezone'
 
@@ -19,6 +29,21 @@ const RECENT_ACTIVITY_LIMIT = 8
 interface PlatformSessionIdentity {
   userId: string
   platformRole?: string | null
+}
+
+export type PlatformChecklistStatus = 'complete' | 'pending' | 'attention'
+
+export interface PlatformChecklistItem {
+  id: string
+  label: string
+  detail: string
+  status: PlatformChecklistStatus
+}
+
+export interface PlatformChecklistGroup {
+  id: string
+  title: string
+  items: PlatformChecklistItem[]
 }
 
 export interface PlatformOverviewFilters {
@@ -98,14 +123,24 @@ export interface PlatformBarbershopDetailData {
     name: string
     slug: string
     timezone: string
+    address: string | null
+    phone: string | null
+    email: string | null
     operationalActive: boolean
     subscriptionPlan: string | null
     subscriptionStatus: BarbershopSubscriptionStatus
     trialEndsAt: Date | null
     billingEmail: string | null
+    whatsappEnabled: boolean
+    evolutionInstanceName: string | null
+    whatsappLastInboundAt: Date | null
+    whatsappLastOutboundAt: Date | null
+    whatsappLastErrorAt: Date | null
+    whatsappLastErrorMessage: string | null
     blockedAt: Date | null
     blockedReason: string | null
     createdAt: Date
+    updatedAt: Date
     createdAtLabel: string
   }
   totals: {
@@ -113,6 +148,7 @@ export interface PlatformBarbershopDetailData {
     professionals: number
     customers: number
     appointmentsThisMonth: number
+    upcomingAppointments: number
     whatsappMessagesThisMonth: number
     aiTokensThisMonth: number
     aiEstimatedCostCents: number | null
@@ -129,6 +165,99 @@ export interface PlatformBarbershopDetailData {
     active: boolean
     createdAt: Date
   }>
+  serviceCategories: Array<{
+    id: string
+    name: string
+    active: boolean
+  }>
+  professionals: Array<{
+    id: string
+    name: string
+    email: string | null
+    phone: string | null
+    avatar: string | null
+    active: boolean
+    attendanceScope: 'BOTH' | 'SUBSCRIPTION_ONLY' | 'WALK_IN_ONLY'
+    commissionRate: number | null
+    haircutPrice: number | null
+    beardPrice: number | null
+    comboPrice: number | null
+    upcomingAppointments: number
+    createdAt: Date
+  }>
+  services: Array<{
+    id: string
+    name: string
+    description: string | null
+    price: number
+    duration: number
+    active: boolean
+    categoryId: string | null
+    categoryName: string | null
+    upcomingAppointments: number
+    createdAt: Date
+  }>
+  customers: Array<{
+    id: string
+    name: string
+    phone: string | null
+    email: string | null
+    notes: string | null
+    type: CustomerType
+    subscriptionStatus: SubscriptionStatus | null
+    subscriptionPrice: number | null
+    subscriptionStartedAt: Date | null
+    preferredProfessionalId: string | null
+    preferredProfessionalName: string | null
+    active: boolean
+    marketingOptOut: boolean
+    upcomingAppointments: number
+    updatedAt: Date
+  }>
+  checklist: {
+    groups: PlatformChecklistGroup[]
+    summary: {
+      complete: number
+      pending: number
+      attention: number
+      total: number
+    }
+  }
+  schedule: {
+    defaultWindow: {
+      startHour: number
+      endHour: number
+      label: string
+    }
+    upcomingBlocks: Array<{
+      id: string
+      professionalId: string
+      professionalName: string
+      startAt: Date
+      endAt: Date
+      notes: string | null
+      dateInputValue: string
+      startTimeValue: string
+      endTimeValue: string
+      dateLabel: string
+      startTimeLabel: string
+      endTimeLabel: string
+    }>
+  }
+  migration: {
+    documentationPath: string
+    strategyCards: Array<{
+      id: string
+      title: string
+      description: string
+    }>
+    csvPreview: {
+      professionals: string[]
+      services: string[]
+      customers: string[]
+      futureAppointments: string[]
+    }
+  }
   aiUsageBySource: Array<{
     source: AiChatUsageSource
     requests: number
@@ -143,6 +272,12 @@ export interface PlatformBarbershopDetailData {
     lastUsedAt: Date | null
   }>
   integrations: {
+    whatsappEnabled: boolean
+    evolutionInstanceName: string | null
+    evolutionApiKeyManagedPerTenant: boolean
+    webhookSecretConfigured: boolean
+    webhookSecretMasked: string | null
+    whatsappStatusLabel: string
     whatsappLastEventAt: Date | null
     automationActiveConfigs: number
     automationLastRunAt: Date | null
@@ -217,8 +352,64 @@ type PlatformRecentUsageRow = {
   createdAt: Date
 }
 
+interface PlatformBarbershopChecklistInput {
+  barbershop: {
+    name: string
+    slug: string
+    timezone: string | null
+    whatsappEnabled: boolean
+    evolutionInstanceName: string | null
+  }
+  metrics: {
+    activeProfessionals: number
+    activeServices: number
+    customers: number
+    upcomingAppointments: number
+    financialCategories: number
+    whatsappLastEventAt: Date | null
+  }
+}
+
 function normalizeText(value?: string | null) {
   return typeof value === 'string' ? value.trim() : ''
+}
+
+function formatDatePartsInTimezone(date: Date, timezone: string) {
+  const formatter = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+
+  const parts = formatter.formatToParts(date)
+  const year = parts.find((part) => part.type === 'year')?.value ?? '0000'
+  const month = parts.find((part) => part.type === 'month')?.value ?? '01'
+  const day = parts.find((part) => part.type === 'day')?.value ?? '01'
+
+  return {
+    year,
+    month,
+    day,
+  }
+}
+
+function formatDateInputInTimezone(date: Date, timezone: string) {
+  const parts = formatDatePartsInTimezone(date, timezone)
+  return `${parts.year}-${parts.month}-${parts.day}`
+}
+
+function formatTimeInputInTimezone(date: Date, timezone: string) {
+  const formatter = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+
+  const hour = formatter.formatToParts(date).find((part) => part.type === 'hour')?.value ?? '00'
+  const minute = formatter.formatToParts(date).find((part) => part.type === 'minute')?.value ?? '00'
+  return `${hour}:${minute}`
 }
 
 function normalizeNumericValue(value: Prisma.Decimal | number | null | undefined) {
@@ -286,6 +477,203 @@ function normalizeSubscriptionStatus(value?: string | null): BarbershopSubscript
   }
 
   return null
+}
+
+function toChecklistItemStatus(done: boolean, attention = false): PlatformChecklistStatus {
+  if (done) {
+    return 'complete'
+  }
+
+  return attention ? 'attention' : 'pending'
+}
+
+function buildChecklistSummary(groups: PlatformChecklistGroup[]) {
+  return groups
+    .flatMap((group) => group.items)
+    .reduce(
+      (summary, item) => {
+        summary.total += 1
+        summary[item.status] += 1
+        return summary
+      },
+      {
+        complete: 0,
+        pending: 0,
+        attention: 0,
+        total: 0,
+      }
+    )
+}
+
+function maskSecretPreview(value?: string | null) {
+  const normalized = typeof value === 'string' ? value.trim() : ''
+
+  if (!normalized) {
+    return null
+  }
+
+  if (normalized.length <= 8) {
+    return `${normalized.slice(0, 2)}***${normalized.slice(-2)}`
+  }
+
+  return `${normalized.slice(0, 4)}***${normalized.slice(-4)}`
+}
+
+export function buildBarbershopOnboardingChecklist(
+  input: PlatformBarbershopChecklistInput
+): PlatformBarbershopDetailData['checklist'] {
+  const basicConfigured = Boolean(input.barbershop.name && input.barbershop.slug)
+  const timezoneConfigured = Boolean(input.barbershop.timezone)
+  const hasProfessionals = input.metrics.activeProfessionals > 0
+  const hasServices = input.metrics.activeServices > 0
+  const hasCustomers = input.metrics.customers > 0
+  const hasUpcomingAppointments = input.metrics.upcomingAppointments > 0
+  const hasWhatsappInstance = Boolean(input.barbershop.evolutionInstanceName)
+  const hasWhatsappEnabled = input.barbershop.whatsappEnabled
+  const hasWhatsappTraffic = Boolean(input.metrics.whatsappLastEventAt)
+  const hasFinancialCategories = input.metrics.financialCategories > 0
+
+  const groups: PlatformChecklistGroup[] = [
+    {
+      id: 'basics',
+      title: 'Dados basicos',
+      items: [
+        {
+          id: 'name-slug',
+          label: 'Nome e slug configurados',
+          detail: basicConfigured
+            ? 'Identidade principal do tenant pronta para operacao e URLs internas.'
+            : 'Revise nome e slug antes de seguir para o piloto.',
+          status: toChecklistItemStatus(basicConfigured),
+        },
+        {
+          id: 'timezone',
+          label: 'Timezone configurada',
+          detail: timezoneConfigured
+            ? `Operando em ${input.barbershop.timezone}.`
+            : 'Defina o fuso horario oficial da barbearia.',
+          status: toChecklistItemStatus(timezoneConfigured),
+        },
+      ],
+    },
+    {
+      id: 'operation',
+      title: 'Operacao',
+      items: [
+        {
+          id: 'professionals',
+          label: 'Profissionais ativos cadastrados',
+          detail: hasProfessionals
+            ? `${input.metrics.activeProfessionals} profissional${input.metrics.activeProfessionals === 1 ? '' : 'is'} ativo${input.metrics.activeProfessionals === 1 ? '' : 's'} pronto${input.metrics.activeProfessionals === 1 ? '' : 's'} para agenda.`
+            : 'Cadastre ao menos 1 profissional para preparar atendimento e agenda.',
+          status: toChecklistItemStatus(hasProfessionals),
+        },
+        {
+          id: 'services',
+          label: 'Servicos ativos cadastrados',
+          detail: hasServices
+            ? `${input.metrics.activeServices} servico${input.metrics.activeServices === 1 ? '' : 's'} ativo${input.metrics.activeServices === 1 ? '' : 's'} com precificacao pronta.`
+            : 'Cadastre servicos com preco e duracao antes do piloto.',
+          status: toChecklistItemStatus(hasServices),
+        },
+        {
+          id: 'hours',
+          label: 'Horarios operacionais revisados',
+          detail: hasProfessionals
+            ? `A janela base atual do produto e ${String(SCHEDULE_START_HOUR).padStart(2, '0')}:00-${String(SCHEDULE_END_HOUR).padStart(2, '0')}:00. Use bloqueios operacionais para indisponibilidades enquanto nao houver grade semanal persistente.`
+            : 'Defina primeiro a equipe para revisar disponibilidade operacional.',
+          status: toChecklistItemStatus(hasProfessionals, true),
+        },
+        {
+          id: 'future-agenda',
+          label: 'Agenda futura preparada',
+          detail: hasUpcomingAppointments
+            ? `${input.metrics.upcomingAppointments} horario${input.metrics.upcomingAppointments === 1 ? '' : 's'} futuro${input.metrics.upcomingAppointments === 1 ? '' : 's'} ja cadastrado${input.metrics.upcomingAppointments === 1 ? '' : 's'}.`
+            : 'Ainda nao ha agenda futura cadastrada para o tenant.',
+          status: toChecklistItemStatus(hasUpcomingAppointments),
+        },
+      ],
+    },
+    {
+      id: 'whatsapp',
+      title: 'WhatsApp',
+      items: [
+        {
+          id: 'instance',
+          label: 'Instance Evolution configurada',
+          detail: hasWhatsappInstance
+            ? `Instance atual: ${input.barbershop.evolutionInstanceName}.`
+            : 'Defina a instance Evolution para resolver o tenant corretamente.',
+          status: toChecklistItemStatus(hasWhatsappInstance),
+        },
+        {
+          id: 'whatsapp-enabled',
+          label: 'WhatsApp habilitado',
+          detail: hasWhatsappEnabled
+            ? 'Mensageria habilitada para este tenant.'
+            : 'Ative o WhatsApp apenas quando a configuracao estiver pronta.',
+          status: toChecklistItemStatus(hasWhatsappEnabled),
+        },
+        {
+          id: 'whatsapp-traffic',
+          label: 'Ultimo evento recebido',
+          detail: hasWhatsappTraffic
+            ? 'Ja existe trafego recente na camada de mensageria desse tenant.'
+            : 'Ainda nao ha evento recente registrado; valide a integracao antes do piloto.',
+          status: toChecklistItemStatus(hasWhatsappTraffic, true),
+        },
+      ],
+    },
+    {
+      id: 'migration',
+      title: 'Migracao',
+      items: [
+        {
+          id: 'customers',
+          label: 'Clientes principais cadastrados',
+          detail: hasCustomers
+            ? `${input.metrics.customers} cliente${input.metrics.customers === 1 ? '' : 's'} ja disponivel${input.metrics.customers === 1 ? '' : 'eis'} para operacao e relacionamento.`
+            : 'Comece pela base principal de clientes da barbearia.',
+          status: toChecklistItemStatus(hasCustomers),
+        },
+        {
+          id: 'services-reviewed',
+          label: 'Servicos revisados para implantacao',
+          detail: hasServices
+            ? 'Catalogo operacional ja pode sustentar migracao manual.'
+            : 'Revise servicos, precos e duracoes antes da carga manual.',
+          status: toChecklistItemStatus(hasServices),
+        },
+        {
+          id: 'professionals-reviewed',
+          label: 'Equipe revisada',
+          detail: hasProfessionals
+            ? 'Equipe inicial revisada para atendimento e agenda.'
+            : 'A equipe ainda nao foi preparada para o tenant.',
+          status: toChecklistItemStatus(hasProfessionals),
+        },
+      ],
+    },
+    {
+      id: 'finance',
+      title: 'Financeiro',
+      items: [
+        {
+          id: 'categories',
+          label: 'Categorias financeiras basicas',
+          detail: hasFinancialCategories
+            ? `${input.metrics.financialCategories} categoria${input.metrics.financialCategories === 1 ? '' : 's'} financeira${input.metrics.financialCategories === 1 ? '' : 's'} disponivel${input.metrics.financialCategories === 1 ? '' : 'eis'}.`
+            : 'As categorias financeiras ainda nao foram configuradas para este tenant.',
+          status: toChecklistItemStatus(hasFinancialCategories, true),
+        },
+      ],
+    },
+  ]
+
+  return {
+    groups,
+    summary: buildChecklistSummary(groups),
+  }
 }
 
 function roundUsd(value: number) {
@@ -1077,6 +1465,7 @@ export async function getPlatformBarbershopDetailData(
   assertPlatformRoleAllowed(session.platformRole)
 
   const { startOfMonth, sevenDaysAgo } = getDateWindows()
+  const now = new Date()
   const pricing = buildPlatformPricingMeta()
   const barbershop = await prisma.barbershop.findUnique({
     where: { id: barbershopId },
@@ -1085,14 +1474,24 @@ export async function getPlatformBarbershopDetailData(
       name: true,
       slug: true,
       timezone: true,
+      address: true,
+      phone: true,
+      email: true,
       active: true,
       subscriptionPlan: true,
       subscriptionStatus: true,
       trialEndsAt: true,
       billingEmail: true,
+      whatsappEnabled: true,
+      evolutionInstanceName: true,
+      whatsappLastInboundAt: true,
+      whatsappLastOutboundAt: true,
+      whatsappLastErrorAt: true,
+      whatsappLastErrorMessage: true,
       blockedAt: true,
       blockedReason: true,
       createdAt: true,
+      updatedAt: true,
       _count: {
         select: {
           users: true,
@@ -1112,13 +1511,23 @@ export async function getPlatformBarbershopDetailData(
 
   const [
     users,
+    professionals,
+    services,
+    customers,
+    serviceCategories,
     appointmentsThisMonth,
+    futureAppointmentsCount,
     whatsappMessagesThisMonth,
     recentAutomations,
     automationsThisMonthCount,
     automationActiveConfigs,
     messagingLastEvent,
     automationLastRun,
+    financialCategoriesCount,
+    upcomingBlocks,
+    professionalUpcomingCounts,
+    serviceUpcomingCounts,
+    customerUpcomingCounts,
     failedMessaging,
     failedAutomation,
   ] = await Promise.all([
@@ -1137,11 +1546,108 @@ export async function getPlatformBarbershopDetailData(
         createdAt: true,
       },
     }),
+    prisma.professional.findMany({
+      where: {
+        barbershopId,
+      },
+      orderBy: [{ active: 'desc' }, { name: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        avatar: true,
+        active: true,
+        commissionRate: true,
+        haircutPrice: true,
+        beardPrice: true,
+        comboPrice: true,
+        acceptsWalkIn: true,
+        acceptsSubscription: true,
+        createdAt: true,
+      },
+    }),
+    prisma.service.findMany({
+      where: {
+        barbershopId,
+      },
+      orderBy: [{ active: 'desc' }, { name: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        price: true,
+        duration: true,
+        active: true,
+        categoryId: true,
+        createdAt: true,
+        category: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    }),
+    prisma.customer.findMany({
+      where: {
+        barbershopId,
+      },
+      orderBy: [{ active: 'desc' }, { updatedAt: 'desc' }],
+      take: 24,
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        email: true,
+        notes: true,
+        type: true,
+        subscriptionStatus: true,
+        subscriptionPrice: true,
+        subscriptionStartedAt: true,
+        active: true,
+        marketingOptOutAt: true,
+        updatedAt: true,
+        preferredProfessionalId: true,
+        preferredProfessional: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    }),
+    prisma.operationalCategory.findMany({
+      where: {
+        barbershopId,
+        type: 'SERVICE',
+      },
+      orderBy: [{ active: 'desc' }, { name: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        active: true,
+      },
+    }),
     prisma.appointment.count({
       where: {
         barbershopId,
         startAt: {
           gte: startOfMonth,
+        },
+      },
+    }),
+    prisma.appointment.count({
+      where: {
+        barbershopId,
+        status: {
+          in: ['PENDING', 'CONFIRMED'],
+        },
+        startAt: {
+          gte: now,
+        },
+        NOT: {
+          sourceReference: {
+            startsWith: OPERATIONAL_BLOCK_SOURCE_PREFIX,
+          },
         },
       },
     }),
@@ -1204,6 +1710,101 @@ export async function getPlatformBarbershopDetailData(
       },
       select: {
         startedAt: true,
+      },
+    }),
+    prisma.financialCategory.count({
+      where: {
+        barbershopId,
+      },
+    }),
+    prisma.appointment.findMany({
+      where: {
+        barbershopId,
+        status: {
+          in: ['PENDING', 'CONFIRMED'],
+        },
+        sourceReference: {
+          startsWith: OPERATIONAL_BLOCK_SOURCE_PREFIX,
+        },
+        endAt: {
+          gte: now,
+        },
+      },
+      orderBy: {
+        startAt: 'asc',
+      },
+      take: 18,
+      select: {
+        id: true,
+        professionalId: true,
+        startAt: true,
+        endAt: true,
+        notes: true,
+        professional: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    }),
+    prisma.appointment.groupBy({
+      by: ['professionalId'],
+      where: {
+        barbershopId,
+        status: {
+          in: ['PENDING', 'CONFIRMED'],
+        },
+        startAt: {
+          gte: now,
+        },
+        NOT: {
+          sourceReference: {
+            startsWith: OPERATIONAL_BLOCK_SOURCE_PREFIX,
+          },
+        },
+      },
+      _count: {
+        _all: true,
+      },
+    }),
+    prisma.appointment.groupBy({
+      by: ['serviceId'],
+      where: {
+        barbershopId,
+        status: {
+          in: ['PENDING', 'CONFIRMED'],
+        },
+        startAt: {
+          gte: now,
+        },
+        NOT: {
+          sourceReference: {
+            startsWith: OPERATIONAL_BLOCK_SOURCE_PREFIX,
+          },
+        },
+      },
+      _count: {
+        _all: true,
+      },
+    }),
+    prisma.appointment.groupBy({
+      by: ['customerId'],
+      where: {
+        barbershopId,
+        status: {
+          in: ['PENDING', 'CONFIRMED'],
+        },
+        startAt: {
+          gte: now,
+        },
+        NOT: {
+          sourceReference: {
+            startsWith: OPERATIONAL_BLOCK_SOURCE_PREFIX,
+          },
+        },
+      },
+      _count: {
+        _all: true,
       },
     }),
     prisma.messagingEvent.findMany({
@@ -1273,6 +1874,34 @@ export async function getPlatformBarbershopDetailData(
   const unpricedAiUsageBySourceMap = new Map(
     unpricedUsageBySource.map((item) => [item.source, item._count._all])
   )
+  const professionalUpcomingMap = new Map(
+    professionalUpcomingCounts.map((item) => [item.professionalId, item._count._all])
+  )
+  const serviceUpcomingMap = new Map(
+    serviceUpcomingCounts.map((item) => [item.serviceId, item._count._all])
+  )
+  const customerUpcomingMap = new Map(
+    customerUpcomingCounts.map((item) => [item.customerId, item._count._all])
+  )
+  const activeProfessionalsCount = professionals.filter((professional) => professional.active).length
+  const activeServicesCount = services.filter((service) => service.active).length
+  const checklist = buildBarbershopOnboardingChecklist({
+    barbershop: {
+      name: barbershop.name,
+      slug: barbershop.slug,
+      timezone,
+      whatsappEnabled: barbershop.whatsappEnabled,
+      evolutionInstanceName: barbershop.evolutionInstanceName,
+    },
+    metrics: {
+      activeProfessionals: activeProfessionalsCount,
+      activeServices: activeServicesCount,
+      customers: barbershop._count.customers,
+      upcomingAppointments: futureAppointmentsCount,
+      financialCategories: financialCategoriesCount,
+      whatsappLastEventAt: messagingLastEvent?.createdAt ?? null,
+    },
+  })
 
   const recentErrors = [
     ...failedAiUsage.map((item) => ({
@@ -1314,14 +1943,24 @@ export async function getPlatformBarbershopDetailData(
       name: barbershop.name,
       slug: barbershop.slug,
       timezone,
+      address: barbershop.address,
+      phone: barbershop.phone,
+      email: barbershop.email,
       operationalActive: barbershop.active,
       subscriptionPlan: barbershop.subscriptionPlan,
       subscriptionStatus: barbershop.subscriptionStatus,
       trialEndsAt: barbershop.trialEndsAt,
       billingEmail: barbershop.billingEmail,
+      whatsappEnabled: barbershop.whatsappEnabled,
+      evolutionInstanceName: barbershop.evolutionInstanceName,
+      whatsappLastInboundAt: barbershop.whatsappLastInboundAt,
+      whatsappLastOutboundAt: barbershop.whatsappLastOutboundAt,
+      whatsappLastErrorAt: barbershop.whatsappLastErrorAt,
+      whatsappLastErrorMessage: barbershop.whatsappLastErrorMessage,
       blockedAt: barbershop.blockedAt,
       blockedReason: barbershop.blockedReason,
       createdAt: barbershop.createdAt,
+      updatedAt: barbershop.updatedAt,
       createdAtLabel: formatDateTimeInTimezone(barbershop.createdAt, timezone),
     },
     totals: {
@@ -1329,6 +1968,7 @@ export async function getPlatformBarbershopDetailData(
       professionals: barbershop._count.professionals,
       customers: barbershop._count.customers,
       appointmentsThisMonth,
+      upcomingAppointments: futureAppointmentsCount,
       whatsappMessagesThisMonth,
       aiTokensThisMonth: aiTotals.totalTokens,
       aiEstimatedCostCents: hasEstimatedAiCost ? aiTotals.estimatedCostCents : (aiTotals.totalTokens === 0 ? 0 : null),
@@ -1349,6 +1989,115 @@ export async function getPlatformBarbershopDetailData(
       active: user.active,
       createdAt: user.createdAt,
     })),
+    serviceCategories,
+    professionals: professionals.map((professional) => ({
+      id: professional.id,
+      name: professional.name,
+      email: professional.email,
+      phone: professional.phone,
+      avatar: professional.avatar,
+      active: professional.active,
+      attendanceScope: resolveProfessionalAttendanceScope({
+        acceptsSubscription: professional.acceptsSubscription,
+        acceptsWalkIn: professional.acceptsWalkIn,
+      }),
+      commissionRate: normalizeNumericValue(professional.commissionRate),
+      haircutPrice: normalizeNumericValue(professional.haircutPrice),
+      beardPrice: normalizeNumericValue(professional.beardPrice),
+      comboPrice: normalizeNumericValue(professional.comboPrice),
+      upcomingAppointments: professionalUpcomingMap.get(professional.id) ?? 0,
+      createdAt: professional.createdAt,
+    })),
+    services: services.map((service) => ({
+      id: service.id,
+      name: service.name,
+      description: service.description,
+      price: normalizeNumericValue(service.price) ?? 0,
+      duration: service.duration,
+      active: service.active,
+      categoryId: service.categoryId,
+      categoryName: service.category?.name ?? null,
+      upcomingAppointments: serviceUpcomingMap.get(service.id) ?? 0,
+      createdAt: service.createdAt,
+    })),
+    customers: customers.map((customer) => ({
+      id: customer.id,
+      name: customer.name,
+      phone: customer.phone,
+      email: customer.email,
+      notes: customer.notes,
+      type: customer.type,
+      subscriptionStatus: customer.subscriptionStatus,
+      subscriptionPrice: normalizeNumericValue(customer.subscriptionPrice),
+      subscriptionStartedAt: customer.subscriptionStartedAt,
+      preferredProfessionalId: customer.preferredProfessionalId,
+      preferredProfessionalName: customer.preferredProfessional?.name ?? null,
+      active: customer.active,
+      marketingOptOut: Boolean(customer.marketingOptOutAt),
+      upcomingAppointments: customerUpcomingMap.get(customer.id) ?? 0,
+      updatedAt: customer.updatedAt,
+    })),
+    checklist,
+    schedule: {
+      defaultWindow: {
+        startHour: SCHEDULE_START_HOUR,
+        endHour: SCHEDULE_END_HOUR,
+        label: `${String(SCHEDULE_START_HOUR).padStart(2, '0')}:00 - ${String(SCHEDULE_END_HOUR).padStart(2, '0')}:00`,
+      },
+      upcomingBlocks: upcomingBlocks.map((block) => ({
+        id: block.id,
+        professionalId: block.professionalId,
+        professionalName: block.professional.name,
+        startAt: block.startAt,
+        endAt: block.endAt,
+        notes: block.notes,
+        dateInputValue: formatDateInputInTimezone(block.startAt, timezone),
+        startTimeValue: formatTimeInputInTimezone(block.startAt, timezone),
+        endTimeValue: formatTimeInputInTimezone(block.endAt, timezone),
+        dateLabel: new Intl.DateTimeFormat('pt-BR', {
+          timeZone: timezone,
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        }).format(block.startAt),
+        startTimeLabel: new Intl.DateTimeFormat('pt-BR', {
+          timeZone: timezone,
+          hour: '2-digit',
+          minute: '2-digit',
+        }).format(block.startAt),
+        endTimeLabel: new Intl.DateTimeFormat('pt-BR', {
+          timeZone: timezone,
+          hour: '2-digit',
+          minute: '2-digit',
+        }).format(block.endAt),
+      })),
+    },
+    migration: {
+      documentationPath: 'docs/migration-playbook.md',
+      strategyCards: [
+        {
+          id: 'greenfield',
+          title: 'Sem sistema anterior',
+          description: 'Comece pela barbearia, equipe, servicos e disponibilidade. Depois cadastre clientes-chave e agenda futura.',
+        },
+        {
+          id: 'cash-barber',
+          title: 'Cash Barber',
+          description: 'Use esta fase para revisar equipe, servicos, precos, clientes principais e compromissos futuros antes do piloto.',
+        },
+        {
+          id: 'manual',
+          title: 'Migracao manual assistida',
+          description: 'Alimente profissionais, servicos, clientes e bloqueios operacionais direto pelo painel master enquanto o importador automatico nao chega.',
+        },
+      ],
+      csvPreview: {
+        professionals: ['name', 'email', 'phone', 'attendanceScope', 'commissionRate'],
+        services: ['name', 'price', 'duration', 'description', 'category'],
+        customers: ['name', 'phone', 'email', 'type', 'subscriptionStatus'],
+        futureAppointments: ['customerName', 'professionalName', 'serviceName', 'date', 'time'],
+      },
+    },
     aiUsageBySource: usageBySource.map((item) => ({
       source: item.source,
       requests: item.requests,
@@ -1363,6 +2112,16 @@ export async function getPlatformBarbershopDetailData(
       lastUsedAt: item.lastUsedAt,
     })),
     integrations: {
+      whatsappEnabled: barbershop.whatsappEnabled,
+      evolutionInstanceName: barbershop.evolutionInstanceName,
+      evolutionApiKeyManagedPerTenant: false,
+      webhookSecretConfigured: Boolean(process.env.EVOLUTION_WEBHOOK_SECRET),
+      webhookSecretMasked: maskSecretPreview(process.env.EVOLUTION_WEBHOOK_SECRET),
+      whatsappStatusLabel: barbershop.whatsappEnabled
+        ? barbershop.evolutionInstanceName
+          ? 'Configurado'
+          : 'Atenção: falta instance'
+        : 'Desabilitado',
       whatsappLastEventAt: messagingLastEvent?.createdAt ?? null,
       automationActiveConfigs,
       automationLastRunAt: automationLastRun?.startedAt ?? null,
