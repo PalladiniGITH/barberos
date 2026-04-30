@@ -1,6 +1,6 @@
 'use client'
 
-import { MessageSquareText, Sparkles } from 'lucide-react'
+import { MessageSquareText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { BarberExLogo } from '@/components/brand/barberex-logo'
 import { useAssistantWidget } from '@/components/assistente/assistant-widget-provider'
@@ -27,9 +27,6 @@ export function AssistantLauncher() {
       aria-label="Abrir BarberEX IA"
     >
       <span className="relative flex h-12 w-12 items-center justify-center rounded-[1rem] border border-[rgba(124,92,255,0.18)] bg-[radial-gradient(circle_at_35%_25%,rgba(168,85,247,0.18),transparent_45%),linear-gradient(135deg,rgba(124,92,255,0.14),rgba(19,19,23,0.96))] text-[11px] font-semibold tracking-[0.16em] text-violet-50">
-        <span className="absolute right-1.5 top-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[rgba(139,92,246,0.18)] text-violet-100">
-          <Sparkles className="h-3 w-3" />
-        </span>
         <BarberExLogo
           variant="symbol"
           tone="white"
