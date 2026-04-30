@@ -9,8 +9,13 @@ import {
   isProfessionalAvatarUrl,
   normalizeProfessionalAvatarUrl,
 } from '@/lib/professionals/avatar'
+import { deleteProfessionalAvatarFile } from '@/lib/professionals/avatar-storage'
+import { revalidateProfessionalSurfaces } from '@/lib/professionals/revalidation'
 
 type ActionResult = { success: true } | { success: false; error: string }
+type ProfessionalMutationResult =
+  | { success: true; professionalId: string }
+  | { success: false; error: string }
 
 function blockBarberAdministrativeAction(role: string) {
   if (role === 'BARBER') {
@@ -56,7 +61,7 @@ const ProfessionalSchema = z.object({
   attendanceScope: z.enum(['BOTH', 'SUBSCRIPTION_ONLY', 'WALK_IN_ONLY']).default('BOTH'),
 })
 
-export async function createProfessional(rawData: unknown): Promise<ActionResult> {
+export async function createProfessional(rawData: unknown): Promise<ProfessionalMutationResult> {
   const session = await requireSession()
   const { barbershopId } = session.user
   const blocked = blockBarberAdministrativeAction(session.user.role)
@@ -89,7 +94,7 @@ export async function createProfessional(rawData: unknown): Promise<ActionResult
     if (exists) return { success: false, error: 'Já existe um profissional com este email' }
   }
 
-  await prisma.professional.create({
+  const createdProfessional = await prisma.professional.create({
     data: {
       name,
       email: email || null,
@@ -104,16 +109,11 @@ export async function createProfessional(rawData: unknown): Promise<ActionResult
     },
   })
 
-  revalidatePath('/equipe/profissionais')
-  revalidatePath('/equipe')
-  revalidatePath('/equipe/desempenho')
-  revalidatePath('/equipe/metas')
-  revalidatePath('/agendamentos')
-  revalidatePath('/dashboard')
-  return { success: true }
+  revalidateProfessionalSurfaces()
+  return { success: true, professionalId: createdProfessional.id }
 }
 
-export async function updateProfessional(id: string, rawData: unknown): Promise<ActionResult> {
+export async function updateProfessional(id: string, rawData: unknown): Promise<ProfessionalMutationResult> {
   const session = await requireSession()
   const { barbershopId } = session.user
   const blocked = blockBarberAdministrativeAction(session.user.role)
@@ -122,7 +122,10 @@ export async function updateProfessional(id: string, rawData: unknown): Promise<
     return blocked
   }
 
-  const existing = await prisma.professional.findUnique({ where: { id }, select: { barbershopId: true } })
+  const existing = await prisma.professional.findUnique({
+    where: { id },
+    select: { barbershopId: true, avatar: true },
+  })
   if (!existing || existing.barbershopId !== barbershopId) return { success: false, error: 'Não autorizado' }
 
   const parsed = ProfessionalSchema.safeParse(rawData)
@@ -140,6 +143,7 @@ export async function updateProfessional(id: string, rawData: unknown): Promise<
     attendanceScope,
   } = parsed.data
   const attendanceFlags = attendanceScopeToFlags(attendanceScope)
+  const normalizedAvatar = normalizeProfessionalAvatarUrl(avatar)
 
   await prisma.professional.update({
     where: { id },
@@ -147,7 +151,7 @@ export async function updateProfessional(id: string, rawData: unknown): Promise<
       name,
       email: email || null,
       phone: phone || null,
-      avatar: normalizeProfessionalAvatarUrl(avatar),
+      avatar: normalizedAvatar,
       commissionRate,
       haircutPrice,
       beardPrice,
@@ -156,16 +160,15 @@ export async function updateProfessional(id: string, rawData: unknown): Promise<
     },
   })
 
-  revalidatePath('/equipe/profissionais')
-  revalidatePath('/equipe')
-  revalidatePath('/equipe/desempenho')
-  revalidatePath('/equipe/metas')
-  revalidatePath('/agendamentos')
-  revalidatePath('/dashboard')
-  return { success: true }
+  if (existing.avatar && existing.avatar !== normalizedAvatar) {
+    await deleteProfessionalAvatarFile(existing.avatar).catch(() => null)
+  }
+
+  revalidateProfessionalSurfaces()
+  return { success: true, professionalId: id }
 }
 
-export async function toggleProfessionalActive(id: string): Promise<ActionResult> {
+export async function toggleProfessionalActive(id: string): Promise<ProfessionalMutationResult> {
   const session = await requireSession()
   const blocked = blockBarberAdministrativeAction(session.user.role)
 
@@ -176,13 +179,8 @@ export async function toggleProfessionalActive(id: string): Promise<ActionResult
   const prof = await prisma.professional.findUnique({ where: { id }, select: { barbershopId: true, active: true } })
   if (!prof || prof.barbershopId !== session.user.barbershopId) return { success: false, error: 'Não autorizado' }
   await prisma.professional.update({ where: { id }, data: { active: !prof.active } })
-  revalidatePath('/equipe/profissionais')
-  revalidatePath('/equipe')
-  revalidatePath('/equipe/desempenho')
-  revalidatePath('/equipe/metas')
-  revalidatePath('/agendamentos')
-  revalidatePath('/dashboard')
-  return { success: true }
+  revalidateProfessionalSurfaces()
+  return { success: true, professionalId: id }
 }
 
 // ── Metas ─────────────────────────────────────────────────

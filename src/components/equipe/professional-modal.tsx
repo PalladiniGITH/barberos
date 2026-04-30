@@ -1,14 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { ImagePlus, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { createProfessional, updateProfessional } from '@/actions/equipe'
 import { ProfessionalAvatar } from '@/components/ui/professional-avatar'
+import {
+  PROFESSIONAL_AVATAR_ALLOWED_MIME_TYPES,
+  PROFESSIONAL_AVATAR_DEFAULT_MAX_FILE_SIZE_MB,
+  professionalAvatarMaxFileSizeBytes,
+} from '@/lib/professionals/avatar-upload-policy'
 import {
   isProfessionalAvatarUrl,
   normalizeProfessionalAvatarUrl,
@@ -17,6 +22,11 @@ import {
   PROFESSIONAL_ATTENDANCE_SCOPE_LABELS,
   type ProfessionalAttendanceScope,
 } from '@/lib/professionals/operational-config'
+
+const PROFESSIONAL_AVATAR_INPUT_ACCEPT = '.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp'
+const PROFESSIONAL_AVATAR_MAX_FILE_SIZE_BYTES = professionalAvatarMaxFileSizeBytes(
+  PROFESSIONAL_AVATAR_DEFAULT_MAX_FILE_SIZE_MB
+)
 
 const decimalField = z
   .string()
@@ -69,39 +79,148 @@ function formatNumberInput(value: number | null | undefined) {
   return typeof value === 'number' ? String(value) : ''
 }
 
+function buildDefaultValues(professional?: ProfessionalFormValue): FormData {
+  return {
+    name: professional?.name ?? '',
+    email: professional?.email ?? '',
+    phone: professional?.phone ?? '',
+    avatar: professional?.avatar ?? '',
+    commissionRate: formatNumberInput(professional?.commissionRate),
+    haircutPrice: formatNumberInput(professional?.haircutPrice),
+    beardPrice: formatNumberInput(professional?.beardPrice),
+    comboPrice: formatNumberInput(professional?.comboPrice),
+    attendanceScope: professional?.attendanceScope ?? 'BOTH',
+  }
+}
+
+async function uploadProfessionalAvatar(professionalId: string, file: File) {
+  const formData = new FormData()
+  formData.set('file', file)
+
+  const response = await fetch(`/api/professionals/${professionalId}/avatar`, {
+    method: 'POST',
+    body: formData,
+  })
+
+  const payload = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    throw new Error(payload?.error ?? 'Nao foi possivel enviar a foto agora.')
+  }
+
+  return payload as { success: true; avatarUrl: string }
+}
+
 export function ProfessionalModal({ professional }: Props) {
   const [open, setOpen] = useState(false)
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null)
+  const [selectedAvatarPreviewUrl, setSelectedAvatarPreviewUrl] = useState<string | null>(null)
+  const [showAdvancedAvatarField, setShowAdvancedAvatarField] = useState(false)
+  const [avatarTaskLabel, setAvatarTaskLabel] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const router = useRouter()
   const isEdit = Boolean(professional)
+  const defaultValues = buildDefaultValues(professional)
 
   const {
     register,
     handleSubmit,
     watch,
     setValue,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      name: professional?.name ?? '',
-      email: professional?.email ?? '',
-      phone: professional?.phone ?? '',
-      avatar: professional?.avatar ?? '',
-      commissionRate: formatNumberInput(professional?.commissionRate),
-      haircutPrice: formatNumberInput(professional?.haircutPrice),
-      beardPrice: formatNumberInput(professional?.beardPrice),
-      comboPrice: formatNumberInput(professional?.comboPrice),
-      attendanceScope: professional?.attendanceScope ?? 'BOTH',
-    },
+    defaultValues,
   })
 
+  useEffect(() => {
+    if (!selectedAvatarPreviewUrl) {
+      return undefined
+    }
+
+    return () => {
+      URL.revokeObjectURL(selectedAvatarPreviewUrl)
+    }
+  }, [selectedAvatarPreviewUrl])
+
+  const watchedAvatarValue = watch('avatar')
   const previewName = watch('name') || professional?.name || 'Novo profissional'
-  const previewAvatarUrl = normalizeProfessionalAvatarUrl(watch('avatar'))
+  const previewAvatarUrl = selectedAvatarPreviewUrl
+    ?? normalizeProfessionalAvatarUrl(watchedAvatarValue)
+  const hasAvatarPreview = Boolean(previewAvatarUrl)
+  const isBusy = isSubmitting
+
+  function resetPendingAvatarSelection() {
+    setSelectedAvatarFile(null)
+    setSelectedAvatarPreviewUrl(null)
+    setAvatarTaskLabel(null)
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  function handleRemoveAvatar() {
+    resetPendingAvatarSelection()
+    setValue('avatar', '', { shouldDirty: true, shouldValidate: true })
+  }
+
+  function closeModal() {
+    resetPendingAvatarSelection()
+    reset(buildDefaultValues(professional))
+    setShowAdvancedAvatarField(false)
+    setOpen(false)
+  }
+
+  function openModal() {
+    reset(buildDefaultValues(professional))
+    resetPendingAvatarSelection()
+    setShowAdvancedAvatarField(false)
+    setOpen(true)
+  }
+
+  function handleAvatarFileSelection(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+
+    if (!file) {
+      return
+    }
+
+    if (
+      !PROFESSIONAL_AVATAR_ALLOWED_MIME_TYPES.includes(
+        file.type as (typeof PROFESSIONAL_AVATAR_ALLOWED_MIME_TYPES)[number]
+      )
+    ) {
+      toast.error('Envie apenas imagens JPG, PNG ou WEBP.')
+      event.target.value = ''
+      return
+    }
+
+    if (file.size > PROFESSIONAL_AVATAR_MAX_FILE_SIZE_BYTES) {
+      toast.error(`A foto deve ter no maximo ${PROFESSIONAL_AVATAR_DEFAULT_MAX_FILE_SIZE_MB}MB.`)
+      event.target.value = ''
+      return
+    }
+
+    setSelectedAvatarFile(file)
+    setSelectedAvatarPreviewUrl((currentPreviewUrl) => {
+      if (currentPreviewUrl) {
+        URL.revokeObjectURL(currentPreviewUrl)
+      }
+
+      return URL.createObjectURL(file)
+    })
+  }
 
   async function onSubmit(data: FormData) {
+    const isUploadingNewAvatar = Boolean(selectedAvatarFile)
+    const avatarValueForMutation = isUploadingNewAvatar
+      ? professional?.avatar ?? ''
+      : data.avatar?.trim() ?? ''
     const payload = {
       ...data,
-      avatar: data.avatar?.trim() ?? '',
+      avatar: avatarValueForMutation,
       commissionRate: data.commissionRate?.replace(',', '.') ?? '',
       haircutPrice: data.haircutPrice?.replace(',', '.') ?? '',
       beardPrice: data.beardPrice?.replace(',', '.') ?? '',
@@ -112,19 +231,39 @@ export function ProfessionalModal({ professional }: Props) {
       ? await updateProfessional(professional.id, payload)
       : await createProfessional(payload)
 
-    if (result.success) {
-      toast.success(isEdit ? 'Profissional atualizado!' : 'Profissional cadastrado!')
-      setOpen(false)
-      router.refresh()
-    } else {
+    if (!result.success) {
       toast.error(result.error)
+      return
     }
+
+    if (selectedAvatarFile) {
+      setAvatarTaskLabel('Enviando foto...')
+
+      try {
+        await uploadProfessionalAvatar(result.professionalId, selectedAvatarFile)
+      } catch (error) {
+        toast.error(
+          isEdit
+            ? `Profissional atualizado, mas a foto nao foi enviada: ${(error as Error).message}`
+            : `Profissional cadastrado, mas a foto nao foi enviada: ${(error as Error).message}`
+        )
+        closeModal()
+        router.refresh()
+        return
+      } finally {
+        setAvatarTaskLabel(null)
+      }
+    }
+
+    toast.success(isEdit ? 'Profissional atualizado!' : 'Profissional cadastrado!')
+    closeModal()
+    router.refresh()
   }
 
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={openModal}
         className={
           isEdit
             ? 'flex items-center gap-1 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground'
@@ -136,7 +275,7 @@ export function ProfessionalModal({ professional }: Props) {
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOpen(false)} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeModal} />
           <div className="modal-shell relative w-full max-w-2xl animate-fade-in">
             <div className="flex items-center justify-between border-b border-[rgba(255,255,255,0.08)] px-5 py-4 sm:px-6">
               <div>
@@ -146,7 +285,7 @@ export function ProfessionalModal({ professional }: Props) {
                 </p>
               </div>
 
-              <button onClick={() => setOpen(false)} className="rounded-[0.9rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-2 text-muted-foreground transition-colors hover:text-foreground">
+              <button onClick={closeModal} className="rounded-[0.9rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-2 text-muted-foreground transition-colors hover:text-foreground">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -163,29 +302,87 @@ export function ProfessionalModal({ professional }: Props) {
                   <div className="min-w-0 flex-1">
                     <h3 className="text-sm font-semibold text-foreground">Foto do profissional</h3>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      Use uma URL publica em `https://...` ou um caminho interno em `/uploads/...`. Se ficar vazio, o sistema usa as iniciais.
+                      Envie uma foto JPG, PNG ou WEBP com ate {PROFESSIONAL_AVATAR_DEFAULT_MAX_FILE_SIZE_MB}MB. O sistema salva apenas o caminho seguro da imagem e usa fallback por iniciais quando necessario.
                     </p>
-                    {previewAvatarUrl && (
+
+                    {selectedAvatarFile ? (
+                      <p className="mt-3 text-xs font-medium text-foreground/80">
+                        Arquivo selecionado: {selectedAvatarFile.name}
+                      </p>
+                    ) : null}
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept={PROFESSIONAL_AVATAR_INPUT_ACCEPT}
+                        className="hidden"
+                        onChange={handleAvatarFileSelection}
+                      />
+
                       <button
                         type="button"
-                        onClick={() => setValue('avatar', '', { shouldDirty: true })}
-                        className="mt-3 inline-flex items-center gap-2 rounded-[0.9rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="inline-flex items-center gap-2 rounded-[0.9rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Remover foto
+                        <ImagePlus className="h-3.5 w-3.5" />
+                        {selectedAvatarFile || hasAvatarPreview ? 'Trocar foto' : 'Enviar foto'}
                       </button>
-                    )}
+
+                      {hasAvatarPreview ? (
+                        <button
+                          type="button"
+                          onClick={handleRemoveAvatar}
+                          className="inline-flex items-center gap-2 rounded-[0.9rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Remover foto
+                        </button>
+                      ) : null}
+
+                      {selectedAvatarFile ? (
+                        <button
+                          type="button"
+                          onClick={resetPendingAvatarSelection}
+                          className="inline-flex items-center gap-2 rounded-[0.9rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          Descartar upload
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-foreground">URL da foto</label>
-                  <input
-                    {...register('avatar')}
-                    placeholder="https://cdn.seusite.com/profissionais/joao.webp"
-                    className="auth-input px-3 py-2.5"
-                  />
-                  {errors.avatar && <p className="mt-1 text-xs text-destructive">{errors.avatar.message}</p>}
+                <div className="surface-tier-low space-y-3 rounded-[1.25rem] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">Fallback avancado</h3>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        Se voce ja tiver um CDN ou storage externo, ainda pode salvar uma URL manualmente.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvancedAvatarField((currentValue) => !currentValue)}
+                      className="rounded-[0.9rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      {showAdvancedAvatarField ? 'Ocultar URL' : 'Usar URL manual'}
+                    </button>
+                  </div>
+
+                  <div className={showAdvancedAvatarField ? 'block' : 'hidden'}>
+                    <label className="mb-1.5 block text-sm font-medium text-foreground">URL da foto</label>
+                    <input
+                      {...register('avatar')}
+                      placeholder="https://cdn.seusite.com/profissionais/joao.webp"
+                      className="auth-input px-3 py-2.5"
+                    />
+                    {showAdvancedAvatarField && errors.avatar ? (
+                      <p className="mt-1 text-xs text-destructive">{errors.avatar.message}</p>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
@@ -295,18 +492,18 @@ export function ProfessionalModal({ professional }: Props) {
               <div className="modal-shell-footer">
                 <button
                   type="button"
-                  onClick={() => setOpen(false)}
+                  onClick={closeModal}
                   className="action-button flex-1"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isBusy}
                   className="action-button-primary flex flex-1 items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {isSubmitting ? 'Salvando...' : 'Salvar profissional'}
+                  {isBusy && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {avatarTaskLabel ?? (isBusy ? 'Salvando...' : 'Salvar profissional')}
                 </button>
               </div>
             </form>
